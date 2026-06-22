@@ -32,6 +32,8 @@ export class ForumService {
   private readonly api = inject(ApiService);
 
   getPosts(page = 1, pageSize = 20): Observable<ForumPostList> {
+    void page;
+    void pageSize;
     /**
      * TODO:
      *   return this.api.get<ForumPostList>(`/forum/posts?page=${page}&page_size=${pageSize}`);
@@ -43,6 +45,7 @@ export class ForumService {
   }
 
   getPost(id: string): Observable<ForumPost> {
+    void id;
     /**
      * TODO:
      *   return this.api.get<ForumPost>(`/forum/posts/${id}`);
@@ -51,6 +54,7 @@ export class ForumService {
   }
 
   createPost(data: ForumPostCreate): Observable<ForumPost> {
+    void data;
     /**
      * TODO:
      *   return this.api.post<ForumPost>('/forum/posts', data);
@@ -59,6 +63,8 @@ export class ForumService {
   }
 
   reportPost(postId: string, data: ReportCreate): Observable<unknown> {
+    void postId;
+    void data;
     /**
      * TODO:
      *   return this.api.post(`/forum/posts/${postId}/report`, data);
@@ -79,6 +85,7 @@ export class ForumService {
   }
 
   sendMessage(data: DirectMessageCreate): Observable<DirectMessage> {
+    void data;
     /**
      * TODO:
      *   return this.api.post<DirectMessage>('/messages', data);
@@ -87,6 +94,8 @@ export class ForumService {
   }
 
   getConversation(userId: string, page = 1): Observable<DirectMessage[]> {
+    void userId;
+    void page;
     /**
      * TODO:
      *   return this.api.get<DirectMessage[]>(`/messages/${userId}?page=${page}`);
@@ -95,6 +104,7 @@ export class ForumService {
   }
 
   searchUsers(name: string): Observable<UserPublic[]> {
+    void name;
     /**
      * TODO:
      *   return this.api.get<UserPublic[]>(`/users/search?name=${encodeURIComponent(name)}`);

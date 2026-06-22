@@ -25,6 +25,7 @@ export class ReportService {
   private readonly api = inject(ApiService);
 
   fileReport(data: ReportCreate): Observable<Report> {
+    void data;
     /**
      * TODO:
      *   return this.api.post<Report>('/reports', data);
@@ -41,6 +42,8 @@ export class ReportService {
   }
 
   decideReport(reportId: string, data: ReportDecideRequest): Observable<Report> {
+    void reportId;
+    void data;
     /**
      * TODO: (moderator role)
      *   return this.api.post<Report>(`/moderator/reports/${reportId}/decide`, data);
@@ -50,6 +53,7 @@ export class ReportService {
 
   // Admin
   getAuditLog(page = 1): Observable<unknown[]> {
+    void page;
     /**
      * TODO: (admin role)
      *   return this.api.get<unknown[]>(`/admin/audit-log?page=${page}`);
@@ -66,6 +70,7 @@ export class ReportService {
   }
 
   approveRegistration(userId: string): Observable<unknown> {
+    void userId;
     /**
      * TODO: (admin role)
      *   return this.api.post(`/admin/registrations/${userId}/approve`, {});
@@ -74,6 +79,8 @@ export class ReportService {
   }
 
   rejectRegistration(userId: string, reason: string): Observable<unknown> {
+    void userId;
+    void reason;
     /**
      * TODO: (admin role)
      *   return this.api.post(`/admin/registrations/${userId}/reject`, { reason });

@@ -35,6 +35,7 @@ export class ProfessionalService {
   }
 
   askQuestion(data: ProfessionalQueryCreate): Observable<ProfessionalQuery> {
+    void data;
     /**
      * TODO:
      *   return this.api.post<ProfessionalQuery>('/advice/questions', data);
@@ -51,6 +52,8 @@ export class ProfessionalService {
   }
 
   getPublicQA(domain?: ProfessionalDomain, page = 1): Observable<PublicQA[]> {
+    void domain;
+    void page;
     /**
      * TODO:
      *   const params = domain ? `?domain=${domain}&page=${page}` : `?page=${page}`;
@@ -68,6 +71,8 @@ export class ProfessionalService {
   }
 
   answerQuestion(queryId: string, answer: string): Observable<ProfessionalQuery> {
+    void queryId;
+    void answer;
     /**
      * TODO: (professional role only)
      *   return this.api.put<ProfessionalQuery>(`/advice/questions/${queryId}/answer`, { answer });

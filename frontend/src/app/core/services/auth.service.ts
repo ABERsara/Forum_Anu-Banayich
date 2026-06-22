@@ -56,6 +56,7 @@ export class AuthService {
   // ──────────────────────────────────────────────────────────
 
   register(data: RegisterRequest): Observable<unknown> {
+    void data;
     /**
      * TODO:
      *   return this.api.post('/auth/register', data);
@@ -64,6 +65,7 @@ export class AuthService {
   }
 
   verifyOtp(data: OtpVerifyRequest): Observable<unknown> {
+    void data;
     /**
      * TODO:
      *   return this.api.post('/auth/verify-otp', data);
@@ -72,6 +74,7 @@ export class AuthService {
   }
 
   resendOtp(email: string): Observable<unknown> {
+    void email;
     /**
      * TODO:
      *   return this.api.post('/auth/resend-otp', { email });
@@ -84,6 +87,7 @@ export class AuthService {
   // ──────────────────────────────────────────────────────────
 
   login(data: LoginRequest): Observable<TokenResponse> {
+    void data;
     /**
      * TODO:
      *   1. Call POST /auth/login

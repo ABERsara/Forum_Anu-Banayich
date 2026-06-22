@@ -70,10 +70,12 @@ export class PendingRegistrationsComponent implements OnInit {
   }
 
   approve(userId: string): void {
+    void userId;
     // TODO: call reportService.approveRegistration(userId)
   }
 
   reject(userId: string): void {
+    void userId;
     // TODO: show reason input, then call reportService.rejectRegistration(userId, reason)
   }
 }
