@@ -21,7 +21,6 @@
  */
 
 import { Component, OnInit, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
 
 import { Report } from '../../../core/models';
 import { ReportDecision, REPORT_REASON_LABELS } from '../../../core/constants';
@@ -30,7 +29,6 @@ import { ReportService } from '../../../core/services/report.service';
 @Component({
   selector: 'app-moderator-reports',
   standalone: true,
-  imports: [RouterLink],
   template: `
     <div style="padding: 1rem; direction: rtl">
       <h1>לוח בקרת מבקר – דיווחים ממתינים</h1>
@@ -71,7 +69,8 @@ export class ModeratorReportsComponent implements OnInit {
   }
 
   decide(reportId: string, decision: 'valid' | 'invalid'): void {
-    const d = decision === 'valid' ? ReportDecision.VALID : ReportDecision.INVALID;
+    void reportId;
+    void (decision === 'valid' ? ReportDecision.VALID : ReportDecision.INVALID);
     // TODO: call reportService.decideReport(reportId, { decision: d })
   }
 }
