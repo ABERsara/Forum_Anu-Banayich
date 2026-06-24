@@ -40,6 +40,12 @@ desktop.ini
 *.sln
 *.sw?
 
+# ─── Claude Code ──────────────────────────────────
+.claude/
+
+# ─── Local planning docs ──────────────────────────
+SPRINTS.md
+
 # ─── Misc ─────────────────────────────────────────
 *.log
 *.lock
