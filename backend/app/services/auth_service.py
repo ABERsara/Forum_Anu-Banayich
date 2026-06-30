@@ -14,12 +14,13 @@ import random
 import string
 from datetime import UTC, datetime, timedelta
 
+from fastapi import HTTPException
 from jose import jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.constants import AccountStatus, UserRole
-from app.core.security import ALGORITHM, get_password_hash, verify_password
+from app.core.security import ALGORITHM, get_password_hash
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
 from app.services.email_service import send_otp_email
@@ -36,33 +37,49 @@ def _create_token(subject: str, expires_delta: timedelta, token_type: str = "acc
 
 
 def register(db: Session, data: RegisterRequest) -> User:
-    """
-    Step 1: Create a new user account and send OTP.
-
-    TODO:
-      1. Check if email already exists → raise 400
-      2. Hash the password with get_password_hash()
-      3. Create the User object and save to DB
-      4. Generate OTP, save it + expiry on the user, send email
-      5. Return the created user
-    """
-    # TODO: implement this function
-    raise NotImplementedError("register() is not yet implemented")
+    existing = db.query(User).filter(User.email == data.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="כתובת המייל כבר רשומה במערכת")
+    hashed = get_password_hash(data.password)
+    user = User(
+        email=data.email,
+        password_hash=hashed,
+        first_name=data.first_name,
+        last_name=data.last_name,
+        phone=data.phone,
+        birth_date=data.birth_date,
+        user_type=data.user_type,
+        sector=data.sector,
+        id_number=data.id_number,
+        role=UserRole.USER,
+        account_status=AccountStatus.PENDING_OTP,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    otp = _generate_otp()
+    user.otp_code = otp
+    user.otp_expires_at = datetime.now(UTC) + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
+    db.commit()
+    send_otp_email(user.email, otp)
+    return user
 
 
 def verify_otp(db: Session, email: str, otp_code: str) -> User:
-    """
-    Step 2: Verify OTP and move user to pending_approval status.
-
-    TODO:
-      1. Find user by email
-      2. Check OTP code matches and hasn't expired
-      3. Update status to PENDING_APPROVAL
-      4. Clear the OTP from the DB
-      5. Return the user
-    """
-    # TODO: implement this function
-    raise NotImplementedError("verify_otp() is not yet implemented")
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if user.otp_code != otp_code:
+        raise HTTPException(status_code=400, detail="קוד האימות שגוי")
+    expires_at = user.otp_expires_at
+    if expires_at is None or expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
+        raise HTTPException(status_code=400, detail="קוד האימות פג תוקף")
+    user.account_status = AccountStatus.PENDING_APPROVAL
+    user.otp_code = None
+    user.otp_expires_at = None
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def login(db: Session, data: LoginRequest) -> TokenResponse:
@@ -96,14 +113,13 @@ def refresh_token(db: Session, refresh_tok: str) -> TokenResponse:
 
 
 def resend_otp(db: Session, email: str) -> None:
-    """
-    Resend OTP to a user still in PENDING_OTP status.
-
-    TODO:
-      1. Find user by email
-      2. Verify status is PENDING_OTP
-      3. Generate new OTP, update expiry
-      4. Send email
-    """
-    # TODO: implement this function
-    raise NotImplementedError("resend_otp() is not yet implemented")
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if user.account_status != AccountStatus.PENDING_OTP:
+        raise HTTPException(status_code=400, detail="לא ניתן לשלוח קוד אימות במצב זה")
+    otp = _generate_otp()
+    user.otp_code = otp
+    user.otp_expires_at = datetime.now(UTC) + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
+    db.commit()
+    send_otp_email(user.email, otp)
