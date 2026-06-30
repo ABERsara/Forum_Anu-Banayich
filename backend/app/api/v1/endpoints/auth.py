@@ -68,4 +68,5 @@ def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
 def resend_otp(email: str, db: Session = Depends(get_db)):
     """Resend OTP to the given email."""
     auth_service.resend_otp(db, email)
+    # PROD: deviates from spec — spec defines "קוד OTP חדש נשלח.", message changed for consistency with other project messages. Reconsider before PROD.
     return {"message": "קוד אימות נשלח מחדש"}

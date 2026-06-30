@@ -39,6 +39,7 @@ def _create_token(subject: str, expires_delta: timedelta, token_type: str = "acc
 def register(db: Session, data: RegisterRequest) -> User:
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
+        # PROD: deviates from spec — spec defines 400, changed to 409 Conflict for semantic correctness (valid request conflicting with existing resource). Reconsider before PROD.
         raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
     hashed = get_password_hash(data.password)
     user = User(
@@ -67,10 +68,14 @@ def register(db: Session, data: RegisterRequest) -> User:
 
 def verify_otp(db: Session, email: str, otp_code: str) -> User:
     user = db.query(User).filter(User.email == email).first()
-    if not user or user.otp_code != otp_code:
+    if not user:
+        # PROD: intentionally 400 instead of 404 — prevents User Enumeration Attack.
         raise HTTPException(status_code=400, detail="הפרטים שהוזנו שגויים")
     expires_at = user.otp_expires_at
     if expires_at is None or expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
+        # PROD: deviates from spec — spec defines a generic message for all OTP errors. Distinguishing "expired" from "wrong code" slightly weakens User Enumeration protection. Reconsider before PROD.
+        raise HTTPException(status_code=400, detail="קוד האימות פג תוקף")
+    if user.otp_code != otp_code:
         raise HTTPException(status_code=400, detail="הפרטים שהוזנו שגויים")
     user.account_status = AccountStatus.PENDING_APPROVAL
     user.otp_code = None
@@ -113,6 +118,7 @@ def refresh_token(db: Session, refresh_tok: str) -> TokenResponse:
 def resend_otp(db: Session, email: str) -> None:
     user = db.query(User).filter(User.email == email).first()
     if not user or user.account_status != AccountStatus.PENDING_OTP:
+        # PROD: intentionally 400 instead of 404 — prevents User Enumeration Attack.
         raise HTTPException(status_code=400, detail="לא ניתן לשלוח קוד אימות")
     otp = _generate_otp()
     user.otp_code = otp
