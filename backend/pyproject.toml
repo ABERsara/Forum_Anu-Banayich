@@ -15,6 +15,7 @@ dependencies = [
     "alembic>=1.13",
     "python-jose[cryptography]>=3.3",
     "passlib[bcrypt]>=1.7",
+    "bcrypt>=3.0,<4.1",
     "httpx>=0.27",
 ]
 
@@ -39,6 +40,9 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body", "fastapi.Header", "fastapi.Cookie"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
