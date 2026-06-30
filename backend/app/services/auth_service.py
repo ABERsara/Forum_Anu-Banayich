@@ -39,7 +39,7 @@ def _create_token(subject: str, expires_delta: timedelta, token_type: str = "acc
 def register(db: Session, data: RegisterRequest) -> User:
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
-        raise HTTPException(status_code=400, detail="כתובת המייל כבר רשומה במערכת")
+        raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
     hashed = get_password_hash(data.password)
     user = User(
         email=data.email,
