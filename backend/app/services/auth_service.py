@@ -67,10 +67,12 @@ def register(db: Session, data: RegisterRequest) -> User:
 
 def verify_otp(db: Session, email: str, otp_code: str) -> User:
     user = db.query(User).filter(User.email == email).first()
-    if not user or user.otp_code != otp_code:
+    if not user:
         raise HTTPException(status_code=400, detail="הפרטים שהוזנו שגויים")
     expires_at = user.otp_expires_at
     if expires_at is None or expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
+        raise HTTPException(status_code=400, detail="קוד האימות פג תוקף")
+    if user.otp_code != otp_code:
         raise HTTPException(status_code=400, detail="הפרטים שהוזנו שגויים")
     user.account_status = AccountStatus.PENDING_APPROVAL
     user.otp_code = None

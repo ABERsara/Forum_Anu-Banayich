@@ -154,13 +154,13 @@ class TestVerifyOtp:
         r = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": otp})
         assert r.status_code == 400
 
-    async def test_expired_otp_generic_message(self, client, db_session):
+    async def test_expired_otp_distinct_message(self, client, db_session):
         otp = await self._register_and_get_otp(client, db_session)
         user = _get_user(db_session)
         user.otp_expires_at = datetime.now(UTC) - timedelta(minutes=1)
         db_session.commit()
         r = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": otp})
-        assert r.json()["detail"] == "הפרטים שהוזנו שגויים"
+        assert r.json()["detail"] == "קוד האימות פג תוקף"
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +179,7 @@ class TestResendOtp:
         await client.post(f"{BASE}/resend-otp", params={"email": VALID_PAYLOAD["email"]})
         user = _get_user(db_session)
         assert user.otp_code is not None
+        assert user.otp_code != old_otp
         assert user.otp_expires_at is not None
 
     async def test_resend_new_otp_is_valid(self, client, db_session):
