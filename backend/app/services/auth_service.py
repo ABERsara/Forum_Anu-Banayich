@@ -67,13 +67,11 @@ def register(db: Session, data: RegisterRequest) -> User:
 
 def verify_otp(db: Session, email: str, otp_code: str) -> User:
     user = db.query(User).filter(User.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
-    if user.otp_code != otp_code:
-        raise HTTPException(status_code=400, detail="קוד האימות שגוי")
+    if not user or user.otp_code != otp_code:
+        raise HTTPException(status_code=400, detail="הפרטים שהוזנו שגויים")
     expires_at = user.otp_expires_at
     if expires_at is None or expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
-        raise HTTPException(status_code=400, detail="קוד האימות פג תוקף")
+        raise HTTPException(status_code=400, detail="הפרטים שהוזנו שגויים")
     user.account_status = AccountStatus.PENDING_APPROVAL
     user.otp_code = None
     user.otp_expires_at = None
@@ -114,10 +112,8 @@ def refresh_token(db: Session, refresh_tok: str) -> TokenResponse:
 
 def resend_otp(db: Session, email: str) -> None:
     user = db.query(User).filter(User.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
-    if user.account_status != AccountStatus.PENDING_OTP:
-        raise HTTPException(status_code=400, detail="לא ניתן לשלוח קוד אימות במצב זה")
+    if not user or user.account_status != AccountStatus.PENDING_OTP:
+        raise HTTPException(status_code=400, detail="לא ניתן לשלוח קוד אימות")
     otp = _generate_otp()
     user.otp_code = otp
     user.otp_expires_at = datetime.now(UTC) + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
