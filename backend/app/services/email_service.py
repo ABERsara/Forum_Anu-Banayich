@@ -1,26 +1,53 @@
 """
-Email service – stub.
+Email service.
 
-In production this would use SMTP or a service like SendGrid / AWS SES.
-For now, all functions just print to the console so development can proceed
-without setting up a real mail server.
+send_otp_email sends real mail via SMTP when SMTP_HOST is configured.
+The other notifications below are still stubs.
 
 TODO (when ready for production):
-  [ ] Replace print() calls with actual SMTP sending
+  [ ] Send real email for approval/rejection/moderator/suspension/question notifications
   [ ] Load templates from HTML files
   [ ] Add retry logic for failed sends
   [ ] Add unsubscribe links where required by law
 """
 
 import logging
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 def send_otp_email(email: str, otp_code: str) -> None:
     """Send OTP verification code to a new registrant."""
-    logger.info(f"[EMAIL] OTP {otp_code} → {email}")
-    # TODO: send real email
+    if not settings.SMTP_HOST:
+        logger.info(f"[DEV EMAIL] OTP {otp_code} -> {email}")
+        return
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "קוד אימות"
+    msg["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>"
+    msg["To"] = email
+    html = (
+        f'<div dir="rtl">'
+        f"<h2>קוד האימות שלך</h2>"
+        f"<h1>{otp_code}</h1>"
+        f"<p>הקוד בתוקף ל-{settings.OTP_EXPIRE_MINUTES} דקות.</p>"
+        f"</div>"
+    )
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as s:
+            s.ehlo()
+            s.starttls()
+            s.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            s.send_message(msg)
+    except Exception as exc:
+        logger.error(f"[EMAIL] Failed to send OTP email to {email}: {exc}")
 
 
 def send_approval_email(email: str, first_name: str) -> None:
