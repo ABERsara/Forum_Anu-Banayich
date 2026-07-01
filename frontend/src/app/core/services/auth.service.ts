@@ -56,30 +56,15 @@ export class AuthService {
   // ──────────────────────────────────────────────────────────
 
   register(data: RegisterRequest): Observable<unknown> {
-    void data;
-    /**
-     * TODO:
-     *   return this.api.post('/auth/register', data);
-     */
-    throw new Error('register() not yet implemented');
+    return this.api.post('/auth/register', data);
   }
 
   verifyOtp(data: OtpVerifyRequest): Observable<unknown> {
-    void data;
-    /**
-     * TODO:
-     *   return this.api.post('/auth/verify-otp', data);
-     */
-    throw new Error('verifyOtp() not yet implemented');
+    return this.api.post('/auth/verify-otp', data);
   }
 
   resendOtp(email: string): Observable<unknown> {
-    void email;
-    /**
-     * TODO:
-     *   return this.api.post('/auth/resend-otp', { email });
-     */
-    throw new Error('resendOtp() not yet implemented');
+    return this.api.post('/auth/resend-otp', { email });
   }
 
   // ──────────────────────────────────────────────────────────
@@ -87,34 +72,17 @@ export class AuthService {
   // ──────────────────────────────────────────────────────────
 
   login(data: LoginRequest): Observable<TokenResponse> {
-    void data;
-    /**
-     * TODO:
-     *   1. Call POST /auth/login
-     *   2. On success: save tokens with saveTokens()
-     *   3. Load current user profile with loadCurrentUser()
-     *   4. Navigate to /forum (or role-based dashboard)
-     *
-     * Example:
-     *   return this.api.post<TokenResponse>('/auth/login', data).pipe(
-     *     tap(tokens => {
-     *       this.saveTokens(tokens);
-     *       this.loadCurrentUser().subscribe();
-     *       this.router.navigate(['/forum']);
-     *     })
-     *   );
-     */
-    throw new Error('login() not yet implemented');
+    return this.api.post<TokenResponse>('/auth/login', data).pipe(
+      tap((tokens) => {
+        this.saveTokens(tokens);
+        this.loadCurrentUser().subscribe();
+      }),
+    );
   }
 
   logout(): void {
-    /**
-     * TODO:
-     *   1. Clear tokens with clearTokens()
-     *   2. Clear _currentUser signal
-     *   3. Navigate to /login
-     */
-    throw new Error('logout() not yet implemented');
+    this.clearTokens();
+    this.router.navigate(['/login']);
   }
 
   // ──────────────────────────────────────────────────────────
@@ -143,9 +111,9 @@ export class AuthService {
   refreshToken(): Observable<TokenResponse> {
     const refresh_token = this.getRefreshToken();
     if (!refresh_token) throw new Error('No refresh token available');
-    return this.api.post<TokenResponse>('/auth/refresh', { refresh_token }).pipe(
-      tap(tokens => this.saveTokens(tokens)),
-    );
+    return this.api
+      .post<TokenResponse>('/auth/refresh', { refresh_token })
+      .pipe(tap((tokens) => this.saveTokens(tokens)));
   }
 
   // ──────────────────────────────────────────────────────────
@@ -153,8 +121,6 @@ export class AuthService {
   // ──────────────────────────────────────────────────────────
 
   loadCurrentUser(): Observable<UserProfile> {
-    return this.api.get<UserProfile>('/users/me').pipe(
-      tap(user => this._currentUser.set(user)),
-    );
+    return this.api.get<UserProfile>('/users/me').pipe(tap((user) => this._currentUser.set(user)));
   }
 }
