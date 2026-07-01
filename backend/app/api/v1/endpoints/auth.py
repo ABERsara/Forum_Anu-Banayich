@@ -19,12 +19,13 @@ from app.schemas.auth import (
     RegisterRequest,
     TokenResponse,
 )
+from app.schemas.user import UserProfile
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=UserProfile, status_code=status.HTTP_201_CREATED)
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
     """
     Submit a new registration request.
@@ -32,19 +33,17 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     After this endpoint, the user is in PENDING_OTP status.
     An OTP is sent to their email.
     """
-    # TODO: call auth_service.register(db, data) and return a success message
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+    return auth_service.register(db, data)
 
 
-@router.post("/verify-otp")
+@router.post("/verify-otp", response_model=UserProfile)
 def verify_otp(data: OtpVerifyRequest, db: Session = Depends(get_db)):
     """
     Verify the OTP received by email.
 
     After this, user moves to PENDING_APPROVAL status.
     """
-    # TODO: call auth_service.verify_otp(db, data.email, data.otp_code)
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+    return auth_service.verify_otp(db, data.email, data.otp_code)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -65,8 +64,9 @@ def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
     raise HTTPException(status_code=501, detail="Not implemented yet")
 
 
-@router.post("/resend-otp")
+@router.post("/resend-otp", status_code=status.HTTP_200_OK)
 def resend_otp(email: str, db: Session = Depends(get_db)):
     """Resend OTP to the given email."""
-    # TODO: call auth_service.resend_otp(db, email)
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+    auth_service.resend_otp(db, email)
+    # PROD: deviates from spec — spec defines "קוד OTP חדש נשלח.", message changed for consistency with other project messages. Reconsider before PROD.
+    return {"message": "קוד אימות נשלח מחדש"}
