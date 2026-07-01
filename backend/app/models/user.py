@@ -144,7 +144,10 @@ class User(Base):
         "Report", back_populates="reporter", foreign_keys="Report.reporter_id"
     )
     audit_logs: Mapped[list["AuditLog"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
-        "AuditLog", back_populates="actor"
+        "AuditLog",
+        primaryjoin="foreign(AuditLog.actor_id) == User.id",
+        viewonly=True,
+        back_populates="actor",
     )
 
     def __repr__(self) -> str:

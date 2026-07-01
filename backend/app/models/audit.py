@@ -49,9 +49,9 @@ class AuditLog(Base):
     # ------------------------------------------------------------------
     actor: Mapped["User"] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "User",
+        primaryjoin="foreign(AuditLog.actor_id) == User.id",
+        viewonly=True,
         back_populates="audit_logs",
-        foreign_keys=[actor_id],
-        primaryjoin="AuditLog.actor_id == User.id",
     )
 
     def __repr__(self) -> str:

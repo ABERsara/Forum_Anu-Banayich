@@ -16,8 +16,8 @@ env/
 *.sqlite3
 
 # ─── FastAPI / Alembic ────────────────────────────
-alembic/versions/*.py
-!alembic/versions/.gitkeep
+# migrations/versions/ is tracked in git (migration files belong in VCS)
+# dev.db is excluded via *.db above
 
 # ─── Node / Angular ───────────────────────────────
 node_modules/
