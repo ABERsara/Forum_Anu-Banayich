@@ -173,6 +173,14 @@ describe('FileUploadComponent', () => {
 
       expect(revokeSpy).toHaveBeenCalledWith('blob:fake-url');
     });
+
+    it('should emit empty validationError on clear', () => {
+      triggerChange(fixture, makeFile('photo.jpg', 'image/jpeg', 2));
+      const spy = vi.spyOn(component.validationError, 'emit');
+      fixture.nativeElement.querySelector('.file-upload__clear').click();
+
+      expect(spy).toHaveBeenCalledWith('');
+    });
   });
 
   // ---------------------------------------------------------------------------

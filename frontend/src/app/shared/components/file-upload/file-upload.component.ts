@@ -53,6 +53,7 @@ export class FileUploadComponent {
   clear(fileInput: HTMLInputElement): void {
     this.clearPreview();
     fileInput.value = '';
+    this.validationError.emit('');
   }
 
   private clearPreview(): void {
