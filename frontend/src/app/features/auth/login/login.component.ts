@@ -15,7 +15,7 @@
  *   - Warm, supportive color scheme (see _variables.scss)
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
@@ -65,16 +65,16 @@ import { LoginRequest } from '../../../core/models';
             }
           </div>
 
-          <app-error-display [message]="errorMessage" />
+          <app-error-display [message]="errorMessage()" />
 
-          @if (isLoading) {
-            <app-loading-spinner message="מתחברת..." />
+          @if (isLoading()) {
+            <app-loading-spinner message="מתחבר/ת..." />
           }
 
           <button
             type="submit"
             class="btn-submit"
-            [disabled]="form.invalid || isLoading"
+            [disabled]="form.invalid || isLoading()"
           >
             כניסה
           </button>
@@ -82,7 +82,7 @@ import { LoginRequest } from '../../../core/models';
         </form>
 
         <p class="register-link">
-          אין לך חשבון? <a routerLink="/register">הירשמי כאן</a>
+          אין לך חשבון? <a routerLink="/register">הירשם/י כאן</a>
         </p>
       </div>
     </div>
@@ -98,23 +98,26 @@ export class LoginComponent {
     password: ['', Validators.required],
   });
 
-  isLoading = false;
-  errorMessage = '';
+  isLoading = signal(false);
+  errorMessage = signal('');
 
   onSubmit(): void {
-    if (this.form.invalid) return;
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
 
-    this.isLoading = true;
-    this.errorMessage = '';
+    this.isLoading.set(true);
+    this.errorMessage.set('');
 
     this.auth.login(this.form.getRawValue() as LoginRequest).subscribe({
       next: () => {
-        this.isLoading = false;
+        this.isLoading.set(false);
         this.router.navigate(['/home']);
       },
       error: (err) => {
-        this.errorMessage = err.error?.detail ?? 'שגיאה בכניסה. בדקי את הפרטים.';
-        this.isLoading = false;
+        this.errorMessage.set(err.error?.detail ?? 'שגיאה בכניסה. בדקי את הפרטים.');
+        this.isLoading.set(false);
       },
     });
   }
