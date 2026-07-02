@@ -75,6 +75,7 @@ export class AuthService {
     return this.api.post<TokenResponse>('/auth/login', data).pipe(
       tap((tokens) => {
         this.saveTokens(tokens);
+        // if profile load fails after login, clear tokens to avoid a half-authenticated state
         this.loadCurrentUser().subscribe({
           error: () => this.clearTokens(),
         });
