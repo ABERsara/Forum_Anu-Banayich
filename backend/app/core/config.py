@@ -5,7 +5,6 @@ Copy .env.example to .env and fill in real values before running.
 Never commit .env to git!
 """
 
-from pydantic import AnyHttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,7 +41,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # CORS
     # ------------------------------------------------------------------
-    BACKEND_CORS_ORIGINS: list[AnyHttpUrl] = [
+    BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:4200",
         "http://localhost:3000",
     ]

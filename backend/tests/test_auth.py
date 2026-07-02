@@ -173,13 +173,13 @@ class TestVerifyOtp:
 class TestResendOtp:
     async def test_success_returns_200(self, client):
         await _register(client)
-        r = await client.post(f"{BASE}/resend-otp", params={"email": VALID_PAYLOAD["email"]})
+        r = await client.post(f"{BASE}/resend-otp", json={"email": VALID_PAYLOAD["email"]})
         assert r.status_code == 200
 
     async def test_resend_updates_otp_in_db(self, client, db_session):
         await _register(client)
         old_otp = _get_user(db_session).otp_code
-        await client.post(f"{BASE}/resend-otp", params={"email": VALID_PAYLOAD["email"]})
+        await client.post(f"{BASE}/resend-otp", json={"email": VALID_PAYLOAD["email"]})
         user = _get_user(db_session)
         assert user.otp_code is not None
         assert user.otp_code != old_otp
@@ -188,13 +188,13 @@ class TestResendOtp:
     async def test_resend_new_otp_is_valid(self, client, db_session):
         """New OTP from resend must work with verify-otp."""
         await _register(client)
-        await client.post(f"{BASE}/resend-otp", params={"email": VALID_PAYLOAD["email"]})
+        await client.post(f"{BASE}/resend-otp", json={"email": VALID_PAYLOAD["email"]})
         new_otp = _get_user(db_session).otp_code
         r = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": new_otp})
         assert r.status_code == 200
 
     async def test_nonexistent_email_returns_400(self, client):
-        r = await client.post(f"{BASE}/resend-otp", params={"email": "nobody@example.com"})
+        r = await client.post(f"{BASE}/resend-otp", json={"email": "nobody@example.com"})
         assert r.status_code == 400
 
     async def test_after_verify_resend_returns_400(self, client, db_session):
@@ -202,7 +202,7 @@ class TestResendOtp:
         await _register(client)
         otp = _get_user(db_session).otp_code
         await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": otp})
-        r = await client.post(f"{BASE}/resend-otp", params={"email": VALID_PAYLOAD["email"]})
+        r = await client.post(f"{BASE}/resend-otp", json={"email": VALID_PAYLOAD["email"]})
         assert r.status_code == 400
 
 
