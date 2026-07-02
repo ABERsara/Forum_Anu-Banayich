@@ -1,0 +1,138 @@
+@use '../../../../styles/variables' as *;
+
+.register-container {
+  max-width: 420px;
+  margin: $spacing-2xl auto;
+  padding: $spacing-xl;
+  background-color: $color-bg;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-md;
+}
+
+h1 {
+  margin: 0 0 $spacing-sm;
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $color-text;
+  text-align: center;
+}
+
+.step-indicator {
+  margin: 0 0 $spacing-lg;
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+  text-align: center;
+}
+
+.field-error {
+  display: block;
+  margin-top: $spacing-xs;
+  margin-bottom: $spacing-md;
+  font-size: 0.75rem;
+  color: $color-danger;
+}
+
+.field-success {
+  display: block;
+  margin-top: $spacing-xs;
+  margin-bottom: $spacing-md;
+  font-size: 0.75rem;
+  color: $color-success;
+}
+
+.register-field {
+  display: block;
+  margin-bottom: $spacing-md;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $color-text;
+
+  input,
+  select {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: $spacing-xs;
+    padding: $spacing-sm;
+    font-family: inherit;
+    font-size: $font-size-base;
+    color: $color-text;
+    background-color: $color-bg;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    transition: border-color $transition-fast;
+
+    &:focus {
+      border-color: $color-primary;
+      outline: none;
+    }
+  }
+}
+
+.register-actions {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-lg;
+}
+
+.btn-primary,
+.btn-secondary {
+  flex: 1;
+  padding: $spacing-sm $spacing-md;
+  font-size: $font-size-base;
+  font-weight: $font-weight-medium;
+  border-radius: $radius-md;
+  cursor: pointer;
+  transition: background-color $transition-fast, opacity $transition-fast;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.btn-primary {
+  color: #fff;
+  background-color: $color-primary;
+  border: none;
+
+  &:hover:not(:disabled) {
+    background-color: $color-primary-dark;
+  }
+}
+
+.btn-secondary {
+  color: $color-primary;
+  background-color: transparent;
+  border: 1px solid $color-primary;
+
+  &:hover:not(:disabled) {
+    background-color: rgba($color-primary, 0.08);
+  }
+}
+
+.otp-hint {
+  margin: 0 0 $spacing-md;
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+}
+
+.pending-approval {
+  padding: $spacing-md;
+  color: $color-success;
+  background-color: rgba($color-success, 0.08);
+  border: 1px solid rgba($color-success, 0.3);
+  border-radius: $radius-md;
+  text-align: center;
+}
+
+.login-link {
+  margin-top: $spacing-lg;
+  font-size: $font-size-sm;
+  text-align: center;
+
+  a {
+    color: $color-primary;
+  }
+}
