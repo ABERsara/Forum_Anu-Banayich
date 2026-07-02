@@ -101,6 +101,15 @@ class TestSendOtpEmailViaSmtp:
         assert 'dir="rtl"' in html
         assert msg["To"] == "test@example.com"
 
+    def test_logs_success_after_send(self, monkeypatch, caplog):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _FakeSMTP)
+
+        with caplog.at_level(logging.INFO):
+            email_service.send_otp_email("test@example.com", "654321")
+
+        assert "[EMAIL] OTP sent → test@example.com" in caplog.text
+
 
 class TestSendOtpEmailSmtpFailure:
     def test_does_not_raise_on_smtp_failure(self, monkeypatch):
