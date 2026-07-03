@@ -1,6 +1,8 @@
 <div class="register-container" dir="rtl">
   <h1>הרשמה למערכת</h1>
-  <p class="step-indicator">שלב {{ currentStep() }} מתוך 4</p>
+  @if (currentStep() !== 4) {
+    <p class="step-indicator">שלב {{ currentStep() }} מתוך 4</p>
+  }
 
   <app-error-display [message]="errorMessage()" />
   @if (isLoading()) {
