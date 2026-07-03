@@ -67,7 +67,7 @@ describe('authInterceptor', () => {
     authServiceMock.getAccessToken.mockReturnValue(newTokens.access_token);
 
     let result: unknown;
-    http.get('/api/test').subscribe(res => (result = res));
+    http.get('/api/test').subscribe((res) => (result = res));
 
     const firstReq = httpMock.expectOne('/api/test');
     expect(firstReq.request.headers.get('Authorization')).toBe('Bearer expired-token');
@@ -91,7 +91,7 @@ describe('authInterceptor', () => {
     );
 
     let error: unknown;
-    http.get('/api/test').subscribe({ error: err => (error = err) });
+    http.get('/api/test').subscribe({ error: (err) => (error = err) });
 
     const req = httpMock.expectOne('/api/test');
     req.flush({ message: 'expired' }, { status: 401, statusText: 'Unauthorized' });
@@ -100,5 +100,22 @@ describe('authInterceptor', () => {
     expect(authServiceMock.clearTokens).toHaveBeenCalledTimes(1);
     expect(routerMock.navigate).toHaveBeenCalledWith(['/login']);
     expect(error).toBeTruthy();
+  });
+  it('does not clear tokens or navigate when refreshToken fails with a non-auth error', () => {
+    localStorage.setItem('access_token', 'expired-token');
+    authServiceMock.refreshToken.mockReturnValue(
+      throwError(() => ({ status: 500, statusText: 'Internal Server Error' })),
+    );
+
+    let error: unknown;
+    http.get('/api/test').subscribe({ error: (err) => (error = err) });
+
+    const req = httpMock.expectOne('/api/test');
+    req.flush({ message: 'expired' }, { status: 401, statusText: 'Unauthorized' });
+
+    expect(authServiceMock.refreshToken).toHaveBeenCalledTimes(1);
+    expect(authServiceMock.clearTokens).not.toHaveBeenCalled();
+    expect(routerMock.navigate).not.toHaveBeenCalled();
+    expect(error).toEqual({ status: 500, statusText: 'Internal Server Error' });
   });
 });
