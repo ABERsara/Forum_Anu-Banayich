@@ -39,7 +39,7 @@ def list_posts(
     page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> ForumPostListResponse:
     """
     Return posts visible to the current user.
     Filtering is automatic – the user only sees their group+sector content.
@@ -55,7 +55,7 @@ def create_post(
     data: ForumPostCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> ForumPostResponse:
     """
     Publish a new forum post.
 
@@ -70,7 +70,7 @@ def get_post(
     post_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> ForumPostResponse:
     """
     Return a single forum post.
 
@@ -86,7 +86,7 @@ def report_post(
     data: ReportCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> None:
     """
     Report a forum post.
 
@@ -104,7 +104,7 @@ def report_post(
 def get_inbox(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[ConversationSummary]:
     """
     Return a list of conversations (inbox view).
 
@@ -119,7 +119,7 @@ def send_message(
     data: DirectMessageCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> DirectMessageResponse:
     """
     Send a private message.
 
@@ -135,7 +135,7 @@ def get_conversation(
     page: int = Query(1, ge=1),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[DirectMessageResponse]:
     """
     Return the conversation with a specific user.
 

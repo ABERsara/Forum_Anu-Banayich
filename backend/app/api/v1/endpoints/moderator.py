@@ -27,7 +27,7 @@ router = APIRouter(
 def list_pending_reports(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> ReportListResponse:
     """
     Return pending reports in the moderator's assigned cells.
     Sorted by report_count DESC (most-reported content first).
@@ -43,7 +43,7 @@ def get_report(
     report_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> ReportResponse:
     """
     Return a single report with the full context of the reported content.
 
@@ -62,7 +62,7 @@ def decide_report(
     data: ReportDecideRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> ReportResponse:
     """
     Moderator decides on a report.
 

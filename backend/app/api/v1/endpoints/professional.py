@@ -30,7 +30,7 @@ router = APIRouter(prefix="/advice", tags=["Professional Advisory"])
 def list_professionals(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[ProfessionalProfile]:
     """
     List professionals visible to the current user (filtered by group+sector).
 
@@ -44,7 +44,7 @@ def list_professionals(
 def my_questions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[ProfessionalQueryResponse]:
     """Return all questions asked by the current user."""
     # TODO: call professional_service.get_my_questions(db, current_user)
     return []
@@ -55,7 +55,7 @@ def ask_question(
     data: ProfessionalQueryCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> ProfessionalQueryResponse:
     """
     Submit a professional question.
 
@@ -70,7 +70,7 @@ def public_qa_feed(
     page: int = Query(1, ge=1),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[PublicQAResponse]:
     """
     Public Q&A knowledge base – answered questions visible to the user's group/sector.
 
@@ -87,7 +87,7 @@ def public_qa_feed(
 def pending_questions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[ProfessionalQueryResponse]:
     """Questions waiting for the current professional to answer."""
     # TODO: call professional_service.get_pending_questions(db, current_user)
     return []
@@ -103,7 +103,7 @@ def answer_question(
     data: ProfessionalAnswerRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> ProfessionalQueryResponse:
     """Professional submits an answer to a question."""
     # TODO: call professional_service.answer_query(db, query_id, data, current_user)
     raise NotImplementedError

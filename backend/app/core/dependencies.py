@@ -14,7 +14,8 @@ def admin_only(current_user: User = Depends(require_admin)):
     ...
 """
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
+from typing import TYPE_CHECKING
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -25,6 +26,9 @@ from app.core.config import settings
 from app.core.constants import AccountStatus, UserRole
 from app.core.security import ALGORITHM
 from app.db.session import SessionLocal
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
@@ -41,7 +45,7 @@ def get_db() -> Generator[Session, None, None]:
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
-):
+) -> "User":
     """
     Decode JWT, load user from DB.
 
@@ -76,12 +80,12 @@ def get_current_user(
     return user
 
 
-def get_current_active_user(current_user=Depends(get_current_user)):
+def get_current_active_user(current_user: "User" = Depends(get_current_user)) -> "User":
     """Alias – use when you just need any logged-in, active user."""
     return current_user
 
 
-def require_role(*roles: UserRole):
+def require_role(*roles: UserRole) -> Callable[..., "User"]:
     """
     Returns a dependency that enforces one of the given roles.
 
@@ -90,7 +94,7 @@ def require_role(*roles: UserRole):
         def admin_endpoint(user = Depends(require_role(UserRole.ADMIN))):
             ...
     """
-    def _check(current_user=Depends(get_current_user)):
+    def _check(current_user: "User" = Depends(get_current_user)) -> "User":
         if current_user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -101,13 +105,13 @@ def require_role(*roles: UserRole):
     return _check
 
 
-def require_admin(current_user=Depends(get_current_user)):
+def require_admin(current_user: "User" = Depends(get_current_user)) -> "User":
     return require_role(UserRole.ADMIN)(current_user)
 
 
-def require_moderator(current_user=Depends(get_current_user)):
+def require_moderator(current_user: "User" = Depends(get_current_user)) -> "User":
     return require_role(UserRole.MODERATOR, UserRole.ADMIN)(current_user)
 
 
-def require_professional(current_user=Depends(get_current_user)):
+def require_professional(current_user: "User" = Depends(get_current_user)) -> "User":
     return require_role(UserRole.PROFESSIONAL)(current_user)
