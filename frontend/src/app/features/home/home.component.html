@@ -1,20 +1,44 @@
-<section class="home">
-  <h1 class="home__title">Welcome to Practicum</h1>
-  <p class="home__subtitle">Your project foundation is ready. Start building.</p>
+<main class="home" dir="rtl">
+  @if (auth.currentUser(); as user) {
+    <h1 class="home__title">ברוכים הבאים</h1>
+    <p class="home__subtitle">שלום, {{ user.first_name }} {{ user.last_name }}</p>
 
-  <div class="home__cards">
-    <app-card title="Frontend" subtitle="Angular 22 + SCSS" [elevated]="true">
-      Standalone components, lazy-loaded routes, shared UI library.
-      <div card-footer class="card-actions">
-        <app-button variant="primary">Get Started</app-button>
-      </div>
-    </app-card>
+    <div class="home__cards">
+      @if (user.role === UserRole.USER) {
+        <a routerLink="/forum" class="home__card-link">
+          <app-card title="פורום" subtitle="שאלות ותשובות מהקהילה" [elevated]="true">
+            שיתוף, תמיכה ותשובות מחברי הקהילה.
+          </app-card>
+        </a>
 
-    <app-card title="Backend" subtitle="FastAPI + Python" [elevated]="true">
-      RESTful API with Pydantic v2, SQLAlchemy, JWT auth skeleton.
-      <div card-footer class="card-actions">
-        <app-button variant="secondary">View Docs</app-button>
-      </div>
-    </app-card>
-  </div>
-</section>
+        <a routerLink="/advice" class="home__card-link">
+          <app-card title="ייעוץ" subtitle="פנייה לאיש מקצוע" [elevated]="true">
+            קבלת ייעוץ אישי ומקצועי בנושאים שמעסיקים אתכם.
+          </app-card>
+        </a>
+      }
+
+      @if (auth.isAdmin()) {
+        <a routerLink="/admin" class="home__card-link">
+          <app-card title="ניהול" subtitle="לוח בקרה למנהלים" [elevated]="true">
+            ניהול משתמשים, אישורי הרשמה ותוכן.
+          </app-card>
+        </a>
+      }
+
+      @if (auth.isModerator()) {
+        <a routerLink="/moderator" class="home__card-link">
+          <app-card title="מבקר" subtitle="דוחות ותלונות" [elevated]="true">
+            סקירת דוחות שהוגשו על ידי משתמשים.
+          </app-card>
+        </a>
+      }
+
+      @if (auth.isProfessional()) {
+        <app-card title="ייעוץ מקצועי" subtitle="בקרוב" [elevated]="true">
+          אזור אישי לאנשי מקצוע — בבנייה.
+        </app-card>
+      }
+    </div>
+  }
+</main>
