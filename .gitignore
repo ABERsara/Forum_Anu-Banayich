@@ -19,6 +19,10 @@ env/
 # migrations/versions/ is tracked in git (migration files belong in VCS)
 # dev.db is excluded via *.db above
 
+# Local network-filtering root CA (e.g. NetFree) — machine-specific, passed
+# to `docker build` via --build-arg, never committed
+netfree-ca.crt
+
 # ─── Node / Angular ───────────────────────────────
 node_modules/
 frontend/dist/

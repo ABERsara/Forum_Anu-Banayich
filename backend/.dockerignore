@@ -1,0 +1,7 @@
+﻿.venv
+.env
+dev.db
+__pycache__
+*.egg-info
+tests
+netfree-ca.crt
