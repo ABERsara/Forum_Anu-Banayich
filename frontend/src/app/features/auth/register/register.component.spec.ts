@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 
 import { RegisterComponent } from './register.component';
 import { AuthService } from '../../../core/services/auth.service';
+import { DocumentType } from '../../../core/constants';
 
 describe('RegisterComponent', () => {
   let fixture: ComponentFixture<RegisterComponent>;
@@ -168,6 +169,67 @@ describe('RegisterComponent', () => {
       expect(authService.resendOtp).toHaveBeenCalledWith('sara@example.com');
       expect(component.currentStep()).toBe(3);
       expect(component.otpResent()).toBe(true);
+    });
+  });
+
+  describe('isStep4Invalid', () => {
+    beforeEach(() => {
+      component.currentStep.set(4);
+    });
+
+    it('is true when no files are selected and no declarations are checked', () => {
+      expect(component.isStep4Invalid()).toBe(true);
+    });
+
+    it('is true when files are selected but declarations are not all checked', () => {
+      component.deathCertificateFile.set(new File([''], 'death.pdf'));
+      component.selfieFile.set(new File([''], 'selfie.png'));
+      component.idDocFile.set(new File([''], 'id.png'));
+      component.form.patchValue({ declare_accuracy: true, declare_terms: true });
+
+      expect(component.isStep4Invalid()).toBe(true);
+    });
+
+    it('is false once all 3 files are selected and all 3 declarations are checked', () => {
+      component.deathCertificateFile.set(new File([''], 'death.pdf'));
+      component.selfieFile.set(new File([''], 'selfie.png'));
+      component.idDocFile.set(new File([''], 'id.png'));
+      component.form.patchValue({
+        declare_accuracy: true,
+        declare_terms: true,
+        declare_authorization: true,
+      });
+
+      expect(component.isStep4Invalid()).toBe(false);
+    });
+  });
+
+  describe('setIdDocType', () => {
+    it('switches the doc type and clears a previously selected file', () => {
+      component.idDocFile.set(new File([''], 'id.png'));
+
+      component.setIdDocType(DocumentType.PASSPORT);
+
+      expect(component.idDocType()).toBe(DocumentType.PASSPORT);
+      expect(component.idDocFile()).toBeNull();
+    });
+
+    it('does nothing when selecting the already-active doc type', () => {
+      component.idDocFile.set(new File([''], 'id.png'));
+
+      component.setIdDocType(DocumentType.ID_CARD);
+
+      expect(component.idDocFile()).not.toBeNull();
+    });
+  });
+
+  describe('submitStep4', () => {
+    it('advances to step 5 (pending approval)', () => {
+      component.currentStep.set(4);
+
+      component.submitStep4();
+
+      expect(component.currentStep()).toBe(5);
     });
   });
 });

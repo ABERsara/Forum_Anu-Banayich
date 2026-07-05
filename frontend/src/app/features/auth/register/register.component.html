@@ -1,6 +1,6 @@
 <div class="register-container" dir="rtl">
   <h1>הרשמה למערכת</h1>
-  @if (currentStep() !== 4) {
+  @if (currentStep() !== 5) {
     <p class="step-indicator">שלב {{ currentStep() }} מתוך 4</p>
   }
 
@@ -93,6 +93,65 @@
       </div>
     }
     @if (currentStep() === 4) {
+      <div>
+        <label class="register-field">תעודת פטירה</label>
+        <app-file-upload
+          variant="primary"
+          label="בחר/י תעודת פטירה"
+          (fileSelected)="onDeathCertificateSelected($event)"
+          (validationError)="errorMessage.set($event)"
+        />
+
+        <label class="register-field">תמונת סלפי</label>
+        <app-file-upload
+          variant="primary"
+          accept="image/*"
+          label="בחר/י תמונת סלפי"
+          (fileSelected)="onSelfieSelected($event)"
+          (validationError)="errorMessage.set($event)"
+        />
+
+        <label class="register-field">מסמך מזהה</label>
+        <div class="id-doc-toggle">
+          <button
+            type="button"
+            class="id-doc-toggle__btn"
+            [class.id-doc-toggle__btn--active]="idDocType() === DocumentType.ID_CARD"
+            (click)="setIdDocType(DocumentType.ID_CARD)"
+          >תעודת זהות</button>
+          <button
+            type="button"
+            class="id-doc-toggle__btn"
+            [class.id-doc-toggle__btn--active]="idDocType() === DocumentType.PASSPORT"
+            (click)="setIdDocType(DocumentType.PASSPORT)"
+          >דרכון</button>
+        </div>
+        <app-file-upload
+          variant="primary"
+          [label]="idDocType() === DocumentType.ID_CARD ? 'בחר/י תעודת זהות' : 'בחר/י דרכון'"
+          (fileSelected)="onIdDocSelected($event)"
+          (validationError)="errorMessage.set($event)"
+        />
+
+        <div class="declaration-field">
+          <input type="checkbox" id="declare_accuracy" formControlName="declare_accuracy" />
+          <label for="declare_accuracy">אני מצהיר/ה כי כל הפרטים והמסמכים שמסרתי נכונים ומדויקים</label>
+        </div>
+        <div class="declaration-field">
+          <input type="checkbox" id="declare_terms" formControlName="declare_terms" />
+          <label for="declare_terms">קראתי ואני מסכים/ה לתנאי השימוש ומדיניות הפרטיות</label>
+        </div>
+        <div class="declaration-field">
+          <input type="checkbox" id="declare_authorization" formControlName="declare_authorization" />
+          <label for="declare_authorization">אני מצהיר/ה כי אני זכאי/ת להירשם למערכת בהתאם לסוג המשתמש שבחרתי</label>
+        </div>
+
+        <div class="register-actions">
+          <button type="button" class="btn-primary" [disabled]="isStep4Invalid()" (click)="submitStep4()">סיום</button>
+        </div>
+      </div>
+    }
+    @if (currentStep() === 5) {
       <p class="pending-approval">בקשתך נשלחה בהצלחה וממתינה לאישור.</p>
     }
   </form>

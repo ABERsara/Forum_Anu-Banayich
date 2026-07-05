@@ -29,6 +29,21 @@
     &:focus-visible {
       @include focus-ring;
     }
+
+    &--primary {
+      align-self: stretch;
+      width: 100%;
+      margin-bottom: $spacing-md;
+      background-color: $color-white;
+      color: $color-primary;
+      border-color: $color-primary;
+      transition: background-color $transition-fast, color $transition-fast;
+
+      &:hover {
+        background-color: $color-primary;
+        color: $color-white;
+      }
+    }
   }
 
   &__preview {
