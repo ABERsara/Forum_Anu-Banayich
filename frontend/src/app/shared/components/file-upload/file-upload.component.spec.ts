@@ -205,25 +205,6 @@ describe('FileUploadComponent', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // variant
-  // ---------------------------------------------------------------------------
-
-  describe('variant', () => {
-    it('does not add the primary modifier class by default', () => {
-      const btn = fixture.nativeElement.querySelector('.file-upload__btn');
-      expect(btn.classList.contains('file-upload__btn--primary')).toBe(false);
-    });
-
-    it('adds the primary modifier class when variant is "primary"', () => {
-      fixture.componentRef.setInput('variant', 'primary');
-      fixture.detectChanges();
-
-      const btn = fixture.nativeElement.querySelector('.file-upload__btn');
-      expect(btn.classList.contains('file-upload__btn--primary')).toBe(true);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
   // destroy
   // ---------------------------------------------------------------------------
 

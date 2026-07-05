@@ -13,48 +13,43 @@
  *   Step 3 – OTP verification
  *     Enter the 6-digit code received by email
  *
- *   Step 4 – Document upload & declarations
- *     death_certificate (required), selfie (required), id_card OR passport (required),
- *     3 required declarations. Files are kept client-side only this sprint (no upload call).
+ *   Step 4 – Document upload
+ *     death_certificate (required), selfie (required), id_card OR passport (required)
  *
- *   Step 5 – Pending approval message
+ *   After step 4: show "your request is pending admin approval" message
+ *
+ * TODO:
+ *   1. Build a reactive form with all fields
+ *   2. Use a step tracker (currentStep: 1 | 2 | 3 | 4)
+ *   3. Validate each step before proceeding
+ *   4. Call AuthService.register() after step 2
+ *   5. Call AuthService.verifyOtp() in step 3
+ *   6. Implement file upload in step 4 (multipart/form-data to backend)
+ *   7. Show progress bar or step indicators at the top
  */
 
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import {
-  DocumentType,
-  Sector,
-  UserType,
-  SECTOR_LABELS,
-  USER_TYPE_LABELS,
-} from '../../../core/constants';
+import { Sector, UserType, SECTOR_LABELS, USER_TYPE_LABELS } from '../../../core/constants';
 import { AuthService } from '../../../core/services/auth.service';
 import { RegisterRequest, OtpVerifyRequest } from '../../../core/models';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
-import { FileUploadComponent } from '../../../shared/components/file-upload/file-upload.component';
 
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [
-    ReactiveFormsModule,
-    RouterLink,
-    ErrorDisplayComponent,
-    LoadingSpinnerComponent,
-    FileUploadComponent,
-  ],
+  imports: [ReactiveFormsModule, RouterLink, ErrorDisplayComponent, LoadingSpinnerComponent],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss',
 })
 export class RegisterComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
-  currentStep = signal<1 | 2 | 3 | 4 | 5>(1);
+  currentStep = signal<1 | 2 | 3 | 4>(1);
 
   form = this.fb.group({
     first_name: ['', [Validators.required, Validators.minLength(2)]],
@@ -69,20 +64,11 @@ export class RegisterComponent {
     password: ['', [Validators.required, Validators.minLength(8)]],
 
     otp_code: ['', [Validators.required, Validators.minLength(4)]],
-
-    declare_accuracy: [false, Validators.requiredTrue],
-    declare_terms: [false, Validators.requiredTrue],
-    declare_authorization: [false, Validators.requiredTrue],
   });
 
   isLoading = signal(false);
   errorMessage = signal('');
   otpResent = signal(false);
-
-  idDocType = signal<DocumentType.ID_CARD | DocumentType.PASSPORT>(DocumentType.ID_CARD);
-  deathCertificateFile = signal<File | null>(null);
-  selfieFile = signal<File | null>(null);
-  idDocFile = signal<File | null>(null);
 
   isStep1Invalid(): boolean {
     const fields = ['first_name', 'last_name', 'id_number', 'birth_date', 'user_type', 'sector'];
@@ -96,17 +82,6 @@ export class RegisterComponent {
 
   isStep3Invalid(): boolean {
     return this.form.get('otp_code')!.invalid;
-  }
-
-  isStep4Invalid(): boolean {
-    const declarationFields = ['declare_accuracy', 'declare_terms', 'declare_authorization'];
-    const declarationsInvalid = declarationFields.some(f => this.form.get(f)!.invalid);
-    return (
-      declarationsInvalid ||
-      !this.deathCertificateFile() ||
-      !this.selfieFile() ||
-      !this.idDocFile()
-    );
   }
 
   submitStep2(): void {
@@ -176,44 +151,21 @@ export class RegisterComponent {
     });
   }
 
-  setIdDocType(type: DocumentType.ID_CARD | DocumentType.PASSPORT): void {
-    if (this.idDocType() === type) return;
-    this.idDocType.set(type);
-    this.idDocFile.set(null);
-  }
-
-  onDeathCertificateSelected(file: File): void {
-    this.deathCertificateFile.set(file);
-  }
-
-  onSelfieSelected(file: File): void {
-    this.selfieFile.set(file);
-  }
-
-  onIdDocSelected(file: File): void {
-    this.idDocFile.set(file);
-  }
-
-  submitStep4(): void {
-    this.nextStep();
-  }
-
   // Make enum values available in the template
   readonly userTypes = Object.values(UserType);
   readonly sectors = Object.values(Sector);
   readonly userTypeLabels = USER_TYPE_LABELS;
   readonly sectorLabels = SECTOR_LABELS;
-  readonly DocumentType = DocumentType;
 
   nextStep(): void {
-    if (this.currentStep() < 5) {
-      this.currentStep.update(s => (s + 1) as 1 | 2 | 3 | 4 | 5);
+    if (this.currentStep() < 4) {
+      this.currentStep.update(s => (s + 1) as 1 | 2 | 3 | 4);
     }
   }
 
   prevStep(): void {
     if (this.currentStep() > 1) {
-      this.currentStep.update(s => (s - 1) as 1 | 2 | 3 | 4 | 5);
+      this.currentStep.update(s => (s - 1) as 1 | 2 | 3 | 4);
     }
   }
 }

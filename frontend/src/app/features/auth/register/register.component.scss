@@ -118,44 +118,6 @@ h1 {
   font-size: $font-size-sm;
 }
 
-.id-doc-toggle {
-  display: flex;
-  gap: $spacing-sm;
-  margin-bottom: $spacing-md;
-}
-
-.id-doc-toggle__btn {
-  flex: 1;
-  padding: $spacing-sm $spacing-md;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  color: $color-primary;
-  background-color: transparent;
-  border: 1px solid $color-border;
-  border-radius: $radius-md;
-  cursor: pointer;
-  transition: background-color $transition-fast, border-color $transition-fast;
-
-  &--active {
-    color: $color-white;
-    background-color: $color-primary;
-    border-color: $color-primary;
-  }
-}
-
-.declaration-field {
-  display: flex;
-  align-items: flex-start;
-  gap: $spacing-sm;
-  margin-bottom: $spacing-md;
-  font-size: $font-size-sm;
-  color: $color-text;
-
-  input[type='checkbox'] {
-    margin-top: 3px;
-  }
-}
-
 .pending-approval {
   padding: $spacing-md;
   color: $color-success;
