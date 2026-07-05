@@ -7,7 +7,13 @@
     (change)="onFileChange($event)"
   />
 
-  <button type="button" class="file-upload__btn" (click)="fileInput.click()">
+  <button
+    type="button"
+    class="file-upload__btn"
+    [class.file-upload__btn--primary]="variant() === 'primary'"
+    [attr.aria-label]="ariaLabel() || null"
+    (click)="fileInput.click()"
+  >
     {{ label() }}
   </button>
 
