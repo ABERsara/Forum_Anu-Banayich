@@ -57,7 +57,7 @@ export class LoginComponent {
     // this.auth.login(this.form.value as LoginRequest).subscribe({
     //   next: () => this.router.navigate(['/forum']),
     //   error: (err) => {
-    //     this.errorMessage = err.error?.detail ?? 'שגיאה בכניסה. בדקי את הפרטים.';
+    //     this.errorMessage = err.error?.detail ?? 'שגיאה בכניסה. בדוק את הפרטים.';
     //     this.isLoading = false;
     //   },
     // });

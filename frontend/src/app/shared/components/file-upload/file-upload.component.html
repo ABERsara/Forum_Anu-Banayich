@@ -1,0 +1,27 @@
+<div class="file-upload">
+  <input
+    #fileInput
+    type="file"
+    [accept]="accept()"
+    class="file-upload__input"
+    (change)="onFileChange($event)"
+  />
+
+  <button type="button" class="file-upload__btn" (click)="fileInput.click()">
+    {{ label() }}
+  </button>
+
+  @if (previewUrl) {
+    <div class="file-upload__preview">
+      <img [src]="previewUrl" alt="תצוגה מקדימה" class="file-upload__image" />
+      <button type="button" class="file-upload__clear" (click)="clear(fileInput)">נקה</button>
+    </div>
+  }
+
+  @if (selectedFileName) {
+    <div class="file-upload__preview">
+      <span class="file-upload__filename">{{ selectedFileName }}</span>
+      <button type="button" class="file-upload__clear" (click)="clear(fileInput)">נקה</button>
+    </div>
+  }
+</div>
