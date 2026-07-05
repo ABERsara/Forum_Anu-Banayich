@@ -56,7 +56,7 @@ import { Sector, UserType, SECTOR_LABELS, USER_TYPE_LABELS } from '../../../core
         <p>שלב 4: העלאת מסמכים – TODO</p>
       }
 
-      <p><a routerLink="/login">יש לך חשבון? כנסי כאן</a></p>
+      <p><a routerLink="/login">יש לך חשבון? כנס כאן</a></p>
     </div>
   `,
 })

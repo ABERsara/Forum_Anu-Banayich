@@ -9,7 +9,7 @@ import { Component, DestroyRef, inject, input, output } from '@angular/core';
 export class FileUploadComponent {
   accept = input<string>('image/*,.pdf');
   maxSizeMb = input<number>(5);
-  label = input<string>('בחרי קובץ');
+  label = input<string>('בחר קובץ');
 
   fileSelected = output<File>();
   validationError = output<string>();
