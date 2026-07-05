@@ -1,0 +1,99 @@
+@use '../../../../styles/variables' as *;
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $color-bg-subtle;
+  padding: $spacing-md;
+}
+
+.login-card {
+  background: $color-bg;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-lg;
+  padding: $spacing-2xl;
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-title {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $color-text;
+  text-align: center;
+  margin-bottom: $spacing-xl;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin-bottom: $spacing-md;
+
+  label {
+    font-weight: $font-weight-medium;
+    color: $color-text;
+    font-size: $font-size-base;
+  }
+
+  input {
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    font-size: $font-size-base;
+    transition: border-color $transition-fast;
+
+    &:focus {
+      outline: none;
+      border-color: $color-primary;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+  }
+}
+
+.field-error {
+  font-size: $font-size-xs;
+  color: $color-danger;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  background: $color-primary;
+  color: white;
+  border: none;
+  border-radius: $radius-md;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+  margin-top: $spacing-md;
+  transition: background $transition-fast;
+
+  &:hover:not(:disabled) {
+    background: $color-primary-dark;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.register-link {
+  text-align: center;
+  margin-top: $spacing-lg;
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+
+  a {
+    color: $color-primary;
+    text-decoration: none;
+    font-weight: $font-weight-medium;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
