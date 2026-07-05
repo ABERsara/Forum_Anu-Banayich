@@ -12,7 +12,6 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db
-from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
     OtpVerifyRequest,
@@ -21,31 +20,32 @@ from app.schemas.auth import (
     ResendOtpRequest,
     TokenResponse,
 )
-from app.schemas.user import UserProfile
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/register", response_model=UserProfile, status_code=status.HTTP_201_CREATED)
-def register(data: RegisterRequest, db: Session = Depends(get_db)) -> User:
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+def register(data: RegisterRequest, db: Session = Depends(get_db)) -> dict[str, str]:
     """
     Submit a new registration request.
 
     After this endpoint, the user is in PENDING_OTP status.
     An OTP is sent to their email.
     """
-    return auth_service.register(db, data)
+    user = auth_service.register(db, data)
+    return {"message": "נרשמת בהצלחה. בדקי את המייל לקוד OTP.", "user_id": user.id}
 
 
-@router.post("/verify-otp", response_model=UserProfile)
-def verify_otp(data: OtpVerifyRequest, db: Session = Depends(get_db)) -> User:
+@router.post("/verify-otp")
+def verify_otp(data: OtpVerifyRequest, db: Session = Depends(get_db)) -> dict[str, str]:
     """
     Verify the OTP received by email.
 
     After this, user moves to PENDING_APPROVAL status.
     """
-    return auth_service.verify_otp(db, data.email, data.otp_code)
+    auth_service.verify_otp(db, data.email, data.otp_code)
+    return {"message": "אימות הצליח. הבקשה שלך ממתינה לאישור מנהלים."}
 
 
 @router.post("/login", response_model=TokenResponse)
