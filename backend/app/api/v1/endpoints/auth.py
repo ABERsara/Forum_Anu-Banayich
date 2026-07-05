@@ -34,7 +34,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)) -> dict[str, 
     An OTP is sent to their email.
     """
     user = auth_service.register(db, data)
-    return {"message": "נרשמת בהצלחה. בדקי את המייל לקוד OTP.", "user_id": user.id}
+    return {"message": "נרשמת בהצלחה. בדוק את המייל לקוד OTP.", "user_id": user.id}
 
 
 @router.post("/verify-otp")
