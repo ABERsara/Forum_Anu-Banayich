@@ -28,40 +28,128 @@
  *   7. Show progress bar or step indicators at the top
  */
 
-import { Component } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { Sector, UserType, SECTOR_LABELS, USER_TYPE_LABELS } from '../../../core/constants';
+import { AuthService } from '../../../core/services/auth.service';
+import { RegisterRequest, OtpVerifyRequest } from '../../../core/models';
+import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [RouterLink],
-  template: `
-    <!-- TODO: replace with real multi-step form -->
-    <div style="padding: 2rem; direction: rtl">
-      <h1>הרשמה למערכת</h1>
-      <p>שלב {{ currentStep }} מתוך 4</p>
-
-      @if (currentStep === 1) {
-        <p>שלב 1: פרטים אישיים – TODO</p>
-      }
-      @if (currentStep === 2) {
-        <p>שלב 2: פרטי קשר וסיסמה – TODO</p>
-      }
-      @if (currentStep === 3) {
-        <p>שלב 3: אימות OTP – TODO</p>
-      }
-      @if (currentStep === 4) {
-        <p>שלב 4: העלאת מסמכים – TODO</p>
-      }
-
-      <p><a routerLink="/login">יש לך חשבון? כנס כאן</a></p>
-    </div>
-  `,
+  imports: [ReactiveFormsModule, RouterLink, ErrorDisplayComponent, LoadingSpinnerComponent],
+  templateUrl: './register.component.html',
+  styleUrl: './register.component.scss',
 })
 export class RegisterComponent {
-  currentStep: 1 | 2 | 3 | 4 = 1;
+  private readonly fb = inject(FormBuilder);
+  private readonly auth = inject(AuthService);
+  currentStep = signal<1 | 2 | 3 | 4>(1);
+
+  form = this.fb.group({
+    first_name: ['', [Validators.required, Validators.minLength(2)]],
+    last_name: ['', [Validators.required, Validators.minLength(2)]],
+    id_number: ['', [Validators.required, Validators.minLength(7)]],
+    birth_date: ['', Validators.required],
+    user_type: ['', Validators.required],
+    sector: ['', Validators.required],
+
+    email: ['', [Validators.required, Validators.email]],
+    phone: ['', [Validators.required, Validators.pattern(/^\d{9,15}$/)]],
+    password: ['', [Validators.required, Validators.minLength(8)]],
+
+    otp_code: ['', [Validators.required, Validators.minLength(4)]],
+  });
+
+  isLoading = signal(false);
+  errorMessage = signal('');
+  otpResent = signal(false);
+
+  isStep1Invalid(): boolean {
+    const fields = ['first_name', 'last_name', 'id_number', 'birth_date', 'user_type', 'sector'];
+    return fields.some(f => this.form.get(f)!.invalid);
+  }
+
+  isStep2Invalid(): boolean {
+    const fields = ['email', 'phone', 'password'];
+    return fields.some(f => this.form.get(f)!.invalid);
+  }
+
+  isStep3Invalid(): boolean {
+    return this.form.get('otp_code')!.invalid;
+  }
+
+  submitStep2(): void {
+    this.errorMessage.set('');
+    this.isLoading.set(true);
+
+    const payload: RegisterRequest = {
+      first_name: this.form.value.first_name!,
+      last_name: this.form.value.last_name!,
+      email: this.form.value.email!,
+      phone: this.form.value.phone!,
+      birth_date: this.form.value.birth_date!,
+      user_type: this.form.value.user_type as UserType,
+      sector: this.form.value.sector as Sector,
+      id_number: this.form.value.id_number!,
+      password: this.form.value.password!,
+    };
+
+    this.auth.register(payload).subscribe({
+      next: () => {
+        this.isLoading.set(false);
+        this.nextStep();
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(err.error?.detail ?? 'שגיאה בהרשמה. נסה/י שוב.');
+      },
+    });
+  }
+
+  submitOtp(): void {
+    this.errorMessage.set('');
+    this.otpResent.set(false);
+    this.isLoading.set(true);
+
+    const payload: OtpVerifyRequest = {
+      email: this.form.value.email!,
+      otp_code: this.form.value.otp_code!,
+    };
+
+    this.auth.verifyOtp(payload).subscribe({
+      next: () => {
+        this.isLoading.set(false);
+        this.nextStep();
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(err.error?.detail ?? 'קוד שגוי. נסה/י שוב.');
+      },
+    });
+  }
+
+  resendOtp(): void {
+    this.errorMessage.set('');
+    this.otpResent.set(false);
+    this.isLoading.set(true);
+
+    this.auth.resendOtp(this.form.value.email!).subscribe({
+      next: () => {
+        this.isLoading.set(false);
+        this.otpResent.set(true);
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(err.error?.detail ?? 'שליחת הקוד נכשלה.');
+      },
+    });
+  }
 
   // Make enum values available in the template
   readonly userTypes = Object.values(UserType);
@@ -70,14 +158,14 @@ export class RegisterComponent {
   readonly sectorLabels = SECTOR_LABELS;
 
   nextStep(): void {
-    if (this.currentStep < 4) {
-      this.currentStep = (this.currentStep + 1) as 1 | 2 | 3 | 4;
+    if (this.currentStep() < 4) {
+      this.currentStep.update(s => (s + 1) as 1 | 2 | 3 | 4);
     }
   }
 
   prevStep(): void {
-    if (this.currentStep > 1) {
-      this.currentStep = (this.currentStep - 1) as 1 | 2 | 3 | 4;
+    if (this.currentStep() > 1) {
+      this.currentStep.update(s => (s - 1) as 1 | 2 | 3 | 4);
     }
   }
 }

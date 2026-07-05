@@ -1,0 +1,101 @@
+<div class="register-container" dir="rtl">
+  <h1>הרשמה למערכת</h1>
+  @if (currentStep() !== 4) {
+    <p class="step-indicator">שלב {{ currentStep() }} מתוך 4</p>
+  }
+
+  <app-error-display [message]="errorMessage()" />
+  @if (isLoading()) {
+    <app-loading-spinner size="md" />
+  }
+
+  <form [formGroup]="form" novalidate>
+    @if (currentStep() === 1) {
+      <div>
+        <label class="register-field">שם פרטי<input formControlName="first_name" /></label>
+        @if (form.controls.first_name.invalid && form.controls.first_name.touched) {
+          <span class="field-error">נא להזין שם פרטי (לפחות 2 תווים)</span>
+        }
+        <label class="register-field">שם משפחה<input formControlName="last_name" /></label>
+        @if (form.controls.last_name.invalid && form.controls.last_name.touched) {
+          <span class="field-error">נא להזין שם משפחה (לפחות 2 תווים)</span>
+        }
+        <label class="register-field">תעודת זהות<input formControlName="id_number" /></label>
+        @if (form.controls.id_number.invalid && form.controls.id_number.touched) {
+          <span class="field-error">נא להזין תעודת זהות תקינה (לפחות 7 ספרות)</span>
+        }
+        <label class="register-field">תאריך לידה<input type="date" formControlName="birth_date" /></label>
+        @if (form.controls.birth_date.invalid && form.controls.birth_date.touched) {
+          <span class="field-error">נא לבחור תאריך לידה</span>
+        }
+        <label class="register-field">סוג משתמש
+          <select formControlName="user_type">
+            <option value="" disabled>בחר/י</option>
+            @for (t of userTypes; track t) {
+              <option [value]="t">{{ userTypeLabels[t] }}</option>
+            }
+          </select>
+        </label>
+        @if (form.controls.user_type.invalid && form.controls.user_type.touched) {
+          <span class="field-error">נא לבחור סוג משתמש</span>
+        }
+        <label class="register-field">שיוך עדתי
+          <select formControlName="sector">
+            <option value="" disabled>בחר/י</option>
+            @for (s of sectors; track s) {
+              <option [value]="s">{{ sectorLabels[s] }}</option>
+            }
+          </select>
+        </label>
+        @if (form.controls.sector.invalid && form.controls.sector.touched) {
+          <span class="field-error">נא לבחור שיוך עדתי</span>
+        }
+        <div class="register-actions">
+          <button type="button" class="btn-primary" [disabled]="isStep1Invalid()" (click)="nextStep()">המשך</button>
+        </div>
+      </div>
+    }
+    @if (currentStep() === 2) {
+      <div>
+        <label class="register-field">אימייל<input dir="ltr" type="email" formControlName="email" /></label>
+        @if (form.controls.email.invalid && form.controls.email.touched) {
+          <span class="field-error">נא להזין כתובת אימייל תקינה</span>
+        }
+        <label class="register-field">טלפון<input type="tel" formControlName="phone" /></label>
+        @if (form.controls.phone.invalid && form.controls.phone.touched) {
+          <span class="field-error">נא להזין מספר טלפון תקין (9-15 ספרות בלבד)</span>
+        }
+        <label class="register-field">סיסמה<input type="password" formControlName="password" /></label>
+        @if (form.controls.password.invalid && form.controls.password.touched) {
+          <span class="field-error">הסיסמה חייבת להכיל לפחות 8 תווים</span>
+        }
+        <div class="register-actions">
+          <button type="button" class="btn-primary" [disabled]="isLoading() || isStep2Invalid()" (click)="submitStep2()">שלח קוד OTP</button>
+        </div>
+      </div>
+    }
+    @if (currentStep() === 3) {
+      <div>
+        <p class="otp-hint">קוד אימות נשלח לאימייל: {{ form.value.email }}</p>
+        <label class="register-field">קוד אימות
+          <input formControlName="otp_code" inputmode="numeric" maxlength="6" (focus)="otpResent.set(false)" />
+        </label>
+        @if (form.controls.otp_code.invalid && form.controls.otp_code.touched) {
+          <span class="field-error">נא להזין קוד אימות (לפחות 4 ספרות)</span>
+        }
+        @if (otpResent()) {
+          <span class="field-success">קוד חדש נשלח</span>
+        }
+        <div class="register-actions">
+          <button type="button" class="btn-primary" [disabled]="isLoading() || isStep3Invalid()" (click)="submitOtp()">אמת/י קוד</button>
+          <button type="button" class="btn-secondary" [disabled]="isLoading()" (click)="resendOtp()">שלח/י קוד מחדש</button>
+        </div>
+      </div>
+    }
+    @if (currentStep() === 4) {
+      <p class="pending-approval">בקשתך נשלחה בהצלחה וממתינה לאישור.</p>
+    }
+  </form>
+
+  <p class="login-link"><a routerLink="/login">יש לך חשבון? כנס/י כאן</a></p>
+</div>

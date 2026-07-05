@@ -1,0 +1,13 @@
+@use '../../../../styles/variables' as *;
+
+.error-display {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  background-color: rgba($color-danger, 0.08);
+  border: 1px solid rgba($color-danger, 0.3);
+  border-radius: $radius-md;
+  color: $color-danger;
+  font-size: $font-size-sm;
+}

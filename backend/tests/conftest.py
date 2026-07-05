@@ -5,9 +5,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401 — registers all models with Base.metadata
+from app.core.constants import AccountStatus
 from app.core.dependencies import get_db
+from app.core.security import get_password_hash
 from app.db.base import Base
 from app.main import app
+from app.models.user import User
 
 
 @pytest.fixture
@@ -42,3 +45,20 @@ async def client(db_session):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def make_active_user(db_session):
+    def _factory(email: str = "active@example.com", password: str = "Pass1234!") -> User:
+        user = User(
+            email=email,
+            password_hash=get_password_hash(password),
+            first_name="אנה",
+            last_name="כהן",
+            account_status=AccountStatus.ACTIVE,
+        )
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+        return user
+    return _factory
