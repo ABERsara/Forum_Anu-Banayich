@@ -12,17 +12,14 @@ TODO list for junior developer:
   [ ] implement search_users_for_dm() – name search within same group/sector
 """
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.core.constants import GroupVisibility, PostStatus, SectorVisibility
 from app.models.forum import DirectMessage, ForumPost
 from app.models.user import User
 from app.schemas.forum import (
     DirectMessageCreate,
     ForumPostCreate,
     ForumPostListResponse,
-    ForumPostResponse,
 )
 
 

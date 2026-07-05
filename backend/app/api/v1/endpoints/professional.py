@@ -22,7 +22,6 @@ from app.schemas.professional import (
     PublicQAResponse,
 )
 from app.schemas.user import ProfessionalProfile
-from app.services import professional_service, user_service
 
 router = APIRouter(prefix="/advice", tags=["Professional Advisory"])
 

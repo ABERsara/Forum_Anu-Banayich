@@ -11,14 +11,10 @@ TODO list for junior developer:
   [ ] implement get_professionals_for_user() – filtered by sector+group
 """
 
-from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.core.constants import AccountStatus, Sector, UserRole, UserType
 from app.models.user import User
-from app.services.audit_service import log_action
-from app.services.email_service import send_approval_email, send_rejection_email
 
 
 def get_pending_registrations(db: Session) -> list[User]:

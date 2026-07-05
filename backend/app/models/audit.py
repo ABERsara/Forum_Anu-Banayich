@@ -11,7 +11,7 @@ Only ADMIN role can read audit logs.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Enum, String, Text, func
+from sqlalchemy import JSON, DateTime, Enum, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import AuditAction

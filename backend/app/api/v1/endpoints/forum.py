@@ -25,7 +25,6 @@ from app.schemas.forum import (
     ForumPostResponse,
 )
 from app.schemas.report import ReportCreate
-from app.services import forum_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
 

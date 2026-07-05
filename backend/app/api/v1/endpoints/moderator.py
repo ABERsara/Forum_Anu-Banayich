@@ -15,7 +15,6 @@ from app.core.constants import UserRole
 from app.core.dependencies import get_current_user, get_db, require_role
 from app.models.user import User
 from app.schemas.report import ReportDecideRequest, ReportListResponse, ReportResponse
-from app.services import report_service
 
 router = APIRouter(
     prefix="/moderator",
