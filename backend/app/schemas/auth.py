@@ -43,6 +43,12 @@ class OtpVerifyRequest(BaseModel):
     otp_code: str = Field(..., min_length=4, max_length=10)
 
 
+class ResendOtpRequest(BaseModel):
+    """POST /auth/resend-otp body."""
+
+    email: EmailStr
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

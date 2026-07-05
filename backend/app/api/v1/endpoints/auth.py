@@ -18,6 +18,7 @@ from app.schemas.auth import (
     OtpVerifyRequest,
     RefreshRequest,
     RegisterRequest,
+    ResendOtpRequest,
     TokenResponse,
 )
 from app.schemas.user import UserProfile
@@ -64,8 +65,8 @@ def refresh(data: RefreshRequest, db: Session = Depends(get_db)) -> TokenRespons
 
 
 @router.post("/resend-otp", status_code=status.HTTP_200_OK)
-def resend_otp(email: str, db: Session = Depends(get_db)) -> dict[str, str]:
+def resend_otp(data: ResendOtpRequest, db: Session = Depends(get_db)) -> dict[str, str]:
     """Resend OTP to the given email."""
-    auth_service.resend_otp(db, email)
+    auth_service.resend_otp(db, data.email)
     # PROD: deviates from spec — spec defines "קוד OTP חדש נשלח.", message changed for consistency with other project messages. Reconsider before PROD.
     return {"message": "קוד אימות נשלח מחדש"}
