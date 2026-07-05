@@ -7,12 +7,7 @@
     (change)="onFileChange($event)"
   />
 
-  <button
-    type="button"
-    class="file-upload__btn"
-    [class.file-upload__btn--primary]="variant() === 'primary'"
-    (click)="fileInput.click()"
-  >
+  <button type="button" class="file-upload__btn" (click)="fileInput.click()">
     {{ label() }}
   </button>
 

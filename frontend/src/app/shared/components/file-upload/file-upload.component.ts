@@ -10,7 +10,6 @@ export class FileUploadComponent {
   accept = input<string>('image/*,.pdf');
   maxSizeMb = input<number>(5);
   label = input<string>('בחר קובץ');
-  variant = input<'default' | 'primary'>('default');
 
   fileSelected = output<File>();
   validationError = output<string>();
