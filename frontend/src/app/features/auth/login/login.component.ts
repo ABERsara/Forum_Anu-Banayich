@@ -116,7 +116,7 @@ export class LoginComponent {
         this.router.navigate(['/home']);
       },
       error: (err) => {
-        this.errorMessage.set(err.error?.detail ?? 'שגיאה בכניסה. בדקי את הפרטים.');
+        this.errorMessage.set(err.error?.detail ?? 'שגיאה בכניסה. בדוק/י את הפרטים.');
         this.isLoading.set(false);
       },
     });
