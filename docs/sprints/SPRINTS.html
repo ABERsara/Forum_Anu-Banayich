@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מפת דרכים — 5 ספרינטים | אנו בניך</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f5f5f0;
+    color: #222;
+    direction: rtl;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* —— COVER —— */
+  .cover {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%);
+    color: white;
+    padding: 70px 40px;
+    text-align: center;
+  }
+  .cover h1 { font-size: 38px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1px; }
+  .cover .sprint-title {
+    font-size: 22px; opacity: 0.85; margin-bottom: 8px;
+    background: rgba(255,255,255,0.12); border-radius: 10px;
+    display: inline-block; padding: 6px 24px;
+  }
+  .cover .subtitle { font-size: 17px; opacity: 0.75; margin-bottom: 28px; }
+  .cover .meta {
+    display: inline-flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+    background: rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 28px;
+  }
+  .cover .meta span { font-size: 13px; opacity: 0.85; }
+  .cover .meta strong { opacity: 1; }
+
+  /* —— GOAL BANNER —— */
+  .goal-banner {
+    background: linear-gradient(90deg, #2563eb, #2563eb);
+    color: white; padding: 24px 40px;
+    text-align: center; font-size: 17px; line-height: 1.6;
+  }
+  .goal-banner strong { font-size: 19px; display: block; margin-bottom: 6px; }
+
+  /* —— LAYOUT —— */
+  .container { max-width: 1050px; margin: 0 auto; padding: 40px 24px; }
+
+  /* —— TOC —— */
+  .toc {
+    background: white; border-radius: 16px; padding: 28px 32px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 40px;
+  }
+  .toc h2 { font-size: 18px; color: #2563eb; margin-bottom: 16px; border-bottom: 2px solid #e8e8e8; padding-bottom: 10px; }
+  .toc ol { padding-right: 20px; columns: 2; column-gap: 32px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: #2563eb; text-decoration: none; font-size: 14px; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* —— SECTIONS —— */
+  .section {
+    background: white; border-radius: 16px; padding: 32px 36px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 28px;
+  }
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 24px; padding-bottom: 14px;
+    border-bottom: 3px solid #f0f0f0;
+  }
+  .section-number {
+    background: #2563eb; color: white; border-radius: 50%;
+    width: 36px; height: 36px; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .section-number.s1  { background: #2563eb; }
+  .section-number.s2  { background: #16a34a; }
+  .section-number.s3  { background: #d97706; }
+  .section-number.s4  { background: #7c3aed; }
+  .section-number.s5  { background: #0d9488; }
+  .section-number.red    { background: #dc2626; }
+  .section-number.green  { background: #16a34a; }
+  .section-number.purple { background: #7c3aed; }
+  .section h2 { font-size: 22px; color: #2563eb; }
+  .section h3 { font-size: 17px; color: #1e3a8a; margin: 22px 0 10px; padding-right: 12px; border-right: 4px solid #2563eb; }
+  .section h4 { font-size: 15px; color: #444; margin: 16px 0 8px; font-weight: 600; }
+  .section p  { margin-bottom: 12px; color: #333; }
+
+  /* —— TABLES —— */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th { background: #2563eb; color: white; padding: 10px 14px; text-align: right; font-weight: 600; }
+  td { padding: 9px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) { background: #f8f9ff; }
+  tr:hover { background: #eff6ff; }
+
+  /* —— CODE —— */
+  code {
+    background: #eff6ff; color: #2563eb; padding: 2px 6px;
+    border-radius: 4px; font-size: 13px; font-family: 'Courier New', monospace;
+  }
+
+  /* —— BADGES —— */
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 600; margin: 2px;
+  }
+  .badge-s1     { background: #dbeafe; color: #1e3a8a; }
+  .badge-s2     { background: #dcfce7; color: #14532d; }
+  .badge-s3     { background: #ffedd5; color: #7c2d12; }
+  .badge-s4     { background: #ede9fe; color: #4c1d95; }
+  .badge-s5     { background: #ccfbf1; color: #134e4a; }
+  .badge-green  { background: #d4edda; color: #155724; }
+  .badge-red    { background: #f8d7da; color: #721c24; }
+  .badge-blue   { background: #d1ecf1; color: #0c5460; }
+  .badge-orange { background: #fff3cd; color: #856404; }
+  .badge-purple { background: #e8d5f5; color: #6a0dad; }
+  .badge-grey   { background: #e9ecef; color: #495057; }
+
+  /* —— CALLOUT BOXES —— */
+  .callout {
+    border-radius: 10px; padding: 16px 20px; margin: 14px 0;
+    border-right: 5px solid; font-size: 14px;
+  }
+  .callout-blue   { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+  .callout-green  { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+  .callout-orange { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+  .callout-red    { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+  .callout-purple { background: #faf5ff; border-color: #a855f7; color: #581c87; }
+  .callout-teal   { background: #f0fdfa; border-color: #14b8a6; color: #134e4a; }
+
+  /* —— TIMELINE STRIP (top visual) —— */
+  .roadmap-strip {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 8px; margin: 20px 0;
+  }
+  .roadmap-cell {
+    border-radius: 12px; padding: 18px 14px; text-align: center; color: white;
+    position: relative; cursor: default;
+  }
+  .roadmap-cell .weeks { font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .roadmap-cell .sprint-num { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+  .roadmap-cell .sprint-name { font-size: 13px; line-height: 1.4; opacity: 0.92; }
+  .roadmap-cell .sprint-tag {
+    display: inline-block; margin-top: 8px; font-size: 11px; font-weight: 700;
+    background: rgba(255,255,255,0.2); border-radius: 20px; padding: 2px 8px;
+  }
+  .rc-s1 { background: linear-gradient(135deg, #1e3a8a, #2563eb); }
+  .rc-s2 { background: linear-gradient(135deg, #14532d, #16a34a); }
+  .rc-s3 { background: linear-gradient(135deg, #7c2d12, #ea580c); }
+  .rc-s4 { background: linear-gradient(135deg, #4c1d95, #7c3aed); }
+  .rc-s5 { background: linear-gradient(135deg, #134e4a, #0d9488); }
+
+  /* Arrow between roadmap cells */
+  .roadmap-arrows {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 16px; margin-bottom: 8px;
+    direction: ltr;
+  }
+  .roadmap-arrows span { color: #94a3b8; font-size: 20px; flex: 1; text-align: center; }
+
+  /* —— SPRINT CARD (big cards for each sprint section) —— */
+  .sprint-card {
+    border-radius: 14px; overflow: hidden; margin-bottom: 20px;
+    border: 2px solid #e0e0e0;
+  }
+  .sprint-card-header {
+    padding: 20px 26px; color: white;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .sprint-card-header.sh-s1 { background: linear-gradient(90deg, #1e3a8a, #2563eb); }
+  .sprint-card-header.sh-s2 { background: linear-gradient(90deg, #14532d, #16a34a); }
+  .sprint-card-header.sh-s3 { background: linear-gradient(90deg, #7c2d12, #ea580c); }
+  .sprint-card-header.sh-s4 { background: linear-gradient(90deg, #4c1d95, #7c3aed); }
+  .sprint-card-header.sh-s5 { background: linear-gradient(90deg, #134e4a, #0d9488); }
+  .sprint-card-num {
+    font-size: 36px; font-weight: 900; opacity: 0.9;
+    background: rgba(255,255,255,0.15); border-radius: 12px;
+    width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .sprint-card-info { flex: 1; }
+  .sprint-card-info h3 { font-size: 21px; font-weight: 800; margin-bottom: 3px; }
+  .sprint-card-info .sprint-weeks { font-size: 14px; opacity: 0.85; }
+  .sprint-card-info .sprint-goal { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+  .sprint-card-body { padding: 24px 26px; }
+
+  /* —— CHECKLIST —— */
+  .checklist { list-style: none; padding: 0; margin: 10px 0; }
+  .checklist li {
+    padding: 6px 0 6px 28px; border-bottom: 1px solid #f0f0f0;
+    font-size: 14px; position: relative;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before {
+    content: '☐'; position: absolute; left: 4px;
+    color: #2563eb; font-size: 16px;
+  }
+
+  /* —— SHARED COMPONENTS GRID —— */
+  .comp-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px; margin: 14px 0;
+  }
+  .comp-card {
+    background: #f8f9ff; border: 2px solid #e0e8ff; border-radius: 12px;
+    padding: 16px; transition: border-color 0.2s;
+  }
+  .comp-card:hover { border-color: #2563eb; }
+  .comp-card .comp-name { font-size: 14px; font-weight: 700; color: #1e3a8a; margin-bottom: 6px; }
+  .comp-card .comp-built { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .comp-card .comp-desc { font-size: 12px; color: #555; margin-bottom: 8px; }
+  .comp-card .comp-used { font-size: 12px; color: #888; }
+
+  /* —— STATUS MACHINE —— */
+  .status-machine {
+    background: #f8f9ff; border-radius: 14px; padding: 28px; margin: 14px 0;
+    direction: ltr; text-align: center;
+  }
+  .status-row { display: flex; justify-content: center; gap: 8px; margin: 6px 0; align-items: center; }
+  .status-node {
+    border-radius: 10px; padding: 10px 16px;
+    font-size: 13px; font-weight: 700; min-width: 130px; text-align: center;
+    border: 2px solid;
+  }
+  .sn-pending  { background: #fff7ed; border-color: #f59e0b; color: #92400e; }
+  .sn-partial  { background: #eff6ff; border-color: #3b82f6; color: #1e3a8a; }
+  .sn-active   { background: #f0fdf4; border-color: #22c55e; color: #14532d; }
+  .sn-rejected { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+  .sn-suspend  { background: #faf5ff; border-color: #a855f7; color: #4c1d95; }
+  .sn-cancel   { background: #f1f5f9; border-color: #94a3b8; color: #475569; }
+  .status-arrow { font-size: 18px; color: #94a3b8; margin: 0 4px; }
+  .status-label { font-size: 11px; color: #64748b; white-space: nowrap; }
+  .status-col { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .status-branch { display: flex; justify-content: center; gap: 24px; margin: 4px 0; }
+
+  /* —— DEPENDENCY CHAIN (between sprints) —— */
+  .dep-chain {
+    background: #f8f9ff; border-radius: 12px; padding: 20px;
+    margin: 14px 0; direction: ltr; text-align: center;
+  }
+  .dep-row { display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .dep-node {
+    background: white; border: 2px solid #2563eb; border-radius: 10px;
+    padding: 10px 16px; font-size: 13px; font-weight: 600; color: #2563eb;
+    display: inline-block; min-width: 120px; text-align: center;
+  }
+  .dep-node small { display: block; font-size: 11px; font-weight: 400; opacity: 0.75; margin-top: 2px; }
+  .dep-node.s1 { border-color: #2563eb; color: #1e3a8a; background: #dbeafe; }
+  .dep-node.s2 { border-color: #16a34a; color: #14532d; background: #dcfce7; }
+  .dep-node.s3 { border-color: #ea580c; color: #7c2d12; background: #ffedd5; }
+  .dep-node.s4 { border-color: #7c3aed; color: #4c1d95; background: #ede9fe; }
+  .dep-node.s5 { border-color: #0d9488; color: #134e4a; background: #ccfbf1; }
+  .dep-arrow { font-size: 20px; color: #94a3b8; }
+
+  /* —— RBAC TABLE —— */
+  .rbac-table th:first-child { width: 120px; }
+  .rbac-s1 { background: #dbeafe; }
+  .rbac-s2 { background: #dcfce7; }
+  .rbac-s3 { background: #ffedd5; }
+  .rbac-s4 { background: #ede9fe; }
+  .rbac-s5 { background: #ccfbf1; }
+
+  /* —— FEATURE ITEM —— */
+  .feature-list { list-style: none; padding: 0; margin: 8px 0; }
+  .feature-list li {
+    padding: 5px 0 5px 4px; border-bottom: 1px solid #f0f0f0;
+    font-size: 13px; color: #333;
+  }
+  .feature-list li:last-child { border-bottom: none; }
+  .feature-list li::before { content: '▸ '; color: #2563eb; }
+
+  /* —— SPRINT DEPENDENCY NOTE —— */
+  .sprint-dep-note {
+    display: flex; gap: 14px; margin: 14px 0; flex-wrap: wrap;
+  }
+  .dep-from, .dep-to {
+    flex: 1; min-width: 200px; border-radius: 10px;
+    padding: 14px 16px; font-size: 13px;
+  }
+  .dep-from { background: #fff7ed; border: 2px solid #f59e0b; }
+  .dep-to   { background: #f0fdf4; border: 2px solid #22c55e; }
+  .dep-from strong { color: #92400e; display: block; margin-bottom: 6px; }
+  .dep-to strong   { color: #14532d; display: block; margin-bottom: 6px; }
+
+  @media (max-width: 700px) {
+    .cover h1 { font-size: 26px; }
+    .toc ol { columns: 1; }
+    .section { padding: 20px; }
+    .roadmap-strip { grid-template-columns: 1fr 1fr; }
+    .comp-grid { grid-template-columns: 1fr 1fr; }
+    .sprint-dep-note { flex-direction: column; }
+  }
+  @media print {
+    body { background: white; }
+    .section { box-shadow: none; border: 1px solid #ddd; }
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .roadmap-cell, .sprint-card-header, .roadmap-cell { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>אנו בניך</h1>
+  <div class="sprint-title">מפת דרכים — 5 ספרינטים מלאים</div>
+  <div class="subtitle">פלטפורמת קהילה לאלמנים ויתומים | FastAPI + Angular 22 | פרקטיקום סניף</div>
+  <div class="meta">
+    <span><strong>10 שבועות סה"כ</strong></span>
+    <span><strong>5 ספרינטים × 2 שבועות</strong></span>
+    <span><strong>End-to-End בכל ספרינט</strong></span>
+    <span><strong>MVP חי מ-Sprint 2</strong></span>
+  </div>
+</div>
+
+<!-- GOAL BANNER -->
+<div class="goal-banner">
+  <strong>המסע המלא</strong>
+  Sprint 1: הרשמה + DB מקומית → Sprint 2: ענן + אישור Admin → Sprint 3: פורום + דיווח → Sprint 4: ייעוץ + מודרציה → Sprint 5: הודעות פרטיות + ליטוש מלא
+</div>
+
+<div class="container">
+
+<!-- TOC -->
+<div class="toc">
+  <h2>תוכן עניינים</h2>
+  <ol>
+    <li><a href="#s-roadmap">ציר הזמן הכולל — 5 ספרינטים</a></li>
+    <li><a href="#s-deps">תלויות בין ספרינטים</a></li>
+    <li><a href="#s-shared">מפת קומפוננטות משותפות</a></li>
+    <li><a href="#s-status">מכונת סטטוסים — User Lifecycle</a></li>
+    <li><a href="#s-rbac">RBAC — מי מקבל גישה מתי</a></li>
+    <li><a href="#s-sprint1">Sprint 1 — Auth + DB Foundation</a></li>
+    <li><a href="#s-sprint2">Sprint 2 — Admin Approval + Cloud</a></li>
+    <li><a href="#s-sprint3">Sprint 3 — Forum Module</a></li>
+    <li><a href="#s-sprint4">Sprint 4 — Advisory + Moderation</a></li>
+    <li><a href="#s-sprint5">Sprint 5 — Messages + Polish</a></li>
+    <li><a href="#s-rules">כללי עבודה</a></li>
+    <li><a href="#s-dod">Definition of Done — כולל</a></li>
+  </ol>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SECTION 1 — ROADMAP VISUAL                      -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-roadmap">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2>ציר הזמן הכולל — 5 ספרינטים</h2>
+  </div>
+
+  <div class="roadmap-strip">
+    <div class="roadmap-cell rc-s1">
+      <div class="weeks">שבועות 1–2</div>
+      <div class="sprint-num">1</div>
+      <div class="sprint-name">Auth + DB<br>Foundation</div>
+      <div class="sprint-tag">🔐 הרשמה + כניסה</div>
+    </div>
+    <div class="roadmap-cell rc-s2">
+      <div class="weeks">שבועות 3–4</div>
+      <div class="sprint-num">2</div>
+      <div class="sprint-name">Admin Approval<br>+ DevOps Foundation</div>
+      <div class="sprint-tag">Docker + CI + Admin</div>
+    </div>
+    <div class="roadmap-cell rc-s3">
+      <div class="weeks">שבועות 5–6</div>
+      <div class="sprint-num">3</div>
+      <div class="sprint-name">Forum Module<br>+ Cloud Deploy</div>
+      <div class="sprint-tag">☁️ MVP בענן + 💬 פורום</div>
+    </div>
+    <div class="roadmap-cell rc-s4">
+      <div class="weeks">שבועות 7–8</div>
+      <div class="sprint-num">4</div>
+      <div class="sprint-name">Advisory +<br>Moderation</div>
+      <div class="sprint-tag">⚖️ RBAC מלא</div>
+    </div>
+    <div class="roadmap-cell rc-s5">
+      <div class="weeks">שבועות 9–10</div>
+      <div class="sprint-num">5</div>
+      <div class="sprint-name">Messages +<br>Audit + Polish</div>
+      <div class="sprint-tag">✅ פרויקט מוגמר</div>
+    </div>
+  </div>
+
+  <table style="margin-top: 22px;">
+    <tr>
+      <th>ספרינט</th>
+      <th>מטרת הספרינט</th>
+      <th>מה ה-MVP בסוף</th>
+      <th>תלוי ב</th>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s1">Sprint 1</span></td>
+      <td>הרשמה, OTP, כניסה — מקצה לקצה מקומית</td>
+      <td>משתמשת נרשמת, מקבלת OTP, נכנסת לאפליקציה</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s2">Sprint 2</span></td>
+      <td>מנהל מאשר הרשמות + Dockerfiles + CI</td>
+      <td>Admin Dashboard + docker compose + CI ירוק + דף המתנה למשתמש</td>
+      <td>Sprint 1 מושלם</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s3">Sprint 3</span></td>
+      <td>פיצ'ר הליבה: פורום עם סינון קבוצה/מגזר + דיווח + Deploy לענן</td>
+      <td>URL ציבורי + משתמשים כותבים וקוראים פוסטים</td>
+      <td>Sprint 1 + 2</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s4">Sprint 4</span></td>
+      <td>ייעוץ מקצועי + מבקרים מטפלים בדיווחים</td>
+      <td>RBAC מלא: User / Admin / Moderator / Professional</td>
+      <td>Sprint 1–3</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s5">Sprint 5</span></td>
+      <td>הודעות פרטיות + Audit Log + ליטוש RTL מלא</td>
+      <td>פרויקט מוגמר ומוכן להגשה</td>
+      <td>Sprint 1–4</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SECTION 2 — INTER-SPRINT DEPENDENCIES           -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-deps">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <h2>תלויות בין ספרינטים — מה מאפשר מה</h2>
+  </div>
+
+  <div class="callout callout-orange">
+    ⚠️ <strong>כל ספרינט בונה על הקודם.</strong> ספרינט N לא יכול להתחיל לפני שספרינט N-1 נסגר עם DoD מלא — אחרת בונים על יסודות שבורים.
+  </div>
+
+  <div class="dep-chain">
+    <div class="dep-row">
+      <div class="dep-node s1">
+        <div>Sprint 1</div>
+        <small>Users, Auth, DB, Shared UI</small>
+      </div>
+      <div class="dep-arrow">→</div>
+      <div class="dep-node s2">
+        <div>Sprint 2</div>
+        <small>Admin + Docker + CI/CD</small>
+      </div>
+      <div class="dep-arrow">→</div>
+      <div class="dep-node s3">
+        <div>Sprint 3</div>
+        <small>Forum + Report</small>
+      </div>
+      <div class="dep-arrow">→</div>
+      <div class="dep-node s4">
+        <div>Sprint 4</div>
+        <small>Advisory + Moderation</small>
+      </div>
+      <div class="dep-arrow">→</div>
+      <div class="dep-node s5">
+        <div>Sprint 5</div>
+        <small>Messages + Polish</small>
+      </div>
+    </div>
+  </div>
+
+  <h3>מה עובר בין ספרינטים — שימוש חוזר</h3>
+  <table>
+    <tr><th>מה עובר</th><th>נבנה ב</th><th>בשימוש ב</th><th>הערה</th></tr>
+    <tr>
+      <td><code>loading-spinner</code> + <code>error-display</code></td>
+      <td><span class="badge badge-s1">S1</span></td>
+      <td><span class="badge badge-s2">S2</span> <span class="badge badge-s3">S3</span> <span class="badge badge-s4">S4</span> <span class="badge badge-s5">S5</span></td>
+      <td>כל component חדש חייב להשתמש בהן</td>
+    </tr>
+    <tr>
+      <td><code>confirm-dialog</code></td>
+      <td><span class="badge badge-s1">S1</span></td>
+      <td><span class="badge badge-s2">S2</span> <span class="badge badge-s3">S3</span> <span class="badge badge-s4">S4</span> <span class="badge badge-s5">S5</span></td>
+      <td>מחיקה, השעיה, ביטול חשבון</td>
+    </tr>
+    <tr>
+      <td><code>file-upload</code></td>
+      <td><span class="badge badge-s1">S1</span></td>
+      <td><span class="badge badge-s3">S3</span></td>
+      <td>צירוף קובץ לפוסט בפורום</td>
+    </tr>
+    <tr>
+      <td><code>report-button</code> + modal</td>
+      <td><span class="badge badge-s3">S3</span></td>
+      <td><span class="badge badge-s4">S4</span> <span class="badge badge-s5">S5</span></td>
+      <td>מקבל <code>contentType</code> + <code>contentId</code> — עובד בכל מקום</td>
+    </tr>
+    <tr>
+      <td><code>user-alias.pipe</code></td>
+      <td><span class="badge badge-s4">S4</span></td>
+      <td><span class="badge badge-s4">S4</span> בלבד</td>
+      <td>כינוי שואל: "אלמנה – ספרדי"</td>
+    </tr>
+    <tr>
+      <td>Alembic migrations + DB schema</td>
+      <td><span class="badge badge-s1">S1</span></td>
+      <td>כל ספרינט</td>
+      <td>כל ספרינט מוסיף migrations על הבסיס</td>
+    </tr>
+    <tr>
+      <td>JWT Auth + Guards + Interceptor</td>
+      <td><span class="badge badge-s1">S1</span></td>
+      <td>כל ספרינט</td>
+      <td>כל route מוגן מהרגע שנוצר</td>
+    </tr>
+    <tr>
+      <td>Docker + CI/CD</td>
+      <td><span class="badge badge-s2">S2</span></td>
+      <td><span class="badge badge-s3">S3</span> <span class="badge badge-s4">S4</span> <span class="badge badge-s5">S5</span></td>
+      <td>כל deploy לאחר מכן עובר CI</td>
+    </tr>
+    <tr>
+      <td>Forum + Report logic</td>
+      <td><span class="badge badge-s3">S3</span></td>
+      <td><span class="badge badge-s4">S4</span></td>
+      <td>המבקר בספרינט 4 מטפל בדיווחי ספרינט 3</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SECTION 3 — SHARED COMPONENTS MAP               -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-shared">
+  <div class="section-header">
+    <div class="section-number purple">3</div>
+    <h2>מפת קומפוננטות משותפות</h2>
+  </div>
+
+  <div class="callout callout-red">
+    🚨 <strong>חוק ברזל:</strong> קומפוננטות ב-<code>shared/components/</code> נבנות <strong>פעם אחת</strong> ומשמשות בכל הספרינטים.
+    לפני שכותבות spinner / dialog / כפתור — בדקו אם כבר קיים ב-<code>shared/</code>.
+  </div>
+
+  <div class="comp-grid">
+    <div class="comp-card">
+      <div class="comp-name">🔄 loading-spinner</div>
+      <div class="comp-built"><span class="badge badge-s1">נבנה Sprint 1</span></div>
+      <div class="comp-desc">עיגול סיבובי + הודעת טעינה. inputs: <code>size</code>, <code>message</code></div>
+      <div class="comp-used">בשימוש: כל ספרינט — כל component חדש</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-name">⚠️ error-display</div>
+      <div class="comp-built"><span class="badge badge-s1">נבנה Sprint 1</span></div>
+      <div class="comp-desc">קופסת שגיאה אדומה. input: <code>message</code></div>
+      <div class="comp-used">בשימוש: כל ספרינט — כל טופס / API call</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-name">❓ confirm-dialog</div>
+      <div class="comp-built"><span class="badge badge-s1">נבנה Sprint 1</span></div>
+      <div class="comp-desc">overlay "האם אתה בטוחה?". outputs: <code>confirmed</code>, <code>cancelled</code></div>
+      <div class="comp-used">בשימוש: S2 (השעיה), S3 (מחיקת פוסט), S4 (השעיה), S5 (מחיקת חשבון)</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-name">📎 file-upload</div>
+      <div class="comp-built"><span class="badge badge-s1">נבנה Sprint 1</span></div>
+      <div class="comp-desc">upload + preview + ולידציה גודל/סוג. inputs: <code>acceptedTypes</code>, <code>maxSizeMB</code></div>
+      <div class="comp-used">בשימוש: S1 (הרשמה), S3 (קובץ לפוסט)</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-name">🚩 report-button</div>
+      <div class="comp-built"><span class="badge badge-s3">נבנה Sprint 3</span></div>
+      <div class="comp-desc">כפתור דיווח + modal בחירת סיבה. inputs: <code>contentType</code>, <code>contentId</code></div>
+      <div class="comp-used">בשימוש: S3 (פורום), S4 (שאלות מקצועיות), S5 (הודעות)</div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-name">🏷️ user-alias pipe</div>
+      <div class="comp-built"><span class="badge badge-s4">נבנה Sprint 4</span></div>
+      <div class="comp-desc">ממיר שם אמיתי לכינוי: "אלמנה – ספרדי"</div>
+      <div class="comp-used">בשימוש: S4 בלבד (ייעוץ מקצועי)</div>
+    </div>
+  </div>
+
+  <div class="callout callout-blue">
+    💡 <strong>בדיקה לפני כתיבת קומפוננטה חדשה:</strong> האם יש משהו דומה ב-<code>shared/components/</code>?
+    אם כן — הרחיבו אותה, אל תכתבו חדשה. אם לא — כתבו ב-<code>shared/</code> מההתחלה אם היא תשמש יותר מספרינט אחד.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SECTION 4 — STATUS MACHINE                      -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-status">
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <h2>מכונת סטטוסים — User Lifecycle</h2>
+  </div>
+
+  <p>כל משתמשת עוברת את הסטטוסים האלה. הבינו את הזרימה — זה המנגנון המרכזי שמחבר Sprint 1, 2, ו-4.</p>
+
+  <div class="status-machine">
+    <!-- Row 1: Registration start -->
+    <div class="status-row">
+      <div class="status-node sn-pending">PENDING_OTP<br><span style="font-size:11px; font-weight:400;">נרשמה, ממתינה לאימות מייל</span></div>
+    </div>
+    <div class="status-row">
+      <span class="status-arrow">↓</span>
+      <span class="status-label">[OTP אומת] — Sprint 1</span>
+    </div>
+    <!-- Row 2: After OTP -->
+    <div class="status-row">
+      <div class="status-node sn-pending">PENDING_APPROVAL<br><span style="font-size:11px; font-weight:400;">ממתינה לאישור שני מנהלים</span></div>
+    </div>
+
+    <!-- Branch: 3 options -->
+    <div class="status-row" style="gap: 16px; margin: 12px 0;">
+      <div class="status-col">
+        <span class="status-label">[מנהל א' אישר] — Sprint 2</span>
+        <span class="status-arrow">↓</span>
+        <div class="status-node sn-partial">PARTIAL_APPROVED<br><span style="font-size:11px; font-weight:400;">ממתינה למנהל ב'</span></div>
+        <span class="status-arrow">↓</span>
+        <span class="status-label">[מנהל ב' אישר]</span>
+        <span class="status-arrow">↓</span>
+        <div class="status-node sn-active" style="font-weight:800;">ACTIVE ✓<br><span style="font-size:11px; font-weight:400;">יכולה להשתמש באפליקציה</span></div>
+      </div>
+
+      <div style="display:flex; align-items:center; padding: 0 8px; color: #94a3b8; font-size: 24px; padding-top: 40px;">⟷</div>
+
+      <div class="status-col">
+        <span class="status-label">[מנהל דחה] — Sprint 2</span>
+        <span class="status-arrow">↓</span>
+        <div class="status-node sn-rejected">REJECTED<br><span style="font-size:11px; font-weight:400;">+ מייל עם סיבה + 30 יום לערעור</span></div>
+      </div>
+
+      <div style="display:flex; align-items:center; padding: 0 8px; color: #94a3b8; font-size: 24px; padding-top: 40px;">⟷</div>
+
+      <div class="status-col">
+        <span class="status-label">[מנהל ביקש מידע] — Sprint 2</span>
+        <span class="status-arrow">↓</span>
+        <div class="status-node sn-pending">נשארת PENDING<br><span style="font-size:11px; font-weight:400;">+ מייל למשתמשת</span></div>
+      </div>
+    </div>
+
+    <!-- From ACTIVE: two options -->
+    <div class="status-row" style="margin-top: 12px;">
+      <div class="status-col">
+        <span class="status-label">מ-ACTIVE: [השעיה ידנית / אוטומטית] — Sprint 4</span>
+        <span class="status-arrow">↓</span>
+        <div class="status-row" style="gap: 24px;">
+          <div class="status-node sn-suspend">SUSPENDED<br><span style="font-size:11px; font-weight:400;">זמנית, עם תאריך סיום</span></div>
+          <div class="status-node sn-cancel">CANCELLED<br><span style="font-size:11px; font-weight:400;">מחיקת נתונים (GDPR) — Sprint 5</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table style="margin-top: 18px;">
+    <tr><th>סטטוס</th><th>מי מטפל</th><th>ספרינט</th><th>מה קורה</th></tr>
+    <tr><td><code>PENDING_OTP</code></td><td>המשתמשת עצמה</td><td><span class="badge badge-s1">S1</span></td><td>מאמתת OTP במייל</td></tr>
+    <tr><td><code>PENDING_APPROVAL</code></td><td>שני מנהלים</td><td><span class="badge badge-s2">S2</span></td><td>אישור כפול + SLA 72 שעות</td></tr>
+    <tr><td><code>PARTIAL_APPROVED</code></td><td>מנהל שני</td><td><span class="badge badge-s2">S2</span></td><td>מנהל ראשון אישר, ממתין לשני</td></tr>
+    <tr><td><code>ACTIVE</code></td><td>—</td><td><span class="badge badge-s2">S2</span></td><td>גישה מלאה לפי תפקיד</td></tr>
+    <tr><td><code>REJECTED</code></td><td>המשתמשת</td><td><span class="badge badge-s2">S2</span></td><td>ערעור תוך 30 יום</td></tr>
+    <tr><td><code>SUSPENDED</code></td><td>מנהל / מבקר / אוטומטי</td><td><span class="badge badge-s4">S4</span></td><td>זמנית — חוזרת ל-ACTIVE אחרי התקופה</td></tr>
+    <tr><td><code>CANCELLED</code></td><td>המשתמשת / מנהל</td><td><span class="badge badge-s5">S5</span></td><td>מחיקת פרטים + anonymize פוסטים (GDPR)</td></tr>
+  </table>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SECTION 5 — RBAC MAP                            -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-rbac">
+  <div class="section-header">
+    <div class="section-number">5</div>
+    <h2>RBAC — מי מקבל גישה מתי</h2>
+  </div>
+
+  <p>ארבעה תפקידים, חמישה ספרינטים. הטבלה מראה מה כל תפקיד יכול לעשות בכל ספרינט.</p>
+
+  <table class="rbac-table">
+    <tr>
+      <th>תפקיד</th>
+      <th style="background: #1e3a8a;">Sprint 1</th>
+      <th style="background: #14532d;">Sprint 2</th>
+      <th style="background: #7c2d12;">Sprint 3</th>
+      <th style="background: #4c1d95;">Sprint 4</th>
+      <th style="background: #134e4a;">Sprint 5</th>
+    </tr>
+    <tr>
+      <td><strong>👤 User</strong><br><small>משתמשת רגילה</small></td>
+      <td class="rbac-s1">הרשמה + כניסה + OTP</td>
+      <td class="rbac-s2">המתנה לאישור. מייל: אושרת / נדחית / נדרש מידע</td>
+      <td class="rbac-s3">קריאת פוסטים מסוננים לקבוצה/מגזר. כתיבה + עריכה + מחיקה שלה. דיווח על פוסטים</td>
+      <td class="rbac-s4">שאלה מקצועית (פרטית/ציבורית). צפייה ב-Q&A feed</td>
+      <td class="rbac-s5">שליחת הודעות פרטיות לאנשים מאותה קבוצה/מגזר. מחיקת חשבון</td>
+    </tr>
+    <tr>
+      <td><strong>🛡️ Admin</strong><br><small>מנהלת</small></td>
+      <td class="rbac-s1">—</td>
+      <td class="rbac-s2">אישור / דחייה / בקשת מידע / השעיה. ניהול מנהלים שניים. SLA tracking</td>
+      <td class="rbac-s3">broadcast לכל הקהילה. גישה לכל ההודעות ללא הגבלת קבוצה/מגזר</td>
+      <td class="rbac-s4">הוספת / עריכת / הסרת מבקרים ואנשי מקצוע</td>
+      <td class="rbac-s5">Audit Log מלא. ייצוא נתונים CSV</td>
+    </tr>
+    <tr>
+      <td><strong>🔍 Moderator</strong><br><small>מבקרת</small></td>
+      <td class="rbac-s1">—</td>
+      <td class="rbac-s2">—</td>
+      <td class="rbac-s3">קבלת התראות דיווח (שלב 1+2). הסתרת הודעות</td>
+      <td class="rbac-s4">טיפול בדיווחים בתאים שלה. כרטיס משתמש. השעיה ידנית. זיהוי חריגות</td>
+      <td class="rbac-s5">—</td>
+    </tr>
+    <tr>
+      <td><strong>💼 Professional</strong><br><small>איש מקצוע</small></td>
+      <td class="rbac-s1">—</td>
+      <td class="rbac-s2">—</td>
+      <td class="rbac-s3">—</td>
+      <td class="rbac-s4">קבלת שאלות (לפי תחום / ספציפי). מענה + הבהרה. Q&A feed</td>
+      <td class="rbac-s5">—</td>
+    </tr>
+  </table>
+
+  <div class="callout callout-blue" style="margin-top: 18px;">
+    💡 <strong>הסינון לפי קבוצה × מגזר הוא שכבה נוספת מעל ה-RBAC.</strong>
+    גם User בתפקיד ACTIVE רואה רק את הפורום של הקבוצה/מגזר שלה
+    (אלמנה-חסידית רואה רק פוסטים לאלמנות-חסידיות או לכלל האלמנות או לכולם).
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SPRINT 1                                        -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-sprint1">
+  <div class="section-header">
+    <div class="section-number s1">1</div>
+    <h2>Sprint 1 — Auth + DB Foundation</h2>
+  </div>
+
+  <div class="sprint-card">
+    <div class="sprint-card-header sh-s1">
+      <div class="sprint-card-num">1</div>
+      <div class="sprint-card-info">
+        <h3>הרשמה + כניסה — מקצה לקצה</h3>
+        <div class="sprint-weeks">📅 שבועות 1–2 &nbsp;|&nbsp; 14 משימות (FAB-32 עד FAB-45)</div>
+        <div class="sprint-goal">🎯 בסוף: משתמשת נרשמת, מקבלת OTP, מאמתת, ונכנסת. Guard חוסם דפים מוגנים.</div>
+      </div>
+    </div>
+    <div class="sprint-card-body">
+
+      <div class="callout callout-red">
+        🚨 <strong>שני BLOCKERs ביום 1 — במקביל:</strong>
+        FAB-32 (Alembic Init — ללא זה אין DB), FAB-37 (Shared UI — ללא זה אין components).
+      </div>
+
+      <div class="sprint-dep-note">
+        <div class="dep-from">
+          <strong>🔧 Backend (FAB-32 → FAB-36)</strong>
+          <ul class="feature-list">
+            <li>FAB-32: Alembic init + migration ראשונה (BLOCKER)</li>
+            <li>FAB-33: auth_service — register / verify_otp / resend_otp</li>
+            <li>FAB-34: auth_service — login / refresh_token</li>
+            <li>FAB-35: Wire auth endpoints (מחבר service ל-router)</li>
+            <li>FAB-36: Email service — OTP אמיתי ב-Mailtrap</li>
+          </ul>
+        </div>
+        <div class="dep-to">
+          <strong>🖥️ Frontend (FAB-37 → FAB-45)</strong>
+          <ul class="feature-list">
+            <li>FAB-37: Shared UI — error-display + loading-spinner (BLOCKER)</li>
+            <li>FAB-38: confirm-dialog (shared)</li>
+            <li>FAB-39: file-upload (shared)</li>
+            <li>FAB-40: auth.service.ts — 5 methods HTTP (BLOCKER)</li>
+            <li>FAB-41: Guard bug fix + interceptor 401 auto-refresh</li>
+            <li>FAB-42: Login component</li>
+            <li>FAB-43: Register steps 1–3 + OTP screen (L — הכי גדול)</li>
+            <li>FAB-44: Home + Header</li>
+            <li>FAB-45: Register step 4 (BACKLOG — אם יש זמן)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>alembic upgrade head</code> רץ ללא שגיאות, כל הטבלאות קיימות</li>
+        <li>זרימה שלמה ב-Swagger: register → verify-otp → login → GET /users/me</li>
+        <li>OTP מגיע ל-inbox ב-Mailtrap</li>
+        <li>כניסה ל-route מוגן ללא token → redirect ל-<code>/login</code></li>
+        <li>שלב 3 הרשמה — בחירת 3 קבצים עם preview</li>
+        <li>כל 4 ה-shared components עובדים: spinner, error-display, confirm-dialog, file-upload</li>
+        <li>ראו SPRINT1.html לפירוט מלא של כל 14 המשימות</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SPRINT 2                                        -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-sprint2">
+  <div class="section-header">
+    <div class="section-number s2">2</div>
+    <h2>Sprint 2 — Admin Approval + DevOps Foundation</h2>
+  </div>
+
+  <div class="sprint-card">
+    <div class="sprint-card-header sh-s2">
+      <div class="sprint-card-num">2</div>
+      <div class="sprint-card-info">
+        <h3>מנהל מאשר הרשמות + תשתית DevOps</h3>
+        <div class="sprint-weeks">שבועות 3–4</div>
+        <div class="sprint-goal">בסוף: Docker + CI ירוקים, מנהל מאשר / דוחה הרשמות, משתמש ממתין רואה דף סטטוס</div>
+      </div>
+    </div>
+    <div class="sprint-card-body">
+
+      <div class="callout callout-blue">
+        💡 <strong>Cloud deployment הוא Sprint 3.</strong> Sprint 2 = Dockerfiles + CI בלבד. ה-CD נכנס כ-placeholder — ה-deploy האמיתי יושלם בספרינט הבא.
+      </div>
+
+      <div class="sprint-dep-note">
+        <div class="dep-from">
+          <strong>⚙️ DevOps / Infra</strong>
+          <ul class="feature-list">
+            <li>Dockerfile לbackend (Python + uvicorn)</li>
+            <li>Dockerfile לfrontend (nginx + Angular build)</li>
+            <li>עדכון docker-compose.yml לPostgreSQL</li>
+            <li>GitHub Actions CI — lint + tests על כל PR</li>
+            <li>GitHub Actions CD — placeholder לdeploy</li>
+            <li>.env.example מעודכן עם כל משתני הייצור</li>
+            <li>alembic upgrade head על DB הענן</li>
+          </ul>
+        </div>
+        <div class="dep-to">
+          <strong>Backend — אישור הרשמה</strong>
+          <ul class="feature-list">
+            <li>GET /admin/registrations — רשימת ממתינות</li>
+            <li>GET /admin/registrations/{id} — פרטים מלאים</li>
+            <li>POST /admin/registrations/{id}/approve — אישור (dual: PARTIAL → ACTIVE)</li>
+            <li>POST /admin/registrations/{id}/reject — דחייה + מייל</li>
+            <li>POST /admin/users/{id}/suspend — השעיה עם סיבה + שעות</li>
+            <li>AuditLog לכל פעולת Admin</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Frontend</h4>
+      <ul class="feature-list">
+        <li>admin-dashboard.component — דף ניהול ראשי + badge מספר ממתינות</li>
+        <li>pending-registrations.component — טבלת ממתינות + status badge</li>
+        <li>מודאל פרטי בקשה — כפתורי אישור / דחייה / השעיה + confirm-dialog</li>
+        <li>admin.service.ts — net-new (לא קיים כרגע)</li>
+        <li>auth/pending — דף המתנה לאישור (net-new, G3a)</li>
+        <li>register step 4 — 3 file-upload inputs + 3 checkboxes + navigate לauth/pending (F7b)</li>
+        <li>כל component משתמש ב-loading-spinner + error-display מ-Sprint 1</li>
+      </ul>
+
+      <h4>מכונת הסטטוסים בספרינט זה</h4>
+      <div class="callout callout-purple">
+        💡 PENDING_APPROVAL → [מנהל א'] → PARTIAL_APPROVED → [מנהל ב'] → ACTIVE<br>
+        במקביל: [מנהל דחה] → REJECTED | [בקשת מידע] → נשאר PENDING עם מייל
+      </div>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>docker compose up</code> מביא backend + frontend + PostgreSQL</li>
+        <li>GitHub Actions CI עובר בירוק על כל PR</li>
+        <li>מנהל מאשר הרשמה → משתמשת מקבלת מייל ויכולה להתחבר</li>
+        <li>מנהל דוחה → משתמשת מקבלת מייל עם סיבה</li>
+        <li>מנהל משהה → משתמשת חסומה בכניסה בזמן ההשעיה</li>
+        <li>משתמש שהשלים הרשמה (OTP + שלב 3) → navigate ל-<code>/auth/pending</code></li>
+        <li>Auth guard מנתב משתמשות בסטטוס PENDING ל-<code>/auth/pending</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SPRINT 3                                        -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-sprint3">
+  <div class="section-header">
+    <div class="section-number s3">3</div>
+    <h2>Sprint 3 — Forum Module</h2>
+  </div>
+
+  <div class="sprint-card">
+    <div class="sprint-card-header sh-s3">
+      <div class="sprint-card-num">3</div>
+      <div class="sprint-card-info">
+        <h3>פיצ'ר הליבה — פורום + סינון + דיווח 3 שלבי</h3>
+        <div class="sprint-weeks">📅 שבועות 5–6</div>
+        <div class="sprint-goal">🎯 בסוף: משתמשים פרסמים וקוראים הודעות. סינון קבוצה/מגזר אוטומטי. דיווח 3 שלבי.</div>
+      </div>
+    </div>
+    <div class="sprint-card-body">
+
+      <div class="callout callout-orange">
+        ♻️ <strong>שימוש חוזר ב-Sprint 1:</strong>
+        <code>file-upload.component</code> — צירוף קובץ לפוסט.
+        <code>confirm-dialog.component</code> — מחיקת פוסט.
+        בנינו אותן כבר. לא כותבים שוב.
+      </div>
+
+      <div class="sprint-dep-note">
+        <div class="dep-from">
+          <strong>🔧 Backend</strong>
+          <ul class="feature-list">
+            <li>GET /forum — הודעות עם WHERE אוטומטי לפי קבוצה+מגזר</li>
+            <li>POST /forum — יצירה עם בחירת הפצה + קובץ מצורף</li>
+            <li>GET /forum/{id} — פוסט בודד + ולידציה הרשאה</li>
+            <li>PATCH /forum/{id} — עריכה (יוצר בלבד)</li>
+            <li>DELETE /forum/{id} — מחיקה (יוצר / מנהל / מבקר)</li>
+            <li>Pagination: page + page_size</li>
+            <li>POST /forum/broadcast — Admin בלבד, לכל המשתמשים</li>
+            <li>POST /reports — דיווח על פוסט</li>
+            <li>לוגיקת דיווח 3 שלבי (ראו מטה)</li>
+            <li>AuditLog: מחיקה, עריכה, broadcast</li>
+          </ul>
+        </div>
+        <div class="dep-to">
+          <strong>🖥️ Frontend</strong>
+          <ul class="feature-list">
+            <li>forum.service.ts — getPosts, createPost, getPost, updatePost, deletePost</li>
+            <li>report.service.ts — createReport</li>
+            <li>forum-list.component — רשימה + pagination + סינון</li>
+            <li>forum-post.component — פוסט מלא + קובץ מצורף</li>
+            <li>new-post.component — טופס יצירה + file-upload + בורר הפצה</li>
+            <li>edit-post.component — עריכת פוסט קיים</li>
+            <li><strong>report-button.component (NEW shared!)</strong> — כפתור + modal סיבה</li>
+            <li>ניווט לפורום ב-header + routing</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>לוגיקת דיווח 3 שלבי</h3>
+      <table>
+        <tr><th>שלב</th><th>תנאי</th><th>מה קורה</th></tr>
+        <tr>
+          <td>שלב 1</td>
+          <td>דיווח ראשון</td>
+          <td>התראת מייל למבקר האחראי בלבד. הפוסט נשאר גלוי.</td>
+        </tr>
+        <tr>
+          <td>שלב 2</td>
+          <td>דיווח שני (ממשתמש שונה)</td>
+          <td>הסתרה אוטומטית של הפוסט + מייל דחיפות למבקר.</td>
+        </tr>
+        <tr>
+          <td>שלב 3</td>
+          <td>דיווח שלישי+ (ממשתמשים שונים)</td>
+          <td>מייל חוזר למבקר ("דרינג'"). המבקר מטפל ב-Sprint 4.</td>
+        </tr>
+      </table>
+
+      <div class="callout callout-blue">
+        💡 <strong><code>report-button.component</code> — shared מהרגע שנבנה!</strong>
+        מקבל <code>contentType</code> + <code>contentId</code>.
+        בספרינט 4 — אותו component על שאלות מקצועיות.
+        בספרינט 5 — אותו component על הודעות פרטיות. לא כותבים שוב.
+      </div>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>משתמשת חסידית רואה רק הודעות לקבוצה/מגזר שלה</li>
+        <li>פרסום הודעה → מופיעה ברשימה מיידית</li>
+        <li>עריכה → updated_at מתעדכן + תוכן חדש מוצג</li>
+        <li>דיווח ראשון → מייל למבקר בלבד</li>
+        <li>דיווח שני (ממשתמש שונה) → הפוסט נעלם מהרשימה + מייל דחיפות</li>
+        <li>Admin רואה הכל ללא הגבלה + יכולה לשלוח broadcast</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SPRINT 4                                        -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-sprint4">
+  <div class="section-header">
+    <div class="section-number s4">4</div>
+    <h2>Sprint 4 — Professional Advisory + Moderation</h2>
+  </div>
+
+  <div class="sprint-card">
+    <div class="sprint-card-header sh-s4">
+      <div class="sprint-card-num">4</div>
+      <div class="sprint-card-info">
+        <h3>שאלות מקצועיות + מבקרים + ניהול מבקרים</h3>
+        <div class="sprint-weeks">📅 שבועות 7–8</div>
+        <div class="sprint-goal">🎯 בסוף: RBAC מלא — כל 4 תפקידים פעילים. חריגות אוטומטיות. מנהל מנהל מבקרים.</div>
+      </div>
+    </div>
+    <div class="sprint-card-body">
+
+      <div class="callout callout-purple">
+        ♻️ <strong>שימוש חוזר:</strong>
+        <code>report-button.component</code> מ-Sprint 3 — על שאלות מקצועיות.
+        <code>confirm-dialog.component</code> מ-Sprint 1 — להשעיה ידנית.
+      </div>
+
+      <div class="sprint-dep-note">
+        <div class="dep-from">
+          <strong>💼 Backend — ייעוץ מקצועי</strong>
+          <ul class="feature-list">
+            <li>GET /professionals — קטלוג לפי קבוצה+מגזר</li>
+            <li>POST /queries — שאלה: לספציפי / לתחום, פרטי/ציבורי</li>
+            <li>GET /queries/my — שאלות המשתמשת המחוברת</li>
+            <li>POST /queries/{id}/answer — תשובת איש מקצוע</li>
+            <li>PATCH /queries/{id}/answer — עדכון תשובה</li>
+            <li>PATCH /queries/{id}/favorite-answer — תשובה מועדפת</li>
+            <li>GET /queries/feed — שאלות ציבוריות שנענו</li>
+            <li>כינוי שואל: "אלמנה – ספרדי" (אלא אם בחרה לחשוף)</li>
+            <li>מיילים: לאיש מקצוע ספציפי / לתחום / לשואל בקבלת תשובה</li>
+          </ul>
+        </div>
+        <div class="dep-to">
+          <strong>⚖️ Backend — מודרציה + חריגות</strong>
+          <ul class="feature-list">
+            <li>GET /moderator/reports — דיווחים ממתינים בתאי המבקר</li>
+            <li>GET /moderator/reports/history — היסטוריה</li>
+            <li>POST /moderator/reports/{id}/decide — מחיקה או ביטול</li>
+            <li>GET /moderator/users/{id}/card — כרטיס משתמש + סטטיסטיקות</li>
+            <li>POST /moderator/users/{id}/suspend — השעיה ידנית</li>
+            <li>חריגה 1: 5+ דיווחי-שגוי ב-30 יום → מגבלת 3 דיווחים/יום</li>
+            <li>חריגה 2: 3+ הפרות-מוצדקות ב-30 יום → התראה למנהל</li>
+            <li>חריגה 3: 2+ הפרות ב-7 ימים → השעיה אוטומטית 48 שעות</li>
+            <li>Admin: CRUD על מבקרים ואנשי מקצוע</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Frontend</h4>
+      <ul class="feature-list">
+        <li>professional.service.ts — כל פעולות הייעוץ</li>
+        <li>advice-list.component — קטלוג אנשי מקצוע (שם, תחום — ללא פרטי קשר)</li>
+        <li>ask-question.component — פרטי/ציבורי + ספציפי/תחום + checkbox "חשוף שמי"</li>
+        <li>שילוב report-button.component על שאלות ציבוריות</li>
+        <li>qa-feed.component — שאלות+תשובות ציבוריות + תשובה מועדפת</li>
+        <li>moderator/reports.component — לוח מבקר: דיווחים + היסטוריה</li>
+        <li>moderator/user-card.component — כרטיס משתמש + כפתור השעיה</li>
+        <li>manage-professionals.component — ניהול קטלוג (Admin)</li>
+        <li>manage-moderators.component — הוסף / ערוך / הסר מבקרים (Admin)</li>
+      </ul>
+
+      <h4>חריגות אוטומטיות — לוגיקת ה-auto-suspend</h4>
+      <table>
+        <tr><th>חריגה</th><th>תנאי</th><th>תגובה אוטומטית</th></tr>
+        <tr>
+          <td>חריגה 1</td>
+          <td>5+ דיווחי-שגוי ב-30 יום</td>
+          <td>התראה למבקר + מגבלת 3 דיווחים ליום למשתמשת</td>
+        </tr>
+        <tr>
+          <td>חריגה 2</td>
+          <td>3+ הפרות-מוצדקות ב-30 יום</td>
+          <td>התראה למנהל + עיון בהשעיה (ידנית)</td>
+        </tr>
+        <tr>
+          <td>חריגה 3</td>
+          <td>2+ הפרות-מוצדקות ב-7 ימים</td>
+          <td><strong>השעיה אוטומטית 48 שעות</strong> + התראה למנהל</td>
+        </tr>
+      </table>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>משתמשת שואלת → איש מקצוע מקבל מייל → עונה → השואלת מקבלת מייל</li>
+        <li>שם השואלת מוצג כ-"אלמנה – ספרדי" (לא שם אמיתי) אלא אם בחרה לחשוף</li>
+        <li>מבקרת רואה רק דיווחים בתאים שלה</li>
+        <li>5 דיווחי-שגוי ב-30 יום → מבקר מקבל התראה</li>
+        <li>2 הפרות-מוצדקות ב-7 ימים → משתמשת מושעית 48 שעות אוטומטית</li>
+        <li>Admin מוסיפה / עורכת / מסירה מבקרת</li>
+        <li>שאלות ציבוריות שנענו גלויות ב-feed לחברות הקבוצה/מגזר</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SPRINT 5                                        -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-sprint5">
+  <div class="section-header">
+    <div class="section-number s5">5</div>
+    <h2>Sprint 5 — Private Messages + Audit Log + Polish</h2>
+  </div>
+
+  <div class="sprint-card">
+    <div class="sprint-card-header sh-s5">
+      <div class="sprint-card-num">5</div>
+      <div class="sprint-card-info">
+        <h3>הגשה מוכנה — הכל עובד, ליטוש מלא</h3>
+        <div class="sprint-weeks">📅 שבועות 9–10</div>
+        <div class="sprint-goal">🎯 בסוף: הפרויקט מוגמר. אין 501. RTL עקבי. Responsive. כל component עם loading+error.</div>
+      </div>
+    </div>
+    <div class="sprint-card-body">
+
+      <div class="callout callout-teal">
+        ♻️ <strong>שימוש חוזר:</strong>
+        <code>report-button.component</code> מ-Sprint 3 — על הודעות פרטיות.
+        <code>confirm-dialog.component</code> מ-Sprint 1 — מחיקת חשבון.
+        <code>loading-spinner</code> + <code>error-display</code> — ווידוא שכל component קיים משתמש בהן.
+      </div>
+
+      <div class="sprint-dep-note">
+        <div class="dep-from">
+          <strong>💬 Backend — הודעות פרטיות</strong>
+          <ul class="feature-list">
+            <li>GET /users/search?name= — חיפוש בתוך קבוצה/מגזר בלבד</li>
+            <li>GET /messages — inbox (שיחות פעילות)</li>
+            <li>POST /messages — שליחה (מאמת קבוצה/מגזר זהה)</li>
+            <li>GET /messages/{user_id} — היסטוריית שיחה + pagination</li>
+            <li>מנגנון נגד מטרד: 3 דיווחים מאותו שולח → חסימה אוטומטית</li>
+          </ul>
+        </div>
+        <div class="dep-to">
+          <strong>🔐 Backend — Admin + מחיקה</strong>
+          <ul class="feature-list">
+            <li>GET /admin/audit-log — paginated + filter סוג/תאריך</li>
+            <li>GET /admin/export — ייצוא CSV</li>
+            <li>DELETE /users/me — מחיקה עצמית: anonymize פוסטים (GDPR)</li>
+            <li>השלמת audit_service — כל פעולות Admin/Moderator</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Frontend</h4>
+      <ul class="feature-list">
+        <li>inbox.component — רשימת שיחות + unread count + חיפוש נמענת</li>
+        <li>chat.component — חלון שיחה + שליחה + report-button</li>
+        <li>profile.component — פרופיל אישי + מחיקת חשבון (confirm-dialog)</li>
+        <li>audit-log.component — טבלת לוג עם פילטרים (Admin בלבד)</li>
+        <li>RTL Polish — עיצוב עקבי ימין-לשמאל בכל הקומפוננטות</li>
+        <li>Responsive — תמיכה במובייל בכל הדפים</li>
+        <li>ווידוא כל component: loading-spinner + error-display</li>
+      </ul>
+
+      <h4>✅ Definition of Done — ספרינט 5 + סגירת פרויקט</h4>
+      <ul class="checklist">
+        <li>הודעות פרטיות זורמות בין משתמשות מאותה קבוצה/מגזר בלבד</li>
+        <li>GET /users/search לא חוצה קבוצות (מחזיר רק מאותה קבוצה/מגזר)</li>
+        <li>מנהלת רואה Audit Log מלא עם filter</li>
+        <li>מנהלת מייצאת נתונים ל-CSV</li>
+        <li>מחיקת חשבון: פרטים נמחקים, פוסטי הפורום מאונונימות</li>
+        <li>כל component מציג loading-spinner + error-display מתאים</li>
+        <li>UI עובד תקין על מובייל</li>
+        <li>אין <code>501 Not Implemented</code> ואין <code>raise NotImplementedError</code> בשום מקום</li>
+        <li><code>ng build</code> עובר ללא שגיאות TypeScript</li>
+        <li><code>ng lint</code> ו-<code>ruff check .</code> עוברים ירוק</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SECTION — WORK RULES                            -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-rules">
+  <div class="section-header">
+    <div class="section-number">6</div>
+    <h2>כללי עבודה — לכל ספרינט</h2>
+  </div>
+
+  <h3>חוק ה-End-to-End</h3>
+  <p>בכל ספרינט — כל פיצ'ר הוא <strong>Backend + Frontend ביחד</strong>. אין ספרינט שאחת עושה רק backend ואחרת רק frontend.</p>
+
+  <h3>תיאומי חוזה בין Frontend ל-Backend</h3>
+  <p>לפני שמתחילות כל פיצ'ר שמחבר backend ו-frontend — הגדירו יחד את ה-schema/API contract (5 דקות ביחד חוסכות שעות debugging).</p>
+
+  <h3>חוק ה-Shared Component</h3>
+  <p>לפני שכותבות קומפוננטה חדשה: בדקו אם משהו דומה קיים ב-<code>shared/components/</code>. אם כן — הרחיבו. אם תיבנה ביותר מספרינט אחד — מקמו ב-<code>shared/</code> מהרגע הראשון.</p>
+
+  <h3>Angular 22 — חוקים שאין לשכוח</h3>
+  <table>
+    <tr><th>✅ נכון</th><th>❌ לא נכון (Angular ישן)</th></tr>
+    <tr><td><code>standalone: true</code> בכל component</td><td>NgModule</td></tr>
+    <tr><td><code>input()</code> / <code>output()</code> (Signals)</td><td><code>@Input()</code> / <code>@Output()</code></td></tr>
+    <tr><td><code>@if</code> / <code>@for</code></td><td><code>*ngIf</code> / <code>*ngFor</code></td></tr>
+    <tr><td><code>inject()</code> בתוך הפונקציה ב-interceptor</td><td><code>inject()</code> ברמת המודול</td></tr>
+    <tr><td><code>loadComponent</code> ב-app.routes.ts</td><td>import ישיר בלי lazy-loading</td></tr>
+  </table>
+
+  <h3>FastAPI — חוקים שאין לשכוח</h3>
+  <table>
+    <tr><th>כלל</th><th>למה</th></tr>
+    <tr><td>Pydantic schema לכל request + response</td><td>ולידציה + Swagger אוטומטי</td></tr>
+    <tr><td><code>Depends(get_current_user)</code> על routes מוגנים</td><td>RBAC ב-FastAPI</td></tr>
+    <tr><td><code>HTTPException</code> עם status code ברור</td><td>Frontend מקבל error שניתן להציג</td></tr>
+    <tr><td>router מחובר ב-<code>api/router.py</code></td><td>endpoint שלא מחובר → 404 ולא מתגלה</td></tr>
+  </table>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- OVERALL DOD                                     -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-dod">
+  <div class="section-header">
+    <div class="section-number green">✅</div>
+    <h2>Definition of Done הכולל — הפרויקט מוכן להגשה כשכל זה עובד</h2>
+  </div>
+
+  <div class="callout callout-green">
+    ✅ בדקו את הצ'קליסט הזה <strong>ביחד</strong> בסוף ספרינט 5.
+  </div>
+
+  <h3>זרימות קריטיות — end-to-end</h3>
+  <ul class="checklist">
+    <li>משתמשת נרשמת → OTP → מאמתת → ממתינה → Admin מאשר → נכנסת</li>
+    <li>משתמשת כותבת פוסט בפורום → נראה רק לאותה קבוצה/מגזר</li>
+    <li>2 דיווחים על פוסט → נעלם מהרשימה → מבקרת מחליטה (מחיקה / ביטול)</li>
+    <li>משתמשת שואלת שאלה מקצועית → איש מקצוע עונה → שואלת מקבלת מייל</li>
+    <li>2 הפרות ב-7 ימים → משתמשת מושעית אוטומטית 48 שעות</li>
+    <li>משתמשת שולחת הודעה פרטית → מגיעה רק לאנשים מאותה קבוצה/מגזר</li>
+    <li>מנהלת מייצאת Audit Log → CSV עם כל הפעולות</li>
+    <li>מחיקת חשבון → פרטים נמחקים, פוסטים מאונונימות</li>
+  </ul>
+
+  <h3>איכות קוד</h3>
+  <ul class="checklist">
+    <li><code>ng build</code> + <code>ng lint</code> עוברים ללא שגיאות</li>
+    <li><code>ruff check .</code> + <code>mypy .</code> עוברים על backend</li>
+    <li>CI ירוק על כל PR בכל הספרינטים</li>
+    <li>אין <code>501 Not Implemented</code> / <code>raise NotImplementedError</code> / <code>throw Error('not implemented')</code></li>
+    <li>כל component Angular: <code>standalone: true</code>, <code>input()</code>, <code>@if/@for</code></li>
+    <li>כל component: loading + error states מ-shared components</li>
+    <li>כל route backend: Pydantic schema + HTTPException ברור</li>
+  </ul>
+
+  <h3>מה כל ספרינט מסיים</h3>
+  <table>
+    <tr><th>ספרינט</th><th>מה ה-DoD הספרינטי</th><th>פיצ'ר חדש שנפתח</th></tr>
+    <tr>
+      <td><span class="badge badge-s1">Sprint 1</span></td>
+      <td>הרשמה + OTP + כניסה + Guard + Shared UI</td>
+      <td>App ניתנת לשימוש מקומית</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s2">Sprint 2</span></td>
+      <td>Dockerfiles + CI + Admin Dashboard + אישור כפול + דף המתנה למשתמש</td>
+      <td>Admin מאשר הרשמות, docker compose עובד, CI ירוק</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s3">Sprint 3</span></td>
+      <td>פורום מסונן + דיווח 3 שלבי + Deploy לענן</td>
+      <td>URL ציבורי + הקהילה פעילה</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s4">Sprint 4</span></td>
+      <td>ייעוץ + מבקרים + auto-suspend + ניהול מבקרים</td>
+      <td>כל 4 תפקידים פעילים ומלאים</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s5">Sprint 5</span></td>
+      <td>הודעות + Audit Log + RTL Polish + GDPR</td>
+      <td>פרויקט מוגמר — מוכן להגשה</td>
+    </tr>
+  </table>
+</div>
+
+<div style="text-align:center; padding:32px 0; color:#999; font-size:13px;">
+  אנו בניך · מפת דרכים מלאה · 5 ספרינטים · 2026 · גרסה 1.0
+</div>
+
+</div><!-- /container -->
+</body>
+</html>
