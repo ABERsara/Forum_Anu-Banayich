@@ -92,7 +92,7 @@
     }
     @if (currentStep() === 4) {
       <div>
-        <label class="register-field">תעודת פטירה</label>
+        <span class="register-field">תעודת פטירה</span>
         <app-file-upload
           variant="primary"
           label="בחר/י תעודת פטירה"
@@ -101,7 +101,7 @@
           (validationError)="errorMessage.set($event)"
         />
 
-        <label class="register-field">תמונת סלפי</label>
+        <span class="register-field">תמונת סלפי</span>
         <app-file-upload
           variant="primary"
           accept="image/*"
@@ -111,7 +111,7 @@
           (validationError)="errorMessage.set($event)"
         />
 
-        <label class="register-field">מסמך מזהה</label>
+        <span class="register-field">מסמך מזהה</span>
         <div class="id-doc-toggle">
           <button
             type="button"
