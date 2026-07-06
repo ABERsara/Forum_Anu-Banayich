@@ -1,0 +1,47 @@
+name: CD
+
+# Framework only for now — manual trigger while the real deployment target is undefined.
+# Sprint 3 (depends on FAB-49) will fill in the TODOs below and likely add a push-to-main trigger.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # TODO (sprint 3): build the backend Docker image (./backend)
+      - name: Build backend image
+        run: echo "TODO (sprint 3) - build backend image"
+
+      # TODO (sprint 3): push image to the target registry (needs registry/credentials secrets)
+      - name: Push backend image
+        run: echo "TODO (sprint 3) - push backend image to registry"
+
+      # TODO (sprint 3): deploy backend image to the target host/service
+      - name: Deploy backend
+        run: echo "TODO (sprint 3) - deploy backend to target"
+
+  deploy-frontend:
+    needs: [deploy-backend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # TODO (sprint 3): build the frontend Docker image (./frontend)
+      - name: Build frontend image
+        run: echo "TODO (sprint 3) - build frontend image"
+
+      # TODO (sprint 3): push image to the target registry (needs registry/credentials secrets)
+      - name: Push frontend image
+        run: echo "TODO (sprint 3) - push frontend image to registry"
+
+      # TODO (sprint 3): deploy frontend image to the target host/service
+      - name: Deploy frontend
+        run: echo "TODO (sprint 3) - deploy frontend to target"
