@@ -16,13 +16,12 @@
  *   Step 4 – Document upload & declarations
  *     death_certificate (required), selfie (required), id_card OR passport (required),
  *     3 required declarations. Files are kept client-side only this sprint (no upload call).
- *
- *   Step 5 – Pending approval message
+ *     → After submit: navigate to /auth/pending
  */
 
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import {
   DocumentType,
@@ -54,7 +53,8 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
 export class RegisterComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
-  currentStep = signal<1 | 2 | 3 | 4 | 5>(1);
+  private readonly router = inject(Router);
+  currentStep = signal<1 | 2 | 3 | 4>(1);
 
   form = this.fb.group({
     first_name: ['', [Validators.required, Validators.minLength(2)]],
@@ -195,8 +195,7 @@ export class RegisterComponent {
   }
 
   submitStep4(): void {
-    // TODO(FAB-55): replace nextStep() with Router.navigate(['/auth/pending'])
-    this.nextStep();
+    this.router.navigate(['/auth/pending']);
   }
 
   // Make enum values available in the template
@@ -207,14 +206,14 @@ export class RegisterComponent {
   readonly DocumentType = DocumentType;
 
   nextStep(): void {
-    if (this.currentStep() < 5) {
-      this.currentStep.update(s => (s + 1) as 1 | 2 | 3 | 4 | 5);
+    if (this.currentStep() < 4) {
+      this.currentStep.update(s => (s + 1) as 1 | 2 | 3 | 4);
     }
   }
 
   prevStep(): void {
     if (this.currentStep() > 1) {
-      this.currentStep.update(s => (s - 1) as 1 | 2 | 3 | 4 | 5);
+      this.currentStep.update(s => (s - 1) as 1 | 2 | 3 | 4);
     }
   }
 }

@@ -1,8 +1,6 @@
 <div class="register-container" dir="rtl">
   <h1>הרשמה למערכת</h1>
-  @if (currentStep() !== 5) {
-    <p class="step-indicator">שלב {{ currentStep() }} מתוך 4</p>
-  }
+  <p class="step-indicator">שלב {{ currentStep() }} מתוך 4</p>
 
   <app-error-display [message]="errorMessage()" />
   @if (isLoading()) {
@@ -153,9 +151,6 @@
           <button type="button" class="btn-primary" [disabled]="isStep4Invalid()" (click)="submitStep4()">סיום</button>
         </div>
       </div>
-    }
-    @if (currentStep() === 5) {
-      <p class="pending-approval">בקשתך נשלחה בהצלחה וממתינה לאישור.</p>
     }
   </form>
 
