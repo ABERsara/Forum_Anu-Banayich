@@ -24,13 +24,17 @@ from app.services.email_service import send_approval_email, send_rejection_email
 def get_pending_registrations(db: Session) -> list[User]:
     """
     Return all users awaiting admin approval.
-
-    TODO:
-      1. Query users where account_status IN (PENDING_APPROVAL, PARTIALLY_APPROVED)
-      2. Order by created_at ascending (oldest first)
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_pending_registrations() is not yet implemented")
+    return (
+        db.query(User)
+        .filter(
+            User.account_status.in_(
+                [AccountStatus.PENDING_APPROVAL, AccountStatus.PARTIALLY_APPROVED]
+            )
+        )
+        .order_by(User.created_at.asc())
+        .all()
+    )
 
 
 def approve_registration(db: Session, user_id: str, admin: User) -> User:

@@ -16,7 +16,6 @@ import {
   ReportCreate,
   ReportDecideRequest,
   ReportList,
-  UserAdminView,
 } from '../models';
 import { ApiService } from './api.service';
 
@@ -61,30 +60,4 @@ export class ReportService {
     throw new Error('getAuditLog() not yet implemented');
   }
 
-  getPendingRegistrations(): Observable<UserAdminView[]> {
-    /**
-     * TODO: (admin role)
-     *   return this.api.get<UserAdminView[]>('/admin/registrations');
-     */
-    throw new Error('getPendingRegistrations() not yet implemented');
-  }
-
-  approveRegistration(userId: string): Observable<unknown> {
-    void userId;
-    /**
-     * TODO: (admin role)
-     *   return this.api.post(`/admin/registrations/${userId}/approve`, {});
-     */
-    throw new Error('approveRegistration() not yet implemented');
-  }
-
-  rejectRegistration(userId: string, reason: string): Observable<unknown> {
-    void userId;
-    void reason;
-    /**
-     * TODO: (admin role)
-     *   return this.api.post(`/admin/registrations/${userId}/reject`, { reason });
-     */
-    throw new Error('rejectRegistration() not yet implemented');
-  }
 }
