@@ -1,4 +1,18 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=anu_banayich
+      - POSTGRES_PASSWORD=anu_banayich
+      - POSTGRES_DB=anu_banayich
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anu_banayich -d anu_banayich"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -8,8 +22,11 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=sqlite:///./dev.db
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - DATABASE_URL=postgresql+psycopg2://anu_banayich:anu_banayich@db:5432/anu_banayich
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:
