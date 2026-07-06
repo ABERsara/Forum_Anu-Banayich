@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ספרינט 2 — Admin Approval + DevOps | אנו בניך</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f5f5f0;
+    color: #222;
+    direction: rtl;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* —— COVER —— */
+  .cover {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%);
+    color: white;
+    padding: 70px 40px;
+    text-align: center;
+  }
+  .cover h1 { font-size: 38px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1px; }
+  .cover .sprint-title {
+    font-size: 22px; opacity: 0.85; margin-bottom: 8px;
+    background: rgba(255,255,255,0.12); border-radius: 10px;
+    display: inline-block; padding: 6px 24px;
+  }
+  .cover .subtitle { font-size: 17px; opacity: 0.75; margin-bottom: 28px; }
+  .cover .meta {
+    display: inline-flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+    background: rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 28px;
+  }
+  .cover .meta span { font-size: 13px; opacity: 0.85; }
+  .cover .meta strong { opacity: 1; }
+
+  /* —— GOAL BANNER —— */
+  .goal-banner {
+    background: linear-gradient(90deg, #2563eb, #2563eb);
+    color: white; padding: 24px 40px;
+    text-align: center; font-size: 17px; line-height: 1.6;
+  }
+  .goal-banner strong { font-size: 19px; display: block; margin-bottom: 6px; }
+
+  /* —— LAYOUT —— */
+  .container { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
+
+  /* —— TOC —— */
+  .toc {
+    background: white; border-radius: 16px; padding: 28px 32px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 40px;
+  }
+  .toc h2 { font-size: 18px; color: #2563eb; margin-bottom: 16px; border-bottom: 2px solid #e8e8e8; padding-bottom: 10px; }
+  .toc ol { padding-right: 20px; columns: 2; column-gap: 32px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: #2563eb; text-decoration: none; font-size: 14px; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* —— SECTIONS —— */
+  .section {
+    background: white; border-radius: 16px; padding: 32px 36px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 28px;
+  }
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 24px; padding-bottom: 14px;
+    border-bottom: 3px solid #f0f0f0;
+  }
+  .section-number {
+    background: #2563eb; color: white; border-radius: 50%;
+    width: 36px; height: 36px; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .section-number.red    { background: #dc2626; }
+  .section-number.green  { background: #16a34a; }
+  .section-number.purple { background: #7c3aed; }
+  .section h2 { font-size: 22px; color: #2563eb; }
+  .section h3 { font-size: 17px; color: #1e3a8a; margin: 22px 0 10px; padding-right: 12px; border-right: 4px solid #2563eb; }
+  .section h4 { font-size: 15px; color: #444; margin: 16px 0 8px; font-weight: 600; }
+  .section p  { margin-bottom: 12px; color: #333; }
+
+  /* —— TABLES —— */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th { background: #2563eb; color: white; padding: 10px 14px; text-align: right; font-weight: 600; }
+  td { padding: 9px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) { background: #f8f9ff; }
+  tr:hover { background: #eff6ff; }
+
+  /* —— CODE (file paths, endpoints, status values) —— */
+  code {
+    background: #eff6ff; color: #2563eb; padding: 2px 6px;
+    border-radius: 4px; font-size: 13px; font-family: 'Courier New', monospace;
+  }
+
+  /* —— BADGES —— */
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 600; margin: 2px;
+  }
+  .badge-green  { background: #d4edda; color: #155724; }
+  .badge-red    { background: #f8d7da; color: #721c24; }
+  .badge-blue   { background: #d1ecf1; color: #0c5460; }
+  .badge-orange { background: #fff3cd; color: #856404; }
+  .badge-purple { background: #e8d5f5; color: #6a0dad; }
+  .badge-grey   { background: #e9ecef; color: #495057; }
+
+  /* —— CALLOUT BOXES —— */
+  .callout {
+    border-radius: 10px; padding: 16px 20px; margin: 14px 0;
+    border-right: 5px solid; font-size: 14px;
+  }
+  .callout-blue   { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+  .callout-green  { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+  .callout-orange { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+  .callout-red    { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+  .callout-purple { background: #faf5ff; border-color: #a855f7; color: #581c87; }
+
+  /* —— TASK CARD —— */
+  .task-card { border-radius: 12px; border: 2px solid #e0e8ff; margin-bottom: 28px; overflow: hidden; }
+  .task-card-header {
+    padding: 16px 22px; display: flex; align-items: center; gap: 12px;
+  }
+  .task-card-header.color-red    { background: #fee2e2; border-bottom: 2px solid #fecaca; }
+  .task-card-header.color-blue   { background: #dbeafe; border-bottom: 2px solid #bfdbfe; }
+  .task-card-header.color-green  { background: #dcfce7; border-bottom: 2px solid #bbf7d0; }
+  .task-card-header.color-purple { background: #ede9fe; border-bottom: 2px solid #ddd6fe; }
+  .task-card-header.color-orange { background: #ffedd5; border-bottom: 2px solid #fed7aa; }
+  .task-card-header.color-grey   { background: #f1f5f9; border-bottom: 2px solid #e2e8f0; }
+  .task-card-body { padding: 20px 22px; }
+  .task-jira { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 6px; background: rgba(0,0,0,0.08); }
+  .task-title { font-size: 18px; font-weight: 700; flex: 1; }
+  .task-effort { font-size: 13px; opacity: 0.75; }
+
+  /* —— CHECKLIST —— */
+  .checklist { list-style: none; padding: 0; margin: 10px 0; }
+  .checklist li {
+    padding: 6px 0 6px 28px; border-bottom: 1px solid #f0f0f0;
+    font-size: 14px; position: relative;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before {
+    content: '☐'; position: absolute; left: 4px;
+    color: #2563eb; font-size: 16px;
+  }
+
+  /* —— BEFORE / AFTER —— */
+  .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  .before-card { background: #fff5f5; border: 2px solid #fecaca; border-radius: 10px; padding: 18px 20px; }
+  .after-card  { background: #f0fdf4; border: 2px solid #bbf7d0; border-radius: 10px; padding: 18px 20px; }
+  .before-card h4 { color: #991b1b; margin-bottom: 10px; }
+  .after-card h4  { color: #166534; margin-bottom: 10px; }
+  .before-card ul, .after-card ul { padding-right: 18px; font-size: 14px; }
+  .before-card li, .after-card li { margin-bottom: 6px; }
+
+  /* —— DEPENDENCY GRAPH —— */
+  .dep-graph {
+    background: #f8f9ff; border-radius: 12px; padding: 28px 20px;
+    margin: 14px 0; direction: ltr; text-align: center;
+  }
+  .dep-node {
+    background: white; border: 2px solid #2563eb; border-radius: 10px;
+    padding: 10px 16px; font-size: 13px; font-weight: 600; color: #2563eb;
+    display: inline-block; min-width: 160px; text-align: center; margin: 4px;
+  }
+  .dep-node small { display: block; font-size: 11px; font-weight: 400; opacity: 0.75; margin-top: 2px; }
+  .dep-node.blocker { border-color: #dc2626; color: #dc2626; background: #fff5f5; }
+  .dep-node.green   { border-color: #16a34a; color: #166534; background: #f0fdf4; }
+  .dep-node.grey    { border-color: #94a3b8; color: #64748b; background: #f8fafc; }
+  .dep-node.carryover { border-color: #d97706; color: #92400e; background: #fffbeb; }
+  .dep-row { display: flex; justify-content: center; align-items: flex-start; gap: 12px; margin: 4px 0; flex-wrap: wrap; }
+  .dep-arrow { color: #94a3b8; font-size: 20px; line-height: 1; margin: 2px 0; display: block; text-align: center; }
+  .dep-col { display: flex; flex-direction: column; align-items: center; }
+
+  /* —— TIMELINE —— */
+  .timeline { position: relative; padding: 0; margin: 20px 0; }
+  .timeline-item { display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
+  .timeline-dot {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: white; margin-top: 2px;
+  }
+  .timeline-dot.blue   { background: #2563eb; }
+  .timeline-dot.red    { background: #dc2626; }
+  .timeline-dot.green  { background: #16a34a; }
+  .timeline-dot.purple { background: #7c3aed; }
+  .timeline-dot.orange { background: #d97706; }
+  .timeline-content { flex: 1; }
+  .timeline-content h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .timeline-content p  { font-size: 14px; color: #555; margin: 0; }
+
+  /* —— APP MOCKUPS —— */
+  .app-screens { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+  .app-frame {
+    width: 300px; background: #f9fafb; border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(37,99,235,0.13), 0 2px 8px rgba(0,0,0,0.07);
+    overflow: hidden; border: 1px solid #e5e7eb; direction: rtl;
+  }
+  .app-topbar { background: #2563eb; color: white; padding: 14px 18px; font-weight: 700; font-size: 15px; text-align: center; }
+  .app-topbar-row { background: #2563eb; color: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .app-topbar-logo { font-weight: 700; font-size: 14px; }
+  .app-topbar-user { font-size: 12px; opacity: 0.9; }
+  .app-topbar-logout { background: rgba(255,255,255,0.2); border-radius: 6px; padding: 3px 9px; font-size: 11px; }
+  .app-body { padding: 20px 18px; }
+  .app-page-title { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 16px; text-align: center; }
+  .app-label { font-size: 11px; font-weight: 600; color: #6b7280; margin-bottom: 4px; display: block; }
+  .app-field { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #9ca3af; margin-bottom: 11px; }
+  .app-select { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #374151; margin-bottom: 11px; display: flex; justify-content: space-between; align-items: center; }
+  .app-btn { border-radius: 8px; padding: 10px; text-align: center; font-weight: 700; font-size: 13px; margin: 5px 0; }
+  .app-btn-primary { background: #2563eb; color: white; }
+  .app-btn-danger  { background: #dc2626; color: white; }
+  .app-btn-outline { background: white; border: 1.5px solid #e5e7eb; color: #374151; }
+  .app-btn-row { display: flex; gap: 8px; margin-top: 4px; }
+  .app-btn-row .app-btn { flex: 1; }
+  .app-link { text-align: center; font-size: 12px; color: #2563eb; margin-top: 10px; }
+  .app-home-greeting { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 16px; }
+  .app-home-card { background: white; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 13px 15px; margin-bottom: 9px; }
+  .app-home-card-title { font-size: 13px; font-weight: 700; color: #2563eb; }
+  .app-home-card-desc { font-size: 11px; color: #6b7280; margin-top: 3px; }
+  .app-caption { font-size: 12px; color: #6b7280; text-align: center; padding: 10px; background: white; border-top: 1px solid #e5e7eb; font-style: italic; }
+  .app-note { background: #eff6ff; color: #1d4ed8; border-radius: 8px; padding: 9px 12px; font-size: 11px; margin-top: 8px; text-align: center; }
+  .app-note-green { background: #f0fdf4; color: #166534; border-radius: 8px; padding: 9px 12px; font-size: 11px; margin-top: 8px; text-align: center; }
+  .app-badge { display: inline-block; background: #dc2626; color: white; border-radius: 20px; font-size: 11px; font-weight: 700; padding: 1px 7px; margin-right: 4px; }
+  .app-badge-green { background: #16a34a; }
+  .app-row { display: flex; align-items: center; justify-content: space-between; background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-bottom: 7px; }
+  .app-row-name { font-size: 13px; font-weight: 600; color: #111827; }
+  .app-row-meta { font-size: 11px; color: #6b7280; }
+  .app-row-status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+  .app-row-status.pending { background: #fff7ed; color: #92400e; }
+  .app-check-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #374151; margin-bottom: 7px; }
+  .app-check-box { width: 14px; height: 14px; border: 1.5px solid #d1d5db; border-radius: 3px; flex-shrink: 0; }
+  .app-pending-icon { font-size: 32px; text-align: center; margin: 16px 0 8px; }
+  .app-pending-title { font-size: 15px; font-weight: 700; color: #111827; text-align: center; margin-bottom: 8px; }
+  .app-pending-text { font-size: 12px; color: #6b7280; text-align: center; line-height: 1.5; }
+
+  /* —— SYNC BOX —— */
+  .sync-box {
+    background: #fefce8; border: 2px solid #fde047; border-radius: 10px;
+    padding: 16px 20px; margin: 12px 0; font-size: 14px;
+  }
+  .sync-box strong { color: #713f12; }
+
+  /* —— CARRYOVER BOX —— */
+  .carryover-box {
+    background: #fff7ed; border: 2px solid #f59e0b; border-radius: 12px;
+    padding: 18px 22px; margin: 14px 0;
+  }
+  .carryover-box h4 { color: #92400e; margin-bottom: 10px; font-size: 14px; }
+
+  /* —— DELIVERABLE GRID —— */
+  .deliverable-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin: 14px 0; }
+  .deliverable-card {
+    background: #f8f9ff; border: 2px solid #e0e8ff; border-radius: 12px;
+    padding: 14px; transition: border-color 0.2s;
+  }
+  .deliverable-card:hover { border-color: #2563eb; }
+  .deliverable-card .layer { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+  .deliverable-card .name  { font-size: 14px; font-weight: 700; color: #2563eb; margin-bottom: 4px; }
+  .deliverable-card .desc  { font-size: 12px; color: #555; }
+
+  @media (max-width: 640px) {
+    .cover h1 { font-size: 26px; }
+    .toc ol { columns: 1; }
+    .section { padding: 20px; }
+    .before-after { grid-template-columns: 1fr; }
+    .app-screens { flex-direction: column; align-items: center; }
+  }
+  @media print {
+    body { background: white; }
+    .section { box-shadow: none; border: 1px solid #ddd; }
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>ספרינט 2</h1>
+  <div class="sprint-title">Admin Approval + DevOps Foundation</div>
+  <div class="subtitle">אנו בניך — פלטפורמת קהילה לאלמנים ויתומים | פרקטיקום סניף</div>
+  <div class="meta">
+    <span><strong>שבועות 3–4</strong></span>
+    <span><strong>11 משימות</strong></span>
+    <span><strong>FAB-46 עד FAB-56</strong></span>
+    <span><strong>מטרה: Admin Approval + Docker + CI</strong></span>
+  </div>
+</div>
+
+<!-- GOAL BANNER -->
+<div class="goal-banner">
+  <strong>מטרת הספרינט</strong>
+  בסוף השבועיים: Admin רואה תור ממתינים, מאשר (dual-admin) / דוחה עם סיבה / משהה.
+  Docker ו-CI ירוקים. משתמש שסיים הרשמה מגיע לדף המתנה ולא ל-404.
+</div>
+
+<div class="container">
+
+<!-- TOC -->
+<div class="toc">
+  <h2>תוכן עניינים</h2>
+  <ol>
+    <li><a href="#s-before-after">לפני ואחרי — מה משנים</a></li>
+    <li><a href="#s-deps">מפת תלויות — סדר עבודה</a></li>
+    <li><a href="#s-timeline">ציר זמן — 2 שבועות</a></li>
+    <li><a href="#s-fab46">FAB-46 Backend Dockerfile</a></li>
+    <li><a href="#s-fab47">FAB-47 Frontend Dockerfile</a></li>
+    <li><a href="#s-fab48">FAB-48 docker-compose + PostgreSQL</a></li>
+    <li><a href="#s-fab49">FAB-49 🔴 GitHub Actions CI (BLOCKER)</a></li>
+    <li><a href="#s-fab50">FAB-50 GitHub Actions CD (placeholder)</a></li>
+    <li><a href="#s-fab51">FAB-51 🔴 Pending Registrations List (BLOCKER)</a></li>
+    <li><a href="#s-fab52">FAB-52 Approve + Reject Registration</a></li>
+    <li><a href="#s-fab53">FAB-53 Suspend User</a></li>
+    <li><a href="#s-fab54">FAB-54 Admin Dashboard Stats</a></li>
+    <li><a href="#s-fab55">FAB-55 Pending Approval Page</a></li>
+    <li><a href="#s-fab56">FAB-56 Register Step 4</a></li>
+    <li><a href="#s-sync">נקודות סנכרון</a></li>
+    <li><a href="#s-mockup">האפליקציה בסוף הספרינט</a></li>
+    <li><a href="#s-dod">Definition of Done</a></li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 1 — BEFORE / AFTER                  -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-before-after">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2>לפני ואחרי — מה משנים</h2>
+  </div>
+
+  <h3>DevOps / Infrastructure</h3>
+  <table>
+    <tr><th>קובץ / תיקייה</th><th>עכשיו</th><th>אחרי Sprint 2</th><th>משימה</th></tr>
+    <tr>
+      <td><code>backend/Dockerfile</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>קיים — build מצליח</td>
+      <td>FAB-46</td>
+    </tr>
+    <tr>
+      <td><code>frontend/Dockerfile</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>קיים — build מצליח</td>
+      <td>FAB-47</td>
+    </tr>
+    <tr>
+      <td><code>docker-compose.yml</code></td>
+      <td><span class="badge badge-orange">⚠️ SQLite, אין PostgreSQL</span></td>
+      <td>backend + frontend + PostgreSQL עולים יחד</td>
+      <td>FAB-48</td>
+    </tr>
+    <tr>
+      <td><code>.github/workflows/</code></td>
+      <td><span class="badge badge-red">❌ ספרייה לא קיימת</span></td>
+      <td>ci.yml + deploy.yml (placeholder) קיימים</td>
+      <td>FAB-49, FAB-50</td>
+    </tr>
+  </table>
+
+  <h3>Backend — Admin Approval</h3>
+  <table>
+    <tr><th>קובץ</th><th>עכשיו</th><th>אחרי Sprint 2</th><th>משימה</th></tr>
+    <tr>
+      <td><code>services/user_service.py</code></td>
+      <td><span class="badge badge-red">4 stubs — NotImplementedError</span></td>
+      <td>get_pending / approve / reject / suspend — עובדים</td>
+      <td>FAB-51, FAB-52, FAB-53</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/admin.py</code></td>
+      <td><span class="badge badge-red">כל routes מחזירים [] או 501</span></td>
+      <td>endpoints מחוברים לservice</td>
+      <td>FAB-51, FAB-52, FAB-53</td>
+    </tr>
+    <tr>
+      <td><code>services/email_service.py</code></td>
+      <td><span class="badge badge-orange">⚠️ approve/reject/suspend — logger stubs</span></td>
+      <td>שלושת הפונקציות מחוברות (delivery תלוי FAB-36)</td>
+      <td>FAB-52, FAB-53</td>
+    </tr>
+    <tr>
+      <td><code>services/audit_service.py</code></td>
+      <td><span class="badge badge-green">✅ כבר ממומש במלואו</span></td>
+      <td>קריאה ישירה — ללא שינוי</td>
+      <td>—</td>
+    </tr>
+  </table>
+
+  <h3>Frontend</h3>
+  <table>
+    <tr><th>קובץ / תיקייה</th><th>עכשיו</th><th>אחרי Sprint 2</th><th>משימה</th></tr>
+    <tr>
+      <td><code>core/services/admin.service.ts</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>קיים עם כל methods של Admin</td>
+      <td>FAB-51</td>
+    </tr>
+    <tr>
+      <td><code>features/admin/pending-registrations/</code></td>
+      <td><span class="badge badge-red">🐛 מזריקה ReportService (שגיאה שורה 58)</span></td>
+      <td>מזריקה AdminService + רשימה חיה + כפתורי פעולה</td>
+      <td>FAB-51, FAB-52, FAB-53</td>
+    </tr>
+    <tr>
+      <td><code>features/admin/dashboard/</code></td>
+      <td><span class="badge badge-orange">⚠️ nav links בלבד, אין נתונים</span></td>
+      <td>badge מספר ממתינים + קישור לרשימה</td>
+      <td>FAB-54</td>
+    </tr>
+    <tr>
+      <td><code>features/auth/pending/</code></td>
+      <td><span class="badge badge-red">❌ תיקייה לא קיימת</span></td>
+      <td>דף המתנה לאישור — standalone component</td>
+      <td>FAB-55</td>
+    </tr>
+    <tr>
+      <td><code>features/auth/register/</code> — שלב 4</td>
+      <td><span class="badge badge-orange">⚠️ "שלב 4: TODO" placeholder</span></td>
+      <td>3 file-upload inputs + 3 checkboxes + navigate לauth/pending</td>
+      <td>FAB-56</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 2 — DEPENDENCY GRAPH                -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-deps">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <h2>מפת תלויות — סדר עבודה</h2>
+  </div>
+
+  <div class="callout callout-red">
+    🚨 <strong>שני BLOCKERs עצמאיים — מתחילים ביום 1 במקביל:</strong>
+    FAB-49 (CI — עצמאי לחלוטין) ו-FAB-51 backend (עצמאי לחלוטין).
+    FAB-46 גם עצמאי ויכול לרוץ בו-זמנית.
+  </div>
+
+  <div class="dep-graph">
+    <!-- DevOps chain -->
+    <div style="margin-bottom: 20px;">
+      <div style="font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 8px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">DevOps</div>
+      <div class="dep-row">
+        <div class="dep-col">
+          <div class="dep-node" style="min-width: 130px;">FAB-46<small>Backend Dockerfile</small></div>
+          <div class="dep-arrow">↓</div>
+          <div class="dep-node" style="min-width: 130px;">FAB-47<small>Frontend Dockerfile</small></div>
+          <div class="dep-arrow">↓</div>
+          <div class="dep-node" style="min-width: 130px;">FAB-48<small>docker-compose + PG</small></div>
+        </div>
+
+        <div style="width: 50px; display:flex; align-items:center; justify-content:center; font-size:22px; color:#d1d5db; margin-top: 20px;">║</div>
+
+        <div class="dep-col">
+          <div class="dep-node blocker">🔴 FAB-49<small>GitHub Actions CI — BLOCKER</small></div>
+          <div class="dep-arrow">↓</div>
+          <div class="dep-node grey" style="min-width: 130px;">FAB-50<small>CD placeholder</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin chain -->
+    <div style="margin-bottom: 20px; border-top: 2px solid #e5e7eb; padding-top: 20px;">
+      <div style="font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 8px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">Admin Approval</div>
+      <div class="dep-row">
+        <div class="dep-col">
+          <div class="dep-node blocker">🔴 FAB-51<small>Pending List — BLOCKER</small></div>
+          <div class="dep-arrow">↓</div>
+          <div class="dep-row" style="gap: 8px;">
+            <div class="dep-col">
+              <div class="dep-node" style="min-width: 130px;">FAB-52<small>Approve + Reject</small></div>
+              <div class="dep-arrow">↓</div>
+              <div class="dep-node" style="min-width: 130px;">FAB-53<small>Suspend User</small></div>
+            </div>
+            <div class="dep-node green" style="min-width: 130px; align-self: flex-start;">FAB-54<small>Dashboard Stats</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User flow chain -->
+    <div style="border-top: 2px solid #e5e7eb; padding-top: 20px;">
+      <div style="font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 8px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">User Flow (מחכה ל-Sprint 1 Carryover)</div>
+      <div class="dep-row">
+        <div class="dep-node carryover" style="min-width: 150px;">FAB-40 + FAB-41 + FAB-43<small>Sprint 1 carryover</small></div>
+        <div style="font-size:20px; color:#94a3b8; align-self:center;">→</div>
+        <div class="dep-node" style="min-width: 130px;">FAB-55<small>Pending Page</small></div>
+        <div style="font-size:20px; color:#94a3b8; align-self:center;">→</div>
+        <div class="dep-node" style="min-width: 130px;">FAB-56<small>Register Step 4</small></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>טבלת בחירה — Self-Select</h3>
+  <table>
+    <tr><th>משימה</th><th>Jira</th><th>גודל</th><th>תלויה ב</th><th>הערה</th></tr>
+    <tr style="background:#dbeafe;">
+      <td><strong>Backend Dockerfile</strong></td><td>FAB-46</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>—</td><td>עצמאי — זמין מיד</td>
+    </tr>
+    <tr>
+      <td>Frontend Dockerfile</td><td>FAB-47</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-46</td><td></td>
+    </tr>
+    <tr>
+      <td>docker-compose + PostgreSQL</td><td>FAB-48</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-46, FAB-47</td><td></td>
+    </tr>
+    <tr style="background:#fff5f5;">
+      <td><strong>🔴 GitHub Actions CI</strong></td><td>FAB-49</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>—</td>
+      <td><span class="badge badge-red">BLOCKER — יום 1</span></td>
+    </tr>
+    <tr style="background:#f8fafc;">
+      <td><em>GitHub Actions CD (placeholder)</em></td><td>FAB-50</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-49</td>
+      <td><span class="badge badge-grey">scaffolding בלבד</span></td>
+    </tr>
+    <tr style="background:#fff5f5;">
+      <td><strong>🔴 Pending Registrations List</strong></td><td>FAB-51</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>— (frontend: FAB-40)</td>
+      <td><span class="badge badge-red">BLOCKER — יום 1 (backend)</span></td>
+    </tr>
+    <tr>
+      <td>Approve + Reject Registration</td><td>FAB-52</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>FAB-51</td><td>dual-admin + confirm-dialog</td>
+    </tr>
+    <tr>
+      <td>Suspend User</td><td>FAB-53</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-52</td><td></td>
+    </tr>
+    <tr>
+      <td>Admin Dashboard Stats</td><td>FAB-54</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-51</td><td>frontend בלבד — משתמש ב-endpoint של FAB-51</td>
+    </tr>
+    <tr>
+      <td>Pending Approval Page</td><td>FAB-55</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-40, FAB-41, FAB-43</td><td>מחכה לcarryover</td>
+    </tr>
+    <tr>
+      <td>Register Step 4</td><td>FAB-56</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>FAB-43, FAB-55</td><td></td>
+    </tr>
+  </table>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 3 — TIMELINE                        -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-timeline">
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <h2>ציר זמן — 2 שבועות</h2>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-dot purple">0</div>
+      <div class="timeline-content">
+        <h4>יום 0 — לפני שמתחילות</h4>
+        <p>סגרו יחד את סטטוס Sprint 1 carryover. בדקו שה-backend עולה ו-ng serve עובד. חלקו: מי לוקחת DevOps ומי Admin backend — שתיהן מתחילות ביום 1 במקביל.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot red">1–2</div>
+      <div class="timeline-content">
+        <h4>ימים 1–2 — BLOCKERs במקביל</h4>
+        <p><strong>מפתחת A:</strong> FAB-46 (Backend Dockerfile) + FAB-49 (CI workflow) — שניהם עצמאיים.</p>
+        <p><strong>מפתחת B:</strong> FAB-51 backend — מימוש <code>get_pending_registrations()</code> ב-user_service + חיבור ל-endpoint.
+        בסוף: <code>GET /admin/registrations</code> מחזיר ממתינות מה-DB.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot blue">3–4</div>
+      <div class="timeline-content">
+        <h4>ימים 3–4 — השלמת תשתית + frontend ראשון</h4>
+        <p><strong>DevOps:</strong> FAB-47 (Frontend Dockerfile) + FAB-48 (docker-compose PostgreSQL) + FAB-50 (CD placeholder).</p>
+        <p><strong>Admin frontend:</strong> יצירת <code>admin.service.ts</code> + תיקון injection bug בcomponent + הצגת הרשימה (FAB-51 frontend) — ברגע ש-FAB-40 מוזג.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot orange">5–7</div>
+      <div class="timeline-content">
+        <h4>ימים 5–7 — Approve / Reject / Suspend + Dashboard</h4>
+        <p>FAB-52: כפתורי אישור ודחייה + confirm-dialog לסיבת הדחייה + dual-admin logic בbackend.</p>
+        <p>FAB-53: כפתור השעיה + שדות שעות + סיבה + בדיקת suspension בlogin.</p>
+        <p>FAB-54: badge מספר ממתינים ב-admin-dashboard.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot blue">7–9</div>
+      <div class="timeline-content">
+        <h4>ימים 7–9 — User Flow</h4>
+        <p>FAB-55: יצירת <code>features/auth/pending/</code> + route + עדכון register navigate + עדכון guard.</p>
+        <p>FAB-56: שלב 4 הרשמה — 3 app-file-upload + 3 checkboxes + submit → auth/pending.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot green">10</div>
+      <div class="timeline-content">
+        <h4>יום 10 — בדיקות end-to-end</h4>
+        <p>זרימה מלאה ב-docker compose: register → OTP → שלב 4 → auth/pending → Admin מאשר → משתמש נכנס.
+        בדיקה ש-CI עובר ירוק על PR אמיתי.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-46                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab46">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">FAB-46</div>
+      <div class="task-title">Backend Dockerfile</div>
+      <div class="task-effort">S · ~2–3 שעות · עצמאי</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-orange">
+        ⚠️ <code>docker-compose.yml</code> כבר מפנה ל-<code>backend/Dockerfile</code> — הקובץ הזה חייב להיות קיים כדי שcompose יעלה.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li><code>backend/Dockerfile</code> לא קיים</li>
+            <li><code>docker compose up</code> נופל על build error</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li><code>backend/Dockerfile</code> קיים</li>
+            <li>image בונה בהצלחה</li>
+            <li>FastAPI health endpoint עונה מתוך container</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>היכן לעבוד</h4>
+      <p>קובץ חדש: <code>backend/Dockerfile</code>. המשימה היא יצירתו — docker-compose.yml קיים ומפנה אליו.</p>
+
+      <h4>מחוץ לסקופ</h4>
+      <p>הגדרת PostgreSQL, NGINX, hardening לproduction.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>build image מצליח ללא שגיאות</li>
+        <li>FastAPI עולה ו-health endpoint עונה מתוך container</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-47                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab47">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">FAB-47</div>
+      <div class="task-title">Frontend Dockerfile</div>
+      <div class="task-effort">S · ~2–3 שעות · תלוי ב-FAB-46</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li><code>frontend/Dockerfile</code> לא קיים</li>
+            <li>compose לא יכולה להרים frontend container</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li><code>frontend/Dockerfile</code> קיים</li>
+            <li>Angular app נגיש בדפדפן מתוך container</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>היכן לעבוד</h4>
+      <p>קובץ חדש: <code>frontend/Dockerfile</code>.</p>
+
+      <h4>מחוץ לסקופ</h4>
+      <p>NGINX config מורכב, SSL, multi-stage build optimization.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>build image מצליח</li>
+        <li>Angular app נגיש מהדפדפן דרך ה-container</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-48                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab48">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">FAB-48</div>
+      <div class="task-title">docker-compose + PostgreSQL</div>
+      <div class="task-effort">S · ~2–3 שעות · תלוי ב-FAB-46 + FAB-47</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li><code>docker-compose.yml</code> קיים אבל עם SQLite</li>
+            <li>אין service של PostgreSQL</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li><code>docker compose up</code> מביא backend + frontend + PostgreSQL</li>
+            <li>backend מחובר ל-PostgreSQL (לא SQLite)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>היכן לעבוד</h4>
+      <p>קובץ קיים: <code>docker-compose.yml</code> בשורש הרפו. מוסיפים service של PostgreSQL ומעדכנים את ה-environment wiring לbackend.</p>
+
+      <h4>מחוץ לסקופ</h4>
+      <p>Persistent volumes, cloud registry, ניהול secrets.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>docker compose up</code> מצליח — שלושת הservices עולים ובריאים</li>
+        <li>backend משתמש ב-PostgreSQL בתוך compose (לא SQLite)</li>
+        <li><code>GET /api/v1/health</code> עונה 200 מתוך compose</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-49                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab49">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">FAB-49</div>
+      <div class="task-title">🔴 GitHub Actions CI — BLOCKER</div>
+      <div class="task-effort">S · ~3–4 שעות · עצמאי — BLOCKER יום 1</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-red">
+        🚨 ללא CI — כל PR נמזג ללא בדיקה אוטומטית. FAB-50 (CD) תלוי בזה. זו המשימה הראשונה שצריך לסיים בצד DevOps.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li>ספרייה <code>.github/</code> לא קיימת כלל</li>
+            <li>אין בדיקה אוטומטית על PRs</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li><code>.github/workflows/ci.yml</code> קיים</li>
+            <li>על כל PR: ruff + mypy + pytest (backend) + eslint (frontend) רצים</li>
+            <li>status CI גלוי ב-PR ב-GitHub</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>היכן לעבוד</h4>
+      <p>תיקייה חדשה: <code>.github/workflows/ci.yml</code> — כל הספרייה net-new.</p>
+
+      <h4>מחוץ לסקופ</h4>
+      <p>Deployment, Docker Hub push, environment secrets.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>PR אמיתי → CI רץ אוטומטית</li>
+        <li>backend: ruff + mypy + pytest עוברים</li>
+        <li>frontend: eslint עובר</li>
+        <li>CI status גלוי על ה-PR ב-GitHub</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-50                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab50">
+  <div class="task-card">
+    <div class="task-card-header color-grey">
+      <div class="task-jira">FAB-50</div>
+      <div class="task-title">GitHub Actions CD (placeholder)</div>
+      <div class="task-effort">S · ~1 שעה · תלוי ב-FAB-49</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 ה-deploy האמיתי הוא Sprint 3. הקובץ נוצר עכשיו כ-skeleton ריק כדי שב-Sprint 3 ימלאו בו את ה-deployment steps — לא מתחילים מאפס.
+      </div>
+
+      <h4>היכן לעבוד</h4>
+      <p>קובץ חדש: <code>.github/workflows/deploy.yml</code>. מכיל skeleton עם job structure — ללא לוגיקת deploy.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>deploy.yml</code> קיים ב-<code>.github/workflows/</code></li>
+        <li>GitHub Actions מקבל syntax של הקובץ (אין parse errors)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-51                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab51">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">FAB-51</div>
+      <div class="task-title">🔴 Pending Registrations List — BLOCKER</div>
+      <div class="task-effort">M · ~1.5–2 ימים · backend: עצמאי | frontend: תלוי FAB-40</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-red">
+        🚨 FAB-52, FAB-53, FAB-54 לא יכולות להתחיל לפני ש-FAB-51 נסגרת. גם <code>admin.service.ts</code> נוצר כאן — שתי המשימות הבאות מרחיבות אותו.
+      </div>
+
+      <div class="callout callout-orange">
+        ⚠️ <strong>Sync point לפני frontend:</strong> השוו את שדות <code>UserAdminView</code> ב-<code>backend/app/schemas/user.py</code> עם <code>frontend/.../core/models/index.ts</code> — חייבים להתאים.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li><code>get_pending_registrations()</code> — NotImplementedError</li>
+            <li>endpoint מחזיר רשימה ריקה <code>[]</code></li>
+            <li><code>admin.service.ts</code> לא קיים</li>
+            <li>component מזריקה <code>ReportService</code> בטעות (שורה 58)</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li><code>GET /admin/registrations</code> מחזיר ממתינות מה-DB</li>
+            <li><code>admin.service.ts</code> קיים עם methods בסיסיים</li>
+            <li>component מזריקה AdminService ✅</li>
+            <li>רשימת ממתינות מוצגת עם loading + empty state</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/user_service.py:24</code> — מימוש <code>get_pending_registrations()</code> (כרגע stub).
+      <code>backend/app/api/v1/endpoints/admin.py</code> — חיבור handler לservice.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/admin.service.ts</code> — יצירה net-new.
+      <code>frontend/.../admin/pending-registrations/pending-registrations.component.ts</code> — תיקון injection bug + קריאה לservice + הצגת רשימה.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>GET /admin/registrations</code> מחזיר ממתינות, ממוינות לפי תאריך הרשמה</li>
+        <li><code>admin.service.ts</code> קיים עם method לשליפת הרשימה</li>
+        <li>component מזריקה AdminService (לא ReportService)</li>
+        <li>הרשימה מוצגת: שם, מייל, תאריך הרשמה, סטטוס</li>
+        <li>loading state בזמן הבקשה, error state אם נכשלת</li>
+        <li>empty state כשאין ממתינות</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-52                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab52">
+  <div class="task-card">
+    <div class="task-card-header color-orange">
+      <div class="task-jira">FAB-52</div>
+      <div class="task-title">Approve + Reject Registration</div>
+      <div class="task-effort">M · ~1.5–2 ימים · תלוי ב-FAB-51</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <strong>Dual-admin:</strong> מנהל ראשון → PARTIAL_APPROVED. מנהל שני (שונה!) → ACTIVE.
+        אותו מנהל לא יכול לאשר פעמיים. כל פעולה נרשמת ב-AuditLog (כבר ממומש — קריאה ישירה).
+      </div>
+
+      <div class="callout callout-orange">
+        ⚠️ <strong>Sync point לפני frontend:</strong> הסכימו על צורת ה-response (HTTP status + body) לaprove ולreject לפני שמתחילות את צד הUI.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li><code>approve_registration()</code> — NotImplementedError</li>
+            <li><code>reject_registration()</code> — NotImplementedError</li>
+            <li>endpoints — stubs, אין לוגיקה</li>
+            <li>component — כפתורי approve/reject ריקים (void stubs)</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>אישור ראשון → PARTIAL_APPROVED, אישור שני → ACTIVE</li>
+            <li>אותו מנהל לא יכול לאשר פעמיים</li>
+            <li>דחייה עם סיבה חובה — confirm-dialog</li>
+            <li>סטטוס מתעדכן על המסך מיד</li>
+            <li>AuditLog נרשם לכל פעולה</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/user_service.py:36</code> — <code>approve_registration()</code> stub.
+      <code>backend/app/services/user_service.py:56</code> — <code>reject_registration()</code> stub.
+      <code>backend/app/api/v1/endpoints/admin.py</code> — שני ה-handlers.
+      <code>backend/app/services/email_service.py:26</code> + שורה 32 — חיבור stubs של approval/rejection email.
+      עמודות המודל הנדרשות כבר קיימות ב-<code>user.py</code> — אין migration.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/.../core/services/admin.service.ts</code> — הוספת methods לaprove ולreject.
+      <code>frontend/.../admin/pending-registrations/pending-registrations.component.ts</code> — חיבור כפתורי אישור ודחייה + <code>confirm-dialog</code> לסיבת הדחייה.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>אישור ראשון → PARTIAL_APPROVED; אישור שני (מנהל שונה) → ACTIVE</li>
+        <li>אותו מנהל מנסה לאשר פעמיים → שגיאה ברורה</li>
+        <li>דחייה → confirm-dialog עם שדה סיבה חובה</li>
+        <li>AuditLog נרשם לאישור ולדחייה</li>
+        <li>email triggered לאחר approve ולאחר reject (delivery תלוי FAB-36)</li>
+        <li>status מתעדכן על המסך ללא reload</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-53                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab53">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">FAB-53</div>
+      <div class="task-title">Suspend User</div>
+      <div class="task-effort">S · ~1 יום · תלוי ב-FAB-52</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-orange">
+        ⚠️ <strong>Sync point לפני frontend:</strong> הסכימו על request body — שעות כ-integer, סיבה כ-string.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li><code>suspend_user()</code> — NotImplementedError</li>
+            <li>login לא בודק suspension</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>Admin משהה עם שעות + סיבה</li>
+            <li>login חוסם משתמש מושעה עם שגיאה ברורה</li>
+            <li>AuditLog נרשם</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/user_service.py:69</code> — <code>suspend_user()</code> stub.
+      <code>backend/app/api/v1/endpoints/admin.py</code> — handler של suspend.
+      <code>backend/app/services/email_service.py:50</code> — חיבור <code>send_suspension_notification()</code> stub.
+      <code>backend/app/services/auth_service.py</code> — הוספת בדיקת suspension בlogin.
+      עמודות המודל (<code>is_suspended</code>, <code>suspended_until</code>) כבר קיימות ב-<code>user.py</code> — אין migration.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/.../core/services/admin.service.ts</code> — הוספת method של suspend.
+      <code>frontend/.../admin/pending-registrations/pending-registrations.component.ts</code> — כפתור השעיה + confirm-dialog עם שדות שעות + סיבה.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>POST /admin/users/{id}/suspend</code> מקבל שעות + סיבה ומגדיר suspension</li>
+        <li>login מחזיר שגיאה ייעודית למשתמש מושעה (לא שגיאת auth גנרית)</li>
+        <li>אחרי תום ההשעיה — המשתמש יכול להיכנס שוב</li>
+        <li>AuditLog נרשם</li>
+        <li>email triggered (delivery תלוי FAB-36)</li>
+        <li>כפתור השעיה פותח confirm-dialog עם שדות שעות + סיבה</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-54                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab54">
+  <div class="task-card">
+    <div class="task-card-header color-green">
+      <div class="task-jira">FAB-54</div>
+      <div class="task-title">Admin Dashboard Stats</div>
+      <div class="task-effort">S · ~3–4 שעות · תלוי ב-FAB-51 · frontend בלבד</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 משימה frontend בלבד — אין backend חדש. משתמשת ב-endpoint שנבנה ב-FAB-51 לשליפת המספר הממתינים.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li><code>admin-dashboard.component</code> — nav links בלבד</li>
+            <li>אין service injection, אין נתונים</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>badge עם מספר ממתינים</li>
+            <li>קישור ל-<code>/admin/registrations</code></li>
+            <li>loading + error states</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/.../admin/dashboard/admin-dashboard.component.ts</code> — הזרקת AdminService + signal לmcount.
+      <code>frontend/.../admin/dashboard/admin-dashboard.component.html</code> — badge מספר + navigation card.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>badge מוצג עם מספר ממתינות הנכון</li>
+        <li>לחיצה על הbadge / הcard → navigate ל-<code>/admin/registrations</code></li>
+        <li>loading state + error state מטופלים</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-55                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab55">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">FAB-55</div>
+      <div class="task-title">Pending Approval Page</div>
+      <div class="task-effort">S · ~3–5 שעות · תלוי ב-FAB-40 + FAB-41 + FAB-43</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-orange">
+        ⚠️ משימה זו ממתינה לסגירת Sprint 1 carryover (FAB-40, FAB-41, FAB-43). backend לא נדרש — כל הלוגיקה frontend.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li>תיקייה <code>features/auth/pending/</code> לא קיימת</li>
+            <li>סיום OTP → ניווט לא מוגדר</li>
+            <li>guard לא מטפל בסטטוס PENDING</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li><code>/auth/pending</code> — דף המתנה ברור</li>
+            <li>סיום הרשמה → navigate ל-<code>/auth/pending</code></li>
+            <li>guard מנתב pending users ל-<code>/auth/pending</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/features/auth/pending/</code> — יצירת תיקייה + standalone component חדש.
+      <code>frontend/src/app/app.routes.ts</code> — הוספת route <code>/auth/pending</code>.
+      <code>frontend/.../auth/register/register.component.ts</code> — navigate ל-<code>/auth/pending</code> אחרי שלב 3.
+      <code>frontend/.../core/guards/auth.guard.ts</code> — הוספת כלל לסטטוסי PENDING ו-PARTIAL_APPROVED.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>route <code>/auth/pending</code> קיים ומציג standalone component</li>
+        <li>הדף מציג הודעה ברורה שהבקשה התקבלת וממתינה לאישור</li>
+        <li>סיום שלב 3 הרשמה → navigate ל-<code>/auth/pending</code></li>
+        <li>guard מנתב pending users ל-<code>/auth/pending</code> (לא ל-<code>/home</code>)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-56                                      -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab56">
+  <div class="task-card">
+    <div class="task-card-header color-purple">
+      <div class="task-jira">FAB-56</div>
+      <div class="task-title">Register Step 4 — מסמכים + הצהרות</div>
+      <div class="task-effort">M · ~1 יום · תלוי ב-FAB-43 + FAB-55 · frontend בלבד</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <code>app-file-upload</code> כבר בנוי מ-Sprint 1 — משתמשים בו ישירות. backend לא נדרש — קבצים נשמרים מקומית בלבד (S3 הוא Sprint 3).
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>עכשיו</h4>
+          <ul>
+            <li>שלב 4 ב-<code>register.component</code> — "שלב 4: TODO" placeholder</li>
+            <li>אין inputs, אין checkboxes, כפתור לא מוגדר</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>3 inputs של <code>app-file-upload</code></li>
+            <li>3 checkboxes עם ולידציה</li>
+            <li>submit פעיל רק כשהכל מלא → navigate ל-<code>/auth/pending</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/.../auth/register/register.component.ts</code> — החלפת ה-TODO placeholder בלוגיקת שלב 4.
+      <code>frontend/.../auth/register/register.component.html</code> — template עם 3 <code>app-file-upload</code> ו-3 checkboxes.</p>
+
+      <h4>שלושת המסמכים הנדרשים</h4>
+      <p>תעודת פטירה, תמונת selfie, תעודת זהות — כל אחד דרך <code>app-file-upload</code> הקיים.</p>
+
+      <h4>שלושת ה-checkboxes</h4>
+      <p>קראתי ואני מסכים/ה לתנאי השימוש — אני מסכים/ה לעיבוד מידע אישי — אני מצהיר/ה שהמסמכים אמיתיים.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>שלב 4 מציג 3 inputs של file-upload</li>
+        <li>שלב 4 מציג 3 checkboxes</li>
+        <li>submit מנוטרל עד שכל הקבצים נבחרו וכל הcheckboxes מסומנים</li>
+        <li>submit מוצלח → navigate ל-<code>/auth/pending</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SYNC POINTS                                 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-sync">
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <h2>נקודות סנכרון — תיאומים קריטיים</h2>
+  </div>
+
+  <div class="sync-box">
+    <strong>יום 0 — 15 דקות ביחד לפני שמתחילות:</strong><br>
+    בדקו שהשרת עולה ו-ng serve עובד אצל שתיכן. בדקו סטטוס carryover. חלקו: מי DevOps ומי Admin backend.
+  </div>
+
+  <div class="sync-box">
+    <strong>לפני FAB-51 frontend — UserAdminView contract:</strong><br>
+    השוו את <code>backend/app/schemas/user.py:UserAdminView</code> עם <code>frontend/.../core/models/index.ts:UserAdminView</code>.
+    שדות חייבים להתאים. 5 דקות חוסכות שעות debugging.
+  </div>
+
+  <div class="sync-box">
+    <strong>לפני FAB-52 frontend — approve/reject API response:</strong><br>
+    הסכימו על HTTP status codes וצורת ה-response body (message, updated_status) לפני שמתחילות את ה-UI.
+  </div>
+
+  <div class="sync-box">
+    <strong>לפני FAB-53 frontend — suspend request body:</strong><br>
+    הסכימו: שעות כ-integer, סיבה כ-string — וודאו שה-frontend שולחת בדיוק מה שה-backend מצפה.
+  </div>
+
+  <div class="sync-box">
+    <strong>יום 6 — end-to-end Docker test:</strong><br>
+    ברגע שFAB-48 (compose) ו-FAB-51 (admin list) מוזגים — עשו יחד:
+    <code>docker compose up</code> → כניסה כ-Admin → צפייה ברשימת ממתינות.
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- MOCKUPS                                     -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-mockup">
+  <div class="section-header">
+    <div class="section-number">5</div>
+    <h2>האפליקציה בסוף הספרינט</h2>
+  </div>
+
+  <div class="app-screens">
+
+    <!-- Admin Dashboard -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <div class="app-topbar-logo">אנו בניך</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="app-topbar-user">שרה (Admin)</span>
+          <span class="app-topbar-logout">יציאה</span>
+        </div>
+      </div>
+      <div class="app-body">
+        <div class="app-home-greeting">לוח ניהול</div>
+        <div class="app-home-card" style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div class="app-home-card-title">ממתינות לאישור</div>
+            <div class="app-home-card-desc">לחצי לצפייה ברשימה</div>
+          </div>
+          <span class="app-badge">7</span>
+        </div>
+        <div class="app-home-card">
+          <div class="app-home-card-title">ניהול משתמשים</div>
+          <div class="app-home-card-desc">חיפוש, השעיה, עריכת תפקידים</div>
+        </div>
+        <div class="app-home-card" style="opacity:0.4;">
+          <div class="app-home-card-title" style="color:#9ca3af;">מבקרים ואנשי מקצוע</div>
+          <div class="app-home-card-desc">זמין בספרינט 4</div>
+        </div>
+      </div>
+      <div class="app-caption">Admin Dashboard — badge מספר ממתינות</div>
+    </div>
+
+    <!-- Pending Registrations -->
+    <div class="app-frame">
+      <div class="app-topbar">ממתינות לאישור</div>
+      <div class="app-body">
+        <div class="app-row">
+          <div>
+            <div class="app-row-name">מרים כהן</div>
+            <div class="app-row-meta">נרשמה: 01/07/2026</div>
+          </div>
+          <div>
+            <span class="app-row-status pending">PENDING</span>
+          </div>
+        </div>
+        <div class="app-row">
+          <div>
+            <div class="app-row-name">רחל לוי</div>
+            <div class="app-row-meta">נרשמה: 29/06/2026</div>
+          </div>
+          <div>
+            <span class="app-row-status" style="background:#ede9fe; color:#4c1d95;">PARTIAL</span>
+          </div>
+        </div>
+        <div class="app-row">
+          <div>
+            <div class="app-row-name">שרה אבי</div>
+            <div class="app-row-meta">נרשמה: 28/06/2026</div>
+          </div>
+          <div>
+            <span class="app-row-status pending">PENDING</span>
+          </div>
+        </div>
+        <div class="app-btn-row" style="margin-top: 10px;">
+          <div class="app-btn app-btn-primary" style="font-size:11px;">אשר</div>
+          <div class="app-btn app-btn-danger" style="font-size:11px;">דחה</div>
+          <div class="app-btn app-btn-outline" style="font-size:11px;">השע</div>
+        </div>
+      </div>
+      <div class="app-caption">רשימת ממתינות — approve / reject / suspend</div>
+    </div>
+
+    <!-- Pending Approval page (user view) -->
+    <div class="app-frame">
+      <div class="app-topbar">אנו בניך</div>
+      <div class="app-body">
+        <div class="app-pending-icon">⏳</div>
+        <div class="app-pending-title">הבקשה שלך התקבלה</div>
+        <div class="app-pending-text">
+          ההרשמה שלך נמצאת בבדיקה.<br>
+          שני מנהלים יאשרו את הבקשה.<br>
+          תקבל/י מייל כשהבקשה תאושר.
+        </div>
+        <div class="app-note-green" style="margin-top:20px;">SLA: עד 72 שעות לאישור</div>
+      </div>
+      <div class="app-caption">דף /auth/pending — למשתמש שסיים הרשמה</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- DEFINITION OF DONE                          -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-dod">
+  <div class="section-header">
+    <div class="section-number green">✅</div>
+    <h2>Definition of Done — ספרינט 2 סגור כשכל זה עובד</h2>
+  </div>
+
+  <div class="callout callout-green">
+    ✅ בדקו את הצ'קליסט הזה <strong>ביחד</strong> לפני שסוגרות את הספרינט.
+  </div>
+
+  <h3>DevOps</h3>
+  <ul class="checklist">
+    <li><code>docker compose up</code> מביא backend + frontend + PostgreSQL — שלושתם בריאים</li>
+    <li>backend מחובר ל-PostgreSQL (לא SQLite) בתוך compose</li>
+    <li>CI רץ על כל PR וירוק: ruff + mypy + pytest + eslint</li>
+    <li><code>.github/workflows/deploy.yml</code> קיים ומתקבל ב-GitHub Actions</li>
+  </ul>
+
+  <h3>Admin Approval</h3>
+  <ul class="checklist">
+    <li>Admin נכנסת → dashboard מציג badge עם מספר ממתינות הנכון</li>
+    <li>Admin לוחצת "אשר" על ממתינה → PARTIAL_APPROVED (אישור ראשון)</li>
+    <li>Admin שני לוחץ "אשר" → ACTIVE + email (אם FAB-36 סגור)</li>
+    <li>אותו Admin לא יכול לאשר פעמיים — מקבל שגיאה ברורה</li>
+    <li>Admin דוחה עם סיבה → confirm-dialog → משתמש עוזב את הרשימה + email</li>
+    <li>Admin משהה → משתמש לא יכול להיכנס בזמן ההשעיה + שגיאה ייעודית</li>
+    <li>AuditLog נרשם לכל אחת מהפעולות: approve / reject / suspend</li>
+  </ul>
+
+  <h3>User Flow</h3>
+  <ul class="checklist">
+    <li>סיום שלב 3 הרשמה → navigate ל-<code>/auth/pending</code></li>
+    <li>שלב 4 הרשמה מציג 3 file-upload inputs + 3 checkboxes</li>
+    <li>submit שלב 4 פעיל רק כשהכל מלא → navigate ל-<code>/auth/pending</code></li>
+    <li>משתמש בסטטוס PENDING מנסה להיכנס ל-<code>/home</code> → redirect ל-<code>/auth/pending</code></li>
+    <li>דף <code>/auth/pending</code> מציג הודעה ברורה שהבקשה ממתינה לאישור</li>
+  </ul>
+
+  <h3>איכות קוד</h3>
+  <ul class="checklist">
+    <li><code>ng build</code> עובר ללא שגיאות TypeScript</li>
+    <li><code>ng lint</code> עובר ללא שגיאות</li>
+    <li><code>ruff check .</code> + <code>mypy .</code> עוברים על backend</li>
+    <li>CI ירוק על כל ה-PRs של הספרינט</li>
+    <li>אין <code>@Input()</code> / <code>@Output()</code> — רק <code>input()</code> / <code>output()</code></li>
+    <li>אין <code>*ngIf</code> / <code>*ngFor</code> — רק <code>@if</code> / <code>@for</code></li>
+    <li>כל קומפוננטה Angular — <code>standalone: true</code></li>
+    <li>כל component חדש משתמש ב-<code>app-loading-spinner</code> + <code>app-error-display</code></li>
+  </ul>
+
+</div>
+
+<div style="text-align:center; padding:32px 0; color:#999; font-size:13px;">
+  אנו בניך · ספרינט 2 · 2026 · גרסה 1.0
+</div>
+
+</div><!-- /container -->
+</body>
+</html>
