@@ -1,0 +1,38 @@
+@use '../../../../styles/variables' as *;
+
+.pending-container {
+  max-width: 420px;
+  margin: $spacing-2xl auto;
+  padding: $spacing-xl;
+  background-color: $color-bg;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-md;
+}
+
+h1 {
+  margin: 0 0 $spacing-lg;
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $color-text;
+  text-align: center;
+}
+
+.pending-message {
+  padding: $spacing-md;
+  color: $color-success;
+  background-color: rgba($color-success, 0.08);
+  border: 1px solid rgba($color-success, 0.3);
+  border-radius: $radius-md;
+  text-align: center;
+}
+
+.login-link {
+  margin-top: $spacing-lg;
+  font-size: $font-size-sm;
+  text-align: center;
+
+  a {
+    color: $color-primary;
+  }
+}

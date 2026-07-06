@@ -42,6 +42,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/register/register.component').then(m => m.RegisterComponent),
   },
+  {
+    path: 'auth/pending',
+    loadComponent: () =>
+      import('./features/auth/pending/pending.component').then(m => m.PendingApprovalComponent),
+  },
 
   // ──────────────────────────────────────────────────────────
   // Protected – USER role
