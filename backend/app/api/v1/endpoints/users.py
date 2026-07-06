@@ -18,7 +18,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get("/me", response_model=UserProfile)
-def get_my_profile(current_user: User = Depends(get_current_user)):
+def get_my_profile(current_user: User = Depends(get_current_user)) -> User:
     """Return the currently authenticated user's profile."""
     return current_user
 
@@ -28,7 +28,7 @@ def search_users(
     name: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> list[UserPublic]:
     """
     Search for users to send a direct message to.
 
@@ -45,7 +45,7 @@ def search_users(
 def delete_my_account(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> None:
     """
     GDPR right-to-be-forgotten – delete own account.
 

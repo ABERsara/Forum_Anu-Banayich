@@ -17,21 +17,12 @@ TODO list for junior developer:
   [ ] implement _check_frequent_false_reporter()
 """
 
-from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.core.constants import PostStatus, ReportDecision, ReportTargetType
-from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
-from app.schemas.report import ReportCreate, ReportDecideRequest, ReportResponse
-from app.services.audit_service import log_action
-from app.services.email_service import (
-    send_moderator_alert,
-    send_suspension_notification,
-    send_urgent_moderator_alert,
-)
+from app.schemas.report import ReportCreate, ReportDecideRequest
 
 
 def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:

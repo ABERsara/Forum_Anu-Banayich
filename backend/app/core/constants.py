@@ -10,7 +10,7 @@ When you add a value here, add it there too!
 import enum
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     """System-level role – controls which pages/actions are allowed."""
     USER = "user"
     ADMIN = "admin"
@@ -18,7 +18,7 @@ class UserRole(str, enum.Enum):
     PROFESSIONAL = "professional"
 
 
-class UserType(str, enum.Enum):
+class UserType(enum.StrEnum):
     """Only for USER role – which bereavement group the person belongs to."""
     WIDOWER = "widower"       # אלמן
     WIDOW = "widow"           # אלמנה
@@ -26,7 +26,7 @@ class UserType(str, enum.Enum):
     ORPHAN_FEMALE = "orphan_female" # יתומה
 
 
-class Sector(str, enum.Enum):
+class Sector(enum.StrEnum):
     """Religious/cultural sector – second axis of the content filter matrix."""
     HASIDIC = "hasidic"     # חסידי
     LITVISH = "litvish"     # ליטאי
@@ -34,7 +34,7 @@ class Sector(str, enum.Enum):
     GENERAL = "general"     # כללי
 
 
-class AccountStatus(str, enum.Enum):
+class AccountStatus(enum.StrEnum):
     """Registration lifecycle states."""
     PENDING_OTP = "pending_otp"               # ממתין לאימות מייל/טלפון
     PENDING_APPROVAL = "pending_approval"      # ממתין לאישור 2 מנהלים
@@ -45,7 +45,7 @@ class AccountStatus(str, enum.Enum):
     CANCELLED = "cancelled"                    # בוטל (מחיקה עצמית / GDPR)
 
 
-class GroupVisibility(str, enum.Enum):
+class GroupVisibility(enum.StrEnum):
     """
     Who can see a piece of content – group axis.
     Used on ForumPost, ProfessionalQuery, DirectMessage.
@@ -57,7 +57,7 @@ class GroupVisibility(str, enum.Enum):
     ALL = "all"                # כולם
 
 
-class SectorVisibility(str, enum.Enum):
+class SectorVisibility(enum.StrEnum):
     """
     Who can see a piece of content – sector axis.
     Used on ForumPost, ProfessionalQuery, DirectMessage.
@@ -69,14 +69,14 @@ class SectorVisibility(str, enum.Enum):
     ALL = "all"     # כל המגזרים
 
 
-class PostStatus(str, enum.Enum):
+class PostStatus(enum.StrEnum):
     """Moderation state of a forum post."""
     VISIBLE = "visible"   # גלוי
     HIDDEN = "hidden"     # מוסתר (הוסתר אוטומטית אחרי 2 דיווחים)
     DELETED = "deleted"   # מחוק (מנהל/מבקר מחק)
 
 
-class ProfessionalDomain(str, enum.Enum):
+class ProfessionalDomain(enum.StrEnum):
     """Area of expertise for Professional users."""
     LAWYER = "lawyer"              # עו"ד
     ACCOUNTANT = "accountant"      # רואה חשבון
@@ -88,14 +88,14 @@ class ProfessionalDomain(str, enum.Enum):
     OTHER = "other"                # אחר
 
 
-class QueryStatus(str, enum.Enum):
+class QueryStatus(enum.StrEnum):
     """Life-cycle of a professional query."""
     OPEN = "open"         # פתוח – טרם נענה
     ANSWERED = "answered" # נענה
     CLOSED = "closed"     # סגור
 
 
-class ReportReason(str, enum.Enum):
+class ReportReason(enum.StrEnum):
     """Why the user reported a piece of content."""
     HARASSMENT = "harassment"         # הטרדה
     OFFENSIVE = "offensive"           # תוכן פוגעני
@@ -103,21 +103,21 @@ class ReportReason(str, enum.Enum):
     OTHER = "other"                   # אחר
 
 
-class ReportTargetType(str, enum.Enum):
+class ReportTargetType(enum.StrEnum):
     """What type of content was reported."""
     FORUM_POST = "forum_post"               # הודעת פורום
     DIRECT_MESSAGE = "direct_message"       # הודעה פרטית
     PROFESSIONAL_QUERY = "professional_query"  # שאלה מקצועית
 
 
-class ReportDecision(str, enum.Enum):
+class ReportDecision(enum.StrEnum):
     """Moderator's decision on a report."""
     PENDING = "pending"   # ממתין לטיפול
     INVALID = "invalid"   # שגוי – הודעה הושבה
     VALID = "valid"       # מוצדק – הודעה נמחקה
 
 
-class DocumentType(str, enum.Enum):
+class DocumentType(enum.StrEnum):
     """Types of documents uploaded during registration."""
     DEATH_CERTIFICATE = "death_certificate"  # תעודת פטירה
     SELFIE = "selfie"                        # תמונת פנים (selfie)
@@ -125,7 +125,7 @@ class DocumentType(str, enum.Enum):
     PASSPORT = "passport"                    # דרכון
 
 
-class AuditAction(str, enum.Enum):
+class AuditAction(enum.StrEnum):
     """Sensitive admin/moderator actions that must be logged."""
     USER_APPROVED = "user_approved"
     USER_REJECTED = "user_rejected"

@@ -10,8 +10,9 @@ Only ADMIN role can read audit logs.
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import JSON, DateTime, Enum, String, Text, func
+from sqlalchemy import JSON, DateTime, Enum, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import AuditAction
@@ -35,7 +36,7 @@ class AuditLog(Base):
     entity_id: Mapped[str] = mapped_column(String(36), nullable=False)
 
     # Extra context stored as JSON (e.g. {"reason": "...", "new_status": "..."})
-    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    details: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     # The IP address of the actor (encrypted)
     ip_address: Mapped[str | None] = mapped_column(String(256), nullable=True)

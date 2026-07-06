@@ -14,6 +14,8 @@ GET  /admin/audit-log                – full audit log
 POST /admin/users/{id}/suspend       – suspend a user manually
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -27,7 +29,6 @@ from app.schemas.user import (
     UserAdminView,
     UserProfile,
 )
-from app.services import audit_service, user_service
 
 router = APIRouter(
     prefix="/admin",
@@ -39,7 +40,7 @@ router = APIRouter(
 @router.get("/registrations", response_model=list[UserAdminView])
 def list_pending_registrations(
     db: Session = Depends(get_db),
-):
+) -> list[UserAdminView]:
     """
     Return all registrations awaiting admin approval.
 
@@ -50,7 +51,7 @@ def list_pending_registrations(
 
 
 @router.get("/registrations/{user_id}", response_model=UserAdminView)
-def get_registration(user_id: str, db: Session = Depends(get_db)):
+def get_registration(user_id: str, db: Session = Depends(get_db)) -> UserAdminView:
     """
     Return a single registration with all uploaded documents.
 
@@ -65,7 +66,7 @@ def approve_registration(
     user_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> None:
     """
     Approve a pending registration.
 
@@ -81,7 +82,7 @@ def reject_registration(
     data: RegistrationRejectRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> None:
     """
     Reject a pending registration with a reason.
 
@@ -92,7 +93,7 @@ def reject_registration(
 
 
 @router.get("/professionals", response_model=list[UserProfile])
-def list_professionals(db: Session = Depends(get_db)):
+def list_professionals(db: Session = Depends(get_db)) -> list[UserProfile]:
     """Return all professional users."""
     # TODO: query users where role=PROFESSIONAL
     return []
@@ -104,7 +105,7 @@ def update_professional(
     data: ProfessionalUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> None:
     """Update a professional's profile (domain, sectors, groups, description)."""
     # TODO: implement + audit log
     raise NotImplementedError
@@ -116,7 +117,7 @@ def suspend_user(
     data: SuspendUserRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> None:
     """
     Manually suspend a user.
 
@@ -131,7 +132,7 @@ def get_audit_log(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, le=100),
     db: Session = Depends(get_db),
-):
+) -> list[Any]:
     """
     Return paginated audit log (admin only).
 
