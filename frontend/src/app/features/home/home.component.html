@@ -4,7 +4,7 @@
     <p class="home__subtitle">שלום, {{ user.first_name }} {{ user.last_name }}</p>
 
     <div class="home__cards">
-      @if (user.role === UserRole.USER) {
+      @if (auth.isUser()) {
         <a routerLink="/forum" class="home__card-link">
           <app-card title="פורום" subtitle="שאלות ותשובות מהקהילה" [elevated]="true">
             שיתוף, תמיכה ותשובות מחברי הקהילה.
