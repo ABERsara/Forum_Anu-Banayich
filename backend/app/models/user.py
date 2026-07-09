@@ -47,9 +47,13 @@ class User(Base):
     # ------------------------------------------------------------------
     # Auth (all roles)
     # ------------------------------------------------------------------
-    email: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)  # encrypted
+    email: Mapped[str] = mapped_column(
+        String(512), unique=True, nullable=False
+    )  # encrypted
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False, default=UserRole.USER)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole), nullable=False, default=UserRole.USER
+    )
 
     # ------------------------------------------------------------------
     # Basic identity (all roles)
@@ -62,8 +66,10 @@ class User(Base):
     # ------------------------------------------------------------------
     user_type: Mapped[UserType | None] = mapped_column(Enum(UserType), nullable=True)
     sector: Mapped[Sector | None] = mapped_column(Enum(Sector), nullable=True)
-    id_number: Mapped[str | None] = mapped_column(String(512), nullable=True)   # encrypted
-    phone: Mapped[str | None] = mapped_column(String(512), nullable=True)        # encrypted
+    id_number: Mapped[str | None] = mapped_column(
+        String(512), nullable=True
+    )  # encrypted
+    phone: Mapped[str | None] = mapped_column(String(512), nullable=True)  # encrypted
     face_image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
@@ -90,7 +96,9 @@ class User(Base):
     # MODERATOR role – which cells (group+sector) this moderator oversees
     # Stored as JSON: [{"group": "widower", "sector": "hasidic"}, ...]
     # ------------------------------------------------------------------
-    moderator_cells: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
+    moderator_cells: Mapped[list[dict[str, str]] | None] = mapped_column(
+        JSON, nullable=True
+    )
     alert_email: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     # ------------------------------------------------------------------
@@ -135,10 +143,14 @@ class User(Base):
         "DirectMessage", back_populates="sender", foreign_keys="DirectMessage.sender_id"
     )
     received_messages: Mapped[list["DirectMessage"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
-        "DirectMessage", back_populates="recipient", foreign_keys="DirectMessage.recipient_id"
+        "DirectMessage",
+        back_populates="recipient",
+        foreign_keys="DirectMessage.recipient_id",
     )
     professional_queries: Mapped[list["ProfessionalQuery"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
-        "ProfessionalQuery", back_populates="asker", foreign_keys="ProfessionalQuery.asker_id"
+        "ProfessionalQuery",
+        back_populates="asker",
+        foreign_keys="ProfessionalQuery.asker_id",
     )
     reports_filed: Mapped[list["Report"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "Report", back_populates="reporter", foreign_keys="Report.reporter_id"

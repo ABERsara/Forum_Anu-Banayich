@@ -16,7 +16,9 @@ engine = create_engine(
     settings.DATABASE_URL,
     # SQLite-specific: allows the same connection to be used across threads.
     # Remove this line when switching to PostgreSQL.
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+    connect_args={"check_same_thread": False}
+    if "sqlite" in settings.DATABASE_URL
+    else {},
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

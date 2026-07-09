@@ -84,7 +84,9 @@ h1 {
   font-weight: $font-weight-medium;
   border-radius: $radius-md;
   cursor: pointer;
-  transition: background-color $transition-fast, opacity $transition-fast;
+  transition:
+    background-color $transition-fast,
+    opacity $transition-fast;
 
   &:disabled {
     cursor: not-allowed;
@@ -134,7 +136,9 @@ h1 {
   border: 1px solid $color-border;
   border-radius: $radius-md;
   cursor: pointer;
-  transition: background-color $transition-fast, border-color $transition-fast;
+  transition:
+    background-color $transition-fast,
+    border-color $transition-fast;
 
   &--active {
     color: $color-white;

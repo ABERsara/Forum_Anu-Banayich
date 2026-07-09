@@ -45,7 +45,10 @@ import { DatePipe } from '@angular/common';
             <a [routerLink]="['/forum', post.id]">
               <strong>{{ post.title }}</strong>
             </a>
-            <p>{{ post.author.first_name }} {{ post.author.last_name }} | {{ post.created_at | date }}</p>
+            <p>
+              {{ post.author.first_name }} {{ post.author.last_name }} |
+              {{ post.created_at | date }}
+            </p>
             <!-- TODO: show excerpt, visibility badge, report button -->
           </div>
         }

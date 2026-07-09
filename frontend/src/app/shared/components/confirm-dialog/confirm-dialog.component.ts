@@ -16,4 +16,3 @@ export class ConfirmDialogComponent {
   confirmed = output<void>();
   cancelled = output<void>();
 }
-

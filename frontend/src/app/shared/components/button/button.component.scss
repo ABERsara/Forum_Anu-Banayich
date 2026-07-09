@@ -9,7 +9,9 @@
   border-radius: $radius-md;
   font-weight: $font-weight-medium;
   cursor: pointer;
-  transition: background-color $transition-fast, opacity $transition-fast;
+  transition:
+    background-color $transition-fast,
+    opacity $transition-fast;
 
   &:focus-visible {
     @include focus-ring;
@@ -24,30 +26,47 @@
   &--primary {
     background-color: $color-primary;
     color: white;
-    &:hover:not(:disabled) { background-color: $color-primary-dark; }
+    &:hover:not(:disabled) {
+      background-color: $color-primary-dark;
+    }
   }
 
   &--secondary {
     background-color: $color-bg-subtle;
     color: $color-text;
     border: 1px solid $color-border;
-    &:hover:not(:disabled) { background-color: $color-border; }
+    &:hover:not(:disabled) {
+      background-color: $color-border;
+    }
   }
 
   &--danger {
     background-color: $color-danger;
     color: white;
-    &:hover:not(:disabled) { background-color: color.adjust($color-danger, $lightness: -10%); }
+    &:hover:not(:disabled) {
+      background-color: color.adjust($color-danger, $lightness: -10%);
+    }
   }
 
   &--ghost {
     background-color: transparent;
     color: $color-primary;
-    &:hover:not(:disabled) { background-color: rgba($color-primary, 0.08); }
+    &:hover:not(:disabled) {
+      background-color: rgba($color-primary, 0.08);
+    }
   }
 
   // Sizes
-  &--sm { padding: $spacing-xs $spacing-sm; font-size: $font-size-sm; }
-  &--md { padding: $spacing-sm $spacing-md; font-size: $font-size-base; }
-  &--lg { padding: $spacing-md $spacing-lg; font-size: $font-size-lg; }
+  &--sm {
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-sm;
+  }
+  &--md {
+    padding: $spacing-sm $spacing-md;
+    font-size: $font-size-base;
+  }
+  &--lg {
+    padding: $spacing-md $spacing-lg;
+    font-size: $font-size-lg;
+  }
 }

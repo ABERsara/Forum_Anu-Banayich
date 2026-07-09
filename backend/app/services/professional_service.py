@@ -28,12 +28,15 @@ def _build_alias(user: User) -> str:
     Example: "אלמנה – ספרדי"
     """
     from app.core.constants import SECTOR_LABELS, USER_TYPE_LABELS  # noqa: PLC0415
+
     user_type_label = USER_TYPE_LABELS.get(user.user_type, "")  # type: ignore[arg-type]
     sector_label = SECTOR_LABELS.get(user.sector, "")  # type: ignore[arg-type]
     return f"{user_type_label} – {sector_label}"
 
 
-def create_query(db: Session, data: ProfessionalQueryCreate, asker: User) -> ProfessionalQuery:
+def create_query(
+    db: Session, data: ProfessionalQueryCreate, asker: User
+) -> ProfessionalQuery:
     """
     Ask a professional question.
 

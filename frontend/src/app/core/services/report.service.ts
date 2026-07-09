@@ -11,13 +11,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import {
-  Report,
-  ReportCreate,
-  ReportDecideRequest,
-  ReportList,
-  UserAdminView,
-} from '../models';
+import { Report, ReportCreate, ReportDecideRequest, ReportList, UserAdminView } from '../models';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })

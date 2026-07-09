@@ -52,7 +52,9 @@ class ProfessionalQuery(Base):
     status: Mapped[QueryStatus] = mapped_column(
         Enum(QueryStatus), nullable=False, default=QueryStatus.OPEN
     )
-    is_featured: Mapped[bool] = mapped_column(Boolean, default=False)  # "מועדפת" by asker
+    is_featured: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # "מועדפת" by asker
 
     # ------------------------------------------------------------------
     # Privacy: professional sees only this alias (e.g. "אלמנה – ספרדי")

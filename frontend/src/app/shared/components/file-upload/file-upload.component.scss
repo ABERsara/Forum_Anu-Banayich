@@ -37,7 +37,9 @@
       background-color: $color-white;
       color: $color-primary;
       border-color: $color-primary;
-      transition: background-color $transition-fast, color $transition-fast;
+      transition:
+        background-color $transition-fast,
+        color $transition-fast;
 
       &:hover {
         background-color: $color-primary;
@@ -73,7 +75,9 @@
     font-size: $font-size-sm;
     color: $color-text-muted;
     cursor: pointer;
-    transition: color $transition-fast, border-color $transition-fast;
+    transition:
+      color $transition-fast,
+      border-color $transition-fast;
 
     &:hover {
       color: $color-danger;

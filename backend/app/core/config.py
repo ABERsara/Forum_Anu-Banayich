@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    EMAIL_FROM: str = 'noreply@anu-banayich.org.il'
+    EMAIL_FROM: str = "noreply@anu-banayich.org.il"
     EMAIL_FROM_NAME: str = 'עמותת "אנו בניך"'
 
     # ------------------------------------------------------------------
@@ -72,13 +72,13 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Moderation thresholds (can be tuned without code changes)
     # ------------------------------------------------------------------
-    AUTO_HIDE_REPORT_COUNT: int = 2        # Reports before auto-hide
-    AUTO_SUSPEND_VALID_REPORTS: int = 3    # Valid reports in 7 days → suspend
+    AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide
+    AUTO_SUSPEND_VALID_REPORTS: int = 3  # Valid reports in 7 days → suspend
     AUTO_SUSPEND_DAYS_WINDOW: int = 7
     AUTO_SUSPEND_HOURS: int = 48
-    FALSE_REPORT_LIMIT: int = 5            # False reports in 30 days → restrict
+    FALSE_REPORT_LIMIT: int = 5  # False reports in 30 days → restrict
     FALSE_REPORT_DAYS_WINDOW: int = 30
-    DM_BLOCK_AFTER_REPORTS: int = 3        # DM reports before auto-block
+    DM_BLOCK_AFTER_REPORTS: int = 3  # DM reports before auto-block
 
 
 settings = Settings()

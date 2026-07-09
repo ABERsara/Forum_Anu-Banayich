@@ -80,4 +80,6 @@ class Report(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Report id={self.id} target={self.target_type} decision={self.decision}>"
+        return (
+            f"<Report id={self.id} target={self.target_type} decision={self.decision}>"
+        )

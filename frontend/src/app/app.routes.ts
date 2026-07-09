@@ -30,23 +30,22 @@ export const routes: Routes = [
   {
     path: 'home',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/home/home.component').then(m => m.HomeComponent),
+    loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
   },
   {
     path: 'login',
     loadComponent: () =>
-      import('./features/auth/login/login.component').then(m => m.LoginComponent),
+      import('./features/auth/login/login.component').then((m) => m.LoginComponent),
   },
   {
     path: 'register',
     loadComponent: () =>
-      import('./features/auth/register/register.component').then(m => m.RegisterComponent),
+      import('./features/auth/register/register.component').then((m) => m.RegisterComponent),
   },
   {
     path: 'auth/pending',
     loadComponent: () =>
-      import('./features/auth/pending/pending.component').then(m => m.PendingApprovalComponent),
+      import('./features/auth/pending/pending.component').then((m) => m.PendingApprovalComponent),
   },
 
   // ──────────────────────────────────────────────────────────
@@ -60,19 +59,19 @@ export const routes: Routes = [
         path: '',
         loadComponent: () =>
           import('./features/forum/forum-list/forum-list.component').then(
-            m => m.ForumListComponent,
+            (m) => m.ForumListComponent,
           ),
       },
       {
         path: 'new',
         loadComponent: () =>
-          import('./features/forum/new-post/new-post.component').then(m => m.NewPostComponent),
+          import('./features/forum/new-post/new-post.component').then((m) => m.NewPostComponent),
       },
       {
         path: ':id',
         loadComponent: () =>
           import('./features/forum/forum-post/forum-post.component').then(
-            m => m.ForumPostComponent,
+            (m) => m.ForumPostComponent,
           ),
       },
     ],
@@ -85,20 +84,20 @@ export const routes: Routes = [
         path: '',
         loadComponent: () =>
           import('./features/advice/advice-list/advice-list.component').then(
-            m => m.AdviceListComponent,
+            (m) => m.AdviceListComponent,
           ),
       },
       {
         path: 'ask',
         loadComponent: () =>
           import('./features/advice/ask-question/ask-question.component').then(
-            m => m.AskQuestionComponent,
+            (m) => m.AskQuestionComponent,
           ),
       },
       {
         path: 'qa',
         loadComponent: () =>
-          import('./features/advice/qa-feed/qa-feed.component').then(m => m.QaFeedComponent),
+          import('./features/advice/qa-feed/qa-feed.component').then((m) => m.QaFeedComponent),
       },
     ],
   },
@@ -109,12 +108,12 @@ export const routes: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./features/messages/inbox/inbox.component').then(m => m.InboxComponent),
+          import('./features/messages/inbox/inbox.component').then((m) => m.InboxComponent),
       },
       {
         path: ':userId',
         loadComponent: () =>
-          import('./features/messages/chat/chat.component').then(m => m.ChatComponent),
+          import('./features/messages/chat/chat.component').then((m) => m.ChatComponent),
       },
     ],
   },
@@ -122,7 +121,7 @@ export const routes: Routes = [
     path: 'profile',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/profile/profile.component').then(m => m.ProfileComponent),
+      import('./features/profile/profile.component').then((m) => m.ProfileComponent),
   },
 
   // ──────────────────────────────────────────────────────────
@@ -136,29 +135,27 @@ export const routes: Routes = [
         path: '',
         loadComponent: () =>
           import('./features/admin/dashboard/admin-dashboard.component').then(
-            m => m.AdminDashboardComponent,
+            (m) => m.AdminDashboardComponent,
           ),
       },
       {
         path: 'registrations',
         loadComponent: () =>
-          import(
-            './features/admin/pending-registrations/pending-registrations.component'
-          ).then(m => m.PendingRegistrationsComponent),
+          import('./features/admin/pending-registrations/pending-registrations.component').then(
+            (m) => m.PendingRegistrationsComponent,
+          ),
       },
       {
         path: 'professionals',
         loadComponent: () =>
           import('./features/admin/manage-professionals/manage-professionals.component').then(
-            m => m.ManageProfessionalsComponent,
+            (m) => m.ManageProfessionalsComponent,
           ),
       },
       {
         path: 'audit-log',
         loadComponent: () =>
-          import('./features/admin/audit-log/audit-log.component').then(
-            m => m.AuditLogComponent,
-          ),
+          import('./features/admin/audit-log/audit-log.component').then((m) => m.AuditLogComponent),
       },
     ],
   },
@@ -179,7 +176,7 @@ export const routes: Routes = [
         path: 'reports',
         loadComponent: () =>
           import('./features/moderator/reports/reports.component').then(
-            m => m.ModeratorReportsComponent,
+            (m) => m.ModeratorReportsComponent,
           ),
       },
     ],

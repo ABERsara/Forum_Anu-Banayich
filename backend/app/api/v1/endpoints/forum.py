@@ -33,6 +33,7 @@ router = APIRouter(tags=["Forum & Messages"])
 # Forum posts
 # ──────────────────────────────────────────────────────────
 
+
 @router.get("/forum/posts", response_model=ForumPostListResponse)
 def list_posts(
     page: int = Query(1, ge=1),
@@ -99,6 +100,7 @@ def report_post(
 # ──────────────────────────────────────────────────────────
 # Direct messages
 # ──────────────────────────────────────────────────────────
+
 
 @router.get("/messages", response_model=list[ConversationSummary])
 def get_inbox(
