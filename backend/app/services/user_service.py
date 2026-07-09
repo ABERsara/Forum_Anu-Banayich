@@ -11,10 +11,15 @@ TODO list for junior developer:
   [ ] implement get_professionals_for_user() – filtered by sector+group
 """
 
+from datetime import UTC, datetime
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.constants import AccountStatus, AuditAction
 from app.models.user import User
+from app.services.audit_service import log_action
+from app.services.email_service import send_approval_email, send_rejection_email
 
 
 def get_pending_registrations(db: Session) -> list[User]:
@@ -45,8 +50,43 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
       3. Log to audit_log
       4. Return updated user
     """
-    # TODO: implement this function
-    raise NotImplementedError("approve_registration() is not yet implemented")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if user.account_status not in (
+        AccountStatus.PENDING_APPROVAL,
+        AccountStatus.PARTIALLY_APPROVED,
+    ):
+        raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
+    if user.first_approver_id == admin.id:
+        raise HTTPException(status_code=400, detail="לא ניתן לאשר את אותה הרשמה פעמיים")
+
+    previous_status = user.account_status
+
+    if user.first_approver_id is None:
+        user.first_approver_id = admin.id
+        user.account_status = AccountStatus.PARTIALLY_APPROVED
+    else:
+        user.second_approver_id = admin.id
+        user.account_status = AccountStatus.ACTIVE
+        user.approved_at = datetime.now(UTC)
+
+    db.commit()
+    db.refresh(user)
+
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.USER_APPROVED,
+        entity_type="User",
+        entity_id=user.id,
+        details={"previous_status": previous_status, "new_status": user.account_status},
+    )
+
+    if user.account_status == AccountStatus.ACTIVE:
+        send_approval_email(user.email, user.first_name)
+
+    return user
 
 
 def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> User:
