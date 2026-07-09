@@ -35,7 +35,6 @@ import { LoginRequest } from '../../../core/models';
         <h1 class="login-title">כניסה למערכת</h1>
 
         <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-
           <div class="form-field">
             <label for="email">אימייל</label>
             <input
@@ -71,19 +70,12 @@ import { LoginRequest } from '../../../core/models';
             <app-loading-spinner message="מתחבר/ת..." />
           }
 
-          <button
-            type="submit"
-            class="btn-submit"
-            [disabled]="form.invalid || isLoading()"
-          >
+          <button type="submit" class="btn-submit" [disabled]="form.invalid || isLoading()">
             כניסה
           </button>
-
         </form>
 
-        <p class="register-link">
-          אין לך חשבון? <a routerLink="/register">הירשם/י כאן</a>
-        </p>
+        <p class="register-link">אין לך חשבון? <a routerLink="/register">הירשם/י כאן</a></p>
       </div>
     </div>
   `,
@@ -120,6 +112,5 @@ export class LoginComponent {
         this.isLoading.set(false);
       },
     });
-
   }
 }

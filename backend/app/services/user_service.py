@@ -11,7 +11,6 @@ TODO list for junior developer:
   [ ] implement get_professionals_for_user() – filtered by sector+group
 """
 
-
 from sqlalchemy.orm import Session
 
 from app.core.constants import AccountStatus
@@ -67,7 +66,9 @@ def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> 
     raise NotImplementedError("reject_registration() is not yet implemented")
 
 
-def suspend_user(db: Session, user_id: str, actor: User, hours: int, reason: str) -> User:
+def suspend_user(
+    db: Session, user_id: str, actor: User, hours: int, reason: str
+) -> User:
     """
     Temporarily suspend a user.
 

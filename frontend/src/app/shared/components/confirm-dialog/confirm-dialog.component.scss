@@ -50,19 +50,25 @@
   &--primary {
     background-color: $color-primary;
     color: white;
-    &:hover { background-color: $color-primary-dark; }
+    &:hover {
+      background-color: $color-primary-dark;
+    }
   }
 
   &--danger {
     background-color: $color-danger;
     color: white;
-    &:hover { background-color: color.adjust($color-danger, $lightness: -10%); }
+    &:hover {
+      background-color: color.adjust($color-danger, $lightness: -10%);
+    }
   }
 
   &--cancel {
     background-color: $color-bg-subtle;
     color: $color-text;
     border: 1px solid $color-border;
-    &:hover { background-color: $color-border; }
+    &:hover {
+      background-color: $color-border;
+    }
   }
 }

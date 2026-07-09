@@ -25,14 +25,18 @@ import { AuthService } from '../../../core/services/auth.service';
   standalone: true,
   imports: [RouterLink, FormsModule],
   template: `
-    <div style="padding: 1rem; direction: rtl; display: flex; flex-direction: column; height: 100vh">
+    <div
+      style="padding: 1rem; direction: rtl; display: flex; flex-direction: column; height: 100vh"
+    >
       <a routerLink="/messages">← חזרה לתיבת הדואר</a>
 
       <!-- Messages -->
       <div style="flex: 1; overflow-y: auto; padding: 1rem">
         @for (msg of messages; track msg.id) {
           <div [style.text-align]="isMyMessage(msg) ? 'left' : 'right'" style="margin: 0.5rem 0">
-            <span style="background: #e5e7eb; padding: 0.5rem 1rem; border-radius: 12px; display: inline-block">
+            <span
+              style="background: #e5e7eb; padding: 0.5rem 1rem; border-radius: 12px; display: inline-block"
+            >
               {{ msg.content }}
             </span>
           </div>

@@ -17,10 +17,7 @@ describe('LoginComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
-      providers: [
-        provideRouter([]),
-        { provide: AuthService, useValue: { login: authLoginMock } },
-      ],
+      providers: [provideRouter([]), { provide: AuthService, useValue: { login: authLoginMock } }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(LoginComponent);

@@ -5,18 +5,18 @@
       <p class="dialog__message">{{ message() }}</p>
     }
     <div class="dialog__actions">
-      <button
-        class="btn btn--cancel"
-        type="button"
-        (click)="cancelled.emit()"
-      >{{ cancelText() }}</button>
+      <button class="btn btn--cancel" type="button" (click)="cancelled.emit()">
+        {{ cancelText() }}
+      </button>
       <button
         class="btn"
         [class.btn--danger]="isDestructive()"
         [class.btn--primary]="!isDestructive()"
         type="button"
         (click)="confirmed.emit()"
-      >{{ confirmText() }}</button>
+      >
+        {{ confirmText() }}
+      </button>
     </div>
   </div>
 </div>
