@@ -14,6 +14,7 @@ TODO list for junior developer:
 
 from sqlalchemy.orm import Session
 
+from app.core.constants import AccountStatus
 from app.models.user import User
 
 

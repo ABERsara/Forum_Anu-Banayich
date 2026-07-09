@@ -29,6 +29,7 @@ from app.schemas.user import (
     UserAdminView,
     UserProfile,
 )
+from app.services import user_service
 
 router = APIRouter(
     prefix="/admin",
