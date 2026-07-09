@@ -19,11 +19,18 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: $spacing-lg;
-    text-align: left;
+    text-align: right;
   }
-}
 
-.card-actions {
-  padding: $spacing-md $spacing-lg $spacing-lg;
-  border-top: 1px solid $color-border;
+  &__card-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    transition: transform $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: $shadow-md;
+    }
+  }
 }
