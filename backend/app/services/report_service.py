@@ -17,7 +17,6 @@ TODO list for junior developer:
   [ ] implement _check_frequent_false_reporter()
 """
 
-
 from sqlalchemy.orm import Session
 
 from app.models.report import Report

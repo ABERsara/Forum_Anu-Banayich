@@ -72,16 +72,19 @@ class UserAdminView(BaseModel):
 
 class RegistrationApproveRequest(BaseModel):
     """Admin approves a pending registration."""
+
     pass  # no body needed – the action is clear from the endpoint
 
 
 class RegistrationRejectRequest(BaseModel):
     """Admin rejects a pending registration."""
+
     reason: str
 
 
 class SuspendUserRequest(BaseModel):
     """Suspend a user for N hours."""
+
     hours: int = 48
     reason: str
 
@@ -101,6 +104,7 @@ class ProfessionalProfile(BaseModel):
 
 class ProfessionalUpdateRequest(BaseModel):
     """Admin updates a professional's profile."""
+
     professional_domain: ProfessionalDomain | None = None
     professional_groups: list[str] | None = None
     professional_sectors: list[str] | None = None

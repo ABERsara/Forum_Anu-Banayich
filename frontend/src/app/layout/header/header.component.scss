@@ -34,7 +34,8 @@
       text-decoration: none;
       transition: color $transition-fast;
 
-      &:hover, &.active {
+      &:hover,
+      &.active {
         color: $color-primary;
       }
     }

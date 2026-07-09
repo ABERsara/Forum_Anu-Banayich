@@ -44,9 +44,9 @@ export interface UserProfile {
   role: UserRole;
   user_type: UserType | null;
   sector: Sector | null;
-  birth_date: string | null;   // ISO date string "YYYY-MM-DD"
+  birth_date: string | null; // ISO date string "YYYY-MM-DD"
   account_status: AccountStatus;
-  created_at: string;           // ISO datetime
+  created_at: string; // ISO datetime
 }
 
 /** What admin sees when reviewing a registration. */
@@ -77,7 +77,7 @@ export interface RegisterRequest {
   last_name: string;
   email: string;
   phone: string;
-  birth_date: string;   // "YYYY-MM-DD"
+  birth_date: string; // "YYYY-MM-DD"
   user_type: UserType;
   sector: Sector;
   id_number: string;

@@ -27,7 +27,9 @@ class AuditLog(Base):
     )
 
     # The admin/moderator who performed the action
-    actor_id: Mapped[str] = mapped_column(String(36), nullable=False)  # no FK – logs outlive users
+    actor_id: Mapped[str] = mapped_column(
+        String(36), nullable=False
+    )  # no FK – logs outlive users
 
     action: Mapped[AuditAction] = mapped_column(Enum(AuditAction), nullable=False)
 
