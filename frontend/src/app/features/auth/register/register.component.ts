@@ -36,7 +36,6 @@ import { ErrorDisplayComponent } from '../../../shared/components/error-display/
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { FileUploadComponent } from '../../../shared/components/file-upload/file-upload.component';
 
-
 @Component({
   selector: 'app-register',
   standalone: true,
@@ -86,12 +85,12 @@ export class RegisterComponent {
 
   isStep1Invalid(): boolean {
     const fields = ['first_name', 'last_name', 'id_number', 'birth_date', 'user_type', 'sector'];
-    return fields.some(f => this.form.get(f)!.invalid);
+    return fields.some((f) => this.form.get(f)!.invalid);
   }
 
   isStep2Invalid(): boolean {
     const fields = ['email', 'phone', 'password'];
-    return fields.some(f => this.form.get(f)!.invalid);
+    return fields.some((f) => this.form.get(f)!.invalid);
   }
 
   isStep3Invalid(): boolean {
@@ -100,12 +99,9 @@ export class RegisterComponent {
 
   isStep4Invalid(): boolean {
     const declarationFields = ['declare_accuracy', 'declare_terms', 'declare_authorization'];
-    const declarationsInvalid = declarationFields.some(f => this.form.get(f)!.invalid);
+    const declarationsInvalid = declarationFields.some((f) => this.form.get(f)!.invalid);
     return (
-      declarationsInvalid ||
-      !this.deathCertificateFile() ||
-      !this.selfieFile() ||
-      !this.idDocFile()
+      declarationsInvalid || !this.deathCertificateFile() || !this.selfieFile() || !this.idDocFile()
     );
   }
 
@@ -207,13 +203,13 @@ export class RegisterComponent {
 
   nextStep(): void {
     if (this.currentStep() < 4) {
-      this.currentStep.update(s => (s + 1) as 1 | 2 | 3 | 4);
+      this.currentStep.update((s) => (s + 1) as 1 | 2 | 3 | 4);
     }
   }
 
   prevStep(): void {
     if (this.currentStep() > 1) {
-      this.currentStep.update(s => (s - 1) as 1 | 2 | 3 | 4);
+      this.currentStep.update((s) => (s - 1) as 1 | 2 | 3 | 4);
     }
   }
 }

@@ -21,9 +21,9 @@ export enum UserRole {
 // ---------------------------------------------------------------------------
 
 export enum UserType {
-  WIDOWER = 'widower',         // אלמן
-  WIDOW = 'widow',             // אלמנה
-  ORPHAN_MALE = 'orphan_male',     // יתום
+  WIDOWER = 'widower', // אלמן
+  WIDOW = 'widow', // אלמנה
+  ORPHAN_MALE = 'orphan_male', // יתום
   ORPHAN_FEMALE = 'orphan_female', // יתומה
 }
 
@@ -39,10 +39,10 @@ export const USER_TYPE_LABELS: Record<UserType, string> = {
 // ---------------------------------------------------------------------------
 
 export enum Sector {
-  HASIDIC = 'hasidic',     // חסידי
-  LITVISH = 'litvish',     // ליטאי
+  HASIDIC = 'hasidic', // חסידי
+  LITVISH = 'litvish', // ליטאי
   SEPHARDIC = 'sephardic', // ספרדי
-  GENERAL = 'general',     // כללי
+  GENERAL = 'general', // כללי
 }
 
 export const SECTOR_LABELS: Record<Sector, string> = {

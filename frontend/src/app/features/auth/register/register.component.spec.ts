@@ -40,10 +40,7 @@ describe('RegisterComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [RegisterComponent],
-      providers: [
-        provideRouter([]),
-        { provide: AuthService, useValue: authService },
-      ],
+      providers: [provideRouter([]), { provide: AuthService, useValue: authService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(RegisterComponent);
@@ -147,9 +144,7 @@ describe('RegisterComponent', () => {
     });
 
     it('sets errorMessage when the code is wrong', () => {
-      authService.verifyOtp.mockReturnValue(
-        throwError(() => ({ error: { detail: 'קוד שגוי' } })),
-      );
+      authService.verifyOtp.mockReturnValue(throwError(() => ({ error: { detail: 'קוד שגוי' } })));
 
       component.submitOtp();
 

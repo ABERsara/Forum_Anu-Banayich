@@ -94,6 +94,7 @@ def require_role(*roles: UserRole) -> Callable[..., "User"]:
         def admin_endpoint(user = Depends(require_role(UserRole.ADMIN))):
             ...
     """
+
     def _check(current_user: "User" = Depends(get_current_user)) -> "User":
         if current_user.role not in roles:
             raise HTTPException(

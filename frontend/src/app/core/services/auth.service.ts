@@ -38,6 +38,7 @@ export class AuthService {
 
   readonly currentUser = this._currentUser.asReadonly();
   readonly isLoggedIn = computed(() => this._currentUser() !== null);
+  readonly isUser = computed(() => this._currentUser()?.role === UserRole.USER);
   readonly isAdmin = computed(() => this._currentUser()?.role === UserRole.ADMIN);
   readonly isModerator = computed(() => this._currentUser()?.role === UserRole.MODERATOR);
   readonly isProfessional = computed(() => this._currentUser()?.role === UserRole.PROFESSIONAL);
@@ -114,9 +115,9 @@ export class AuthService {
   refreshToken(): Observable<TokenResponse> {
     const refresh_token = this.getRefreshToken();
     if (!refresh_token) throw new Error('No refresh token available');
-    return this.api.post<TokenResponse>('/auth/refresh', { refresh_token }).pipe(
-      tap(tokens => this.saveTokens(tokens)),
-    );
+    return this.api
+      .post<TokenResponse>('/auth/refresh', { refresh_token })
+      .pipe(tap((tokens) => this.saveTokens(tokens)));
   }
 
   // ──────────────────────────────────────────────────────────
@@ -124,8 +125,6 @@ export class AuthService {
   // ──────────────────────────────────────────────────────────
 
   loadCurrentUser(): Observable<UserProfile> {
-    return this.api.get<UserProfile>('/users/me').pipe(
-      tap(user => this._currentUser.set(user)),
-    );
+    return this.api.get<UserProfile>('/users/me').pipe(tap((user) => this._currentUser.set(user)));
   }
 }

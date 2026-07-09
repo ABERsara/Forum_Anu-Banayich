@@ -67,7 +67,9 @@ def send_rejection_email(email: str, first_name: str, reason: str) -> None:
     # TODO: send real email
 
 
-def send_moderator_alert(moderator_email: str, report_id: str, content_preview: str) -> None:
+def send_moderator_alert(
+    moderator_email: str, report_id: str, content_preview: str
+) -> None:
     """Notify a moderator of a new report (1st report on content)."""
     logger.info(f"[EMAIL] Moderator alert for report {report_id} → {moderator_email}")
     # TODO: send real email
@@ -75,17 +77,23 @@ def send_moderator_alert(moderator_email: str, report_id: str, content_preview: 
 
 def send_urgent_moderator_alert(moderator_email: str, report_id: str) -> None:
     """Urgent notification – content auto-hidden after 2nd report."""
-    logger.info(f"[EMAIL] URGENT moderator alert for report {report_id} → {moderator_email}")
+    logger.info(
+        f"[EMAIL] URGENT moderator alert for report {report_id} → {moderator_email}"
+    )
     # TODO: send real email
 
 
 def send_suspension_notification(email: str, hours: int, reason: str) -> None:
     """Notify a user that their account was suspended."""
-    logger.info(f"[EMAIL] Suspension notification → {email}, {hours}h, reason: {reason}")
+    logger.info(
+        f"[EMAIL] Suspension notification → {email}, {hours}h, reason: {reason}"
+    )
     # TODO: send real email
 
 
-def send_question_notification(professional_email: str, query_id: str, is_general: bool) -> None:
+def send_question_notification(
+    professional_email: str, query_id: str, is_general: bool
+) -> None:
     """Notify a professional of a new question."""
     label = "שאלה כללית" if is_general else "שאלה ישירה"
     logger.info(f"[EMAIL] {label} {query_id} → {professional_email}")

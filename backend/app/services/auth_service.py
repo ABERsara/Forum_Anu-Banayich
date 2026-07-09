@@ -30,7 +30,9 @@ def _generate_otp(length: int = 6) -> str:
     return "".join(random.choices(string.digits, k=length))
 
 
-def _create_token(subject: str, expires_delta: timedelta, token_type: str = "access") -> str:
+def _create_token(
+    subject: str, expires_delta: timedelta, token_type: str = "access"
+) -> str:
     expire = datetime.now(UTC) + expires_delta
     payload = {"sub": subject, "exp": expire, "type": token_type}
     return str(jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM))
@@ -60,7 +62,9 @@ def register(db: Session, data: RegisterRequest) -> User:
     db.refresh(user)
     otp = _generate_otp()
     user.otp_code = otp
-    user.otp_expires_at = datetime.now(UTC) + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
+    user.otp_expires_at = datetime.now(UTC) + timedelta(
+        minutes=settings.OTP_EXPIRE_MINUTES
+    )
     db.commit()
     send_otp_email(user.email, otp)
     return user
@@ -91,9 +95,15 @@ def login(db: Session, data: LoginRequest) -> TokenResponse:
         raise HTTPException(status_code=401, detail="אימות נכשל. בדוק/י מייל וסיסמה.")
     if user.account_status != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="החשבון אינו פעיל. פנה/י למנהל.")
-    access = _create_token(user.id, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), "access")
-    refresh = _create_token(user.id, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS), "refresh")
-    return TokenResponse(access_token=access, refresh_token=refresh, token_type="bearer")
+    access = _create_token(
+        user.id, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), "access"
+    )
+    refresh = _create_token(
+        user.id, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS), "refresh"
+    )
+    return TokenResponse(
+        access_token=access, refresh_token=refresh, token_type="bearer"
+    )
 
 
 def refresh_token(db: Session, refresh_tok: str) -> TokenResponse:
@@ -109,8 +119,12 @@ def refresh_token(db: Session, refresh_tok: str) -> TokenResponse:
     user = db.query(User).filter(User.id == user_id).first()
     if not user or user.account_status != AccountStatus.ACTIVE:
         raise HTTPException(status_code=401, detail="טוקן רענון לא תקין.")
-    access = _create_token(user.id, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), "access")
-    return TokenResponse(access_token=access, refresh_token=refresh_tok, token_type="bearer")
+    access = _create_token(
+        user.id, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), "access"
+    )
+    return TokenResponse(
+        access_token=access, refresh_token=refresh_tok, token_type="bearer"
+    )
 
 
 def resend_otp(db: Session, email: str) -> None:
@@ -120,6 +134,8 @@ def resend_otp(db: Session, email: str) -> None:
         raise HTTPException(status_code=400, detail="לא ניתן לשלוח קוד אימות")
     otp = _generate_otp()
     user.otp_code = otp
-    user.otp_expires_at = datetime.now(UTC) + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
+    user.otp_expires_at = datetime.now(UTC) + timedelta(
+        minutes=settings.OTP_EXPIRE_MINUTES
+    )
     db.commit()
     send_otp_email(user.email, otp)
