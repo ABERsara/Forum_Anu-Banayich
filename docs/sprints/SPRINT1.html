@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ספרינט 1 — הרשמה + כניסה | אנו בניך</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f5f5f0;
+    color: #222;
+    direction: rtl;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* —— COVER —— */
+  .cover {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%);
+    color: white;
+    padding: 70px 40px;
+    text-align: center;
+  }
+  .cover h1 { font-size: 38px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1px; }
+  .cover .sprint-title {
+    font-size: 22px; opacity: 0.85; margin-bottom: 8px;
+    background: rgba(255,255,255,0.12); border-radius: 10px;
+    display: inline-block; padding: 6px 24px;
+  }
+  .cover .subtitle { font-size: 17px; opacity: 0.75; margin-bottom: 28px; }
+  .cover .meta {
+    display: inline-flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+    background: rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 28px;
+  }
+  .cover .meta span { font-size: 13px; opacity: 0.85; }
+  .cover .meta strong { opacity: 1; }
+
+  /* —— GOAL BANNER —— */
+  .goal-banner {
+    background: linear-gradient(90deg, #2563eb, #2563eb);
+    color: white; padding: 24px 40px;
+    text-align: center; font-size: 17px; line-height: 1.6;
+  }
+  .goal-banner strong { font-size: 19px; display: block; margin-bottom: 6px; }
+
+  /* —— LAYOUT —— */
+  .container { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
+
+  /* —— TOC —— */
+  .toc {
+    background: white; border-radius: 16px; padding: 28px 32px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 40px;
+  }
+  .toc h2 { font-size: 18px; color: #2563eb; margin-bottom: 16px; border-bottom: 2px solid #e8e8e8; padding-bottom: 10px; }
+  .toc ol { padding-right: 20px; columns: 2; column-gap: 32px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: #2563eb; text-decoration: none; font-size: 14px; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* —— SECTIONS —— */
+  .section {
+    background: white; border-radius: 16px; padding: 32px 36px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 28px;
+  }
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 24px; padding-bottom: 14px;
+    border-bottom: 3px solid #f0f0f0;
+  }
+  .section-number {
+    background: #2563eb; color: white; border-radius: 50%;
+    width: 36px; height: 36px; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .section-number.red    { background: #dc2626; }
+  .section-number.green  { background: #16a34a; }
+  .section-number.purple { background: #7c3aed; }
+  .section h2 { font-size: 22px; color: #2563eb; }
+  .section h3 { font-size: 17px; color: #1e3a8a; margin: 22px 0 10px; padding-right: 12px; border-right: 4px solid #2563eb; }
+  .section h4 { font-size: 15px; color: #444; margin: 16px 0 8px; font-weight: 600; }
+  .section p  { margin-bottom: 12px; color: #333; }
+
+  /* —— TABLES —— */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th { background: #2563eb; color: white; padding: 10px 14px; text-align: right; font-weight: 600; }
+  td { padding: 9px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) { background: #f8f9ff; }
+  tr:hover { background: #eff6ff; }
+
+  /* —— CODE —— */
+  code {
+    background: #eff6ff; color: #2563eb; padding: 2px 6px;
+    border-radius: 4px; font-size: 13px; font-family: 'Courier New', monospace;
+  }
+
+  /* —— BADGES —— */
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 600; margin: 2px;
+  }
+  .badge-green  { background: #d4edda; color: #155724; }
+  .badge-red    { background: #f8d7da; color: #721c24; }
+  .badge-blue   { background: #d1ecf1; color: #0c5460; }
+  .badge-orange { background: #fff3cd; color: #856404; }
+  .badge-purple { background: #e8d5f5; color: #6a0dad; }
+  .badge-grey   { background: #e9ecef; color: #495057; }
+
+  /* —— CALLOUT BOXES —— */
+  .callout {
+    border-radius: 10px; padding: 16px 20px; margin: 14px 0;
+    border-right: 5px solid; font-size: 14px;
+  }
+  .callout-blue   { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+  .callout-green  { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+  .callout-orange { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+  .callout-red    { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+  .callout-purple { background: #faf5ff; border-color: #a855f7; color: #581c87; }
+
+  /* —— TASK CARD —— */
+  .task-card { border-radius: 12px; border: 2px solid #e0e8ff; margin-bottom: 28px; overflow: hidden; }
+  .task-card-header {
+    padding: 16px 22px; display: flex; align-items: center; gap: 12px;
+  }
+  .task-card-header.color-red    { background: #fee2e2; border-bottom: 2px solid #fecaca; }
+  .task-card-header.color-blue   { background: #dbeafe; border-bottom: 2px solid #bfdbfe; }
+  .task-card-header.color-green  { background: #dcfce7; border-bottom: 2px solid #bbf7d0; }
+  .task-card-header.color-purple { background: #ede9fe; border-bottom: 2px solid #ddd6fe; }
+  .task-card-header.color-orange { background: #ffedd5; border-bottom: 2px solid #fed7aa; }
+  .task-card-header.color-grey   { background: #f1f5f9; border-bottom: 2px solid #e2e8f0; }
+  .task-card-body { padding: 20px 22px; }
+  .task-jira { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 6px; background: rgba(0,0,0,0.08); }
+  .task-title { font-size: 18px; font-weight: 700; flex: 1; }
+  .task-effort { font-size: 13px; opacity: 0.75; }
+
+  /* —— CHECKLIST —— */
+  .checklist { list-style: none; padding: 0; margin: 10px 0; }
+  .checklist li {
+    padding: 6px 0 6px 28px; border-bottom: 1px solid #f0f0f0;
+    font-size: 14px; position: relative;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before {
+    content: '☐'; position: absolute; left: 4px;
+    color: #2563eb; font-size: 16px;
+  }
+
+  /* —— BEFORE / AFTER —— */
+  .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  .before-card { background: #fff5f5; border: 2px solid #fecaca; border-radius: 10px; padding: 18px 20px; }
+  .after-card  { background: #f0fdf4; border: 2px solid #bbf7d0; border-radius: 10px; padding: 18px 20px; }
+  .before-card h4 { color: #991b1b; margin-bottom: 10px; }
+  .after-card h4  { color: #166534; margin-bottom: 10px; }
+  .before-card ul, .after-card ul { padding-right: 18px; font-size: 14px; }
+  .before-card li, .after-card li { margin-bottom: 6px; }
+
+  /* —— DEPENDENCY GRAPH —— */
+  .dep-graph {
+    background: #f8f9ff; border-radius: 12px; padding: 28px 20px;
+    margin: 14px 0; direction: ltr; text-align: center;
+  }
+  .dep-node {
+    background: white; border: 2px solid #2563eb; border-radius: 10px;
+    padding: 10px 16px; font-size: 13px; font-weight: 600; color: #2563eb;
+    display: inline-block; min-width: 160px; text-align: center; margin: 4px;
+  }
+  .dep-node small { display: block; font-size: 11px; font-weight: 400; opacity: 0.75; margin-top: 2px; }
+  .dep-node.blocker { border-color: #dc2626; color: #dc2626; background: #fff5f5; }
+  .dep-node.teal    { border-color: #0d9488; color: #0d9488; background: #f0fdfa; }
+  .dep-node.purple  { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }
+  .dep-node.grey    { border-color: #94a3b8; color: #64748b; background: #f8fafc; }
+  .dep-row { display: flex; justify-content: center; align-items: flex-start; gap: 12px; margin: 4px 0; }
+  .dep-arrow { color: #94a3b8; font-size: 20px; line-height: 1; margin: 2px 0; display: block; text-align: center; }
+  .dep-col { display: flex; flex-direction: column; align-items: center; }
+
+  /* —— TIMELINE —— */
+  .timeline { position: relative; padding: 0; margin: 20px 0; }
+  .timeline-item { display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
+  .timeline-dot {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: white; margin-top: 2px;
+  }
+  .timeline-dot.blue   { background: #2563eb; }
+  .timeline-dot.red    { background: #dc2626; }
+  .timeline-dot.green  { background: #16a34a; }
+  .timeline-dot.purple { background: #7c3aed; }
+  .timeline-dot.orange { background: #d97706; }
+  .timeline-content { flex: 1; }
+  .timeline-content h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .timeline-content p  { font-size: 14px; color: #555; margin: 0; }
+
+  /* —— APP MOCKUPS —— */
+  .app-screens { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+  .app-frame {
+    width: 300px; background: #f9fafb; border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(37,99,235,0.13), 0 2px 8px rgba(0,0,0,0.07);
+    overflow: hidden; border: 1px solid #e5e7eb; direction: rtl;
+  }
+  .app-topbar { background: #2563eb; color: white; padding: 14px 18px; font-weight: 700; font-size: 15px; text-align: center; }
+  .app-topbar-row { background: #2563eb; color: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .app-topbar-logo { font-weight: 700; font-size: 14px; }
+  .app-topbar-user { font-size: 12px; opacity: 0.9; }
+  .app-topbar-logout { background: rgba(255,255,255,0.2); border-radius: 6px; padding: 3px 9px; font-size: 11px; }
+  .app-body { padding: 20px 18px; }
+  .app-page-title { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 16px; text-align: center; }
+  .app-label { font-size: 11px; font-weight: 600; color: #6b7280; margin-bottom: 4px; display: block; }
+  .app-field { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #9ca3af; margin-bottom: 11px; }
+  .app-field.secret { color: #111827; letter-spacing: 4px; }
+  .app-select { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #374151; margin-bottom: 11px; display: flex; justify-content: space-between; align-items: center; }
+  .app-select-arrow { color: #9ca3af; font-size: 11px; }
+  .app-btn { border-radius: 8px; padding: 10px; text-align: center; font-weight: 700; font-size: 13px; margin: 5px 0; }
+  .app-btn-primary { background: #2563eb; color: white; }
+  .app-btn-outline { background: white; border: 1.5px solid #e5e7eb; color: #374151; }
+  .app-btn-row { display: flex; gap: 8px; margin-top: 4px; }
+  .app-btn-row .app-btn { flex: 1; }
+  .app-btn-row .app-btn-primary { flex: 2; }
+  .app-link { text-align: center; font-size: 12px; color: #2563eb; margin-top: 10px; }
+  .app-stepper { display: flex; align-items: flex-start; justify-content: center; margin-bottom: 20px; }
+  .app-step { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .app-step-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: white; border: 2px solid #e5e7eb; color: #9ca3af; }
+  .app-step-dot.active { background: #2563eb; border-color: #2563eb; color: white; }
+  .app-step-label { font-size: 10px; color: #9ca3af; }
+  .app-step-label.active { color: #2563eb; font-weight: 600; }
+  .app-step-line { width: 36px; height: 2px; background: #e5e7eb; margin-top: 12px; }
+  .app-home-greeting { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 16px; }
+  .app-home-card { background: white; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 13px 15px; margin-bottom: 9px; }
+  .app-home-card-title { font-size: 13px; font-weight: 700; color: #2563eb; }
+  .app-home-card-desc { font-size: 11px; color: #6b7280; margin-top: 3px; }
+  .app-caption { font-size: 12px; color: #6b7280; text-align: center; padding: 10px; background: white; border-top: 1px solid #e5e7eb; font-style: italic; }
+  .app-note { background: #eff6ff; color: #1d4ed8; border-radius: 8px; padding: 9px 12px; font-size: 11px; margin-top: 8px; text-align: center; }
+
+  /* —— SYNC BOX —— */
+  .sync-box {
+    background: #fefce8; border: 2px solid #fde047; border-radius: 10px;
+    padding: 16px 20px; margin: 12px 0; font-size: 14px;
+  }
+  .sync-box strong { color: #713f12; }
+
+  /* —— ANGULAR RULES BOX —— */
+  .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+  .rule-card {
+    border-radius: 10px; padding: 16px 18px;
+    border: 2px solid #e0e8ff; background: #f8f9ff;
+  }
+  .rule-card h5 { font-size: 13px; font-weight: 700; color: #2563eb; margin-bottom: 8px; }
+  .rule-card p  { font-size: 13px; color: #444; margin: 0; }
+
+  /* —— DELIVERABLE GRID —— */
+  .deliverable-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin: 14px 0; }
+  .deliverable-card {
+    background: #f8f9ff; border: 2px solid #e0e8ff; border-radius: 12px;
+    padding: 14px; transition: border-color 0.2s;
+  }
+  .deliverable-card:hover { border-color: #2563eb; }
+  .deliverable-card .layer { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+  .deliverable-card .name  { font-size: 14px; font-weight: 700; color: #2563eb; margin-bottom: 4px; }
+  .deliverable-card .desc  { font-size: 12px; color: #555; }
+
+  @media (max-width: 640px) {
+    .cover h1 { font-size: 26px; }
+    .toc ol { columns: 1; }
+    .section { padding: 20px; }
+    .before-after, .rules-grid { grid-template-columns: 1fr; }
+  }
+  @media print {
+    body { background: white; }
+    .section { box-shadow: none; border: 1px solid #ddd; }
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>ספרינט 1</h1>
+  <div class="sprint-title">הרשמה + כניסה — מקצה לקצה</div>
+  <div class="subtitle">אנו בניך — פלטפורמת קהילה לאלמנים ויתומים | פרקטיקום סניף</div>
+  <div class="meta">
+    <span><strong>שבועות 1–2</strong></span>
+    <span><strong>14 משימות</strong></span>
+    <span><strong>FAB-32 עד FAB-45</strong></span>
+    <span><strong>מטרה: Auth עובד מקומית</strong></span>
+  </div>
+</div>
+
+<!-- GOAL BANNER -->
+<div class="goal-banner">
+  <strong>מטרת הספרינט</strong>
+  בסוף השבועיים: משתמשת נרשמת, מקבלת OTP במייל, מאמתת, ונכנסת לאפליקציה.
+  Guard חוסם דפים מוגנים. Shared components מוכנים לשאר הספרינטים.
+</div>
+
+<div class="container">
+
+<!-- TOC -->
+<div class="toc">
+  <h2>תוכן עניינים</h2>
+  <ol>
+    <li><a href="#s-before-after">לפני ואחרי — מה משנים</a></li>
+    <li><a href="#s-deps">מפת תלויות — סדר עבודה</a></li>
+    <li><a href="#s-timeline">ציר זמן — 2 שבועות</a></li>
+    <li><a href="#s-angular">חוקי Angular — לקרוא פעם אחת</a></li>
+    <li><a href="#s-fab32">FAB-32 🔴 Alembic Init (BLOCKER)</a></li>
+    <li><a href="#s-fab33">FAB-33 🔴 auth_service: register/OTP</a></li>
+    <li><a href="#s-fab34">FAB-34 auth_service: login/refresh</a></li>
+    <li><a href="#s-fab35">FAB-35 Wire Auth Endpoints</a></li>
+    <li><a href="#s-fab36">FAB-36 Email OTP</a></li>
+    <li><a href="#s-fab37">FAB-37 🔴 Shared UI Components (BLOCKER)</a></li>
+    <li><a href="#s-fab38">FAB-38 Confirm Dialog</a></li>
+    <li><a href="#s-fab39">FAB-39 File Upload Component</a></li>
+    <li><a href="#s-fab40">FAB-40 🔴 auth.service.ts (BLOCKER)</a></li>
+    <li><a href="#s-fab41">FAB-41 Guard Fix + Interceptor</a></li>
+    <li><a href="#s-fab42">FAB-42 Login Component</a></li>
+    <li><a href="#s-fab43">FAB-43 Register Steps 1–3</a></li>
+    <li><a href="#s-fab44">FAB-44 Home + Header</a></li>
+    <li><a href="#s-fab45">FAB-45 ⬛ Register Step 4 (BACKLOG)</a></li>
+    <li><a href="#s-dod">Definition of Done</a></li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 1 — BEFORE / AFTER                  -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-before-after">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2>לפני ואחרי — מה משנים</h2>
+  </div>
+
+  <div class="callout callout-blue">
+    הסקאפולד מלא — <strong>אל תכתבו קוד חדש מאפס.</strong> כל קובץ כבר קיים.
+    המשימה שלכן היא למלא את ה-stubs שמחכים בפנים.
+  </div>
+
+  <h3>Backend</h3>
+  <table>
+    <tr><th>קובץ</th><th>עכשיו</th><th>אחרי Sprint 1</th><th>משימה</th></tr>
+    <tr>
+      <td><code>alembic.ini</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>קיים + migrations/</td>
+      <td>FAB-32</td>
+    </tr>
+    <tr>
+      <td><code>services/auth_service.py</code></td>
+      <td><span class="badge badge-red">raise NotImplementedError</span></td>
+      <td>5 פונקציות עובדות</td>
+      <td>FAB-33, FAB-34</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/auth.py</code></td>
+      <td><span class="badge badge-red">501 Not Implemented</span></td>
+      <td>מחוברים ל-service</td>
+      <td>FAB-35</td>
+    </tr>
+    <tr>
+      <td><code>services/email_service.py</code></td>
+      <td><span class="badge badge-orange">⚠️ logger stub</span></td>
+      <td>שולח מייל אמיתי (Mailtrap)</td>
+      <td>FAB-36</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/users.py</code></td>
+      <td><span class="badge badge-green">✅ GET /users/me עובד</span></td>
+      <td>ללא שינוי</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/health.py</code></td>
+      <td><span class="badge badge-green">✅ עובד</span></td>
+      <td>ללא שינוי</td>
+      <td>—</td>
+    </tr>
+  </table>
+
+  <h3>Frontend</h3>
+  <table>
+    <tr><th>קובץ</th><th>עכשיו</th><th>אחרי Sprint 1</th><th>משימה</th></tr>
+    <tr>
+      <td><code>shared/components/error-display/</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>קומפוננטה עובדת</td>
+      <td>FAB-37</td>
+    </tr>
+    <tr>
+      <td><code>shared/components/loading-spinner/</code></td>
+      <td><span class="badge badge-orange">⚠️ חסר message input</span></td>
+      <td>size + message</td>
+      <td>FAB-37</td>
+    </tr>
+    <tr>
+      <td><code>shared/components/confirm-dialog/</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>קומפוננטה עובדת</td>
+      <td>FAB-38</td>
+    </tr>
+    <tr>
+      <td><code>shared/components/file-upload/</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>קומפוננטה עובדת</td>
+      <td>FAB-39</td>
+    </tr>
+    <tr>
+      <td><code>core/services/auth.service.ts</code></td>
+      <td><span class="badge badge-red">5 stubs ריקים</span></td>
+      <td>5 פונקציות HTTP אמיתיות</td>
+      <td>FAB-40</td>
+    </tr>
+    <tr>
+      <td><code>core/guards/auth.guard.ts</code></td>
+      <td><span class="badge badge-red">🐛 redirect → /home</span></td>
+      <td>redirect → /login ✅</td>
+      <td>FAB-41</td>
+    </tr>
+    <tr>
+      <td><code>core/interceptors/auth.interceptor.ts</code></td>
+      <td><span class="badge badge-orange">⚠️ JWT בלבד, אין 401</span></td>
+      <td>+ auto-refresh על 401</td>
+      <td>FAB-41</td>
+    </tr>
+    <tr>
+      <td><code>features/auth/login/</code></td>
+      <td><span class="badge badge-orange">⚠️ shell ריק</span></td>
+      <td>טופס עובד מחובר</td>
+      <td>FAB-42</td>
+    </tr>
+    <tr>
+      <td><code>features/auth/register/</code></td>
+      <td><span class="badge badge-orange">⚠️ שלבים ללא forms</span></td>
+      <td>3 שלבים + OTP עובדים</td>
+      <td>FAB-43</td>
+    </tr>
+    <tr>
+      <td><code>features/home/</code> + <code>layout/header/</code></td>
+      <td><span class="badge badge-orange">⚠️ HTML ריק</span></td>
+      <td>ניווט לפי תפקיד + header</td>
+      <td>FAB-44</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 2 — DEPENDENCY GRAPH                -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-deps">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <h2>מפת תלויות — סדר עבודה</h2>
+  </div>
+
+  <div class="callout callout-red">
+    🚨 <strong>לפני שמתחילות:</strong> FAB-32 ו-FAB-37 חייבות להיות מוכנות לפני הכל.
+    ללא FAB-32 — אין טבלאות ב-DB, כל endpoint קורס. ללא FAB-37 — אין shared components, כל UI תקוע.
+  </div>
+
+  <div class="dep-graph">
+    <!-- Row 1: Parallel blockers -->
+    <div class="dep-row">
+      <div class="dep-col">
+        <div class="dep-node blocker">🔴 FAB-32<small>Alembic Init — BLOCKER</small></div>
+        <div class="dep-arrow">↓</div>
+        <div class="dep-row" style="gap:8px;">
+          <div class="dep-node" style="min-width:140px;">FAB-33<small>register / OTP</small></div>
+          <div class="dep-node" style="min-width:140px;">FAB-34<small>login / refresh</small></div>
+          <div class="dep-node" style="min-width:140px;">FAB-36<small>Email OTP</small></div>
+        </div>
+        <div class="dep-arrow">↓</div>
+        <div class="dep-node teal">FAB-35<small>Wire Endpoints</small></div>
+      </div>
+
+      <div style="width: 60px; display:flex; align-items:center; justify-content:center; font-size:28px; color:#94a3b8; margin-top: 20px;">⟷</div>
+
+      <div class="dep-col">
+        <div class="dep-node blocker">🔴 FAB-37<small>Shared UI — BLOCKER</small></div>
+        <div class="dep-arrow">↓</div>
+        <div class="dep-row" style="gap:8px;">
+          <div class="dep-node" style="min-width:140px;">FAB-38<small>Confirm Dialog</small></div>
+          <div class="dep-node" style="min-width:140px;">FAB-39<small>File Upload</small></div>
+          <div class="dep-node blocker" style="min-width:140px;">🔴 FAB-40<small>auth.service.ts</small></div>
+        </div>
+        <div class="dep-arrow">↓</div>
+        <div class="dep-row" style="gap:8px;">
+          <div class="dep-node" style="min-width:140px;">FAB-41<small>Guard + Interceptor</small></div>
+          <div class="dep-node" style="min-width:140px;">FAB-42<small>Login Component</small></div>
+          <div class="dep-node" style="min-width:140px;">FAB-43<small>Register 1–3</small></div>
+        </div>
+        <div class="dep-arrow">↓</div>
+        <div class="dep-node teal">FAB-44<small>Home + Header</small></div>
+        <div class="dep-arrow">↓</div>
+        <div class="dep-node grey">FAB-45 — BACKLOG<small>Register Step 4</small></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>טבלת בחירה — Self-Select</h3>
+  <table>
+    <tr><th>משימה</th><th>Jira</th><th>גודל</th><th>תלויה ב</th><th>הערה</th></tr>
+    <tr style="background:#fff5f5;">
+      <td><strong>🔴 Alembic Init</strong></td><td>FAB-32</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>—</td>
+      <td><span class="badge badge-red">BLOCKER — יום 1</span></td>
+    </tr>
+    <tr>
+      <td>auth_service: register/OTP</td><td>FAB-33</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>FAB-32</td><td></td>
+    </tr>
+    <tr>
+      <td>auth_service: login/refresh</td><td>FAB-34</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-32</td><td></td>
+    </tr>
+    <tr>
+      <td>Wire Auth Endpoints</td><td>FAB-35</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-33, FAB-34</td><td></td>
+    </tr>
+    <tr>
+      <td>Email OTP</td><td>FAB-36</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-32</td><td>Mailtrap בחינם</td>
+    </tr>
+    <tr style="background:#fff5f5;">
+      <td><strong>🔴 Shared UI Components</strong></td><td>FAB-37</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>—</td>
+      <td><span class="badge badge-red">BLOCKER — יום 1</span></td>
+    </tr>
+    <tr>
+      <td>Confirm Dialog</td><td>FAB-38</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-37</td><td></td>
+    </tr>
+    <tr>
+      <td>File Upload</td><td>FAB-39</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>FAB-37</td><td></td>
+    </tr>
+    <tr style="background:#fff5f5;">
+      <td><strong>🔴 auth.service.ts</strong></td><td>FAB-40</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-37</td>
+      <td><span class="badge badge-red">BLOCKER frontend</span></td>
+    </tr>
+    <tr>
+      <td>Guard Fix + Interceptor</td><td>FAB-41</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-40</td><td>bug חד-שורתי + 401 refresh</td>
+    </tr>
+    <tr>
+      <td>Login Component</td><td>FAB-42</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>FAB-40</td><td></td>
+    </tr>
+    <tr>
+      <td>Register Steps 1–3</td><td>FAB-43</td>
+      <td><span class="badge badge-red">L</span></td>
+      <td>FAB-40, FAB-39</td><td>הכי גדול בספרינט</td>
+    </tr>
+    <tr>
+      <td>Home + Header</td><td>FAB-44</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-40</td><td></td>
+    </tr>
+    <tr style="background:#f8fafc;">
+      <td><em>Register Step 4 (הצהרות)</em></td><td>FAB-45</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>FAB-43</td>
+      <td><span class="badge badge-grey">BACKLOG — אם יש זמן</span></td>
+    </tr>
+  </table>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 3 — TIMELINE                        -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-timeline">
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <h2>ציר זמן — 2 שבועות</h2>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-dot purple">0</div>
+      <div class="timeline-content">
+        <h4>יום 0 — לפני שמתחילות</h4>
+        <p>וודאו שהשרת עולה: <code>uvicorn app.main:app --reload</code> → <code>GET /api/v1/health ✅</code>.
+        Frontend: <code>ng serve</code> → localhost:4200 נפתח. קראו יחד את הטבלה "לפני ואחרי".</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot red">1–2</div>
+      <div class="timeline-content">
+        <h4>ימים 1–2 — BLOCKERS במקביל</h4>
+        <p><strong>מפתחת 1 (Backend):</strong> FAB-32 — Alembic init + migration ראשונה + seed.
+        בסוף: <code>alembic upgrade head</code> עובד, טבלאות קיימות.</p>
+        <p><strong>מפתחת 2 (Frontend):</strong> FAB-37 — error-display + loading-spinner message input.
+        בסוף: שתי הקומפוננטות עובדות standalone עם Signals.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot red">3–4</div>
+      <div class="timeline-content">
+        <h4>ימים 3–4 — לוגיקה עיקרית</h4>
+        <p><strong>Backend:</strong> FAB-33 (register/OTP/resend) + FAB-34 (login/refresh).
+        בדיקה ב-Swagger: register → verify-otp → login עובד.</p>
+        <p><strong>Frontend:</strong> FAB-38 (confirm-dialog) + FAB-39 (file-upload) + FAB-40 (auth.service 5 methods).
+        FAB-40 קטנה מאוד — רק 5 פונקציות HTTP.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot blue">5–6</div>
+      <div class="timeline-content">
+        <h4>ימים 5–6 — חיבורים</h4>
+        <p><strong>Backend:</strong> FAB-35 (wire endpoints) + FAB-36 (email Mailtrap).
+        בסוף: flow שלם ב-Swagger.</p>
+        <p><strong>Frontend:</strong> FAB-41 (guard bug + 401 interceptor) + FAB-42 (login component).
+        בסוף: login עובד ומנתב ל-/home.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot orange">7–9</div>
+      <div class="timeline-content">
+        <h4>ימים 7–9 — UI</h4>
+        <p><strong>שתיהן:</strong> FAB-43 (register steps 1–3) — הכי גדול.
+        שלב 2 של ההרשמה קורא register() שמפעיל FAB-33.
+        הגיע הזמן לחבר frontend + backend יחד.</p>
+        <p>במקביל: FAB-44 (home + header) — קטן, ניתן לעשות בסוף יום.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot green">10</div>
+      <div class="timeline-content">
+        <h4>יום 10 — בדיקות + PR reviews</h4>
+        <p>End-to-end: נרשמות כמשתמשת חדשה, מקבלות OTP, מאמתות, נכנסות.
+        FAB-45 אם יש זמן. כל ה-PRs עוברים review של מפתחת שנייה לפני merge.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 4 — ANGULAR RULES                   -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-angular">
+  <div class="section-header">
+    <div class="section-number purple">4</div>
+    <h2>חוקי Angular 22 — לקרוא פעם אחת לפני שמתחילות</h2>
+  </div>
+
+  <div class="callout callout-red">
+    🚨 Angular 22 != Angular מהקורס. אם לא תקראו את זה — תבזבזו שעות על שגיאות שנובעות מדפוסים ישנים.
+  </div>
+
+  <div class="rules-grid">
+    <div class="rule-card">
+      <h5>✅ standalone: true — תמיד</h5>
+      <p>כל קומפוננטה מוגדרת עם <code>standalone: true</code> ובתוך מערך <code>imports</code> מפורש.</p>
+    </div>
+    <div class="rule-card">
+      <h5>✅ Signals — לא @Input()/@Output()</h5>
+      <p>שדות קלט מוגדרים עם <code>input()</code> ואירועי פלט עם <code>output()</code> — לא עם decorators ישנים כמו <code>@Input()</code> ו-<code>@Output()</code>.</p>
+    </div>
+    <div class="rule-card">
+      <h5>✅ @if / @for — לא *ngIf / *ngFor</h5>
+      <p>בלוקים מותנים וחזרתיים משתמשים ב-<code>@if</code> ו-<code>@for</code> — לא ב-<code>*ngIf</code> ו-<code>*ngFor</code>.</p>
+    </div>
+    <div class="rule-card">
+      <h5>✅ inject() בתוך הפונקציה — בinterceptor</h5>
+      <p>ב-interceptors, הפונקציה <code>inject()</code> חייבת להיקרא בתוך גוף הפונקציה — לא ברמת המודול — כדי למנוע circular dependency.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-32 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab32">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">FAB-32</div>
+      <div class="task-title">🔴 Alembic Init + Migration ראשונה</div>
+      <div class="task-effort">S · ~3–4 שעות · BLOCKER — יום 1</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-red">
+        🚨 ללא FAB-32 אין טבלאות ב-DB — כל endpoint קורס עם 500. זו המשימה הראשונה שצריך לסיים.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ עכשיו</h4>
+          <ul>
+            <li><code>alembic.ini</code> לא קיים</li>
+            <li><code>migrations/</code> לא קיים</li>
+            <li>אין טבלאות ב-DB</li>
+            <li>כל קריאת DB מחזירה 500</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ אחרי</h4>
+          <ul>
+            <li><code>alembic upgrade head</code> רץ ללא שגיאות</li>
+            <li>כל הטבלאות קיימות ב-DB</li>
+            <li><code>GET /api/v1/health → {"status":"ok"}</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>שלבי ביצוע</h4>
+      <p>אתחלו את Alembic בתיקיית <code>backend/</code>. עדכנו את <code>migrations/env.py</code> כך שיכיר את המודלים הקיימים, ועדכנו את <code>alembic.ini</code> לחיבור לDB המקומי. צרו migration ראשון (autogenerate), ואז הריצו אותו.</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>alembic upgrade head</code> רץ ללא שגיאות</li>
+        <li>קובץ migration קיים ב-<code>migrations/versions/</code></li>
+        <li><code>GET /api/v1/health</code> מחזיר 200</li>
+        <li>PR עבר review של מפתחת שנייה + מוזג</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-33 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab33">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">FAB-33</div>
+      <div class="task-title">🔴 auth_service: register / verify_otp / resend_otp</div>
+      <div class="task-effort">M · ~1–2 ימים · תלוי ב-FAB-32</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <code>_generate_otp()</code> ו-<code>_create_token()</code> <strong>כבר קיימות</strong> בקובץ — השתמשו בהן.
+        <code>get_password_hash()</code> קיים ב-<code>core/security.py</code>.
+      </div>
+
+      <h4>קובץ לעריכה: <code>backend/app/services/auth_service.py</code></h4>
+      <p>מחפשות <code>raise NotImplementedError</code> ומחליפות ב-לוגיקה האמיתית.</p>
+
+      <h4>register(db, data) — יצירת משתמש חדש</h4>
+      <p>מממשת: בדיקת כפל מייל, יצירת OTP (השתמשו ב-<code>_generate_otp()</code> הקיים), שמירת המשתמש לDB עם סטטוס PENDING_OTP, ושליחת ה-OTP דרך <code>email_service</code>.</p>
+
+      <h4>verify_otp(db, data) — אימות OTP</h4>
+      <p>מממשת: חיפוש משתמש לפי מייל, בדיקת תקינות ה-OTP ותוקפו, ועדכון הסטטוס ל-PENDING_APPROVAL עם ניקוי שדה ה-OTP.</p>
+
+      <h4>✅ Definition of Done (בדיקה ב-Swagger: localhost:8000/docs)</h4>
+      <ul class="checklist">
+        <li><code>POST /api/v1/auth/register</code> — משתמש נוצר ב-DB עם <code>otp_code</code></li>
+        <li><code>POST /api/v1/auth/verify-otp</code> — סטטוס משתנה ל-PENDING_APPROVAL</li>
+        <li><code>POST /api/v1/auth/resend-otp</code> — OTP חדש נוצר</li>
+        <li>מייל שגוי → 400, OTP פג → 400, הכל ברור</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-34 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab34">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">FAB-34</div>
+      <div class="task-title">auth_service: login / refresh_token</div>
+      <div class="task-effort">S · ~3–5 שעות · תלוי ב-FAB-32</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <code>verify_password()</code> ו-<code>decode_token()</code> קיימים ב-<code>core/security.py</code>.
+        <code>_create_token()</code> קיים ב-auth_service — access 15 דק, refresh 7 ימים.
+      </div>
+
+      <h4>login(db, data) — כניסה + הנפקת tokens</h4>
+      <p>מממשת: חיפוש משתמש לפי מייל, אימות סיסמה (דרך <code>verify_password()</code> הקיים), בדיקת סטטוס חשבון, ויצירת access_token + refresh_token דרך <code>_create_token()</code> הקיים.</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>POST /api/v1/auth/login</code> → מחזיר <code>access_token</code> + <code>refresh_token</code></li>
+        <li>סיסמה שגויה → 401</li>
+        <li>משתמש שלא אימת OTP → 403 עם הסבר</li>
+        <li><code>POST /api/v1/auth/refresh</code> → access_token חדש</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-35 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab35">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">FAB-35</div>
+      <div class="task-title">Wire Auth Endpoints</div>
+      <div class="task-effort">S · ~2–3 שעות · תלוי ב-FAB-33 + FAB-34</div>
+    </div>
+    <div class="task-card-body">
+
+      <h4>קובץ לעריכה: <code>backend/app/api/v1/endpoints/auth.py</code></h4>
+      <p>כל endpoint מחזיר כרגע <code>raise HTTPException(status_code=501)</code>. החליפו כל אחד בקריאה לפונקציה המתאימה ב-<code>auth_service</code>, תוך העברת <code>db</code> ו-<code>data</code> בהתאמה. חמישה endpoints: register, verify-otp, resend-otp, login, refresh.</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>זרימה שלמה ב-Swagger: register → verify-otp → login → GET /users/me</li>
+        <li>אף endpoint לא מחזיר 501</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-36 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab36">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">FAB-36</div>
+      <div class="task-title">Email Service — OTP אמיתי</div>
+      <div class="task-effort">S · ~2–4 שעות · תלוי ב-FAB-32</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-green">
+        💡 ב-dev: אם <code>SMTP_HOST</code> ריק → OTP מודפס ל-console. זה בכוונה!
+        לבדיקה אמיתית — הירשמו ל-Mailtrap (חינם).
+      </div>
+
+      <h4>הגדרת Mailtrap</h4>
+      <p>הירשמו ל-Mailtrap (חינם), צרו inbox חדש, והעתיקו את פרטי ה-SMTP שלהם ל-<code>backend/.env</code>: שם שרת, פורט, שם משתמש, סיסמה, וכתובת שולח.</p>
+
+      <h4>קובץ לעריכה: <code>backend/app/services/email_service.py</code></h4>
+      <p>פונקציית <code>send_otp()</code> תרכיב מייל עם קוד ה-OTP ותשלח אותו דרך SMTP. אם <code>SMTP_HOST</code> לא מוגדר — תדפיס את הקוד ל-console (fallback לפיתוח מקומי בכוונה).</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>OTP מגיע ל-inbox ב-Mailtrap (לא רק ב-console)</li>
+        <li>ללא SMTP_HOST — ממשיך לעבוד (מדפיס לconsole)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-37 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab37">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">FAB-37</div>
+      <div class="task-title">🔴 Shared UI: error-display + loading-spinner</div>
+      <div class="task-effort">S · ~3–4 שעות · BLOCKER — יום 1</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-red">
+        🚨 כל קומפוננטת UI בספרינט הזה תשתמש באלה. בנו אותן לפני שנוגעות בכל דף אחר.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ עכשיו</h4>
+          <ul>
+            <li><code>error-display</code> לא קיים</li>
+            <li><code>loading-spinner</code> קיים אבל חסר <code>message</code> input</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ אחרי</h4>
+          <ul>
+            <li><code>&lt;app-error-display message="שגיאה!" /&gt;</code> עובד</li>
+            <li><code>&lt;app-loading-spinner message="טוען..." /&gt;</code> עובד</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>1. error-display (חדש לגמרי)</h4>
+      <p>צרו קומפוננטה חדשה <code>error-display.component.ts</code> בתיקייה <code>shared/components/error-display/</code>. הקומפוננטה מקבלת שדה קלט <code>message</code> ומציגה תיבת שגיאה ויזואלית רק כשהערך לא ריק. standalone, signals.</p>
+
+      <h4>2. loading-spinner (עריכה — הוספת message)</h4>
+      <p>הוסיפו שדה קלט <code>message</code> לקומפוננטה הקיימת (אל תמחקו את <code>size</code>), ועדכנו את ה-template כך שיציג את ההודעה מתחת לאייקון הספינר כשהיא לא ריקה.</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>error-display</code> קיים, standalone, מקבל <code>message</code> signal input</li>
+        <li><code>loading-spinner</code> מקבל גם <code>size</code> וגם <code>message</code></li>
+        <li>אין <code>@Input()</code> בשום מקום — רק <code>input()</code></li>
+        <li>אין <code>*ngIf</code> — רק <code>@if</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-38 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab38">
+  <div class="task-card">
+    <div class="task-card-header color-purple">
+      <div class="task-jira">FAB-38</div>
+      <div class="task-title">Confirm Dialog Component</div>
+      <div class="task-effort">S · ~2–3 שעות · תלוי ב-FAB-37</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        ישמש בכל ספרינט עתידי: מחיקת פוסט, השעיה, ביטול חשבון. בנו פעם אחת ונכון.
+      </div>
+
+      <h4>API שנדרש</h4>
+      <table>
+        <tr><th>שדה</th><th>כיוון</th><th>ברירת מחדל</th><th>תיאור</th></tr>
+        <tr><td><code>title</code></td><td>input</td><td>האם אתה בטוחה?</td><td>כותרת הדיאלוג</td></tr>
+        <tr><td><code>message</code></td><td>input</td><td>—</td><td>תיאור הפעולה המתבקשת</td></tr>
+        <tr><td><code>confirmLabel</code></td><td>input</td><td>אישור</td><td>טקסט כפתור האישור</td></tr>
+        <tr><td><code>cancelLabel</code></td><td>input</td><td>ביטול</td><td>טקסט כפתור הביטול</td></tr>
+        <tr><td><code>confirmed</code></td><td>output</td><td>—</td><td>אירוע בלחיצה על אישור</td></tr>
+        <tr><td><code>cancelled</code></td><td>output</td><td>—</td><td>אירוע בלחיצה על ביטול / סגירה</td></tr>
+      </table>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>מוצג מעל שאר התוכן (overlay כהה)</li>
+        <li>"אישור" → event <code>confirmed</code></li>
+        <li>"ביטול" / לחיצה מחוץ → event <code>cancelled</code></li>
+        <li>standalone, signals, @if</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-39 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab39">
+  <div class="task-card">
+    <div class="task-card-header color-purple">
+      <div class="task-jira">FAB-39</div>
+      <div class="task-title">File Upload Component</div>
+      <div class="task-effort">M · ~1 יום · תלוי ב-FAB-37</div>
+    </div>
+    <div class="task-card-body">
+
+      <h4>API שנדרש</h4>
+      <table>
+        <tr><th>שדה</th><th>כיוון</th><th>ברירת מחדל</th><th>תיאור</th></tr>
+        <tr><td><code>acceptedTypes</code></td><td>input</td><td>image/*,.pdf</td><td>סוגי קבצים מותרים</td></tr>
+        <tr><td><code>maxSizeMB</code></td><td>input</td><td>5</td><td>גודל מקסימלי ב-MB</td></tr>
+        <tr><td><code>label</code></td><td>input</td><td>בחרי קובץ</td><td>טקסט כפתור הבחירה</td></tr>
+        <tr><td><code>fileSelected</code></td><td>output</td><td>—</td><td>אירוע עם הקובץ שנבחר</td></tr>
+        <tr><td><code>uploadError</code></td><td>output</td><td>—</td><td>אירוע שגיאת ולידציה עם הודעה</td></tr>
+      </table>
+
+      <h4>תכונות חובה</h4>
+      <ul style="font-size:14px; padding-right:18px; margin-bottom:12px;">
+        <li>לחיצה לבחירת קובץ</li>
+        <li>Preview לתמונות / שם קובץ ל-PDF</li>
+        <li>ולידציה: קובץ גדול מדי → <code>uploadError.emit("הקובץ גדול מ-5MB")</code></li>
+        <li>ולידציה: סוג לא מותר → <code>uploadError.emit("סוג קובץ לא נתמך")</code></li>
+        <li>כפתור "הסר" לאחר בחירה</li>
+      </ul>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>בחירת תמונה → preview מוצג</li>
+        <li>בחירת PDF → שם הקובץ מוצג</li>
+        <li>קובץ גדול / סוג שגוי → הודעת שגיאה ברורה</li>
+        <li>standalone, signals</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-40 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab40">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">FAB-40</div>
+      <div class="task-title">🔴 auth.service.ts — 5 Methods</div>
+      <div class="task-effort">S · ~3–5 שעות · BLOCKER frontend</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <code>refreshToken()</code> ו-<code>loadCurrentUser()</code> <strong>כבר מומשו</strong> — אל תגעו בהן.
+        רק 5 הפונקציות האלה הן stubs.
+      </div>
+
+      <h4>קובץ לעריכה: <code>frontend/src/app/core/services/auth.service.ts</code></h4>
+
+      <table>
+        <tr><th>פונקציה</th><th>מה עושה</th></tr>
+        <tr><td><code>register(data)</code></td><td>POST /api/v1/auth/register</td></tr>
+        <tr><td><code>verifyOtp(data)</code></td><td>POST /api/v1/auth/verify-otp</td></tr>
+        <tr><td><code>login(data)</code></td><td>POST /api/v1/auth/login + saveTokens()</td></tr>
+        <tr><td><code>logout()</code></td><td>clearTokens() + navigate('/login')</td></tr>
+        <tr><td><code>resendOtp(email)</code></td><td>POST /api/v1/auth/resend-otp</td></tr>
+      </table>
+
+      <h4>הדרכה</h4>
+      <p>כל פונקציה שולחת HTTP request דרך <code>apiService</code> ומחזירה Observable. <code>login()</code> שומרת tokens ב-storage לאחר הצלחה. <code>logout()</code> מנקה את ה-storage ומנתבת ל-<code>/login</code>.</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>כל 5 פונקציות מממשות HTTP אמיתי (לא throw)</li>
+        <li><code>login()</code> שומר tokens → <code>getAccessToken()</code> מחזיר אותם</li>
+        <li><code>logout()</code> מנקה + מנתב ל-/login</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-41 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab41">
+  <div class="task-card">
+    <div class="task-card-header color-orange">
+      <div class="task-jira">FAB-41</div>
+      <div class="task-title">Guard Bug Fix + Interceptor 401</div>
+      <div class="task-effort">S · ~3–4 שעות · תלוי ב-FAB-40</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ עכשיו</h4>
+          <ul>
+            <li>auth.guard.ts שורה 10: redirect → <code>/home</code> 🐛</li>
+            <li>interceptor: JWT בלבד, אין 401 handling</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ אחרי</h4>
+          <ul>
+            <li>redirect → <code>/login</code> ✅</li>
+            <li>401 → refreshToken() → retry אוטומטי</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>תיקון 1 — auth.guard.ts (שורה 10)</h4>
+      <p>שנו את ה-redirect מ-<code>/home</code> ל-<code>/login</code>.</p>
+
+      <h4>תיקון 2 — auth.interceptor.ts (הוספת 401)</h4>
+      <p>הוסיפו לinterceptor הקיים טיפול ב-401: כשמגיע 401, קראו ל-<code>refreshToken()</code> ואחרי הצלחה שלחו מחדש את הבקשה המקורית עם ה-access token החדש. שימו לב: <code>inject()</code> חייב להיקרא בתוך גוף הפונקציה — ראו חוקי Angular.</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>כניסה ל-<code>/forum</code> ללא token → redirect ל-<code>/login</code> (לא <code>/home</code>)</li>
+        <li>access token פג → מתרענן אוטומטית ומנסה שוב</li>
+        <li><code>inject()</code> נמצא בתוך הפונקציה — לא ברמת המודול</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-42 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab42">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">FAB-42</div>
+      <div class="task-title">Login Component</div>
+      <div class="task-effort">M · ~1 יום · תלוי ב-FAB-40</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 ב-ts: <code>form</code>, <code>isLoading</code>, <code>errorMessage</code> <strong>כבר קיימים</strong> ב-shell.
+        צריך לממש את <code>onSubmit()</code> ולכתוב את ה-HTML.
+      </div>
+
+      <h4>onSubmit() — מה להוסיף</h4>
+      <p>מממשת: בדיקת תקינות הטופס, הגדרת loading, קריאה ל-<code>authService.login()</code>, ניתוב ל-<code>/home</code> בהצלחה, הצגת שגיאה מה-response בכישלון.</p>
+
+      <h4>Template (login.component.html)</h4>
+      <p>טופס עם שדות email + password, הצגת <code>&lt;app-error-display&gt;</code> לשגיאות, הצגת <code>&lt;app-loading-spinner&gt;</code> בזמן המתנה, כפתור submit מנוטרל כשהטופס לא תקין, ולינק לדף ההרשמה.</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>פרטים נכונים → navigate ל-<code>/home</code></li>
+        <li>פרטים שגויים → <code>app-error-display</code> מציג שגיאה</li>
+        <li>loading → spinner מוצג, כפתור מסתתר</li>
+        <li>Enter → שולח טופס</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-43 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab43">
+  <div class="task-card">
+    <div class="task-card-header color-orange">
+      <div class="task-jira">FAB-43</div>
+      <div class="task-title">Register Steps 1–3 + OTP Screen</div>
+      <div class="task-effort">L · ~3–4 ימים · תלוי ב-FAB-40 + FAB-39</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 ה-component קיים עם <code>currentStep</code>, <code>nextStep()</code>, <code>prevStep()</code>.
+        צריך להוסיף forms ו-service calls.
+      </div>
+
+      <h4>3 שלבים + OTP</h4>
+      <table>
+        <tr><th>שלב</th><th>שדות</th><th>מה קורה בסוף</th></tr>
+        <tr>
+          <td>שלב 1</td>
+          <td>שם מלא, ת"ז, תאריך לידה, מגדר, מגזר, סוג (אלמן/נה/יתום)</td>
+          <td>nextStep() → שלב 2</td>
+        </tr>
+        <tr>
+          <td>שלב 2</td>
+          <td>אימייל + טלפון</td>
+          <td><code>register()</code> → OTP נשלח → מסך OTP</td>
+        </tr>
+        <tr>
+          <td>OTP</td>
+          <td>קוד 6 ספרות</td>
+          <td><code>verifyOtp()</code> → שלב 3</td>
+        </tr>
+        <tr>
+          <td>שלב 3</td>
+          <td>3 מסמכים (תעודת פטירה, selfie, ת"ז) — <code>&lt;app-file-upload&gt;</code></td>
+          <td>שמירה → navigate('/home')</td>
+        </tr>
+      </table>
+
+      <h4>onStep2Submit() — הלוגיקה הכי חשובה</h4>
+      <p>מממשת: הגדרת loading, ריכוז ה-payload משני השלבים, קריאה ל-<code>authService.register()</code>, מעבר למסך OTP בהצלחה, הצגת שגיאה בכישלון.</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>שלב 1 — ולידציה: שדות חובה לא ריקים</li>
+        <li>שלב 2 — POST register עובד → OTP נשלח</li>
+        <li>מסך OTP → <code>verifyOtp()</code> → מגיע לשלב 3</li>
+        <li>שלב 3 — 3 קבצים נבחרים ומוצגים (app-file-upload)</li>
+        <li>כפתור "חזור" עובד בין שלבים</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-44 -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab44">
+  <div class="task-card">
+    <div class="task-card-header color-green">
+      <div class="task-jira">FAB-44</div>
+      <div class="task-title">Home + Header Components</div>
+      <div class="task-effort">S · ~3–4 שעות · תלוי ב-FAB-40</div>
+    </div>
+    <div class="task-card-body">
+
+      <h4>דף הבית — stub עם ניווט לפי תפקיד</h4>
+      <div class="mockup">
+"שלום [שם משתמש]!"
+
+Admin        → כפתור "לוח ניהול"         → /admin
+Moderator    → כפתור "דיווחים ממתינים"  → /moderator
+Professional → כפתור "שאלות ממתינות"    → /advice
+User         → כפתור "לפורום"           → /forum
+      </div>
+
+      <h4>ניווט לפי תפקיד — בtemplate</h4>
+      <p>קראו את <code>currentUser()</code> מה-authService והציגו כפתורי ניווט שונים לפי ה-role: Admin → לוח ניהול, Moderator → דיווחים ממתינים, Professional → שאלות ממתינות, User → לפורום.</p>
+
+      <h4>Header — שם משתמש + כפתור יציאה</h4>
+      <p>Header עם שם האפליקציה, שם המשתמש המחובר (מתוך <code>currentUser()</code>), וכפתור יציאה שקורא ל-<code>authService.logout()</code>.</p>
+
+      <h4>✅ Definition of Done</h4>
+      <ul class="checklist">
+        <li>Header: שם משתמש + יציאה → מנקה session + /login</li>
+        <li>דף הבית: תוכן שונה לפי תפקיד</li>
+        <li>currentUser() קרוא מ-authService (signal)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- FAB-45 BACKLOG -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-fab45">
+  <div class="task-card">
+    <div class="task-card-header color-grey">
+      <div class="task-jira">FAB-45</div>
+      <div class="task-title">⬛ Register Step 4 — הצהרות (BACKLOG)</div>
+      <div class="task-effort">S · תלוי ב-FAB-43 · לא חלק מ-Sprint 1</div>
+    </div>
+    <div class="task-card-body">
+      <div class="callout callout-orange">
+        ⏸️ <strong>אל תתחילו בזה לפני שסיימתם FAB-43</strong> ויש לכם זמן פנוי.
+        אם לא הגעתם אליו — ספרינט 2 יתחיל ממנו.
+      </div>
+      <p>שלב 4 של ההרשמה: שלושה checkboxes:</p>
+      <ul style="font-size:14px; padding-right:18px;">
+        <li>קראתי ואני מסכימה לתנאי השימוש</li>
+        <li>אני מסכימה לעיבוד מידע אישי</li>
+        <li>אני מצהירה שהמסמכים שהעלאתי אמיתיים</li>
+      </ul>
+      <p>כפתור "סיום" פעיל רק כשכל שלושה מסומנים.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SYNC POINTS -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-sync">
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <h2>נקודות סנכרון — תיאומים חשובים</h2>
+  </div>
+
+  <div class="sync-box">
+    <strong>📅 יום 0 — 15 דקות ביחד לפני שמתחילות:</strong><br>
+    וודאו שהשרת עולה אצל שתיכן. קראו יחד את טבלת "לפני ואחרי". חלקו משימות.
+  </div>
+
+  <div class="sync-box">
+    <strong>📅 לפני שמתחילות FAB-43 ו-FAB-33 — Contract ביחד:</strong><br>
+    FAB-33 מחזיר <code>RegisterRequest</code> schema. FAB-43 שולחת את אותו payload מה-frontend.
+    5 דקות לוודא שה-fields תואמים — חוסכות שעות של debugging.
+  </div>
+
+  <div class="sync-box">
+    <strong>⚠️ FAB-43 ו-FAB-39 חולקות קוד — תאמו לפני שמתחילות:</strong><br>
+    FAB-43 משתמשת ב-<code>&lt;app-file-upload&gt;</code> שנבנה ב-FAB-39.
+    וודאו ש-FAB-39 מוזגה לפני שמתחילות את שלב 3 של FAB-43.
+  </div>
+
+  <div class="sync-box">
+    <strong>🔗 חיבור Backend + Frontend — יום 6:</strong><br>
+    ברגע שFAB-35 (wire endpoints) מוזג + FAB-40 (auth.service) מוזג —
+    עשו יחד end-to-end test: register → verify-otp → login → home.
+  </div>
+
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION — UI MOCKUPS                        -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-mockup">
+  <div class="section-header">
+    <div class="section-number">5</div>
+    <h2>האפליקציה בסוף הספרינט</h2>
+  </div>
+
+  <div class="app-screens">
+
+    <!-- Login -->
+    <div class="app-frame">
+      <div class="app-topbar">אנו בניך</div>
+      <div class="app-body">
+        <div class="app-page-title">כניסה לחשבון</div>
+        <span class="app-label">אימייל</span>
+        <div class="app-field">הכנס אימייל...</div>
+        <span class="app-label">סיסמה</span>
+        <div class="app-field secret">••••••••</div>
+        <div class="app-btn app-btn-primary">כניסה</div>
+        <div class="app-link">אין לך חשבון? הירשמי</div>
+      </div>
+      <div class="app-caption">דף התחברות</div>
+    </div>
+
+    <!-- Register step 1 -->
+    <div class="app-frame">
+      <div class="app-topbar">אנו בניך — הרשמה</div>
+      <div class="app-body">
+        <div class="app-stepper">
+          <div class="app-step">
+            <div class="app-step-dot active">1</div>
+            <div class="app-step-label active">פרטים</div>
+          </div>
+          <div class="app-step-line"></div>
+          <div class="app-step">
+            <div class="app-step-dot">2</div>
+            <div class="app-step-label">חשבון</div>
+          </div>
+          <div class="app-step-line"></div>
+          <div class="app-step">
+            <div class="app-step-dot">3</div>
+            <div class="app-step-label">מסמכים</div>
+          </div>
+        </div>
+        <span class="app-label">שם מלא</span>
+        <div class="app-field">שם מלא...</div>
+        <span class="app-label">תעודת זהות</span>
+        <div class="app-field">מספר ת"ז...</div>
+        <span class="app-label">מגזר</span>
+        <div class="app-select"><span>בחרי מגזר</span><span class="app-select-arrow">▾</span></div>
+        <span class="app-label">סוג</span>
+        <div class="app-select"><span>אלמנ/ה, יתום/ה</span><span class="app-select-arrow">▾</span></div>
+        <div class="app-btn-row">
+          <div class="app-btn app-btn-outline">חזור</div>
+          <div class="app-btn app-btn-primary">המשך</div>
+        </div>
+      </div>
+      <div class="app-caption">הרשמה — שלב 1</div>
+    </div>
+
+    <!-- Home Admin -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <div class="app-topbar-logo">אנו בניך</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="app-topbar-user">שרה (מנהל)</span>
+          <span class="app-topbar-logout">יציאה</span>
+        </div>
+      </div>
+      <div class="app-body">
+        <div class="app-home-greeting">שלום שרה!</div>
+        <div class="app-home-card">
+          <div class="app-home-card-title">לוח ניהול</div>
+          <div class="app-home-card-desc">ניהול משתמשים ואישורי הרשמה</div>
+        </div>
+        <div class="app-home-card" style="opacity:0.4;">
+          <div class="app-home-card-title" style="color:#9ca3af;">אישור הרשמות</div>
+          <div class="app-home-card-desc">זמין בספרינט 2</div>
+        </div>
+        <div class="app-note">ספרינט 1 — Admin רואה דף בית בלבד</div>
+      </div>
+      <div class="app-caption">דף הבית — Admin</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- DEFINITION OF DONE                          -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-dod">
+  <div class="section-header">
+    <div class="section-number green">✅</div>
+    <h2>Definition of Done — ספרינט 1 סגור כשכל זה עובד</h2>
+  </div>
+
+  <div class="callout callout-green">
+    ✅ בדקו את הצ'קליסט הזה <strong>ביחד</strong> לפני שסוגרות את הספרינט.
+  </div>
+
+  <h3>Backend — בדיקה ב-Swagger (localhost:8000/docs)</h3>
+  <ul class="checklist">
+    <li><code>alembic upgrade head</code> רץ ללא שגיאות</li>
+    <li><code>GET /api/v1/health</code> → 200</li>
+    <li><code>POST /api/v1/auth/register</code> → משתמש נוצר + OTP נשלח</li>
+    <li><code>POST /api/v1/auth/verify-otp</code> → סטטוס PENDING_APPROVAL</li>
+    <li><code>POST /api/v1/auth/resend-otp</code> → OTP חדש</li>
+    <li><code>POST /api/v1/auth/login</code> → access_token + refresh_token</li>
+    <li><code>POST /api/v1/auth/refresh</code> → access_token חדש</li>
+    <li><code>GET /api/v1/users/me</code> עם Authorization header → פרטי משתמש</li>
+    <li>OTP מגיע ל-inbox ב-Mailtrap (לא רק ב-console)</li>
+  </ul>
+
+  <h3>Frontend — בדיקה ב-ng serve (localhost:4200)</h3>
+  <ul class="checklist">
+    <li>כניסה לדף מוגן ללא token → redirect ל-<code>/login</code> (לא <code>/home</code>!)</li>
+    <li>/login — טופס עובד, שגיאות מוצגות, loading spinner מוצג</li>
+    <li>/register — שלב 1 + 2 + OTP + שלב 3 עובדים</li>
+    <li>OTP נכון → מגיעים לשלב 3</li>
+    <li>שלב 3 — בחירת 3 קבצים עם preview</li>
+    <li>/home — תוכן שונה לפי תפקיד</li>
+    <li>יציאה → session נמחק + redirect ל-/login</li>
+  </ul>
+
+  <h3>Shared Components — בדיקה ויזואלית</h3>
+  <ul class="checklist">
+    <li><code>app-error-display</code> — מציג קופסת שגיאה עם message</li>
+    <li><code>app-loading-spinner</code> — מציג ספינר + message</li>
+    <li><code>app-confirm-dialog</code> — overlay + confirmed/cancelled events</li>
+    <li><code>app-file-upload</code> — preview + ולידציה גודל + סוג</li>
+  </ul>
+
+  <h3>קוד — Quality</h3>
+  <ul class="checklist">
+    <li><code>ng build</code> עובר ללא שגיאות TypeScript</li>
+    <li><code>ng lint</code> עובר ללא שגיאות</li>
+    <li><code>ruff check .</code> עובר על Backend</li>
+    <li>כל 14 ה-PRs עברו review של מפתחת שנייה לפני merge</li>
+    <li>אין <code>@Input()</code> / <code>@Output()</code> — רק <code>input()</code> / <code>output()</code></li>
+    <li>אין <code>*ngIf</code> / <code>*ngFor</code> — רק <code>@if</code> / <code>@for</code></li>
+    <li>כל קומפוננטה Angular היא <code>standalone: true</code></li>
+  </ul>
+
+</div>
+
+<div style="text-align:center; padding:32px 0; color:#999; font-size:13px;">
+  אנו בניך · ספרינט 1 · 2026 · גרסה 1.0
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

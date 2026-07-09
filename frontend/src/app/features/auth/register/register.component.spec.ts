@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -224,12 +224,14 @@ describe('RegisterComponent', () => {
   });
 
   describe('submitStep4', () => {
-    it('advances to step 5 (pending approval)', () => {
+    it('navigates to /auth/pending', () => {
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigate');
       component.currentStep.set(4);
 
       component.submitStep4();
 
-      expect(component.currentStep()).toBe(5);
+      expect(navigateSpy).toHaveBeenCalledWith(['/auth/pending']);
     });
   });
 });

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from jose import jwt
 from passlib.context import CryptContext
@@ -14,16 +15,19 @@ def create_access_token(subject: str, expires_delta: timedelta | None = None) ->
     expire = datetime.now(UTC) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    return jwt.encode(
-        {"exp": expire, "sub": subject},
-        settings.SECRET_KEY,
-        algorithm=ALGORITHM,
+    return cast(
+        str,
+        jwt.encode(
+            {"exp": expire, "sub": subject},
+            settings.SECRET_KEY,
+            algorithm=ALGORITHM,
+        ),
     )
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return cast(bool, pwd_context.verify(plain, hashed))
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return cast(str, pwd_context.hash(password))

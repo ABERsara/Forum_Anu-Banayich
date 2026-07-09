@@ -19,6 +19,8 @@ Usage:
     )
 """
 
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from app.core.constants import AuditAction
@@ -32,7 +34,7 @@ def log_action(
     action: AuditAction,
     entity_type: str,
     entity_id: str,
-    details: dict | None = None,
+    details: dict[str, Any] | None = None,
     ip_address: str | None = None,
 ) -> AuditLog:
     """

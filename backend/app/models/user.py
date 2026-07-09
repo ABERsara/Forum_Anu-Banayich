@@ -90,7 +90,7 @@ class User(Base):
     # MODERATOR role – which cells (group+sector) this moderator oversees
     # Stored as JSON: [{"group": "widower", "sector": "hasidic"}, ...]
     # ------------------------------------------------------------------
-    moderator_cells: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    moderator_cells: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
     alert_email: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     # ------------------------------------------------------------------
@@ -100,9 +100,9 @@ class User(Base):
         Enum(ProfessionalDomain), nullable=True
     )
     # JSON lists of UserType values: ["widower", "widow"] or ["all"]
-    professional_groups: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    professional_groups: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     # JSON lists of Sector values: ["hasidic", "litvish"] or ["all"]
-    professional_sectors: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    professional_sectors: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     professional_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active_professional: Mapped[bool] = mapped_column(Boolean, default=True)
 

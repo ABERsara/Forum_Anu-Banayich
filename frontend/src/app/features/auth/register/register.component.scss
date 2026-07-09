@@ -156,15 +156,6 @@ h1 {
   }
 }
 
-.pending-approval {
-  padding: $spacing-md;
-  color: $color-success;
-  background-color: rgba($color-success, 0.08);
-  border: 1px solid rgba($color-success, 0.3);
-  border-radius: $radius-md;
-  text-align: center;
-}
-
 .login-link {
   margin-top: $spacing-lg;
   font-size: $font-size-sm;

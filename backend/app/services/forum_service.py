@@ -12,21 +12,18 @@ TODO list for junior developer:
   [ ] implement search_users_for_dm() – name search within same group/sector
 """
 
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 
-from app.core.constants import GroupVisibility, PostStatus, SectorVisibility
 from app.models.forum import DirectMessage, ForumPost
 from app.models.user import User
 from app.schemas.forum import (
     DirectMessageCreate,
     ForumPostCreate,
     ForumPostListResponse,
-    ForumPostResponse,
 )
 
 
-def _content_filter(query, current_user: User):
+def _content_filter(query: Query[ForumPost], current_user: User) -> Query[ForumPost]:
     """
     Apply the visibility filter to a query on ForumPost.
 

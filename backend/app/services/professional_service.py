@@ -13,16 +13,13 @@ TODO list for junior developer:
 
 from sqlalchemy.orm import Session
 
-from app.core.constants import QueryStatus
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import (
     ProfessionalAnswerRequest,
     ProfessionalQueryCreate,
-    ProfessionalQueryResponse,
     PublicQAResponse,
 )
-from app.services.email_service import send_question_notification
 
 
 def _build_alias(user: User) -> str:
