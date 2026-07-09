@@ -29,6 +29,7 @@ from app.schemas.user import (
     UserAdminView,
     UserProfile,
 )
+from app.services import user_service
 
 router = APIRouter(
     prefix="/admin",
@@ -43,11 +44,8 @@ def list_pending_registrations(
 ) -> list[UserAdminView]:
     """
     Return all registrations awaiting admin approval.
-
-    TODO: call user_service.get_pending_registrations(db)
     """
-    # TODO: implement
-    return []
+    return user_service.get_pending_registrations(db)
 
 
 @router.get("/registrations/{user_id}", response_model=UserAdminView)

@@ -7,7 +7,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spinner {
@@ -17,9 +19,19 @@
   border-top-color: $color-primary;
   animation: spin 0.7s linear infinite;
 
-  &--sm { width: 14px; height: 14px; }
-  &--md { width: 24px; height: 24px; }
-  &--lg { width: 40px; height: 40px; border-width: 3px; }
+  &--sm {
+    width: 14px;
+    height: 14px;
+  }
+  &--md {
+    width: 24px;
+    height: 24px;
+  }
+  &--lg {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+  }
 }
 .spinner-message {
   margin-top: $spacing-sm;

@@ -35,9 +35,12 @@
       text-decoration: none;
       padding-bottom: $spacing-xs;
       border-bottom: 2px solid transparent;
-      transition: color $transition-fast, border-color $transition-fast;
+      transition:
+        color $transition-fast,
+        border-color $transition-fast;
 
-      &:hover, &.active {
+      &:hover,
+      &.active {
         color: $color-primary;
         border-bottom-color: $color-primary;
       }
@@ -54,7 +57,9 @@
     cursor: pointer;
     padding: 0 0 $spacing-xs;
     border-bottom: 2px solid transparent;
-    transition: color $transition-fast, border-color $transition-fast;
+    transition:
+      color $transition-fast,
+      border-color $transition-fast;
 
     &:hover {
       color: $color-primary;

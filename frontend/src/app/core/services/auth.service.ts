@@ -13,7 +13,7 @@
 
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, throwError } from 'rxjs';
 
 import {
   LoginRequest,
@@ -114,7 +114,7 @@ export class AuthService {
 
   refreshToken(): Observable<TokenResponse> {
     const refresh_token = this.getRefreshToken();
-    if (!refresh_token) throw new Error('No refresh token available');
+    if (!refresh_token) return throwError(() => new Error('No refresh token available'));
     return this.api.post<TokenResponse>('/auth/refresh', { refresh_token }).pipe(
       tap(tokens => this.saveTokens(tokens)),
     );
