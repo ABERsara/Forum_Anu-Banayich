@@ -13,7 +13,7 @@
  * Remember: Two admins must approve. The backend tracks who already approved.
  */
 
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 
@@ -30,14 +30,14 @@ import { AdminService } from '../../../core/services/admin.service';
       <a routerLink="/admin">← חזרה ללוח הבקרה</a>
       <h1>הרשמות ממתינות לאישור</h1>
 
-      @if (isLoading) {
+      @if (isLoading()) {
         <p>טוען...</p>
-      } @else if (hasError) {
+      } @else if (hasError()) {
         <p>אירעה שגיאה בטעינת ההרשמות. נסי לרענן את הדף.</p>
-      } @else if (registrations.length === 0) {
+      } @else if (registrations().length === 0) {
         <p>אין הרשמות ממתינות כרגע.</p>
       } @else {
-        @for (reg of registrations; track reg.id) {
+        @for (reg of registrations(); track reg.id) {
           <div style="border: 1px solid #ccc; margin: 0.5rem 0; padding: 1rem; border-radius: 8px">
             <strong>{{ reg.first_name }} {{ reg.last_name }}</strong>
             <span> | {{ reg.email }}</span>
@@ -58,24 +58,24 @@ import { AdminService } from '../../../core/services/admin.service';
 export class PendingRegistrationsComponent implements OnInit {
   private readonly adminService = inject(AdminService);
 
-  registrations: UserAdminView[] = [];
-  isLoading = false;
-  hasError = false;
+  registrations = signal<UserAdminView[]>([]);
+  isLoading = signal(false);
+  hasError = signal(false);
   readonly userTypeLabels = USER_TYPE_LABELS;
   readonly sectorLabels = SECTOR_LABELS;
   readonly statusLabels = ACCOUNT_STATUS_LABELS;
 
   ngOnInit(): void {
-    this.isLoading = true;
-    this.hasError = false;
+    this.isLoading.set(true);
+    this.hasError.set(false);
     this.adminService.getPendingRegistrations().subscribe({
       next: (result) => {
-        this.registrations = result;
-        this.isLoading = false;
+        this.registrations.set(result);
+        this.isLoading.set(false);
       },
       error: () => {
-        this.hasError = true;
-        this.isLoading = false;
+        this.hasError.set(true);
+        this.isLoading.set(false);
       },
     });
   }
