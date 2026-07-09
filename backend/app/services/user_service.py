@@ -50,7 +50,7 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
       3. Log to audit_log
       4. Return updated user
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
         raise HTTPException(status_code=404, detail="משתמש לא נמצא")
     if user.account_status not in (
@@ -98,8 +98,34 @@ def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> 
       2. Send rejection email with reason
       3. Log to audit_log
     """
-    # TODO: implement this function
-    raise NotImplementedError("reject_registration() is not yet implemented")
+    user = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if user.account_status not in (
+        AccountStatus.PENDING_APPROVAL,
+        AccountStatus.PARTIALLY_APPROVED,
+    ):
+        raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
+
+    previous_status = user.account_status
+    user.account_status = AccountStatus.REJECTED
+    user.rejection_reason = reason
+
+    db.commit()
+    db.refresh(user)
+
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.USER_REJECTED,
+        entity_type="User",
+        entity_id=user.id,
+        details={"previous_status": previous_status, "reason": reason},
+    )
+
+    send_rejection_email(user.email, user.first_name, reason)
+
+    return user
 
 
 def suspend_user(db: Session, user_id: str, actor: User, hours: int, reason: str) -> User:
