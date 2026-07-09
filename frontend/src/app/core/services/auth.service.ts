@@ -38,6 +38,7 @@ export class AuthService {
 
   readonly currentUser = this._currentUser.asReadonly();
   readonly isLoggedIn = computed(() => this._currentUser() !== null);
+  readonly isUser = computed(() => this._currentUser()?.role === UserRole.USER);
   readonly isAdmin = computed(() => this._currentUser()?.role === UserRole.ADMIN);
   readonly isModerator = computed(() => this._currentUser()?.role === UserRole.MODERATOR);
   readonly isProfessional = computed(() => this._currentUser()?.role === UserRole.PROFESSIONAL);
