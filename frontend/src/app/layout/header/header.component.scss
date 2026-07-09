@@ -26,17 +26,39 @@
 
   &__nav {
     display: flex;
+    align-items: center;
     gap: $spacing-lg;
 
     a {
       color: $color-text-muted;
       font-weight: $font-weight-medium;
       text-decoration: none;
-      transition: color $transition-fast;
+      padding-bottom: $spacing-xs;
+      border-bottom: 2px solid transparent;
+      transition: color $transition-fast, border-color $transition-fast;
 
       &:hover, &.active {
         color: $color-primary;
+        border-bottom-color: $color-primary;
       }
+    }
+  }
+
+  &__logout {
+    color: $color-text-muted;
+    font-weight: $font-weight-medium;
+    font-family: inherit;
+    font-size: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 0 $spacing-xs;
+    border-bottom: 2px solid transparent;
+    transition: color $transition-fast, border-color $transition-fast;
+
+    &:hover {
+      color: $color-primary;
+      border-bottom-color: $color-primary;
     }
   }
 }

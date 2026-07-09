@@ -1,8 +1,15 @@
-<header class="header">
+<header class="header" dir="rtl">
   <div class="header__inner">
-    <a class="header__logo" routerLink="/">Practicum</a>
+    <a class="header__logo" routerLink="/home">הפורום</a>
+
     <nav class="header__nav">
-      <a routerLink="/home" routerLinkActive="active">Home</a>
+      @if (auth.isLoggedIn()) {
+        <a routerLink="/home" routerLinkActive="active">בית</a>
+        <button type="button" class="header__logout" (click)="logout()">התנתקות</button>
+      } @else {
+        <a routerLink="/login" routerLinkActive="active">כניסה</a>
+        <a routerLink="/register" routerLinkActive="active">הרשמה</a>
+      }
     </nav>
   </div>
 </header>

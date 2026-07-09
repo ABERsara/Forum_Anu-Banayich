@@ -248,6 +248,7 @@ export interface PaginatedResponse<T> {
 export interface AuthState {
   user: UserProfile | null;
   isLoggedIn: boolean;
+  isUser: boolean;
   isAdmin: boolean;
   isModerator: boolean;
   isProfessional: boolean;
