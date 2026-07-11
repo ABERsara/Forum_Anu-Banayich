@@ -31,6 +31,37 @@
     margin: 0 0 $spacing-lg;
   }
 
+  &__field {
+    margin: 0 0 $spacing-lg;
+  }
+
+  &__label {
+    display: block;
+    margin-bottom: $spacing-xs;
+    font-size: $font-size-sm;
+    color: $color-text;
+  }
+
+  &__textarea {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: $spacing-sm;
+    font-family: inherit;
+    font-size: $font-size-base;
+    color: $color-text;
+    background-color: $color-bg;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    resize: vertical;
+    transition: border-color $transition-fast;
+
+    &:focus {
+      border-color: $color-primary;
+      outline: none;
+    }
+  }
+
   &__actions {
     display: flex;
     gap: $spacing-sm;
@@ -46,6 +77,11 @@
   font-weight: $font-weight-medium;
   cursor: pointer;
   transition: background-color $transition-fast;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 
   &--primary {
     background-color: $color-primary;
