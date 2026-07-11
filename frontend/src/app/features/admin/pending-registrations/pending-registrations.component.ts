@@ -13,6 +13,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 
 import { UserAdminView } from '../../../core/models';
 import {
@@ -108,7 +109,8 @@ export class PendingRegistrationsComponent implements OnInit {
     this.actionError.set(null);
     this.adminService.approveRegistration(userId).subscribe({
       next: (updated) => this.applyUpdate(updated),
-      error: () => this.actionError.set('אירעה שגיאה באישור ההרשמה. נסה שוב.'),
+      error: (err: HttpErrorResponse) =>
+        this.actionError.set(err.error?.detail ?? 'אירעה שגיאה באישור ההרשמה. נסה שוב.'),
     });
   }
 
@@ -131,7 +133,8 @@ export class PendingRegistrationsComponent implements OnInit {
         this.applyUpdate(updated);
         this.rejectingId.set(null);
       },
-      error: () => this.actionError.set('אירעה שגיאה בדחיית ההרשמה. נסה שוב.'),
+      error: (err: HttpErrorResponse) =>
+        this.actionError.set(err.error?.detail ?? 'אירעה שגיאה בדחיית ההרשמה. נסה שוב.'),
     });
   }
 
