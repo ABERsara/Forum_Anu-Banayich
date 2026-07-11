@@ -59,35 +59,31 @@ def get_registration(user_id: str, db: Session = Depends(get_db)) -> UserAdminVi
     raise NotImplementedError
 
 
-@router.post("/registrations/{user_id}/approve")
+@router.post("/registrations/{user_id}/approve", response_model=UserAdminView)
 def approve_registration(
     user_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> UserAdminView:
     """
     Approve a pending registration.
-
-    TODO: call user_service.approve_registration(db, user_id, current_user)
     """
-    # TODO: implement
-    raise NotImplementedError
+    user = user_service.approve_registration(db, user_id, current_user)
+    return UserAdminView.model_validate(user)
 
 
-@router.post("/registrations/{user_id}/reject")
+@router.post("/registrations/{user_id}/reject", response_model=UserAdminView)
 def reject_registration(
     user_id: str,
     data: RegistrationRejectRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> UserAdminView:
     """
     Reject a pending registration with a reason.
-
-    TODO: call user_service.reject_registration(db, user_id, current_user, data.reason)
     """
-    # TODO: implement
-    raise NotImplementedError
+    user = user_service.reject_registration(db, user_id, current_user, data.reason)
+    return UserAdminView.model_validate(user)
 
 
 @router.get("/professionals", response_model=list[UserProfile])

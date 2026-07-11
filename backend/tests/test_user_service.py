@@ -1,15 +1,20 @@
 """
-Unit tests for user_service.get_pending_registrations.
+Unit tests for user_service registration functions.
 """
 
 from datetime import UTC, datetime, timedelta
 
-from app.core.constants import AccountStatus
+import pytest
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
+from app.core.constants import AccountStatus, AuditAction, UserRole
+from app.models.audit import AuditLog
 from app.models.user import User
 from app.services import user_service
 
 
-def _make_user(db_session, email, status, created_at) -> User:
+def _make_user(db_session: Session, email: str, status: AccountStatus, created_at: datetime) -> User:
     user = User(
         email=email,
         password_hash="hashed",
@@ -21,6 +26,20 @@ def _make_user(db_session, email, status, created_at) -> User:
     db_session.add(user)
     db_session.commit()
     return user
+
+
+def _make_admin(db_session: Session, email: str) -> User:
+    admin = User(
+        email=email,
+        password_hash="hashed",
+        first_name="Admin",
+        last_name="User",
+        role=UserRole.ADMIN,
+        account_status=AccountStatus.ACTIVE,
+    )
+    db_session.add(admin)
+    db_session.commit()
+    return admin
 
 
 class TestGetPendingRegistrations:
@@ -52,3 +71,139 @@ class TestGetPendingRegistrations:
         result = user_service.get_pending_registrations(db_session)
 
         assert [u.email for u in result] == [oldest.email, middle.email, newest.email]
+
+
+class TestApproveRegistration:
+    def test_first_approval_sets_partially_approved(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        result = user_service.approve_registration(db_session, user.id, admin)
+
+        assert result.account_status == AccountStatus.PARTIALLY_APPROVED
+        assert result.first_approver_id == admin.id
+        assert result.second_approver_id is None
+
+    def test_first_approval_does_not_send_email(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        called = []
+        monkeypatch.setattr(user_service, "send_approval_email", lambda *a: called.append(a))
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        user_service.approve_registration(db_session, user.id, admin)
+
+        assert called == []
+
+    def test_second_approval_by_different_admin_activates_and_sends_email(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(user_service, "send_approval_email", lambda *a: sent.append(a))
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        admin_a = _make_admin(db_session, "admin1@example.com")
+        admin_b = _make_admin(db_session, "admin2@example.com")
+
+        user_service.approve_registration(db_session, user.id, admin_a)
+        result = user_service.approve_registration(db_session, user.id, admin_b)
+
+        assert result.account_status == AccountStatus.ACTIVE
+        assert result.first_approver_id == admin_a.id
+        assert result.second_approver_id == admin_b.id
+        assert result.approved_at is not None
+        assert sent == [(user.email, user.first_name)]
+
+    def test_same_admin_cannot_approve_twice(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        user_service.approve_registration(db_session, user.id, admin)
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.approve_registration(db_session, user.id, admin)
+        assert exc_info.value.status_code == 400
+
+    def test_cannot_approve_non_pending_registration(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "active@example.com", AccountStatus.ACTIVE, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.approve_registration(db_session, user.id, admin)
+        assert exc_info.value.status_code == 400
+
+    def test_approve_nonexistent_user_raises_404(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.approve_registration(db_session, "does-not-exist", admin)
+        assert exc_info.value.status_code == 404
+
+    def test_creates_audit_log_entry(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        user_service.approve_registration(db_session, user.id, admin)
+
+        logs = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).all()
+        assert len(logs) == 1
+        assert logs[0].action == AuditAction.USER_APPROVED
+        assert logs[0].actor_id == admin.id
+        details = logs[0].details
+        assert details is not None
+        assert details["previous_status"] == AccountStatus.PENDING_APPROVAL
+        assert details["new_status"] == AccountStatus.PARTIALLY_APPROVED
+
+
+class TestRejectRegistration:
+    def test_reject_sets_status_and_reason_and_sends_email(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(user_service, "send_rejection_email", lambda *a: sent.append(a))
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        result = user_service.reject_registration(db_session, user.id, admin, "not enough documents")
+
+        assert result.account_status == AccountStatus.REJECTED
+        assert result.rejection_reason == "not enough documents"
+        assert sent == [(user.email, user.first_name, "not enough documents")]
+
+    def test_reject_nonexistent_user_raises_404(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.reject_registration(db_session, "does-not-exist", admin, "some reason")
+        assert exc_info.value.status_code == 404
+
+    def test_cannot_reject_non_pending_registration(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "rejected@example.com", AccountStatus.REJECTED, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.reject_registration(db_session, user.id, admin, "some reason")
+        assert exc_info.value.status_code == 400
+
+    def test_creates_audit_log_entry(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        user_service.reject_registration(db_session, user.id, admin, "not enough documents")
+
+        logs = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).all()
+        assert len(logs) == 1
+        assert logs[0].action == AuditAction.USER_REJECTED
+        assert logs[0].actor_id == admin.id
+        details = logs[0].details
+        assert details is not None
+        assert details["reason"] == "not enough documents"
