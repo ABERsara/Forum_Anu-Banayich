@@ -45,7 +45,10 @@ def list_pending_registrations(
     """
     Return all registrations awaiting admin approval.
     """
-    return user_service.get_pending_registrations(db)
+    return [
+        UserAdminView.model_validate(user)
+        for user in user_service.get_pending_registrations(db)
+    ]
 
 
 @router.get("/registrations/{user_id}", response_model=UserAdminView)
