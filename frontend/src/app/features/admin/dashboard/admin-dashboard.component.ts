@@ -20,12 +20,13 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
   standalone: true,
   imports: [RouterLink, LoadingSpinnerComponent, ErrorDisplayComponent],
   templateUrl: './admin-dashboard.component.html',
+  styleUrl: './admin-dashboard.component.scss',
 })
 export class AdminDashboardComponent implements OnInit {
   private readonly adminService = inject(AdminService);
 
   pendingCount = signal<number | null>(null);
-  isLoading = signal(false);
+  isLoading = signal(true);
   hasError = signal(false);
 
   ngOnInit(): void {

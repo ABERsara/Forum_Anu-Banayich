@@ -1,23 +1,22 @@
 <div style="padding: 1rem; direction: rtl">
   <h1>לוח בקרה – מנהל</h1>
 
-  <a
-    routerLink="/admin/registrations"
-    style="display: block; border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; text-decoration: none; color: inherit"
-  >
-    <span>הרשמות ממתינות לאישור</span>
-    @if (isLoading()) {
-      <app-loading-spinner size="sm" />
-    } @else if (hasError()) {
-      <app-error-display message="שגיאה בטעינת מספר ההרשמות הממתינות" />
-    } @else {
-      <span
-        style="display: inline-block; min-width: 1.5rem; padding: 0.15rem 0.5rem; margin-inline-start: 0.5rem; border-radius: 999px; background: #d32f2f; color: #fff; text-align: center; font-weight: bold"
-      >
-        {{ pendingCount() }}
-      </span>
-    }
+  <a routerLink="/admin/registrations" class="stats-card">
+    <div class="stats-card__body">
+      @if (isLoading()) {
+        <app-loading-spinner size="sm" />
+      } @else {
+        @if (!hasError()) {
+          <span class="stats-card__value">{{ pendingCount() }}</span>
+        }
+        <span class="stats-card__label">הרשמות ממתינות לאישור</span>
+      }
+    </div>
+    <span class="stats-card__arrow" aria-hidden="true">‹</span>
   </a>
+  @if (hasError()) {
+    <app-error-display message="שגיאה בטעינת מספר ההרשמות הממתינות" />
+  }
 
   <nav>
     <a routerLink="/admin/registrations">הרשמות ממתינות</a> |

@@ -1,0 +1,49 @@
+@use '../../../../styles/variables' as *;
+
+.stats-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  background: $color-bg;
+  border: 1px solid $color-border;
+  border-inline-start: 4px solid $color-primary;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+  text-decoration: none;
+  color: $color-text;
+  box-shadow: $shadow-sm;
+  transition:
+    box-shadow $transition-fast,
+    transform $transition-fast;
+
+  &:hover {
+    box-shadow: $shadow-md;
+    transform: translateY(-1px);
+  }
+
+  &__body {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  &__value {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $color-primary;
+  }
+
+  &__label {
+    font-size: $font-size-base;
+    color: $color-text;
+    white-space: nowrap;
+  }
+
+  &__arrow {
+    font-size: $font-size-xl;
+    color: $color-text-muted;
+  }
+}
