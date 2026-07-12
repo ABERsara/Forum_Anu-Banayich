@@ -85,8 +85,8 @@ class RegistrationRejectRequest(BaseModel):
 class SuspendUserRequest(BaseModel):
     """Suspend a user for N hours."""
 
-    hours: int = 48
-    reason: str
+    hours: int = Field(48, gt=0)
+    reason: str = Field(..., min_length=5, max_length=100)
 
 
 class ProfessionalProfile(BaseModel):

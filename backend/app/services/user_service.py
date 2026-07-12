@@ -7,11 +7,11 @@ TODO list for junior developer:
   [ ] implement approve_registration() – first or second admin approves
   [ ] implement reject_registration()
   [ ] implement get_pending_registrations()
-  [ ] implement suspend_user()
+  [x] implement suspend_user()
   [ ] implement get_professionals_for_user() – filtered by sector+group
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -19,7 +19,11 @@ from sqlalchemy.orm import Session
 from app.core.constants import AccountStatus, AuditAction, UserRole
 from app.models.user import User
 from app.services.audit_service import log_action
-from app.services.email_service import send_approval_email, send_rejection_email
+from app.services.email_service import (
+    send_approval_email,
+    send_rejection_email,
+    send_suspension_notification,
+)
 
 
 def get_pending_registrations(db: Session) -> list[User]:
@@ -145,16 +149,32 @@ def suspend_user(
 ) -> User:
     """
     Temporarily suspend a user.
-
-    TODO:
-      1. Load user
-      2. Set is_suspended=True, suspended_until = now + hours
-      3. Set account_status = SUSPENDED
-      4. Log to audit_log with reason
-      5. Send notification email to user
     """
-    # TODO: implement this function
-    raise NotImplementedError("suspend_user() is not yet implemented")
+    user = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if user.role != UserRole.USER:
+        raise HTTPException(status_code=400, detail="ניתן להשעות רק משתמשים רגילים")
+    if user.account_status != AccountStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="ניתן להשעות רק משתמש פעיל")
+
+    user.is_suspended = True
+    user.suspended_until = datetime.now(UTC) + timedelta(hours=hours)
+    user.account_status = AccountStatus.SUSPENDED
+
+    log_action(
+        db,
+        actor=actor,
+        action=AuditAction.USER_SUSPENDED,
+        entity_type="User",
+        entity_id=user.id,
+        details={"hours": hours, "reason": reason},
+    )
+    db.refresh(user)
+
+    send_suspension_notification(user.email, hours, reason)
+
+    return user
 
 
 def get_professionals_for_user(db: Session, current_user: User) -> list[User]:

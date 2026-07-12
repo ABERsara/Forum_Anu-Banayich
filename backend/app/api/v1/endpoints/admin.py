@@ -119,20 +119,18 @@ def update_professional(
     raise NotImplementedError
 
 
-@router.post("/users/{user_id}/suspend")
+@router.post("/users/{user_id}/suspend", response_model=UserAdminView)
 def suspend_user(
     user_id: str,
     data: SuspendUserRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> UserAdminView:
     """
     Manually suspend a user.
-
-    TODO: call user_service.suspend_user(db, user_id, current_user, data.hours, data.reason)
     """
-    # TODO: implement
-    raise NotImplementedError
+    user = user_service.suspend_user(db, user_id, current_user, data.hours, data.reason)
+    return UserAdminView.model_validate(user)
 
 
 @router.get("/audit-log")
