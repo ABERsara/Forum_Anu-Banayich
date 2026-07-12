@@ -279,6 +279,50 @@ class TestLogin:
         r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
         assert r.status_code == 403
 
+    async def test_suspended_user_within_window_returns_403(self, client, db_session):
+        user = await _register_verify_and_activate(client, db_session)
+        user.is_suspended = True
+        user.account_status = AccountStatus.SUSPENDED
+        user.suspended_until = datetime.now(UTC) + timedelta(hours=1)
+        db_session.commit()
+
+        r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        assert r.status_code == 403
+
+    async def test_suspended_user_within_window_distinct_message(self, client, db_session):
+        user = await _register_verify_and_activate(client, db_session)
+        user.is_suspended = True
+        user.account_status = AccountStatus.SUSPENDED
+        user.suspended_until = datetime.now(UTC) + timedelta(hours=1)
+        db_session.commit()
+
+        r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        assert r.json()["detail"] == "החשבון מושעה זמנית. נסה/י שוב מאוחר יותר."
+
+    async def test_suspended_user_after_window_can_login(self, client, db_session):
+        user = await _register_verify_and_activate(client, db_session)
+        user.is_suspended = True
+        user.account_status = AccountStatus.SUSPENDED
+        user.suspended_until = datetime.now(UTC) - timedelta(minutes=1)
+        db_session.commit()
+
+        r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        assert r.status_code == 200
+
+    async def test_suspended_user_after_window_restores_active_status(self, client, db_session):
+        user = await _register_verify_and_activate(client, db_session)
+        user.is_suspended = True
+        user.account_status = AccountStatus.SUSPENDED
+        user.suspended_until = datetime.now(UTC) - timedelta(minutes=1)
+        db_session.commit()
+
+        await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+
+        restored = _get_user(db_session)
+        assert restored.account_status == AccountStatus.ACTIVE
+        assert restored.is_suspended is False
+        assert restored.suspended_until is None
+
 
 # ---------------------------------------------------------------------------
 # refresh
