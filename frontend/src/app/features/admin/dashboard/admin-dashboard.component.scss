@@ -1,5 +1,11 @@
 @use '../../../../styles/variables' as *;
 
+:host {
+  display: block;
+  padding: $spacing-lg;
+  direction: rtl;
+}
+
 .stats-card {
   display: flex;
   align-items: center;

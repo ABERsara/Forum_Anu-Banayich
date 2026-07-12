@@ -30,7 +30,6 @@ export class AdminDashboardComponent implements OnInit {
   hasError = signal(false);
 
   ngOnInit(): void {
-    this.isLoading.set(true);
     this.hasError.set(false);
 
     this.adminService.getPendingRegistrations().subscribe({
