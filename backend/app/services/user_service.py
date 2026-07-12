@@ -75,9 +75,6 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
         user.account_status = AccountStatus.ACTIVE
         user.approved_at = datetime.now(UTC)
 
-    db.commit()
-    db.refresh(user)
-
     log_action(
         db,
         actor=admin,
@@ -86,6 +83,7 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
         entity_id=user.id,
         details={"previous_status": previous_status, "new_status": user.account_status},
     )
+    db.refresh(user)
 
     if user.account_status == AccountStatus.ACTIVE:
         send_approval_email(user.email, user.first_name)
@@ -115,9 +113,6 @@ def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> 
     user.account_status = AccountStatus.REJECTED
     user.rejection_reason = reason
 
-    db.commit()
-    db.refresh(user)
-
     log_action(
         db,
         actor=admin,
@@ -126,6 +121,7 @@ def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> 
         entity_id=user.id,
         details={"previous_status": previous_status, "reason": reason},
     )
+    db.refresh(user)
 
     send_rejection_email(user.email, user.first_name, reason)
 
