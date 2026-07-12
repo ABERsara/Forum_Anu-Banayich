@@ -169,7 +169,7 @@ class TestApproveRegistration:
         user_service.approve_registration(db_session, user.id, admin_a)
         user_service.approve_registration(db_session, user.id, admin_b)
 
-        logs = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).all()
+        logs = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).order_by(AuditLog.timestamp).all()
         assert len(logs) == 2
         second_log = logs[1]
         assert second_log.action == AuditAction.USER_APPROVED
