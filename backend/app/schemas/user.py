@@ -9,7 +9,7 @@ RegistrationItem → pending registration in admin queue
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from app.core.constants import (
     AccountStatus,
@@ -79,7 +79,7 @@ class RegistrationApproveRequest(BaseModel):
 class RegistrationRejectRequest(BaseModel):
     """Admin rejects a pending registration."""
 
-    reason: str
+    reason: str = Field(..., min_length=5, max_length=100)
 
 
 class SuspendUserRequest(BaseModel):

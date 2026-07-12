@@ -4,6 +4,21 @@
     @if (message()) {
       <p class="dialog__message">{{ message() }}</p>
     }
+    @if (requireInput()) {
+      <div class="dialog__field">
+        @if (inputLabel()) {
+          <label class="dialog__label" for="confirm-dialog-input">{{ inputLabel() }}</label>
+        }
+        <textarea
+          id="confirm-dialog-input"
+          class="dialog__textarea"
+          rows="3"
+          [placeholder]="inputPlaceholder()"
+          [value]="inputValue()"
+          (input)="onInputChange($any($event.target).value)"
+        ></textarea>
+      </div>
+    }
     <div class="dialog__actions">
       <button class="btn btn--cancel" type="button" (click)="cancelled.emit()">
         {{ cancelText() }}
@@ -13,7 +28,8 @@
         [class.btn--danger]="isDestructive()"
         [class.btn--primary]="!isDestructive()"
         type="button"
-        (click)="confirmed.emit()"
+        [disabled]="isConfirmDisabled"
+        (click)="onConfirm()"
       >
         {{ confirmText() }}
       </button>

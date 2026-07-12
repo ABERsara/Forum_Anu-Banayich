@@ -15,4 +15,12 @@ export class AdminService {
   getRegistration(userId: string): Observable<UserAdminView> {
     return this.api.get<UserAdminView>(`/admin/registrations/${userId}`);
   }
+
+  approveRegistration(userId: string): Observable<UserAdminView> {
+    return this.api.post<UserAdminView>(`/admin/registrations/${userId}/approve`, {});
+  }
+
+  rejectRegistration(userId: string, reason: string): Observable<UserAdminView> {
+    return this.api.post<UserAdminView>(`/admin/registrations/${userId}/reject`, { reason });
+  }
 }
