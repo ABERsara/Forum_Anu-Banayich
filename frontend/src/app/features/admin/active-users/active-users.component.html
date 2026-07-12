@@ -27,7 +27,7 @@
 
   @if (suspendingId()) {
     <app-suspend-dialog
-      message="פעולה זו תשעה את המשתמש למספר השעות שתקבעי, ותשלח לו הודעה עם הסיבה."
+      message="פעולה זו תשעה את המשתמש למספר השעות שנקבעו, ותשלח לו הודעה עם הסיבה."
       (confirmed)="confirmSuspend($event)"
       (cancelled)="cancelSuspend()"
     />
