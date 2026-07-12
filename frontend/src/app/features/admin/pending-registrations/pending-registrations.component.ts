@@ -29,13 +29,14 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
   selector: 'app-pending-registrations',
   standalone: true,
   imports: [RouterLink, DatePipe, ConfirmDialogComponent],
+  styleUrl: './pending-registrations.component.scss',
   template: `
     <div style="padding: 1rem; direction: rtl">
       <a routerLink="/admin">← חזרה ללוח הבקרה</a>
       <h1>הרשמות ממתינות לאישור</h1>
 
       @if (actionError()) {
-        <p style="color: #dc2626">{{ actionError() }}</p>
+        <p class="error-message">{{ actionError() }}</p>
       }
 
       @if (isLoading()) {
