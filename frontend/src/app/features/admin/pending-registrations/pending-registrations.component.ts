@@ -147,7 +147,7 @@ export class PendingRegistrationsComponent implements OnInit {
     this.registrations.set(
       stillPending
         ? this.registrations().map((reg) => (reg.id === updated.id ? updated : reg))
-        : this.registrations().filter((reg) => reg.id !== updated.id)
+        : this.registrations().filter((reg) => reg.id !== updated.id),
     );
   }
 }

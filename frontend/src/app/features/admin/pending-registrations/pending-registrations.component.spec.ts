@@ -72,7 +72,10 @@ describe('PendingRegistrationsComponent', () => {
   });
 
   it('updates the row in place when approve leaves it partially approved', () => {
-    const updated = makeUser({ account_status: AccountStatus.PARTIALLY_APPROVED, first_approver_id: 'admin1' });
+    const updated = makeUser({
+      account_status: AccountStatus.PARTIALLY_APPROVED,
+      first_approver_id: 'admin1',
+    });
     adminServiceMock.approveRegistration.mockReturnValue(of(updated));
 
     component.approve('u1');
@@ -126,7 +129,10 @@ describe('PendingRegistrationsComponent', () => {
   });
 
   it('rejects with the given reason and removes the row on success', () => {
-    const updated = makeUser({ account_status: AccountStatus.REJECTED, rejection_reason: 'מסמכים חסרים' });
+    const updated = makeUser({
+      account_status: AccountStatus.REJECTED,
+      rejection_reason: 'מסמכים חסרים',
+    });
     adminServiceMock.rejectRegistration.mockReturnValue(of(updated));
 
     component.reject('u1');
