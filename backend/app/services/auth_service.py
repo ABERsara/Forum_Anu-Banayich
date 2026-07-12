@@ -101,7 +101,7 @@ def login(db: Session, data: LoginRequest) -> TokenResponse:
         )
         if still_suspended:
             raise HTTPException(
-                status_code=403, detail="החשבון מושעה זמנית. נסה/י שוב מאוחר יותר."
+                status_code=403, detail="החשבון מושעה זמנית. נסה שוב מאוחר יותר."
             )
         user.account_status = AccountStatus.ACTIVE
         user.is_suspended = False

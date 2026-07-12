@@ -297,7 +297,7 @@ class TestLogin:
         db_session.commit()
 
         r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
-        assert r.json()["detail"] == "החשבון מושעה זמנית. נסה/י שוב מאוחר יותר."
+        assert r.json()["detail"] == "החשבון מושעה זמנית. נסה שוב מאוחר יותר."
 
     async def test_suspended_user_after_window_can_login(self, client, db_session):
         user = await _register_verify_and_activate(client, db_session)
