@@ -11,12 +11,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import {
-  Report,
-  ReportCreate,
-  ReportDecideRequest,
-  ReportList,
-} from '../models';
+import { Report, ReportCreate, ReportDecideRequest, ReportList } from '../models';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -59,5 +54,4 @@ export class ReportService {
      */
     throw new Error('getAuditLog() not yet implemented');
   }
-
 }
