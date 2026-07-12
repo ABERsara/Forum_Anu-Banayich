@@ -1,0 +1,43 @@
+<div class="overlay">
+  <div class="dialog" dir="rtl">
+    <h2 class="dialog__title">{{ title() }}</h2>
+    @if (message()) {
+      <p class="dialog__message">{{ message() }}</p>
+    }
+    <div class="dialog__field">
+      <label class="dialog__label" for="suspend-dialog-hours">מספר שעות</label>
+      <input
+        id="suspend-dialog-hours"
+        class="dialog__input"
+        type="number"
+        min="1"
+        [value]="hoursValue()"
+        (input)="onHoursChange($any($event.target).value)"
+      />
+    </div>
+    <div class="dialog__field">
+      <label class="dialog__label" for="suspend-dialog-reason">סיבת ההשעייה</label>
+      <textarea
+        id="suspend-dialog-reason"
+        class="dialog__textarea"
+        rows="3"
+        placeholder="לדוגמה: הפרת כללי הפורום"
+        [value]="reasonValue()"
+        (input)="onReasonChange($any($event.target).value)"
+      ></textarea>
+    </div>
+    <div class="dialog__actions">
+      <button class="btn btn--cancel" type="button" (click)="cancelled.emit()">
+        {{ cancelText() }}
+      </button>
+      <button
+        class="btn btn--danger"
+        type="button"
+        [disabled]="isConfirmDisabled"
+        (click)="onConfirm()"
+      >
+        {{ confirmText() }}
+      </button>
+    </div>
+  </div>
+</div>
