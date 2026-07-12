@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.constants import AccountStatus, AuditAction
+from app.core.constants import AccountStatus, AuditAction, UserRole
 from app.models.user import User
 from app.services.audit_service import log_action
 from app.services.email_service import send_approval_email, send_rejection_email
@@ -33,6 +33,18 @@ def get_pending_registrations(db: Session) -> list[User]:
                 [AccountStatus.PENDING_APPROVAL, AccountStatus.PARTIALLY_APPROVED]
             )
         )
+        .order_by(User.created_at.asc())
+        .all()
+    )
+
+
+def get_active_users(db: Session) -> list[User]:
+    """
+    Return all active users (role=USER only, not admins/moderators/professionals).
+    """
+    return (
+        db.query(User)
+        .filter(User.account_status == AccountStatus.ACTIVE, User.role == UserRole.USER)
         .order_by(User.created_at.asc())
         .all()
     )

@@ -89,6 +89,17 @@ def reject_registration(
     return UserAdminView.model_validate(user)
 
 
+@router.get("/users/active", response_model=list[UserAdminView])
+def list_active_users(db: Session = Depends(get_db)) -> list[UserAdminView]:
+    """
+    Return all active users.
+    """
+    return [
+        UserAdminView.model_validate(user)
+        for user in user_service.get_active_users(db)
+    ]
+
+
 @router.get("/professionals", response_model=list[UserProfile])
 def list_professionals(db: Session = Depends(get_db)) -> list[UserProfile]:
     """Return all professional users."""
