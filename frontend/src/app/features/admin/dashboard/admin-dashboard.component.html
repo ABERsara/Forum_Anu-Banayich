@@ -1,0 +1,27 @@
+<div>
+  <h1>לוח בקרה – מנהל</h1>
+
+  <a routerLink="/admin/registrations" class="stats-card">
+    <div class="stats-card__body">
+      @if (isLoading()) {
+        <app-loading-spinner size="sm" />
+      } @else {
+        @if (!hasError()) {
+          <span class="stats-card__value">{{ pendingCount() }}</span>
+        }
+        <span class="stats-card__label">הרשמות ממתינות לאישור</span>
+      }
+    </div>
+    <span class="stats-card__arrow" aria-hidden="true">‹</span>
+  </a>
+  @if (hasError()) {
+    <app-error-display message="שגיאה בטעינת מספר ההרשמות הממתינות" />
+  }
+
+  <nav>
+    <a routerLink="/admin/registrations">הרשמות ממתינות</a> |
+    <a routerLink="/admin/professionals">ניהול אנשי מקצוע</a> |
+    <a routerLink="/admin/audit-log">יומן פעולות</a> |
+    <a routerLink="/moderator/reports">דיווחים</a>
+  </nav>
+</div>

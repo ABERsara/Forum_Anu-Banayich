@@ -2,33 +2,45 @@
  * Admin dashboard – overview of the system.
  *
  * TODO:
- *   1. Show stats cards:
- *      - Pending registrations count (badge with count)
+ *   1. Show remaining stats cards:
  *      - Active users count
  *      - Pending reports count
- *   2. Quick links to /admin/registrations, /admin/professionals, /admin/audit-log
- *   3. Recent audit log entries (last 10 actions)
+ *   2. Recent audit log entries (last 10 actions)
  */
 
-import { Component } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+
+import { AdminService } from '../../../core/services/admin.service';
+import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [RouterLink],
-  template: `
-    <div style="padding: 1rem; direction: rtl">
-      <h1>לוח בקרה – מנהל</h1>
-      <nav>
-        <a routerLink="/admin/registrations">הרשמות ממתינות</a> |
-        <a routerLink="/admin/professionals">ניהול אנשי מקצוע</a> |
-        <a routerLink="/admin/audit-log">יומן פעולות</a> |
-        <a routerLink="/moderator/reports">דיווחים</a>
-      </nav>
-      <!-- TODO: stats cards, recent audit entries -->
-      <p>TODO: implement admin dashboard</p>
-    </div>
-  `,
+  imports: [RouterLink, LoadingSpinnerComponent, ErrorDisplayComponent],
+  templateUrl: './admin-dashboard.component.html',
+  styleUrl: './admin-dashboard.component.scss',
 })
-export class AdminDashboardComponent {}
+export class AdminDashboardComponent implements OnInit {
+  private readonly adminService = inject(AdminService);
+
+  pendingCount = signal<number | null>(null);
+  isLoading = signal(true);
+  hasError = signal(false);
+
+  ngOnInit(): void {
+    this.hasError.set(false);
+
+    this.adminService.getPendingRegistrations().subscribe({
+      next: (registrations) => {
+        this.pendingCount.set(registrations.length);
+        this.isLoading.set(false);
+      },
+      error: () => {
+        this.hasError.set(true);
+        this.isLoading.set(false);
+      },
+    });
+  }
+}
