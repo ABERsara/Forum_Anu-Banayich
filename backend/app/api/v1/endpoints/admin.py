@@ -95,8 +95,7 @@ def list_active_users(db: Session = Depends(get_db)) -> list[UserAdminView]:
     Return all active users.
     """
     return [
-        UserAdminView.model_validate(user)
-        for user in user_service.get_active_users(db)
+        UserAdminView.model_validate(user) for user in user_service.get_active_users(db)
     ]
 
 
