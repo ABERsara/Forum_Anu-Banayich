@@ -160,6 +160,25 @@ class TestApproveRegistration:
         assert details["previous_status"] == AccountStatus.PENDING_APPROVAL
         assert details["new_status"] == AccountStatus.PARTIALLY_APPROVED
 
+    def test_creates_audit_log_for_second_approval(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        admin_a = _make_admin(db_session, "admin1@example.com")
+        admin_b = _make_admin(db_session, "admin2@example.com")
+
+        user_service.approve_registration(db_session, user.id, admin_a)
+        user_service.approve_registration(db_session, user.id, admin_b)
+
+        logs = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).all()
+        assert len(logs) == 2
+        second_log = logs[1]
+        assert second_log.action == AuditAction.USER_APPROVED
+        assert second_log.actor_id == admin_b.id
+        details = second_log.details
+        assert details is not None
+        assert details["previous_status"] == AccountStatus.PARTIALLY_APPROVED
+        assert details["new_status"] == AccountStatus.ACTIVE
+
 
 class TestRejectRegistration:
     def test_reject_sets_status_and_reason_and_sends_email(
