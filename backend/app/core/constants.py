@@ -146,6 +146,7 @@ class AuditAction(enum.StrEnum):
     USER_SUSPENDED = "user_suspended"
     USER_CANCELLED = "user_cancelled"
     POST_DELETED = "post_deleted"
+    BROADCAST_SENT = "broadcast_sent"
     REPORT_DECIDED = "report_decided"
     PROFESSIONAL_ADDED = "professional_added"
     PROFESSIONAL_UPDATED = "professional_updated"

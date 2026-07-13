@@ -1,0 +1,48 @@
+<div class="broadcast-page" dir="rtl">
+  <a routerLink="/admin">← חזרה ללוח הבקרה</a>
+
+  <div class="broadcast-card">
+    <h1 class="broadcast-title">שידור לכלל המשתמשים</h1>
+    <p class="broadcast-hint">
+      הפוסט יופיע ברשימת הפורום של כל המשתמשים הפעילים, ללא קשר לקבוצה או מגזר.
+    </p>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+      <div class="form-field">
+        <label for="title">כותרת</label>
+        <input id="title" type="text" formControlName="title" placeholder="כותרת השידור" />
+        @if (form.controls.title.invalid && form.controls.title.touched) {
+          <span class="field-error">נא להזין כותרת (2 עד 256 תווים)</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="content">תוכן</label>
+        <textarea
+          id="content"
+          rows="8"
+          formControlName="content"
+          placeholder="תוכן ההודעה"
+        ></textarea>
+        <span class="char-counter">{{ contentLength }} / 5000</span>
+        @if (form.controls.content.invalid && form.controls.content.touched) {
+          <span class="field-error">נא להזין תוכן (עד 5000 תווים)</span>
+        }
+      </div>
+
+      <app-error-display [message]="errorMessage()" />
+
+      @if (successMessage()) {
+        <p class="success-message">{{ successMessage() }}</p>
+      }
+
+      @if (isLoading()) {
+        <app-loading-spinner message="שולח שידור..." />
+      }
+
+      <button type="submit" class="btn-submit" [disabled]="form.invalid || isLoading()">
+        שלח שידור
+      </button>
+    </form>
+  </div>
+</div>

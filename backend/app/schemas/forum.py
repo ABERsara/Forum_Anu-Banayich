@@ -20,6 +20,13 @@ class ForumPostCreate(BaseModel):
     # attachment_url is set by the backend after upload – not sent by the client directly
 
 
+class BroadcastCreate(BaseModel):
+    """POST /forum/broadcast – admin-only post visible to all users."""
+
+    title: str = Field(..., min_length=2, max_length=256)
+    content: str = Field(..., min_length=1, max_length=5000)
+
+
 class ForumPostResponse(BaseModel):
     """Single post as returned to the client."""
 

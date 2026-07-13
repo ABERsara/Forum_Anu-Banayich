@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { AdminService } from './admin.service';
 import { environment } from '../../../environments/environment';
-import type { UserAdminView } from '../models';
+import type { ForumPost, UserAdminView } from '../models';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -44,5 +44,20 @@ describe('AdminService', () => {
     const mockUser = { id: 'u1' } as UserAdminView;
     req.flush(mockUser);
     expect(result).toEqual(mockUser);
+  });
+
+  it('sendBroadcast POSTs to the broadcast endpoint with title and content', () => {
+    let result: ForumPost | undefined;
+    service
+      .sendBroadcast({ title: 'הודעה חשובה', content: 'תוכן ההודעה' })
+      .subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/forum/broadcast`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ title: 'הודעה חשובה', content: 'תוכן ההודעה' });
+
+    const mockPost = { id: 'p1', title: 'הודעה חשובה' } as ForumPost;
+    req.flush(mockPost);
+    expect(result).toEqual(mockPost);
   });
 });

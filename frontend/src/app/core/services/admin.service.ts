@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { UserAdminView } from '../models';
+import { BroadcastCreate, ForumPost, UserAdminView } from '../models';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -10,6 +10,10 @@ export class AdminService {
 
   getPendingRegistrations(): Observable<UserAdminView[]> {
     return this.api.get<UserAdminView[]>('/admin/registrations');
+  }
+
+  sendBroadcast(data: BroadcastCreate): Observable<ForumPost> {
+    return this.api.post<ForumPost>('/forum/broadcast', data);
   }
 
   getRegistration(userId: string): Observable<UserAdminView> {

@@ -5,6 +5,7 @@ GET    /forum/posts           – list posts (auto-filtered by group+sector)
 POST   /forum/posts           – create a new post
 GET    /forum/posts/{id}      – single post
 POST   /forum/posts/{id}/report – report a post
+POST   /forum/broadcast       – admin-only post visible to all users
 
 GET    /messages              – inbox (list of conversations)
 POST   /messages              – send a direct message
@@ -14,9 +15,10 @@ GET    /messages/{user_id}    – conversation with a specific user
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db
+from app.core.dependencies import get_current_user, get_db, require_admin
 from app.models.user import User
 from app.schemas.forum import (
+    BroadcastCreate,
     ConversationSummary,
     DirectMessageCreate,
     DirectMessageResponse,
@@ -25,6 +27,7 @@ from app.schemas.forum import (
     ForumPostResponse,
 )
 from app.schemas.report import ReportCreate
+from app.services import forum_service
 
 router = APIRouter(tags=["Forum & Messages"])
 
@@ -79,6 +82,20 @@ def get_post(
     """
     # TODO: implement
     raise NotImplementedError
+
+
+@router.post("/forum/broadcast", response_model=ForumPostResponse, status_code=201)
+def create_broadcast(
+    data: BroadcastCreate,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> ForumPostResponse:
+    """
+    Publish an admin broadcast post, visible to all users regardless of
+    group or sector.
+    """
+    post = forum_service.create_broadcast_post(db, data, current_user)
+    return ForumPostResponse.model_validate(post)
 
 
 @router.post("/forum/posts/{post_id}/report", status_code=201)
