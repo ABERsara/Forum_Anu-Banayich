@@ -90,9 +90,7 @@ describe('ForumListComponent', () => {
   });
 
   it('nextPage requests the next page when not on the last page', () => {
-    forumServiceMock.getPosts.mockReturnValue(
-      of(makeList({ total: 45, page: 1, page_size: 20 })),
-    );
+    forumServiceMock.getPosts.mockReturnValue(of(makeList({ total: 45, page: 1, page_size: 20 })));
     component.ngOnInit();
     forumServiceMock.getPosts.mockClear();
 
@@ -102,9 +100,7 @@ describe('ForumListComponent', () => {
   });
 
   it('nextPage does nothing on the last page', () => {
-    forumServiceMock.getPosts.mockReturnValue(
-      of(makeList({ total: 10, page: 1, page_size: 20 })),
-    );
+    forumServiceMock.getPosts.mockReturnValue(of(makeList({ total: 10, page: 1, page_size: 20 })));
     component.ngOnInit();
     forumServiceMock.getPosts.mockClear();
 
@@ -122,9 +118,7 @@ describe('ForumListComponent', () => {
   });
 
   it('previousPage requests the previous page', () => {
-    forumServiceMock.getPosts.mockReturnValue(
-      of(makeList({ total: 45, page: 2, page_size: 20 })),
-    );
+    forumServiceMock.getPosts.mockReturnValue(of(makeList({ total: 45, page: 2, page_size: 20 })));
     component.ngOnInit();
     forumServiceMock.getPosts.mockClear();
 
