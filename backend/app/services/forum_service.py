@@ -12,14 +12,17 @@ TODO list for junior developer:
   [ ] implement search_users_for_dm() – name search within same group/sector
 """
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Query, Session
 
+from app.core.constants import GroupVisibility, PostStatus, SectorVisibility, UserRole
 from app.models.forum import DirectMessage, ForumPost
 from app.models.user import User
 from app.schemas.forum import (
     DirectMessageCreate,
     ForumPostCreate,
     ForumPostListResponse,
+    ForumPostResponse,
 )
 
 
@@ -34,8 +37,18 @@ def _content_filter(query: Query[ForumPost], current_user: User) -> Query[ForumP
 
     This filter is the heart of the privacy model – do not skip it!
     """
-    # TODO: implement this helper and use it in every post query
-    raise NotImplementedError("_content_filter() is not yet implemented")
+    group_visibility = GroupVisibility(current_user.user_type.value)
+    sector_visibility = SectorVisibility(current_user.sector.value)
+    return query.filter(
+        or_(
+            ForumPost.group_visibility == group_visibility,
+            ForumPost.group_visibility == GroupVisibility.ALL,
+        ),
+        or_(
+            ForumPost.sector_visibility == sector_visibility,
+            ForumPost.sector_visibility == SectorVisibility.ALL,
+        ),
+    )
 
 
 def get_posts(
@@ -55,8 +68,29 @@ def get_posts(
       5. Apply offset + limit for pagination
       6. Return ForumPostListResponse
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_posts() is not yet implemented")
+    query = db.query(ForumPost)
+
+    if current_user.role == UserRole.ADMIN:
+        query = query.filter(ForumPost.status != PostStatus.DELETED)
+    else:
+        query = _content_filter(query, current_user)
+        query = query.filter(ForumPost.status == PostStatus.VISIBLE)
+
+    total = query.count()
+
+    posts = (
+        query.order_by(ForumPost.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return ForumPostListResponse(
+        items=[ForumPostResponse.model_validate(post) for post in posts],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
