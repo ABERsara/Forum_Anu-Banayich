@@ -1,0 +1,36 @@
+<div class="forum-list" dir="rtl">
+  <div class="forum-list__header">
+    <h1>פורום הקהילה</h1>
+    <a routerLink="/forum/new">+ פרסום הודעה חדשה</a>
+  </div>
+
+  @if (isLoading) {
+    <app-loading-spinner size="md" />
+  } @else if (hasError) {
+    <app-error-display message="אירעה שגיאה בטעינת הפוסטים. נסה לרענן את הדף." />
+  } @else if (posts.length === 0) {
+    <p>אין הודעות עדיין. היה הראשון לפרסם!</p>
+  } @else {
+    @for (post of posts; track post.id) {
+      <div class="post-card">
+        <a [routerLink]="['/forum', post.id]">
+          <strong>{{ post.title }}</strong>
+        </a>
+        <p class="post-card__meta">
+          {{ post.author.first_name }} {{ post.author.last_name }} |
+          {{ post.created_at | date }}
+        </p>
+        <!-- Excerpt and a report button are out of scope for ABF-41 (F2 / F5) -->
+        <span class="post-card__badge">
+          {{ groupVisibilityLabels[post.group_visibility] }} · {{ sectorVisibilityLabels[post.sector_visibility] }}
+        </span>
+      </div>
+    }
+
+    <div class="pagination">
+      <button (click)="previousPage()" [disabled]="page <= 1">הקודם</button>
+      <span>עמוד {{ page }} מתוך {{ totalPages }}</span>
+      <button (click)="nextPage()" [disabled]="page >= totalPages">הבא</button>
+    </div>
+  }
+</div>
