@@ -22,6 +22,7 @@ from app.schemas.professional import (
     PublicQAResponse,
 )
 from app.schemas.user import ProfessionalProfile
+from app.services import user_service
 
 router = APIRouter(prefix="/advice", tags=["Professional Advisory"])
 
@@ -33,11 +34,11 @@ def list_professionals(
 ) -> list[ProfessionalProfile]:
     """
     List professionals visible to the current user (filtered by group+sector).
-
-    TODO: call user_service.get_professionals_for_user(db, current_user)
     """
-    # TODO: implement
-    return []
+    return [
+        ProfessionalProfile.model_validate(pro)
+        for pro in user_service.get_professionals_for_user(db, current_user)
+    ]
 
 
 @router.get("/questions", response_model=list[ProfessionalQueryResponse])
