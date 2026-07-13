@@ -21,6 +21,7 @@
         id="suspend-dialog-reason"
         class="dialog__textarea"
         rows="3"
+        maxlength="100"
         placeholder="לדוגמה: הפרת כללי הפורום"
         [value]="reasonValue()"
         (input)="onReasonChange($any($event.target).value)"

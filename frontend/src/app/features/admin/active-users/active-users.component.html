@@ -3,13 +3,13 @@
   <h1>משתמשים פעילים</h1>
 
   @if (actionError()) {
-    <p class="error-message">{{ actionError() }}</p>
+    <app-error-display [message]="actionError()!" />
   }
 
   @if (isLoading()) {
-    <p>טוען...</p>
+    <app-loading-spinner />
   } @else if (hasError()) {
-    <p>אירעה שגיאה בטעינת המשתמשים. נסה לרענן את הדף.</p>
+    <app-error-display message="אירעה שגיאה בטעינת המשתמשים. נסה לרענן את הדף." />
   } @else if (users().length === 0) {
     <p>אין משתמשים פעילים כרגע.</p>
   } @else {

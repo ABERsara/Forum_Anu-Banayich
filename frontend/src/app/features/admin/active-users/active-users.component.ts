@@ -5,6 +5,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { UserAdminView } from '../../../core/models';
 import { SECTOR_LABELS, USER_TYPE_LABELS } from '../../../core/constants';
 import { AdminService } from '../../../core/services/admin.service';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import {
   SuspendDialogComponent,
   SuspendDialogResult,
@@ -13,7 +15,7 @@ import {
 @Component({
   selector: 'app-active-users',
   standalone: true,
-  imports: [RouterLink, SuspendDialogComponent],
+  imports: [RouterLink, LoadingSpinnerComponent, ErrorDisplayComponent, SuspendDialogComponent],
   templateUrl: './active-users.component.html',
   styleUrl: './active-users.component.scss',
 })
