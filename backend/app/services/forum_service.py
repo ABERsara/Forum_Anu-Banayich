@@ -37,6 +37,12 @@ def _content_filter(query: Query[ForumPost], current_user: User) -> Query[ForumP
 
     This filter is the heart of the privacy model – do not skip it!
     """
+    # user_type/sector are Optional on User (roles other than USER don't have them).
+    # Only get_posts()'s non-admin branch calls this today, where they're always set –
+    # but nothing enforces that at the type level, so assert it explicitly here rather
+    # than let a future caller hit a confusing AttributeError deep inside the filter.
+    assert current_user.user_type is not None, "_content_filter() requires a user with user_type set"
+    assert current_user.sector is not None, "_content_filter() requires a user with sector set"
     group_visibility = GroupVisibility(current_user.user_type.value)
     sector_visibility = SectorVisibility(current_user.sector.value)
     return query.filter(
