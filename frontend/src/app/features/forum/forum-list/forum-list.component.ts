@@ -5,7 +5,7 @@
  */
 
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { GROUP_VISIBILITY_LABELS, SECTOR_VISIBILITY_LABELS } from '../../../core/constants';
@@ -23,50 +23,48 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 })
 export class ForumListComponent implements OnInit {
   private readonly forumService = inject(ForumService);
+  private readonly pageSize = 20;
 
-  posts: ForumPost[] = [];
-  isLoading = false;
-  hasError = false;
-  page = 1;
-  pageSize = 20;
-  total = 0;
+  posts = signal<ForumPost[]>([]);
+  isLoading = signal(false);
+  hasError = signal(false);
+  page = signal(1);
+  total = signal(0);
+
+  totalPages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize)));
 
   readonly groupVisibilityLabels = GROUP_VISIBILITY_LABELS;
   readonly sectorVisibilityLabels = SECTOR_VISIBILITY_LABELS;
 
-  get totalPages(): number {
-    return Math.max(1, Math.ceil(this.total / this.pageSize));
-  }
-
   ngOnInit(): void {
-    this.loadPosts(this.page);
+    this.loadPosts(this.page());
   }
 
   nextPage(): void {
-    if (this.page < this.totalPages) {
-      this.loadPosts(this.page + 1);
+    if (this.page() < this.totalPages()) {
+      this.loadPosts(this.page() + 1);
     }
   }
 
   previousPage(): void {
-    if (this.page > 1) {
-      this.loadPosts(this.page - 1);
+    if (this.page() > 1) {
+      this.loadPosts(this.page() - 1);
     }
   }
 
   private loadPosts(page: number): void {
-    this.isLoading = true;
-    this.hasError = false;
+    this.isLoading.set(true);
+    this.hasError.set(false);
     this.forumService.getPosts(page, this.pageSize).subscribe({
       next: (result) => {
-        this.posts = result.items;
-        this.total = result.total;
-        this.page = result.page;
-        this.isLoading = false;
+        this.posts.set(result.items);
+        this.total.set(result.total);
+        this.page.set(result.page);
+        this.isLoading.set(false);
       },
       error: () => {
-        this.hasError = true;
-        this.isLoading = false;
+        this.hasError.set(true);
+        this.isLoading.set(false);
       },
     });
   }

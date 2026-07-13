@@ -4,14 +4,14 @@
     <a routerLink="/forum/new">+ פרסום הודעה חדשה</a>
   </div>
 
-  @if (isLoading) {
+  @if (isLoading()) {
     <app-loading-spinner size="md" />
-  } @else if (hasError) {
+  } @else if (hasError()) {
     <app-error-display message="אירעה שגיאה בטעינת הפוסטים. נסה לרענן את הדף." />
-  } @else if (posts.length === 0) {
+  } @else if (posts().length === 0) {
     <p>אין הודעות עדיין. היה הראשון לפרסם!</p>
   } @else {
-    @for (post of posts; track post.id) {
+    @for (post of posts(); track post.id) {
       <div class="post-card">
         <a [routerLink]="['/forum', post.id]">
           <strong>{{ post.title }}</strong>
@@ -28,9 +28,9 @@
     }
 
     <div class="pagination">
-      <button (click)="previousPage()" [disabled]="page <= 1">הקודם</button>
-      <span>עמוד {{ page }} מתוך {{ totalPages }}</span>
-      <button (click)="nextPage()" [disabled]="page >= totalPages">הבא</button>
+      <button (click)="previousPage()" [disabled]="page() <= 1">הקודם</button>
+      <span>עמוד {{ page() }} מתוך {{ totalPages() }}</span>
+      <button (click)="nextPage()" [disabled]="page() >= totalPages()">הבא</button>
     </div>
   }
 </div>

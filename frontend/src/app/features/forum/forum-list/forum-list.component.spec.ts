@@ -56,10 +56,10 @@ describe('ForumListComponent', () => {
   });
 
   it('loads posts on init', () => {
-    expect(component.isLoading).toBe(false);
-    expect(component.hasError).toBe(false);
-    expect(component.posts.length).toBe(1);
-    expect(component.total).toBe(1);
+    expect(component.isLoading()).toBe(false);
+    expect(component.hasError()).toBe(false);
+    expect(component.posts().length).toBe(1);
+    expect(component.total()).toBe(1);
   });
 
   it('sets hasError when loading fails', () => {
@@ -67,8 +67,8 @@ describe('ForumListComponent', () => {
 
     component.ngOnInit();
 
-    expect(component.hasError).toBe(true);
-    expect(component.isLoading).toBe(false);
+    expect(component.hasError()).toBe(true);
+    expect(component.isLoading()).toBe(false);
   });
 
   it('shows the empty state when there are no posts', () => {
@@ -86,7 +86,7 @@ describe('ForumListComponent', () => {
 
     component.ngOnInit();
 
-    expect(component.totalPages).toBe(3);
+    expect(component.totalPages()).toBe(3);
   });
 
   it('nextPage requests the next page when not on the last page', () => {
