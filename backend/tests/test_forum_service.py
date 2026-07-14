@@ -255,3 +255,197 @@ class TestGetPostsRoleGuard:
             forum_service.get_posts(db_session, professional)
 
         assert exc_info.value.status_code == 403
+
+
+class TestGetPostByIdRoleGuard:
+    def test_professional_gets_403(self, db_session: Session) -> None:
+        professional = _make_user(
+            db_session, "pro@example.com", role=UserRole.PROFESSIONAL
+        )
+        author = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.get_post_by_id(db_session, post.id, professional)
+
+        assert exc_info.value.status_code == 403
+
+    def test_nonexistent_id_gets_404(self, db_session: Session) -> None:
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.get_post_by_id(db_session, "no-such-id", user)
+
+        assert exc_info.value.status_code == 404
+
+
+class TestGetPostByIdAsUser:
+    def test_sees_own_group_and_sector_post(self, db_session: Session) -> None:
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        result = forum_service.get_post_by_id(db_session, post.id, user)
+
+        assert result.id == post.id
+
+    def test_mismatched_group_gets_403(self, db_session: Session) -> None:
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        other_author = _make_user(
+            db_session, "widower@example.com", UserType.WIDOWER, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session,
+            other_author,
+            GroupVisibility.WIDOWERS,
+            SectorVisibility.HASIDIC,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.get_post_by_id(db_session, post.id, user)
+
+        assert exc_info.value.status_code == 403
+
+    def test_hidden_post_gets_404(self, db_session: Session) -> None:
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session,
+            user,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            status=PostStatus.HIDDEN,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.get_post_by_id(db_session, post.id, user)
+
+        assert exc_info.value.status_code == 404
+
+    def test_deleted_post_gets_404(self, db_session: Session) -> None:
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session,
+            user,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            status=PostStatus.DELETED,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.get_post_by_id(db_session, post.id, user)
+
+        assert exc_info.value.status_code == 404
+
+
+class TestGetPostByIdAsAdmin:
+    def test_sees_deleted_post(self, db_session: Session) -> None:
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        author = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session,
+            author,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            status=PostStatus.DELETED,
+        )
+
+        result = forum_service.get_post_by_id(db_session, post.id, admin)
+
+        assert result.id == post.id
+
+    def test_sees_hidden_post(self, db_session: Session) -> None:
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        author = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session,
+            author,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            status=PostStatus.HIDDEN,
+        )
+
+        result = forum_service.get_post_by_id(db_session, post.id, admin)
+
+        assert result.id == post.id
+
+    def test_sees_post_from_other_group_and_sector(self, db_session: Session) -> None:
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        author = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        result = forum_service.get_post_by_id(db_session, post.id, admin)
+
+        assert result.id == post.id
+
+
+class TestGetPostByIdAsModerator:
+    def test_sees_hidden_post(self, db_session: Session) -> None:
+        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+        author = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session,
+            author,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            status=PostStatus.HIDDEN,
+        )
+
+        result = forum_service.get_post_by_id(db_session, post.id, moderator)
+
+        assert result.id == post.id
+
+    def test_deleted_post_gets_404(self, db_session: Session) -> None:
+        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+        author = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session,
+            author,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            status=PostStatus.DELETED,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.get_post_by_id(db_session, post.id, moderator)
+
+        assert exc_info.value.status_code == 404
+
+    def test_sees_post_from_other_group_and_sector(self, db_session: Session) -> None:
+        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+        author = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        result = forum_service.get_post_by_id(db_session, post.id, moderator)
+
+        assert result.id == post.id
