@@ -12,8 +12,9 @@ TODO list for junior developer:
   [ ] implement search_users_for_dm() – name search within same group/sector
 """
 
+from fastapi import HTTPException
 from sqlalchemy import or_
-from sqlalchemy.orm import Query, Session
+from sqlalchemy.orm import Query, Session, joinedload
 
 from app.core.constants import GroupVisibility, PostStatus, SectorVisibility, UserRole
 from app.models.forum import DirectMessage, ForumPost
@@ -78,7 +79,10 @@ def get_posts(
       5. Apply offset + limit for pagination
       6. Return ForumPostListResponse
     """
-    query = db.query(ForumPost)
+    if current_user.role not in (UserRole.USER, UserRole.ADMIN):
+        raise HTTPException(status_code=403, detail="אין לך הרשאה לגשת לפורום הקהילתי.")
+
+    query = db.query(ForumPost).options(joinedload(ForumPost.author))
 
     if current_user.role == UserRole.ADMIN:
         query = query.filter(ForumPost.status != PostStatus.DELETED)
