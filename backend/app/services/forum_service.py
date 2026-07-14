@@ -109,15 +109,48 @@ def get_posts(
 
 def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     """
-    Return a single post – raise 404 if not found, 403 if not visible to user.
+    Return a single post.
 
-    TODO:
-      1. Query ForumPost by id
-      2. Check it passes _content_filter for this user
-      3. Check status != DELETED
+    Visibility rules (deliberately different from get_posts()'s list view):
+      - ADMIN sees any status, including DELETED.
+      - MODERATOR sees VISIBLE and HIDDEN (not DELETED), for any group/sector –
+        bypasses the content filter, since moderators don't have user_type/sector set.
+      - USER sees only VISIBLE posts within their own group/sector (content filter applies).
+
+    Raises 404 if the post doesn't exist, or exists but this user shouldn't know that
+    (wrong status for their role). Raises 403 if the post is VISIBLE but the user's
+    group/sector don't match (the post exists, they just can't read it).
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_post_by_id() is not yet implemented")
+    if current_user.role not in (UserRole.USER, UserRole.ADMIN, UserRole.MODERATOR):
+        raise HTTPException(status_code=403, detail="אין לך הרשאה לגשת לפורום הקהילתי.")
+
+    post = (
+        db.query(ForumPost)
+        .options(joinedload(ForumPost.author))
+        .filter(ForumPost.id == post_id)
+        .first()
+    )
+    if post is None:
+        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+
+    if current_user.role in (UserRole.ADMIN, UserRole.MODERATOR):
+        if post.status == PostStatus.DELETED and current_user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        return post
+
+    # הגענו לכאן רק אם role == USER (ADMIN/MODERATOR תמיד יוצאים למעלה, עם return או raise)
+    if post.status != PostStatus.VISIBLE:
+        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+
+    is_visible_to_user = (
+        _content_filter(db.query(ForumPost).filter(ForumPost.id == post_id), current_user)
+        .first()
+        is not None
+    )
+    if not is_visible_to_user:
+        raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
+
+    return post
 
 
 def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
