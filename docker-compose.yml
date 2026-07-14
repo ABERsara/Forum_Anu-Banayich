@@ -1,4 +1,18 @@
 services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=anu_banayich
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d anu_banayich"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -8,7 +22,10 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=sqlite:///./dev.db
+      - DATABASE_URL=postgresql+psycopg2://user:${POSTGRES_PASSWORD:-password}@db:5432/anu_banayich
+    depends_on:
+      db:
+        condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
