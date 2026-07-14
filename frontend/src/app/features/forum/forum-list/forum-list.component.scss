@@ -1,0 +1,37 @@
+@use '../../../../styles/variables' as *;
+
+.forum-list {
+  padding: $spacing-md;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.post-card {
+  border: 1px solid $color-border;
+  margin: $spacing-sm 0;
+  padding: $spacing-md;
+  border-radius: $radius-md;
+
+  &__meta {
+    color: $color-text-muted;
+  }
+
+  &__badge {
+    display: inline-block;
+    margin-top: $spacing-sm;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+}
