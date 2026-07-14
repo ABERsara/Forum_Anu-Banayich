@@ -13,13 +13,14 @@ import { ProfessionalService } from '../../../core/services/professional.service
   selector: 'app-advice-list',
   standalone: true,
   imports: [RouterLink],
+  styleUrl: './advice-list.component.scss',
   template: `
-    <div style="padding: 1rem; direction: rtl">
+    <div class="page">
       <h1>ייעוץ מקצועי</h1>
       <a routerLink="/advice/qa">לשאלות ותשובות ציבוריות</a>
 
       @if (professionals().length > 0) {
-        <div style="margin: 1rem 0">
+        <div class="filter-bar">
           <label>
             סינון לפי תחום:
             <select (change)="onDomainChange($event)">
@@ -35,12 +36,12 @@ import { ProfessionalService } from '../../../core/services/professional.service
       @if (isLoading()) {
         <p>טוען...</p>
       } @else if (isError()) {
-        <p>אירעה שגיאה בטעינת רשימת אנשי המקצוע. נסה/י שוב מאוחר יותר.</p>
+        <p>אירעה שגיאה בטעינת רשימת אנשי המקצוע. נסה שוב מאוחר יותר.</p>
       } @else if (filteredProfessionals().length === 0) {
         <p>לא נמצאו אנשי מקצוע זמינים.</p>
       } @else {
         @for (pro of filteredProfessionals(); track pro.id) {
-          <div style="border: 1px solid #ccc; margin: 0.5rem 0; padding: 1rem; border-radius: 8px">
+          <div class="professional-card">
             <strong>{{ pro.first_name }} {{ pro.last_name }}</strong>
             <p>{{ domainLabels[pro.professional_domain] }}</p>
             <p>{{ pro.professional_description }}</p>

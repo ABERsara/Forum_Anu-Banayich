@@ -8,7 +8,7 @@ TODO list for junior developer:
   [ ] implement reject_registration()
   [ ] implement get_pending_registrations()
   [x] implement suspend_user()
-  [ ] implement get_professionals_for_user() – filtered by sector+group
+  [x] implement get_professionals_for_user() – filtered by sector+group
 """
 
 from datetime import UTC, datetime, timedelta
