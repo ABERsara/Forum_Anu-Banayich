@@ -72,11 +72,9 @@ def get_post(
 ) -> ForumPostResponse:
     """
     Return a single forum post.
-
-    TODO: call forum_service.get_post_by_id(db, post_id, current_user)
     """
-    # TODO: implement
-    raise NotImplementedError
+    post = forum_service.get_post_by_id(db, post_id, current_user)
+    return ForumPostResponse.model_validate(post)
 
 
 @router.post("/forum/posts/{post_id}/report", status_code=201)
