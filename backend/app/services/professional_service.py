@@ -4,22 +4,27 @@ Professional advisory service.
 Handles professional queries (questions and answers).
 
 TODO list for junior developer:
-  [ ] implement create_query()
+  [x] implement create_query()
   [ ] implement answer_query()
   [ ] implement get_public_qa()
-  [ ] implement get_my_questions() (for the asker)
+  [x] implement get_my_questions() (for the asker)
   [ ] implement get_pending_questions() (for the professional)
 """
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.constants import UserRole
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import (
     ProfessionalAnswerRequest,
     ProfessionalQueryCreate,
+    ProfessionalQueryResponse,
     PublicQAResponse,
 )
+from app.schemas.user import ProfessionalProfile, UserPublic
+from app.services import email_service
 
 
 def _build_alias(user: User) -> str:
@@ -34,23 +39,115 @@ def _build_alias(user: User) -> str:
     return f"{user_type_label} – {sector_label}"
 
 
+def _professional_matches_asker(professional: User, asker: User) -> bool:
+    """
+    True if `professional` serves the asker's group (user_type) and sector.
+
+    professional_groups/professional_sectors are JSON lists of UserType/Sector
+    values, or ["all"].
+    """
+    groups = professional.professional_groups or []
+    sectors = professional.professional_sectors or []
+    group_ok = "all" in groups or (
+        asker.user_type is not None and asker.user_type.value in groups
+    )
+    sector_ok = "all" in sectors or (
+        asker.sector is not None and asker.sector.value in sectors
+    )
+    return group_ok and sector_ok
+
+
+def _to_response(query: ProfessionalQuery) -> ProfessionalQueryResponse:
+    """
+    Build the client-facing response for a query, enforcing the privacy rule:
+    the asker's real identity is only included if they chose to reveal it.
+    """
+    return ProfessionalQueryResponse(
+        id=query.id,
+        content=query.content,
+        answer=query.answer,
+        is_public=query.is_public,
+        status=query.status,
+        is_featured=query.is_featured,
+        domain=query.domain,
+        professional=ProfessionalProfile.model_validate(query.professional)
+        if query.professional is not None
+        else None,
+        asker_alias=_build_alias(query.asker),
+        asker=UserPublic.model_validate(query.asker) if query.show_real_name else None,
+        created_at=query.created_at,
+        answered_at=query.answered_at,
+    )
+
+
 def create_query(
     db: Session, data: ProfessionalQueryCreate, asker: User
-) -> ProfessionalQuery:
+) -> ProfessionalQueryResponse:
     """
     Ask a professional question.
 
-    TODO:
-      1. Validate: either professional_id OR domain must be set (not both None)
-      2. If professional_id given: verify that professional serves asker's group/sector
-      3. Create ProfessionalQuery object, save to DB
-      4. Send email notification:
-           - specific professional  → direct email
-           - general domain question → email to all matching professionals
-      5. Return the query
+    1. Validate: either professional_id OR domain must be set (not both None)
+    2. If professional_id given: verify that professional serves asker's group/sector
+    3. Create ProfessionalQuery object, save to DB
+    4. Send email notification:
+         - specific professional  → direct email
+         - general domain question → email to all matching professionals
+    5. Return the query
     """
-    # TODO: implement this function
-    raise NotImplementedError("create_query() is not yet implemented")
+    if data.professional_id is None and data.domain is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Either professional_id or domain must be provided",
+        )
+
+    professional: User | None = None
+    if data.professional_id is not None:
+        professional = (
+            db.query(User)
+            .filter(User.id == data.professional_id, User.role == UserRole.PROFESSIONAL)
+            .first()
+        )
+        if professional is None or not professional.is_active_professional:
+            raise HTTPException(status_code=404, detail="Professional not found")
+        if not _professional_matches_asker(professional, asker):
+            raise HTTPException(
+                status_code=403,
+                detail="This professional does not serve your group/sector",
+            )
+
+    query = ProfessionalQuery(
+        asker_id=asker.id,
+        professional_id=data.professional_id,
+        domain=data.domain,
+        content=data.content,
+        is_public=data.is_public,
+        show_real_name=data.show_real_name,
+    )
+    db.add(query)
+    db.commit()
+    db.refresh(query)
+
+    if professional is not None:
+        email_service.send_question_notification(
+            professional.email, query.id, is_general=False
+        )
+    elif data.domain is not None:
+        matching_professionals = (
+            db.query(User)
+            .filter(
+                User.role == UserRole.PROFESSIONAL,
+                User.professional_domain == data.domain,
+                User.is_active_professional.is_(True),
+            )
+            .all()
+        )
+        for candidate in matching_professionals:
+            if _professional_matches_asker(candidate, asker):
+                email_service.send_question_notification(
+                    candidate.email, query.id, is_general=True
+                )
+
+    return _to_response(query)
 
 
 def answer_query(
@@ -95,15 +192,18 @@ def get_public_qa(
     raise NotImplementedError("get_public_qa() is not yet implemented")
 
 
-def get_my_questions(db: Session, asker: User) -> list[ProfessionalQuery]:
+def get_my_questions(db: Session, asker: User) -> list[ProfessionalQueryResponse]:
     """
-    Return all questions asked by the current user (both public and private).
-
-    TODO:
-      Query where asker_id == asker.id, order by created_at DESC
+    Return all questions asked by the current user (both public and private),
+    ordered by created_at DESC.
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_my_questions() is not yet implemented")
+    queries = (
+        db.query(ProfessionalQuery)
+        .filter(ProfessionalQuery.asker_id == asker.id)
+        .order_by(ProfessionalQuery.created_at.desc())
+        .all()
+    )
+    return [_to_response(query) for query in queries]
 
 
 def get_pending_questions(db: Session, professional: User) -> list[ProfessionalQuery]:
