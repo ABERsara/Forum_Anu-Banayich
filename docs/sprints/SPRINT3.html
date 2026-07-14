@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ספרינט 3 — אישורי הרשמה + פורום + יעוץ | אנו בניך</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f5f5f0;
+    color: #222;
+    direction: rtl;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  .cover {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%);
+    color: white;
+    padding: 70px 40px;
+    text-align: center;
+  }
+  .cover h1 { font-size: 38px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1px; }
+  .cover .sprint-title {
+    font-size: 22px; opacity: 0.85; margin-bottom: 8px;
+    background: rgba(255,255,255,0.12); border-radius: 10px;
+    display: inline-block; padding: 6px 24px;
+  }
+  .cover .subtitle { font-size: 17px; opacity: 0.75; margin-bottom: 28px; }
+  .cover .meta {
+    display: inline-flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+    background: rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 28px;
+  }
+  .cover .meta span { font-size: 13px; opacity: 0.85; }
+  .cover .meta strong { opacity: 1; }
+
+  .goal-banner {
+    background: linear-gradient(90deg, #2563eb, #2563eb);
+    color: white; padding: 24px 40px;
+    text-align: center; font-size: 17px; line-height: 1.6;
+  }
+  .goal-banner strong { font-size: 19px; display: block; margin-bottom: 6px; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
+
+  .toc {
+    background: white; border-radius: 16px; padding: 28px 32px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 40px;
+  }
+  .toc h2 { font-size: 18px; color: #2563eb; margin-bottom: 16px; border-bottom: 2px solid #e8e8e8; padding-bottom: 10px; }
+  .toc ol { padding-right: 20px; columns: 2; column-gap: 32px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: #2563eb; text-decoration: none; font-size: 14px; }
+  .toc a:hover { text-decoration: underline; }
+
+  .section {
+    background: white; border-radius: 16px; padding: 32px 36px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 28px;
+  }
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 24px; padding-bottom: 14px;
+    border-bottom: 3px solid #f0f0f0;
+  }
+  .section-number {
+    background: #2563eb; color: white; border-radius: 50%;
+    width: 36px; height: 36px; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .section-number.red    { background: #dc2626; }
+  .section-number.green  { background: #16a34a; }
+  .section-number.purple { background: #7c3aed; }
+  .section h2 { font-size: 22px; color: #2563eb; }
+  .section h3 { font-size: 17px; color: #1e3a8a; margin: 22px 0 10px; padding-right: 12px; border-right: 4px solid #2563eb; }
+  .section h4 { font-size: 15px; color: #444; margin: 16px 0 8px; font-weight: 600; }
+  .section p  { margin-bottom: 12px; color: #333; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th { background: #2563eb; color: white; padding: 10px 14px; text-align: right; font-weight: 600; }
+  td { padding: 9px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) { background: #f8f9ff; }
+  tr:hover { background: #eff6ff; }
+
+  code {
+    background: #eff6ff; color: #2563eb; padding: 2px 6px;
+    border-radius: 4px; font-size: 13px; font-family: 'Courier New', monospace;
+  }
+
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 600; margin: 2px;
+  }
+  .badge-green  { background: #d4edda; color: #155724; }
+  .badge-red    { background: #f8d7da; color: #721c24; }
+  .badge-blue   { background: #d1ecf1; color: #0c5460; }
+  .badge-orange { background: #fff3cd; color: #856404; }
+  .badge-purple { background: #e8d5f5; color: #6a0dad; }
+  .badge-grey   { background: #e9ecef; color: #495057; }
+
+  .callout {
+    border-radius: 10px; padding: 16px 20px; margin: 14px 0;
+    border-right: 5px solid; font-size: 14px;
+  }
+  .callout-blue   { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+  .callout-green  { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+  .callout-orange { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+  .callout-red    { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+  .callout-purple { background: #faf5ff; border-color: #a855f7; color: #581c87; }
+
+  .task-card { border-radius: 12px; border: 2px solid #e0e8ff; margin-bottom: 28px; overflow: hidden; }
+  .task-card-header {
+    padding: 16px 22px; display: flex; align-items: center; gap: 12px;
+  }
+  .task-card-header.color-red    { background: #fee2e2; border-bottom: 2px solid #fecaca; }
+  .task-card-header.color-blue   { background: #dbeafe; border-bottom: 2px solid #bfdbfe; }
+  .task-card-header.color-green  { background: #dcfce7; border-bottom: 2px solid #bbf7d0; }
+  .task-card-header.color-purple { background: #ede9fe; border-bottom: 2px solid #ddd6fe; }
+  .task-card-header.color-orange { background: #ffedd5; border-bottom: 2px solid #fed7aa; }
+  .task-card-header.color-grey   { background: #f1f5f9; border-bottom: 2px solid #e2e8f0; }
+  .task-card-body { padding: 20px 22px; }
+  .task-jira { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 6px; background: rgba(0,0,0,0.08); }
+  .task-title { font-size: 18px; font-weight: 700; flex: 1; }
+  .task-effort { font-size: 13px; opacity: 0.75; }
+
+  .checklist { list-style: none; padding: 0; margin: 10px 0; }
+  .checklist li {
+    padding: 6px 0 6px 28px; border-bottom: 1px solid #f0f0f0;
+    font-size: 14px; position: relative;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before {
+    content: '☐'; position: absolute; left: 4px;
+    color: #2563eb; font-size: 16px;
+  }
+
+  .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  .before-card { background: #fff5f5; border: 2px solid #fecaca; border-radius: 10px; padding: 18px 20px; }
+  .after-card  { background: #f0fdf4; border: 2px solid #bbf7d0; border-radius: 10px; padding: 18px 20px; }
+  .before-card h4 { color: #991b1b; margin-bottom: 10px; }
+  .after-card h4  { color: #166534; margin-bottom: 10px; }
+  .before-card ul, .after-card ul { padding-right: 18px; font-size: 14px; }
+  .before-card li, .after-card li { margin-bottom: 6px; }
+
+  .dep-graph {
+    background: #f8f9ff; border-radius: 12px; padding: 28px 20px;
+    margin: 14px 0; direction: ltr; text-align: center;
+  }
+  .dep-node {
+    background: white; border: 2px solid #2563eb; border-radius: 10px;
+    padding: 10px 16px; font-size: 13px; font-weight: 600; color: #2563eb;
+    display: inline-block; min-width: 150px; text-align: center; margin: 4px;
+  }
+  .dep-node small { display: block; font-size: 11px; font-weight: 400; opacity: 0.75; margin-top: 2px; }
+  .dep-node.blocker { border-color: #dc2626; color: #dc2626; background: #fff5f5; }
+  .dep-node.teal    { border-color: #0d9488; color: #0d9488; background: #f0fdfa; }
+  .dep-node.purple  { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }
+  .dep-node.grey    { border-color: #94a3b8; color: #64748b; background: #f8fafc; }
+  .dep-node.green   { border-color: #16a34a; color: #166534; background: #f0fdf4; }
+  .dep-row { display: flex; justify-content: center; align-items: flex-start; gap: 12px; margin: 4px 0; }
+  .dep-arrow { color: #94a3b8; font-size: 20px; line-height: 1; margin: 2px 0; display: block; text-align: center; }
+  .dep-col { display: flex; flex-direction: column; align-items: center; }
+
+  .timeline { position: relative; padding: 0; margin: 20px 0; }
+  .timeline-item { display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
+  .timeline-dot {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: white; margin-top: 2px;
+  }
+  .timeline-dot.blue   { background: #2563eb; }
+  .timeline-dot.red    { background: #dc2626; }
+  .timeline-dot.green  { background: #16a34a; }
+  .timeline-dot.purple { background: #7c3aed; }
+  .timeline-dot.orange { background: #d97706; }
+  .timeline-content { flex: 1; }
+  .timeline-content h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .timeline-content p  { font-size: 14px; color: #555; margin: 0; }
+
+  .app-screens { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+  .app-frame {
+    width: 300px; background: #f9fafb; border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(37,99,235,0.13), 0 2px 8px rgba(0,0,0,0.07);
+    overflow: hidden; border: 1px solid #e5e7eb; direction: rtl;
+  }
+  .app-topbar { background: #2563eb; color: white; padding: 14px 18px; font-weight: 700; font-size: 15px; text-align: center; }
+  .app-topbar-row { background: #2563eb; color: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .app-topbar-logo { font-weight: 700; font-size: 14px; }
+  .app-topbar-user { font-size: 12px; opacity: 0.9; }
+  .app-topbar-logout { background: rgba(255,255,255,0.2); border-radius: 6px; padding: 3px 9px; font-size: 11px; }
+  .app-body { padding: 20px 18px; }
+  .app-page-title { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 16px; text-align: center; }
+  .app-label { font-size: 11px; font-weight: 600; color: #6b7280; margin-bottom: 4px; display: block; }
+  .app-field { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #9ca3af; margin-bottom: 11px; }
+  .app-select { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #374151; margin-bottom: 11px; display: flex; justify-content: space-between; align-items: center; }
+  .app-select-arrow { color: #9ca3af; font-size: 11px; }
+  .app-btn { border-radius: 8px; padding: 10px; text-align: center; font-weight: 700; font-size: 13px; margin: 5px 0; }
+  .app-btn-primary { background: #2563eb; color: white; }
+  .app-btn-outline { background: white; border: 1.5px solid #e5e7eb; color: #374151; }
+  .app-btn-danger  { background: #dc2626; color: white; }
+  .app-btn-row { display: flex; gap: 8px; margin-top: 4px; }
+  .app-btn-row .app-btn { flex: 1; }
+  .app-link { text-align: center; font-size: 12px; color: #2563eb; margin-top: 10px; }
+  .app-home-card { background: white; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 13px 15px; margin-bottom: 9px; }
+  .app-home-card-title { font-size: 13px; font-weight: 700; color: #2563eb; }
+  .app-home-card-desc { font-size: 11px; color: #6b7280; margin-top: 3px; }
+  .app-caption { font-size: 12px; color: #6b7280; text-align: center; padding: 10px; background: white; border-top: 1px solid #e5e7eb; font-style: italic; }
+  .app-note { background: #eff6ff; color: #1d4ed8; border-radius: 8px; padding: 9px 12px; font-size: 11px; margin-top: 8px; text-align: center; }
+  .app-list-row { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-bottom: 7px; display: flex; justify-content: space-between; align-items: center; }
+  .app-list-name { font-size: 13px; font-weight: 600; color: #111827; }
+  .app-list-meta { font-size: 11px; color: #6b7280; }
+  .app-status-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; }
+  .app-status-pending { background: #fef3c7; color: #92400e; }
+  .app-status-partial { background: #dbeafe; color: #1e40af; }
+  .app-pending-box { background: #eff6ff; border: 2px solid #bfdbfe; border-radius: 12px; padding: 24px 18px; text-align: center; margin: 8px 0; }
+  .app-pending-icon { font-size: 32px; margin-bottom: 8px; }
+  .app-pending-title { font-size: 15px; font-weight: 700; color: #1e3a8a; margin-bottom: 6px; }
+  .app-pending-desc { font-size: 12px; color: #6b7280; line-height: 1.5; }
+  .app-forum-card { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 11px 13px; margin-bottom: 8px; }
+  .app-forum-title { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 3px; }
+  .app-forum-meta  { font-size: 11px; color: #6b7280; display: flex; gap: 8px; align-items: center; }
+  .app-forum-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #e0e7ff; color: #3730a3; }
+
+  .sync-box {
+    background: #fefce8; border: 2px solid #fde047; border-radius: 10px;
+    padding: 16px 20px; margin: 12px 0; font-size: 14px;
+  }
+  .sync-box strong { color: #713f12; }
+
+  .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+  .rule-card {
+    border-radius: 10px; padding: 16px 18px;
+    border: 2px solid #e0e8ff; background: #f8f9ff;
+  }
+  .rule-card h5 { font-size: 13px; font-weight: 700; color: #2563eb; margin-bottom: 8px; }
+  .rule-card p  { font-size: 13px; color: #444; margin: 0; }
+
+  .feature-divider {
+    display: flex; align-items: center; gap: 14px; margin: 32px 0 16px;
+  }
+  .feature-divider-line { flex: 1; height: 2px; background: #e5e7eb; }
+  .feature-divider-label {
+    font-size: 13px; font-weight: 700; color: #6b7280;
+    text-transform: uppercase; letter-spacing: 1px;
+    background: white; padding: 4px 14px; border-radius: 20px;
+    border: 1.5px solid #e5e7eb;
+  }
+
+  @media (max-width: 640px) {
+    .cover h1 { font-size: 26px; }
+    .toc ol { columns: 1; }
+    .section { padding: 20px; }
+    .before-after, .rules-grid { grid-template-columns: 1fr; }
+  }
+  @media print {
+    body { background: white; }
+    .section { box-shadow: none; border: 1px solid #ddd; }
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>ספרינט 3</h1>
+  <div class="sprint-title">השלמת אישורי הרשמה + פורום + יסודות יעוץ מקצועי</div>
+  <div class="subtitle">אנו בניך — פלטפורמת קהילה לאלמנים ויתומים | פרקטיקום סניף</div>
+  <div class="meta">
+    <span><strong>שבועות 5–6</strong></span>
+    <span><strong>13 משימות</strong></span>
+    <span><strong>ABF-38 עד ABF-50</strong></span>
+    <span><strong>4 בלוקרים במקביל ביום 1</strong></span>
+  </div>
+</div>
+
+<!-- GOAL BANNER -->
+<div class="goal-banner">
+  <strong>מטרת הספרינט</strong>
+  השלמת תהליך אישורי ההרשמה, העמדת מודול הפורום המלא (רשימה, פרטים, יצירה, עריכה, דיווח), ויסודות הייעוץ המקצועי.
+</div>
+
+<div class="container">
+
+<!-- TOC -->
+<div class="toc">
+  <h2>תוכן עניינים</h2>
+  <ol>
+    <li><a href="#s-before-after">לפני ואחרי — מה משנים</a></li>
+    <li><a href="#s-deps">מפת תלויות — סדר עבודה</a></li>
+    <li><a href="#s-timeline">ציר זמן — 2 שבועות</a></li>
+    <li><a href="#s-angular">חוקי Angular — תזכורת</a></li>
+    <li><a href="#s-abf38">ABF-38 🔴 GitHub Actions CI (BLOCKER)</a></li>
+    <li><a href="#s-abf39">ABF-39 🔴 Pending Registrations List (BLOCKER)</a></li>
+    <li><a href="#s-abf40">ABF-40 Pending Approval Page</a></li>
+    <li><a href="#s-abf43">ABF-43 Approve + Reject Registration</a></li>
+    <li><a href="#s-abf44">ABF-44 Admin Dashboard Stats</a></li>
+    <li><a href="#s-abf47">ABF-47 Suspend User</a></li>
+    <li><a href="#s-abf41">ABF-41 🔴 Forum List (BLOCKER)</a></li>
+    <li><a href="#s-abf45">ABF-45 Forum Post Detail + Delete</a></li>
+    <li><a href="#s-abf48">ABF-48 Create Post + Edit Post</a></li>
+    <li><a href="#s-abf46">ABF-46 Forum Broadcast</a></li>
+    <li><a href="#s-abf49">ABF-49 3-Stage Report Flow</a></li>
+    <li><a href="#s-abf42">ABF-42 🔴 Professional Catalog (BLOCKER)</a></li>
+    <li><a href="#s-abf50">ABF-50 Ask a Question + My Questions</a></li>
+    <li><a href="#s-sync">נקודות סנכרון</a></li>
+    <li><a href="#s-mockup">האפליקציה בסוף הספרינט</a></li>
+    <li><a href="#s-dod">Definition of Done</a></li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 1 — BEFORE / AFTER                  -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-before-after">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2>לפני ואחרי — מה משנים</h2>
+  </div>
+
+  <h3>Backend</h3>
+  <table>
+    <tr><th>קובץ</th><th>עכשיו</th><th>אחרי Sprint 3</th><th>משימה</th></tr>
+    <tr>
+      <td><code>.github/workflows/ci.yml</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>CI רץ על כל PR</td>
+      <td>ABF-38</td>
+    </tr>
+    <tr>
+      <td><code>services/user_service.py</code></td>
+      <td><span class="badge badge-red">4 stubs raise NotImplementedError</span></td>
+      <td>get_pending / approve / reject / suspend ממושמים</td>
+      <td>ABF-39, ABF-43, ABF-47</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/admin.py</code></td>
+      <td><span class="badge badge-red">כל הנתיבים מחזירים [] / NotImplementedError</span></td>
+      <td>מחוברים לservice</td>
+      <td>ABF-39, ABF-43, ABF-47</td>
+    </tr>
+    <tr>
+      <td><code>services/forum_service.py</code></td>
+      <td><span class="badge badge-red">6 stubs raise NotImplementedError</span></td>
+      <td>get/create/update/delete/broadcast/filter ממושמים</td>
+      <td>ABF-41, ABF-45, ABF-46, ABF-48</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/forum.py</code></td>
+      <td><span class="badge badge-red">stubs + חסרים PATCH / DELETE / broadcast</span></td>
+      <td>כל הנתיבים מחוברים + 3 נתיבים חדשים</td>
+      <td>ABF-41, ABF-45, ABF-46, ABF-48, ABF-49</td>
+    </tr>
+    <tr>
+      <td><code>services/report_service.py</code></td>
+      <td><span class="badge badge-red">file_report() raise NotImplementedError</span></td>
+      <td>file_report() + לוגיקת 3 שלבים ממושמת</td>
+      <td>ABF-49</td>
+    </tr>
+    <tr>
+      <td><code>services/user_service.py:80</code></td>
+      <td><span class="badge badge-red">get_professionals_for_user() stub</span></td>
+      <td>שאילתת פרופסיונלים ממושמת</td>
+      <td>ABF-42</td>
+    </tr>
+    <tr>
+      <td><code>services/professional_service.py</code></td>
+      <td><span class="badge badge-red">create_query + get_my_questions stubs</span></td>
+      <td>ממושמים</td>
+      <td>ABF-50</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/professional.py</code></td>
+      <td><span class="badge badge-red">stubs מחזירים []</span></td>
+      <td>מחוברים לservice</td>
+      <td>ABF-42, ABF-50</td>
+    </tr>
+    <tr>
+      <td><code>services/email_service.py</code></td>
+      <td><span class="badge badge-orange">⚠️ logger stubs בלבד</span></td>
+      <td>מחוברים ב-approve / reject / suspend / report</td>
+      <td>ABF-43, ABF-47, ABF-49</td>
+    </tr>
+    <tr>
+      <td><code>services/audit_service.py</code></td>
+      <td><span class="badge badge-green">✅ log_action() מלא — קוראים ישירות</span></td>
+      <td>ללא שינוי</td>
+      <td>—</td>
+    </tr>
+  </table>
+
+  <h3>Frontend</h3>
+  <table>
+    <tr><th>קובץ</th><th>עכשיו</th><th>אחרי Sprint 3</th><th>משימה</th></tr>
+    <tr>
+      <td><code>core/services/admin.service.ts</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>service חדש עם כל מתודות Admin</td>
+      <td>ABF-39</td>
+    </tr>
+    <tr>
+      <td><code>core/services/report.service.ts</code></td>
+      <td><span class="badge badge-orange">⚠️ מכיל מתודות Admin בטעות + fileReport stub</span></td>
+      <td>Admin methods הועברו; fileReport() ממושם</td>
+      <td>ABF-39, ABF-49</td>
+    </tr>
+    <tr>
+      <td><code>features/admin/pending-registrations/</code></td>
+      <td><span class="badge badge-red">🐛 מזריקה ReportService במקום AdminService</span></td>
+      <td>AdminService מוזרקת, ngOnInit קורא service, רשימה מוצגת</td>
+      <td>ABF-39</td>
+    </tr>
+    <tr>
+      <td><code>features/admin/dashboard/</code></td>
+      <td><span class="badge badge-orange">⚠️ לינקי ניווט בלבד, ללא נתונים</span></td>
+      <td>badge ספירת ממתינים + לינק לרשימה</td>
+      <td>ABF-44</td>
+    </tr>
+    <tr>
+      <td><code>features/auth/pending/</code></td>
+      <td><span class="badge badge-red">❌ תיקייה לא קיימת</span></td>
+      <td>קומפוננטה חדשה + route /auth/pending</td>
+      <td>ABF-40</td>
+    </tr>
+    <tr>
+      <td><code>core/guards/auth.guard.ts</code></td>
+      <td><span class="badge badge-orange">⚠️ בודק token בלבד, לא status</span></td>
+      <td>PENDING_APPROVAL / PARTIAL_APPROVED ← /auth/pending</td>
+      <td>ABF-40</td>
+    </tr>
+    <tr>
+      <td><code>core/services/forum.service.ts</code></td>
+      <td><span class="badge badge-red">8 stubs (throw Error)</span></td>
+      <td>getPosts / getPost / createPost / deletePost ממושמים</td>
+      <td>ABF-41, ABF-45, ABF-48</td>
+    </tr>
+    <tr>
+      <td><code>features/forum/forum-list/</code></td>
+      <td><span class="badge badge-orange">⚠️ getPosts() מוקומנטת</span></td>
+      <td>מחוברת, pagination, visibility badge, loading/error</td>
+      <td>ABF-41</td>
+    </tr>
+    <tr>
+      <td><code>features/forum/forum-post/</code></td>
+      <td><span class="badge badge-orange">⚠️ getPost() מוקומנטת</span></td>
+      <td>תוכן מלא + כפתור מחיקה לכותב/Admin</td>
+      <td>ABF-45</td>
+    </tr>
+    <tr>
+      <td><code>features/forum/new-post/</code></td>
+      <td><span class="badge badge-orange">⚠️ onSubmit() ריק</span></td>
+      <td>שליחת פוסט + file-upload + ניווט לפוסט חדש</td>
+      <td>ABF-48</td>
+    </tr>
+    <tr>
+      <td><code>features/forum/edit-post/</code></td>
+      <td><span class="badge badge-red">❌ תיקייה לא קיימת</span></td>
+      <td>קומפוננטה חדשה + route /forum/:id/edit</td>
+      <td>ABF-48</td>
+    </tr>
+    <tr>
+      <td><code>shared/components/report-button/</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>קומפוננטה חדשה שיתופית עם contentType / contentId</td>
+      <td>ABF-49</td>
+    </tr>
+    <tr>
+      <td><code>core/services/professional.service.ts</code></td>
+      <td><span class="badge badge-red">כל המתודות stubs (throw Error)</span></td>
+      <td>getProfessionals + askQuestion + getMyQuestions ממושמים</td>
+      <td>ABF-42, ABF-50</td>
+    </tr>
+    <tr>
+      <td><code>features/advice/advice-list/</code></td>
+      <td><span class="badge badge-orange">⚠️ service מוזרק, אבל קריאה לא מתבצעת</span></td>
+      <td>רשימת פרופסיונלים + filter לפי domain</td>
+      <td>ABF-42</td>
+    </tr>
+    <tr>
+      <td><code>features/advice/ask-question/</code></td>
+      <td><span class="badge badge-orange">⚠️ skeleton-partial</span></td>
+      <td>טופס שאלה + My Questions list</td>
+      <td>ABF-50</td>
+    </tr>
+    <tr>
+      <td><code>shared/components/confirm-dialog/</code> + <code>loading-spinner</code> + <code>error-display</code> + <code>file-upload</code></td>
+      <td><span class="badge badge-green">✅ קיימים ועובדים — משתמשים בהם כבר</span></td>
+      <td>ללא שינוי</td>
+      <td>—</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 2 — DEPENDENCY GRAPH                -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-deps">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <h2>מפת תלויות — סדר עבודה</h2>
+  </div>
+
+  <div class="callout callout-red">
+    🚨 <strong>4 בלוקרים יכולים להתחיל ביום 1 במקביל:</strong> ABF-38 (CI), ABF-39 (Pending List), ABF-41 (Forum List), ABF-42 (Professional Catalog). ABF-40 (Pending Approval Page) עצמאית גם כן ויכולה להתחיל ביום 1.
+  </div>
+
+  <div class="dep-graph">
+    <!-- Independents row -->
+    <div class="dep-row" style="margin-bottom:12px;">
+      <div class="dep-node teal">ABF-38<small>GitHub Actions CI — עצמאי</small></div>
+      <div class="dep-node teal">ABF-40<small>Pending Approval Page — עצמאי</small></div>
+    </div>
+
+    <!-- Three parallel chains -->
+    <div class="dep-row" style="align-items: flex-start; gap: 24px;">
+
+      <!-- Admin chain -->
+      <div class="dep-col">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:8px;">ADMIN APPROVAL</div>
+        <div class="dep-node blocker">ABF-39<small>Pending List — BLOCKER</small></div>
+        <div class="dep-arrow">↓</div>
+        <div class="dep-row" style="gap:8px;">
+          <div class="dep-node" style="min-width:120px;">ABF-43<small>Approve + Reject</small></div>
+          <div class="dep-node green" style="min-width:120px;">ABF-44<small>Dashboard Stats</small></div>
+        </div>
+        <div class="dep-arrow" style="margin-right:52px;">↓</div>
+        <div class="dep-node purple" style="margin-right:52px;">ABF-47<small>Suspend User</small></div>
+      </div>
+
+      <!-- Forum chain -->
+      <div class="dep-col">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:8px;">FORUM</div>
+        <div class="dep-node blocker">ABF-41<small>Forum List — BLOCKER</small></div>
+        <div class="dep-arrow">↓</div>
+        <div class="dep-row" style="gap:8px;">
+          <div class="dep-node" style="min-width:120px;">ABF-45<small>Post Detail + Delete</small></div>
+          <div class="dep-node purple" style="min-width:120px;">ABF-46<small>Broadcast</small></div>
+        </div>
+        <div class="dep-arrow" style="margin-right:52px;">↓</div>
+        <div class="dep-row" style="gap:8px;margin-right:52px;">
+          <div class="dep-node" style="min-width:110px;">ABF-48<small>Create + Edit</small></div>
+          <div class="dep-node purple" style="min-width:110px;">ABF-49<small>Report Flow</small></div>
+        </div>
+      </div>
+
+      <!-- Advisory chain -->
+      <div class="dep-col">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:8px;">ADVISORY</div>
+        <div class="dep-node blocker">ABF-42<small>Professional Catalog — BLOCKER</small></div>
+        <div class="dep-arrow">↓</div>
+        <div class="dep-node green">ABF-50<small>Ask a Question + My Q</small></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>טבלת בחירה — Self-Select</h3>
+  <table>
+    <tr><th>משימה</th><th>Jira</th><th>גודל</th><th>תלויה ב</th><th>הערה</th></tr>
+    <tr style="background:#fff5f5;">
+      <td><strong>🔴 GitHub Actions CI</strong></td><td>ABF-38</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>—</td>
+      <td><span class="badge badge-red">BLOCKER — יום 1</span></td>
+    </tr>
+    <tr style="background:#fff5f5;">
+      <td><strong>🔴 Pending Registrations List</strong></td><td>ABF-39</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>—</td>
+      <td><span class="badge badge-red">BLOCKER — יום 1</span></td>
+    </tr>
+    <tr>
+      <td>Pending Approval Page</td><td>ABF-40</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>—</td>
+      <td>Frontend בלבד — עצמאי</td>
+    </tr>
+    <tr>
+      <td>Approve + Reject Registration</td><td>ABF-43</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>ABF-39</td><td></td>
+    </tr>
+    <tr>
+      <td>Admin Dashboard Stats</td><td>ABF-44</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>ABF-39</td>
+      <td>Frontend בלבד</td>
+    </tr>
+    <tr>
+      <td>Suspend User</td><td>ABF-47</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>ABF-43</td><td></td>
+    </tr>
+    <tr style="background:#fff5f5;">
+      <td><strong>🔴 Forum List</strong></td><td>ABF-41</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>—</td>
+      <td><span class="badge badge-red">BLOCKER — יום 1</span></td>
+    </tr>
+    <tr>
+      <td>Forum Post Detail + Delete</td><td>ABF-45</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>ABF-41</td><td></td>
+    </tr>
+    <tr>
+      <td>Create Post + Edit Post</td><td>ABF-48</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>ABF-45</td><td>edit-post net-new</td>
+    </tr>
+    <tr>
+      <td>Forum Broadcast</td><td>ABF-46</td>
+      <td><span class="badge badge-blue">S</span></td>
+      <td>ABF-41</td>
+      <td>Admin-only</td>
+    </tr>
+    <tr>
+      <td>3-Stage Report Flow</td><td>ABF-49</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>ABF-45</td>
+      <td>report-button net-new</td>
+    </tr>
+    <tr style="background:#fff5f5;">
+      <td><strong>🔴 Professional Catalog</strong></td><td>ABF-42</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>—</td>
+      <td><span class="badge badge-red">BLOCKER — יום 1</span></td>
+    </tr>
+    <tr>
+      <td>Ask a Question + My Questions</td><td>ABF-50</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>ABF-42</td><td></td>
+    </tr>
+  </table>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 3 — TIMELINE                        -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-timeline">
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <h2>ציר זמן — 2 שבועות</h2>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-dot red">1–2</div>
+      <div class="timeline-content">
+        <h4>ימים 1–2 — 4 בלוקרים במקביל</h4>
+        <p><strong>מפתחת 1:</strong> ABF-39 — backend pending list + admin.service.ts + תיקון injection.</p>
+        <p><strong>מפתחת 2:</strong> ABF-41 — forum_service _content_filter + get_posts + forum-list.component.</p>
+        <p><strong>מפתחת 3:</strong> ABF-42 — get_professionals_for_user + advice-list.component.</p>
+        <p><strong>מפתחת 4:</strong> ABF-38 (CI workflow) + ABF-40 (pending approval page) — שתי משימות S.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot orange">3–5</div>
+      <div class="timeline-content">
+        <h4>ימים 3–5 — downstream הראשון</h4>
+        <p>ABF-43 (Approve+Reject) מתחיל אחרי merge של ABF-39.</p>
+        <p>ABF-44 (Dashboard Stats) — קצרה, מתחילה גם אחרי ABF-39.</p>
+        <p>ABF-45 (Forum Post Detail+Delete) מתחיל אחרי merge של ABF-41.</p>
+        <p>ABF-46 (Broadcast) — מתחיל אחרי merge של ABF-41, מקביל ל-ABF-45.</p>
+        <p>ABF-50 (Ask a Question) מתחיל אחרי merge של ABF-42.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot blue">6–8</div>
+      <div class="timeline-content">
+        <h4>ימים 6–8 — downstream שני</h4>
+        <p>ABF-47 (Suspend) מתחיל אחרי merge של ABF-43.</p>
+        <p>ABF-48 (Create+Edit Post) מתחיל אחרי merge של ABF-45.</p>
+        <p>ABF-49 (Report Flow + report-button) מתחיל אחרי merge של ABF-45.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot green">9–10</div>
+      <div class="timeline-content">
+        <h4>ימים 9–10 — אינטגרציה + PR Reviews + DoD</h4>
+        <p>End-to-end: משתמשת נרשמת → /auth/pending → Admin מאשרת → משתמשת מגיעה לפורום → כותבת פוסט → מדווחת.</p>
+        <p>כל ה-PRs עוברים review לפני merge. CI חייב לעבור על כל PR.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 4 — ANGULAR RULES                   -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-angular">
+  <div class="section-header">
+    <div class="section-number purple">4</div>
+    <h2>חוקי Angular 22 — תזכורת לפני שמתחילות</h2>
+  </div>
+
+  <div class="rules-grid">
+    <div class="rule-card">
+      <h5>standalone: true — תמיד</h5>
+      <p>כל קומפוננטה חדשה (edit-post, report-button, pending-approval) מוגדרת standalone עם <code>imports</code> מפורש.</p>
+    </div>
+    <div class="rule-card">
+      <h5>input() / output() — לא decorators</h5>
+      <p><code>report-button</code> מקבל <code>contentType</code> ו-<code>contentId</code> דרך <code>input()</code> — לא <code>@Input()</code>.</p>
+    </div>
+    <div class="rule-card">
+      <h5>@if / @for — לא *ngIf / *ngFor</h5>
+      <p>רשימת הרשמות ממתינות, כרטיסי פורום, ורשימת פרופסיונלים — כולם עם <code>@for</code>.</p>
+    </div>
+    <div class="rule-card">
+      <h5>inject() בתוך הפונקציה — ב-interceptor</h5>
+      <p>אם נוגעות ב-auth.interceptor — <code>inject()</code> בתוך גוף הפונקציה בלבד.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- FEATURE: ADMIN APPROVAL                     -->
+<!-- ═══════════════════════════════════════════ -->
+
+<div class="feature-divider">
+  <div class="feature-divider-line"></div>
+  <div class="feature-divider-label">Admin Approval</div>
+  <div class="feature-divider-line"></div>
+</div>
+
+<!-- ABF-38 -->
+<div class="section" id="s-abf38">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">ABF-38</div>
+      <div class="task-title">🔴 GitHub Actions CI</div>
+      <div class="task-effort">S · ~1 יום · BLOCKER — יום 1 · עצמאי</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-red">
+        🚨 ללא CI — כל PR מוזג ללא בדיקות אוטומטיות. כל הספרינטים הבאים תלויים בקיומו.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ עכשיו</h4>
+          <ul>
+            <li><code>.github/workflows/</code> מכיל רק <code>deploy.yml</code></li>
+            <li><code>ci.yml</code> לא קיים</li>
+            <li>אין בדיקות אוטומטיות על PRs</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ אחרי</h4>
+          <ul>
+            <li><code>.github/workflows/ci.yml</code> קיים</li>
+            <li>CI רץ על כל PR: backend + frontend</li>
+            <li>badge pass/fail מוצג על ה-PR בגיטהאב</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>קובץ לעריכה: <code>.github/workflows/ci.yml</code> — קובץ חדש לגמרי</h4>
+      <p>workflow שרץ על pull_request: Backend — ruff + mypy + pytest. Frontend — eslint. שני jobs נפרדים.</p>
+
+      <div class="callout callout-blue">
+        💡 תיקיית <code>.github/</code> כבר קיימת (יש בה <code>deploy.yml</code>). רק <code>ci.yml</code> חסר.
+      </div>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>CI רץ אוטומטית על כל PR ב-GitHub</li>
+        <li>ruff + mypy + pytest רצים ותוצאותיהם מוצגות</li>
+        <li>eslint רץ ותוצאתו מוצגת</li>
+        <li>badge CI status מוצג על ה-PR</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-39 -->
+<div class="section" id="s-abf39">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">ABF-39</div>
+      <div class="task-title">🔴 Pending Registrations List</div>
+      <div class="task-effort">M · ~3 ימים · BLOCKER — יום 1 · עצמאי</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-red">
+        🚨 ABF-43 (Approve+Reject), ABF-44 (Dashboard) ו-ABF-47 (Suspend) — כולם חסומים עד שזה ממוזג. <code>admin.service.ts</code> נוצר כאן ומשמש את כל שאר משימות ה-Admin.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ עכשיו</h4>
+          <ul>
+            <li><code>admin.service.ts</code> לא קיים</li>
+            <li><code>report.service.ts</code> מחזיק 3 מתודות Admin בטעות</li>
+            <li>pending-registrations.component מזריקה <code>ReportService</code> (באג)</li>
+            <li><code>get_pending_registrations()</code> מחזיר stub ריק</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ אחרי</h4>
+          <ul>
+            <li><code>admin.service.ts</code> קיים עם כל מתודות Admin</li>
+            <li>מתודות Admin הוסרו מ-<code>report.service.ts</code></li>
+            <li>קומפוננטה מזריקה <code>AdminService</code> ✅</li>
+            <li>רשימת משתמשים ממתינים מוצגת על המסך</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/user_service.py:20</code> — stub של <code>get_pending_registrations()</code>; מממשים שאילתה שמחזירה PENDING_APPROVAL + PARTIAL_APPROVED לפי תאריך יצירה.</p>
+      <p><code>backend/app/api/v1/endpoints/admin.py</code> — handler של <code>list_registrations()</code>; מחברים לservice.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/admin.service.ts</code> — קובץ חדש; מתודות לקריאת רשימת הממתינים ורשומה בודדת.</p>
+      <p><code>frontend/src/app/core/services/report.service.ts</code> — מסירים את 3 המתודות של Admin שנמצאות שם בטעות (הן עוברות ל-admin.service.ts).</p>
+      <p><code>frontend/src/app/features/admin/pending-registrations/pending-registrations.component.ts</code> — מתקנים injection (ReportService → AdminService); קוראים לservice ב-ngOnInit; מציגים שם, סוג משתמש, מגזר, תאריך הרשמה, badge סטטוס.</p>
+
+      <div class="callout callout-orange">
+        ⚠️ <strong>Sync point:</strong> לפני כתיבת קוד frontend — מוודאים ש-<code>UserAdminView</code> ב-<code>backend/app/schemas/user.py</code> תואם ל-<code>UserAdminView</code> ב-<code>frontend/.../core/models/index.ts</code>.
+      </div>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>GET /admin/registrations</code> מחזיר PENDING_APPROVAL + PARTIAL_APPROVED לפי תאריך</li>
+        <li>רשימה ריקה מחזירה [] ולא שגיאה</li>
+        <li><code>admin.service.ts</code> קיים עם מתודות fetch</li>
+        <li>מתודות Admin הוסרו מ-<code>report.service.ts</code></li>
+        <li>קומפוננטה מזריקה AdminService (הבאג תוקן)</li>
+        <li>רשימה מציגה: שם, סוג, מגזר, תאריך, badge סטטוס</li>
+        <li>loading ו-error states מוצגים</li>
+        <li>empty state מוצג כשאין ממתינים</li>
+        <li><code>npm run lint</code> עובר ללא שגיאות חדשות</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-40 -->
+<div class="section" id="s-abf40">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">ABF-40</div>
+      <div class="task-title">Pending Approval Page</div>
+      <div class="task-effort">S · ~1 יום · Frontend בלבד · עצמאי</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <code>auth.service.ts</code> ו-<code>auth.guard.ts</code> קיימים ועובדים — המשימה הזו רק מרחיבה את ה-guard ומוסיפה קומפוננטה.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ עכשיו</h4>
+          <ul>
+            <li><code>features/auth/pending/</code> לא קיים</li>
+            <li>auth.guard בודק token בלבד</li>
+            <li>משתמש PENDING יכול להיכנס ל-/home</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ אחרי</h4>
+          <ul>
+            <li>/auth/pending מוצג אחרי OTP</li>
+            <li>guard מפנה PENDING + PARTIAL_APPROVED ל-/auth/pending</li>
+            <li>משתמש ממתין לא יכול להגיע ל-/home</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/features/auth/pending/</code> — תיקייה + קומפוננטה standalone חדשה; מציגה הודעה בעברית ברורה שהבקשה התקבלה ובהמתנה לאישור מנהל.</p>
+      <p><code>frontend/src/app/app.routes.ts</code> — מוסיפים route <code>/auth/pending</code>.</p>
+      <p><code>frontend/src/app/core/guards/auth.guard.ts</code> — מוסיפים בדיקה: אם הסטטוס PENDING_APPROVAL או PARTIAL_APPROVED → redirect ל-/auth/pending במקום לאפשר גישה לנתיבים מוגנים. <code>auth.service.ts</code> כבר טוען את הפרופיל דרך <code>loadCurrentUser()</code> — ניתן לקרוא ממנו.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>route <code>/auth/pending</code> קיים ומרנדר קומפוננטה</li>
+        <li>דף מציג הודעה ברורה על המתנה לאישור</li>
+        <li>auth.guard מפנה PENDING_APPROVAL / PARTIAL_APPROVED ל-/auth/pending</li>
+        <li><code>npm run lint</code> עובר ללא שגיאות חדשות</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-43 -->
+<div class="section" id="s-abf43">
+  <div class="task-card">
+    <div class="task-card-header color-orange">
+      <div class="task-jira">ABF-43</div>
+      <div class="task-title">Approve + Reject Registration</div>
+      <div class="task-effort">M · ~3 ימים · תלוי ב-ABF-39</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 מודל אישור כפול: מנהל ראשון → PARTIAL_APPROVED; מנהל שני (שונה!) → ACTIVE. <code>audit_service.log_action()</code> מלא ומוכן — קוראים ישירות. <code>confirm-dialog</code> קיים ב-shared — משתמשים בו לתיבת הסיבה לדחייה.
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/user_service.py:32</code> — stub של <code>approve_registration()</code>; מממשים לוגיקת אישור כפול + חסימת אישור כפול על ידי אותו מנהל.</p>
+      <p><code>backend/app/services/user_service.py:52</code> — stub של <code>reject_registration()</code>; שמירת הסיבה + עדכון סטטוס + email trigger.</p>
+      <p><code>backend/app/api/v1/endpoints/admin.py</code> — handlers של approve ו-reject; מחברים לservice.</p>
+      <p><code>backend/app/services/email_service.py</code> — מחברים את <code>send_approval_email</code> ו-<code>send_rejection_email</code> (שניהם stubs שם).</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/admin.service.ts</code> — מוסיפים מתודות approve ו-reject (service נוצר ב-ABF-39).</p>
+      <p><code>frontend/src/app/features/admin/pending-registrations/pending-registrations.component.ts</code> — מוסיפים כפתור אישור וכפתור דחייה; דחייה פותחת <code>confirm-dialog</code> עם שדה סיבה חובה.</p>
+
+      <div class="callout callout-orange">
+        ⚠️ <strong>Sync point לפני שמתחילות:</strong> מסכימות על HTTP status codes + צורת ה-response body של approve ו-reject לפני כתיבת ה-frontend.
+      </div>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>POST /admin/registrations/{id}/approve</code> — סטטוס מעודכן, אותו מנהל חסום מאישור כפול</li>
+        <li><code>POST /admin/registrations/{id}/reject</code> — סיבה נשמרת, סטטוס REJECTED</li>
+        <li>audit log נרשם לשתי הפעולות</li>
+        <li>email triggers קיימים בשכבת ה-service</li>
+        <li>כפתור אישור מעדכן סטטוס על המסך אחרי הצלחה</li>
+        <li>כפתור דחייה פותח confirm-dialog עם שדה סיבה חובה</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-44 -->
+<div class="section" id="s-abf44">
+  <div class="task-card">
+    <div class="task-card-header color-green">
+      <div class="task-jira">ABF-44</div>
+      <div class="task-title">Admin Dashboard Stats</div>
+      <div class="task-effort">S · ~1 יום · Frontend בלבד · תלוי ב-ABF-39</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 Frontend בלבד — משתמשת במתודת ה-fetch מ-<code>admin.service.ts</code> שנוצרה ב-ABF-39. אין backend חדש.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ עכשיו</h4>
+          <ul>
+            <li><code>admin-dashboard.component</code> מציג לינקי ניווט בלבד</li>
+            <li>ללא הזרקת service, ללא נתונים</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ אחרי</h4>
+          <ul>
+            <li>badge עם ספירת הממתינים לאישור</li>
+            <li>לחיצה על ה-badge → /admin/registrations</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/features/admin/dashboard/admin-dashboard.component.ts</code> — מזריקים <code>AdminService</code>, קוראים לmethod לספירת הממתינים.</p>
+      <p><code>frontend/src/app/features/admin/dashboard/admin-dashboard.component.html</code> — מוסיפים badge עם הספירה, מקושר ל-/admin/registrations.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>ספירת הממתינים מוצגת ב-dashboard</li>
+        <li>לחיצה על הספירה → /admin/registrations</li>
+        <li>loading ו-error states מטופלים</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-47 -->
+<div class="section" id="s-abf47">
+  <div class="task-card">
+    <div class="task-card-header color-purple">
+      <div class="task-jira">ABF-47</div>
+      <div class="task-title">Suspend User</div>
+      <div class="task-effort">S · ~2 ימים · תלוי ב-ABF-43</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 עמודות <code>is_suspended</code> ו-<code>suspended_until</code> כבר קיימות ב-<code>user.py</code> — אין צורך ב-migration. login_service צריך לבדוק השעיה.
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/user_service.py:65</code> — stub של <code>suspend_user()</code>; מממשים הגדרת תקופת השעיה.</p>
+      <p><code>backend/app/api/v1/endpoints/admin.py</code> — handler של suspend; מחברים לservice.</p>
+      <p><code>backend/app/services/email_service.py</code> — מחברים את <code>send_suspension_notification</code> (stub שם).</p>
+      <p><code>backend/app/services/auth_service.py</code> — מוסיפים בדיקת השעיה ב-login: משתמש מושעה מקבל שגיאה ברורה (לא שגיאת auth גנרית).</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/admin.service.ts</code> — מוסיפים מתודת suspend (service מ-ABF-39).</p>
+      <p><code>frontend/src/app/features/admin/pending-registrations/pending-registrations.component.ts</code> — מוסיפים כפתור השעיה; לחיצה פותחת <code>confirm-dialog</code> עם שדות שעות + סיבה.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>POST /admin/users/{id}/suspend</code> — is_suspended ו-suspended_until מוגדרים</li>
+        <li>login חוסם משתמש מושעה בתוך חלון הזמן, עם הודעת שגיאה ברורה</li>
+        <li>audit log נרשם לפעולת ההשעיה</li>
+        <li>suspension email trigger קיים בשכבת ה-service</li>
+        <li>כפתור השעיה פותח confirm-dialog עם שדות שעות + סיבה</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- FEATURE: FORUM MODULE                       -->
+<!-- ═══════════════════════════════════════════ -->
+
+<div class="feature-divider">
+  <div class="feature-divider-line"></div>
+  <div class="feature-divider-label">Forum Module</div>
+  <div class="feature-divider-line"></div>
+</div>
+
+<!-- ABF-41 -->
+<div class="section" id="s-abf41">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">ABF-41</div>
+      <div class="task-title">🔴 Forum List</div>
+      <div class="task-effort">M · ~3 ימים · BLOCKER — יום 1 · עצמאי</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-red">
+        🚨 <code>_content_filter()</code> הוא לב הפרטיות של כל הפורום — פילטר קבוצה/מגזר נעשה ב-DB ולא ב-Python. ABF-45, ABF-46, ABF-48, ABF-49 חסומים עד שזה ממוזג.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ עכשיו</h4>
+          <ul>
+            <li><code>forum_service.py</code> — כל הפונקציות raise NotImplementedError</li>
+            <li><code>GET /forum/posts</code> — stub מחזיר []</li>
+            <li><code>forum-list.component</code> — getPosts() מוקומנטת</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ אחרי</h4>
+          <ul>
+            <li><code>_content_filter()</code> ממושמת ב-DB level</li>
+            <li>משתמש רואה פוסטים של הקבוצה/מגזר שלו בלבד</li>
+            <li>רשימה + pagination + badge חשיפה על המסך</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/forum_service.py</code> — מממשים <code>_content_filter()</code> helper ו-<code>get_posts()</code> בלבד; שאר הפונקציות (create, delete, broadcast, DM) — משאירים כstubs.</p>
+      <p><code>backend/app/api/v1/endpoints/forum.py</code> — handler של <code>list_posts()</code>; מחברים לservice (כרגע TODO comment).</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/forum.service.ts</code> — מממשים <code>getPosts()</code> בלבד; שאר המתודות (DM, search) — משאירים כstubs.</p>
+      <p><code>frontend/src/app/features/forum/forum-list/forum-list.component.ts</code> — מסירים את ה-comment מ-getPosts(); מוסיפים pagination; visibility badge על כל כרטיס פוסט; loading-spinner ו-error-display מ-shared.</p>
+
+      <div class="callout callout-orange">
+        ⚠️ <strong>Sync point לפני frontend:</strong> מוודאים ש-<code>ForumPost</code> ב-TypeScript תואם ל-<code>ForumPostResponse</code> schema ב-backend.
+      </div>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>_content_filter()</code> מפלטר ב-DB (לא ב-Python אחרי fetch)</li>
+        <li><code>GET /forum/posts</code> מחזיר רק פוסטים של הקבוצה/מגזר; Admin רואה הכל</li>
+        <li>pagination עובד (page + page_size)</li>
+        <li>רשימה מציגה: כותרת, שם כותב, תאריך, visibility badge</li>
+        <li>loading spinner + error-display + empty state</li>
+        <li><code>npm run lint</code> עובר ללא שגיאות חדשות</li>
+        <li>בדיקת cross-group: משתמש A לא רואה פוסטים של קבוצה B</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-45 -->
+<div class="section" id="s-abf45">
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <div class="task-jira">ABF-45</div>
+      <div class="task-title">Forum Post Detail + Delete</div>
+      <div class="task-effort">S · ~2 ימים · תלוי ב-ABF-41</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <code>DELETE /forum/posts/{id}</code> לא קיים ב-<code>forum.py</code> — נתיב חדש לגמרי. <code>audit_service.log_action()</code> מוכן — קוראים בעת מחיקה. <code>confirm-dialog</code> מ-shared לאישור המחיקה.
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/forum_service.py</code> — מממשים <code>get_post_by_id()</code>; מוסיפים <code>delete_post()</code> (חדש — אין stub).</p>
+      <p><code>backend/app/api/v1/endpoints/forum.py</code> — handler של <code>get_post()</code>; מוסיפים <code>DELETE /forum/posts/{post_id}</code> כנתיב חדש; מחברים לservice.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/forum.service.ts</code> — מממשים <code>getPost()</code>; מוסיפים <code>deletePost()</code> (חדש).</p>
+      <p><code>frontend/src/app/features/forum/forum-post/forum-post.component.ts</code> — מסירים comment מ-getPost(); מציגים כותרת, תוכן, שם כותב, תאריך, לינק לקובץ מצורף; כפתור "מחיקה" גלוי לכותב ו-Admin בלבד; confirm-dialog לאישור.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>GET /forum/posts/{id}</code> — 404 אם לא קיים, 403 אם מחוץ לקבוצה</li>
+        <li>HIDDEN / DELETED → 404 למשתמשים רגילים</li>
+        <li><code>DELETE /forum/posts/{id}</code> — status=DELETED, מותר לכותב/moderator/admin, audit log נרשם</li>
+        <li>קומפוננטה מציגה: תוכן מלא + כותב + תאריך + לינק לקובץ</li>
+        <li>כפתור מחיקה גלוי לכותב ו-Admin בלבד</li>
+        <li><code>deletePost()</code> קיים ב-forum.service.ts וקורא DELETE</li>
+        <li><code>npm run lint</code> עובר</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-48 -->
+<div class="section" id="s-abf48">
+  <div class="task-card">
+    <div class="task-card-header color-orange">
+      <div class="task-jira">ABF-48</div>
+      <div class="task-title">Create Post + Edit Post</div>
+      <div class="task-effort">M · ~3 ימים · תלוי ב-ABF-45</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <code>PATCH /forum/posts/{id}</code> לא קיים ב-<code>forum.py</code> — נתיב חדש. <code>edit-post.component</code> — תיקייה חדשה לגמרי. <code>file-upload</code> מ-shared לשדה הקובץ האופציונלי.
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/forum_service.py</code> — מממשים <code>create_post()</code>; מוסיפים <code>update_post()</code> (חדש — אין stub).</p>
+      <p><code>backend/app/api/v1/endpoints/forum.py</code> — handler של <code>create_post()</code>; מוסיפים <code>PATCH /forum/posts/{post_id}</code> כנתיב חדש.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/forum.service.ts</code> — מממשים <code>createPost()</code>; מוסיפים <code>updatePost()</code> (חדש).</p>
+      <p><code>frontend/src/app/features/forum/new-post/new-post.component.ts</code> — מממשים <code>onSubmit()</code>; מחברים <code>file-upload</code> shared component לשדה הקובץ; ניווט ל-/forum/:id אחרי הצלחה.</p>
+      <p><code>frontend/src/app/features/forum/edit-post/</code> — תיקייה + קומפוננטה standalone חדשה; טוענת את הפוסט הקיים, ממלאת את הטופס מראש, קוראת ל-updatePost() בשמירה; ניווט ל-/forum/:id.</p>
+      <p><code>frontend/src/app/app.routes.ts</code> — מוסיפים route <code>/forum/:id/edit</code>.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>POST /forum/posts</code> — יוצר פוסט; כותב חייב להיות ACTIVE</li>
+        <li><code>PATCH /forum/posts/{id}</code> — מעדכן כותרת/תוכן; רק הכותב; updated_at מתעדכן</li>
+        <li>יצירת פוסט מנווטת לדף הפוסט החדש</li>
+        <li>counter תווים מוצג לשדה תוכן</li>
+        <li>שדה קובץ אופציונלי משתמש ב-file-upload shared</li>
+        <li><code>edit-post.component</code> קיים ב-features/forum/edit-post/ וממלא את הטופס מראש</li>
+        <li><code>updatePost()</code> קיים ב-forum.service.ts וקורא PATCH</li>
+        <li>route /forum/:id/edit רשום ב-lazy-load</li>
+        <li><code>npm run lint</code> עובר</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-46 -->
+<div class="section" id="s-abf46">
+  <div class="task-card">
+    <div class="task-card-header color-purple">
+      <div class="task-jira">ABF-46</div>
+      <div class="task-title">Forum Broadcast</div>
+      <div class="task-effort">S · ~1 יום · תלוי ב-ABF-41</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <code>POST /forum/broadcast</code> לא קיים ב-<code>forum.py</code> — נתיב חדש Admin-only. הפוסט נשמר עם group_visibility="all" ו-sector_visibility="all" — עובר דרך <code>_content_filter()</code> של כל משתמש.
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/forum_service.py</code> — מוסיפים <code>create_broadcast_post()</code> (חדש).</p>
+      <p><code>backend/app/api/v1/endpoints/forum.py</code> — מוסיפים <code>POST /forum/broadcast</code> כנתיב חדש; מוגן בdependency admin-only; קורא ל-audit_service.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/admin.service.ts</code> — מוסיפים מתודת broadcast (service מ-ABF-39).</p>
+      <p>טופס broadcast לאדמין — קומפוננטה פשוטה עם שדות כותרת + תוכן; יכולה להיות ב-dashboard או כדף נפרד תחת /admin/broadcast.</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>POST /forum/broadcast</code> יוצר פוסט גלוי לכל המשתמשים; Admin בלבד</li>
+        <li>פוסט broadcast מוצג ב-GET /forum/posts לכל משתמש ללא קשר לקבוצה/מגזר</li>
+        <li>audit log נרשם לפעולת broadcast</li>
+        <li>Admin יכול לשלוח broadcast מה-UI (טופס כותרת + תוכן)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-49 -->
+<div class="section" id="s-abf49">
+  <div class="task-card">
+    <div class="task-card-header color-purple">
+      <div class="task-jira">ABF-49</div>
+      <div class="task-title">3-Stage Report Flow</div>
+      <div class="task-effort">M · ~3 ימים · תלוי ב-ABF-45</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-orange">
+        ⚠️ <code>decide_report()</code> ו-<code>get_pending_reports()</code> הם scope ספרינט 4 — <strong>לא נוגעים בהם.</strong> רק <code>file_report()</code> ולוגיקת 3 השלבים.
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/report_service.py</code> — מממשים <code>file_report()</code> עם לוגיקת 3 שלבים: דיווח ראשון → email למנחה; דיווח שני ממשתמש שונה → post.status=HIDDEN + email דחוף; דיווח שלישי → follow-up. <code>decide_report()</code>, <code>get_pending_reports()</code> — משאירים כstubs.</p>
+      <p><code>backend/app/api/v1/endpoints/forum.py</code> — handler של <code>report_post()</code>; מחברים ל-<code>report_service.file_report()</code> (כרגע TODO).</p>
+      <p><code>backend/app/services/email_service.py</code> — מחברים קריאות email מנחה מתוך <code>file_report()</code>.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/shared/components/report-button/</code> — תיקייה + קומפוננטה standalone חדשה; מקבלת <code>contentType</code> ו-<code>contentId</code> דרך <code>input()</code>; פותחת picker לסיבת הדיווח; קוראת ל-<code>ReportService.fileReport()</code> באישור.</p>
+      <p><code>frontend/src/app/core/services/report.service.ts</code> — מממשים <code>fileReport()</code> בלבד; שאר המתודות — משאירים כstubs.</p>
+      <p><code>frontend/src/app/features/forum/forum-post/forum-post.component.ts</code> — מחליפים את ה-placeholder בקומפוננטה האמיתית <code>&lt;app-report-button&gt;</code>.</p>
+
+      <div class="callout callout-orange">
+        ⚠️ <strong>Sync point:</strong> לפני בניית report-button — מוודאים ש-<code>ReportCreate</code> ב-TypeScript תואם ל-<code>schemas/report.py:ReportCreate</code>.
+      </div>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>POST /forum/posts/{id}/report</code> — יוצר Report; חוסם דיווח כפול מאותו משתמש</li>
+        <li><code>ForumPost.report_count</code> מוגדל בכל דיווח</li>
+        <li>דיווח 1: email למנחה triggered בשכבת ה-service</li>
+        <li>דיווח 2 ממשתמש שונה: post.status=HIDDEN; דיווח דחוף triggered; פוסט נעלם מ-GET /forum/posts למשתמשים רגילים</li>
+        <li>דיווח 3+: follow-up triggered</li>
+        <li><code>report-button.component</code> קיים ב-shared/components/report-button/ עם contentType + contentId inputs</li>
+        <li><code>fileReport()</code> ב-report.service.ts קורא ל-API</li>
+        <li><code>&lt;app-report-button&gt;</code> מוטמע ב-forum-post.component</li>
+        <li><code>npm run lint</code> עובר</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- FEATURE: PROFESSIONAL ADVISORY              -->
+<!-- ═══════════════════════════════════════════ -->
+
+<div class="feature-divider">
+  <div class="feature-divider-line"></div>
+  <div class="feature-divider-label">Professional Advisory</div>
+  <div class="feature-divider-line"></div>
+</div>
+
+<!-- ABF-42 -->
+<div class="section" id="s-abf42">
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <div class="task-jira">ABF-42</div>
+      <div class="task-title">🔴 Professional Catalog</div>
+      <div class="task-effort">M · ~3 ימים · BLOCKER — יום 1 · עצמאי</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-red">
+        🚨 ABF-50 (Ask a Question) חסום עד שזה ממוזג. כלל פרטיות: <strong>אין הצגת פרטי קשר (טלפון, מייל) בשום מקום ברשימה.</strong>
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ עכשיו</h4>
+          <ul>
+            <li><code>get_professionals_for_user()</code> — stub ב-user_service</li>
+            <li><code>GET /advice/professionals</code> — מחזיר []</li>
+            <li><code>advice-list.component</code> — service מוזרק אבל לא נקרא</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ אחרי</h4>
+          <ul>
+            <li>שאילתת פרופסיונלים מפולטרת לקבוצה/מגזר</li>
+            <li>רשימת כרטיסי פרופסיונלים + filter לפי domain</li>
+            <li>אין חשיפת פרטי קשר</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/user_service.py:80</code> — stub של <code>get_professionals_for_user()</code>; מממשים שאילתה לפי הקבוצות/מגזרים של הפרופסיונל.</p>
+      <p><code>backend/app/api/v1/endpoints/professional.py</code> — handler של <code>list_professionals()</code>; מחברים לservice.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/professional.service.ts</code> — מממשים <code>getProfessionals()</code> בלבד; שאר המתודות — משאירים כstubs.</p>
+      <p><code>frontend/src/app/features/advice/advice-list/advice-list.component.ts</code> — מממשים קריאת service; מציגים כל פרופסיונל כ-card עם שם, domain, תיאור; כפתור "שאל שאלה" → /advice/ask; filter לפי domain (client-side).</p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>GET /advice/professionals</code> מחזיר פרופסיונלים מפולטרים לקבוצה/מגזר של המשתמש</li>
+        <li><code>getProfessionals()</code> ממושם ב-professional.service.ts</li>
+        <li>כל כרטיס מציג: שם, domain label, תיאור</li>
+        <li>אין פרטי קשר (טלפון/מייל) בשום מקום</li>
+        <li>filter לפי domain עובד בצד הלקוח</li>
+        <li>loading ו-error states מוצגים</li>
+        <li><code>npm run lint</code> עובר</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-50 -->
+<div class="section" id="s-abf50">
+  <div class="task-card">
+    <div class="task-card-header color-green">
+      <div class="task-jira">ABF-50</div>
+      <div class="task-title">Ask a Question + My Questions</div>
+      <div class="task-effort">M · ~3 ימים · תלוי ב-ABF-42</div>
+    </div>
+    <div class="task-card-body">
+
+      <div class="callout callout-blue">
+        💡 <code>_build_alias()</code> כבר ממושם ב-professional_service.py — כשהשאלה מופנית לפרופסיונל מסוים, הוא רואה alias ("אלמנה – ספרדי") אלא אם המשתמש סימן "חשוף שמי". <code>answer_query()</code> ו-<code>get_public_qa()</code> הם scope ספרינט 4 — <strong>לא נוגעים בהם.</strong>
+      </div>
+
+      <h4>Backend — היכן לעבוד</h4>
+      <p><code>backend/app/services/professional_service.py</code> — מממשים <code>create_query()</code> ו-<code>get_my_questions()</code>; שאר הפונקציות — משאירים כstubs.</p>
+      <p><code>backend/app/api/v1/endpoints/professional.py</code> — handlers של <code>ask_question()</code> ו-<code>my_questions()</code>; מחברים לservice.</p>
+
+      <h4>Frontend — היכן לעבוד</h4>
+      <p><code>frontend/src/app/core/services/professional.service.ts</code> — מממשים <code>askQuestion()</code> ו-<code>getMyQuestions()</code>; שאר המתודות — משאירים כstubs.</p>
+      <p><code>frontend/src/app/features/advice/ask-question/ask-question.component.ts</code> — בונים טופס: topic/domain, פרופסיונל ספציפי (אופציונלי), toggle ציבורי/פרטי, checkbox "חשוף שמי"; קוראים ל-askQuestion() בשמירה; ניווט ל-/advice.</p>
+      <p>רשימת "השאלות שלי" — tab ב-advice-list או דף נפרד; מציגה topic, פרופסיונל/domain, תאריך, סטטוס.</p>
+
+      <div class="callout callout-orange">
+        ⚠️ <strong>Sync point:</strong> לפני בניית הטופס — מוודאים ש-<code>ProfessionalQueryCreate</code> ב-TypeScript תואם ל-backend schema.
+      </div>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li><code>POST /advice/questions</code> — professional_id או domain חייבים להיות מוגדרים</li>
+        <li><code>GET /advice/questions</code> — מחזיר שאלות של המשתמש הנוכחי</li>
+        <li><code>create_query()</code> ו-<code>get_my_questions()</code> ממושמים ב-professional_service.py</li>
+        <li>טופס: selector domain/פרופסיונל, toggle ציבורי/פרטי, checkbox חשיפת שם</li>
+        <li>email notification triggered ביצירת שאלה</li>
+        <li>רשימת "השאלות שלי" מציגה topic, פרופסיונל/domain, תאריך, סטטוס</li>
+        <li><code>askQuestion()</code> ו-<code>getMyQuestions()</code> ממושמים ב-professional.service.ts</li>
+        <li><code>npm run lint</code> עובר</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SYNC POINTS                                  -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-sync">
+  <div class="section-header">
+    <div class="section-number">5</div>
+    <h2>נקודות סנכרון — תיאומים חשובים</h2>
+  </div>
+
+  <div class="sync-box">
+    <strong>📅 לפני ABF-39 frontend — UserAdminView contract:</strong><br>
+    מוודאים ש-<code>backend/app/schemas/user.py:UserAdminView</code> תואם ל-<code>frontend/.../core/models/index.ts:UserAdminView</code> — חמש דקות ביחד, חוסכות שעות debugging.
+  </div>
+
+  <div class="sync-box">
+    <strong>📅 לפני ABF-43 frontend — approve/reject response shape:</strong><br>
+    מסכימות על HTTP status codes + צורת ה-response body של approve ו-reject לפני שמתחילות את ה-frontend של ABF-43.
+  </div>
+
+  <div class="sync-box">
+    <strong>📅 לפני ABF-41 frontend — ForumPost contract:</strong><br>
+    מוודאים ש-<code>ForumPost</code> ב-TypeScript תואם ל-<code>ForumPostResponse</code> schema ב-backend לפני בניית forum-list.
+  </div>
+
+  <div class="sync-box">
+    <strong>📅 לפני ABF-49 frontend — ReportCreate contract:</strong><br>
+    מוודאים ש-<code>ReportCreate</code> ב-TypeScript תואם ל-<code>backend/app/schemas/report.py:ReportCreate</code> לפני בניית report-button.
+  </div>
+
+  <div class="sync-box">
+    <strong>📅 לפני ABF-50 frontend — ProfessionalQueryCreate contract:</strong><br>
+    מוודאים ש-<code>ProfessionalQueryCreate</code> ב-TypeScript תואם ל-backend schema לפני בניית טופס השאלה.
+  </div>
+
+  <div class="sync-box">
+    <strong>⚠️ ABF-39 חייבת לעבור merge לפני שמתחילות ABF-43, ABF-44, ABF-47:</strong><br>
+    כולן תלויות ב-<code>admin.service.ts</code> שנוצר ב-ABF-39. תיאום מוקדם מונע merge conflicts.
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- UI MOCKUPS                                   -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-mockup">
+  <div class="section-header">
+    <div class="section-number">6</div>
+    <h2>האפליקציה בסוף הספרינט</h2>
+  </div>
+
+  <div class="app-screens">
+
+    <!-- Pending Registrations (Admin) -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <div class="app-topbar-logo">אנו בניך — Admin</div>
+        <div class="app-topbar-logout">יציאה</div>
+      </div>
+      <div class="app-body">
+        <div class="app-page-title">הרשמות ממתינות</div>
+        <div class="app-list-row">
+          <div>
+            <div class="app-list-name">רחל לוי</div>
+            <div class="app-list-meta">אלמנה · אשכנזי · 12.07.2026</div>
+          </div>
+          <span class="app-status-badge app-status-pending">ממתין</span>
+        </div>
+        <div class="app-list-row">
+          <div>
+            <div class="app-list-name">יוסף כהן</div>
+            <div class="app-list-meta">יתום · ספרדי · 10.07.2026</div>
+          </div>
+          <span class="app-status-badge app-status-partial">אושר חלקית</span>
+        </div>
+        <div class="app-list-row">
+          <div>
+            <div class="app-list-name">מרים שמש</div>
+            <div class="app-list-meta">אלמנה · כללי · 09.07.2026</div>
+          </div>
+          <span class="app-status-badge app-status-pending">ממתין</span>
+        </div>
+        <div class="app-btn-row" style="margin-top:12px;">
+          <div class="app-btn app-btn-primary">אשר</div>
+          <div class="app-btn app-btn-danger">דחה</div>
+        </div>
+      </div>
+      <div class="app-caption">Admin — רשימת הרשמות ממתינות (ABF-39)</div>
+    </div>
+
+    <!-- Forum List (User) -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <div class="app-topbar-logo">אנו בניך</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="app-topbar-user">רחל (משתמשת)</span>
+          <span class="app-topbar-logout">יציאה</span>
+        </div>
+      </div>
+      <div class="app-body">
+        <div class="app-page-title">פורום הקהילה</div>
+        <div class="app-forum-card">
+          <div class="app-forum-title">שאלה בנושא גמלאות</div>
+          <div class="app-forum-meta">
+            <span>מרים כ. · 12.07</span>
+            <span class="app-forum-badge">קבוצה</span>
+          </div>
+        </div>
+        <div class="app-forum-card">
+          <div class="app-forum-title">עצות לתחילת שנת לימודים</div>
+          <div class="app-forum-meta">
+            <span>יהודה ל. · 11.07</span>
+            <span class="app-forum-badge">מגזר</span>
+          </div>
+        </div>
+        <div class="app-forum-card" style="border-color:#bfdbfe; background:#eff6ff;">
+          <div class="app-forum-title" style="color:#1d4ed8;">הודעה לכלל הקהילה</div>
+          <div class="app-forum-meta">
+            <span>Admin · 10.07</span>
+            <span class="app-forum-badge" style="background:#dbeafe;color:#1e40af;">Broadcast</span>
+          </div>
+        </div>
+        <div class="app-btn app-btn-primary" style="margin-top:10px;">+ פוסט חדש</div>
+        <div style="display:flex;justify-content:center;gap:8px;margin-top:10px;font-size:12px;color:#6b7280;">
+          <span>‹ הקודם</span><span>עמוד 1 / 3</span><span>הבא ›</span>
+        </div>
+      </div>
+      <div class="app-caption">פורום — רשימת פוסטים עם visibility badges (ABF-41)</div>
+    </div>
+
+    <!-- Pending Approval Page (User) -->
+    <div class="app-frame">
+      <div class="app-topbar">אנו בניך</div>
+      <div class="app-body">
+        <div class="app-pending-box">
+          <div class="app-pending-icon">⏳</div>
+          <div class="app-pending-title">ההרשמה שלך התקבלה</div>
+          <div class="app-pending-desc">
+            הבקשה שלך נמצאת בבדיקה אצל מנהלי המערכת.<br>
+            תקבל עדכון בקרוב.
+          </div>
+        </div>
+        <div class="app-note">ניתן לפנות לתמיכה בכל שאלה</div>
+      </div>
+      <div class="app-caption">דף המתנה לאישור — /auth/pending (ABF-40)</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- DEFINITION OF DONE                          -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-dod">
+  <div class="section-header">
+    <div class="section-number green">✅</div>
+    <h2>Definition of Done — ספרינט 3 סגור כשכל זה עובד</h2>
+  </div>
+
+  <div class="callout callout-green">
+    ✅ בדקו את הצ'קליסט הזה ביחד לפני שסוגרות את הספרינט.
+  </div>
+
+  <h3>DevOps — CI</h3>
+  <ul class="checklist">
+    <li>פותחים PR → CI רץ אוטומטית ומציג pass/fail על ה-PR</li>
+    <li>ruff + mypy + pytest עוברים על backend</li>
+    <li>eslint עובר על frontend</li>
+  </ul>
+
+  <h3>Admin Approval — End-to-End</h3>
+  <ul class="checklist">
+    <li>Admin נכנס ל-/admin → badge ספירת ממתינים מוצג</li>
+    <li>Admin ניגש ל-/admin/registrations → רשימה אמיתית מהDB מוצגת</li>
+    <li>Admin לוחץ "אשר" → סטטוס משתנה על המסך; מנהל שני יכול לאשר אחרי זה</li>
+    <li>Admin לוחץ "דחה" → confirm-dialog נפתח; סיבה חובה; משתמש עוזב את הרשימה</li>
+    <li>Admin מפעיל השעיה → משתמש מנסה להיכנס ומקבל הודעה ברורה על חסימה</li>
+  </ul>
+
+  <h3>Pending Approval Flow</h3>
+  <ul class="checklist">
+    <li>משתמש מסיים OTP → מגיע ל-/auth/pending עם הודעה ברורה</li>
+    <li>משתמש ממתין שמנסה ל-/home → מנותב ל-/auth/pending</li>
+  </ul>
+
+  <h3>Forum Module — End-to-End</h3>
+  <ul class="checklist">
+    <li>משתמש ניגש ל-/forum → רשימת פוסטים של הקבוצה/מגזר שלו מוצגת</li>
+    <li>משתמש A לא רואה פוסטים של קבוצה B</li>
+    <li>פוסט broadcast של Admin מוצג לכל המשתמשים</li>
+    <li>פתיחת פוסט → תוכן מלא מוצג; כפתור מחיקה גלוי לכותב/Admin בלבד</li>
+    <li>יצירת פוסט → פוסט מופיע ברשימה; ניווט לפוסט החדש</li>
+    <li>עריכת פוסט → /forum/:id/edit נטען עם תוכן קיים; שמירה מעדכנת</li>
+    <li>לחיצה על כפתור דיווח → picker סיבה; אישור → post.report_count מוגדל</li>
+    <li>דיווח שני ממשתמש אחר → פוסט נעלם מהרשימה למשתמשים רגילים</li>
+  </ul>
+
+  <h3>Professional Advisory — יסודות</h3>
+  <ul class="checklist">
+    <li>משתמש ניגש ל-/advice → רשימת פרופסיונלים מפולטרת מוצגת (ללא פרטי קשר)</li>
+    <li>filter לפי domain עובד בצד הלקוח</li>
+    <li>שליחת שאלה → שאלה נשמרת; מוצגת ב-"השאלות שלי"</li>
+  </ul>
+
+  <h3>קוד — Quality</h3>
+  <ul class="checklist">
+    <li><code>ng build</code> עובר ללא שגיאות TypeScript</li>
+    <li><code>npm run lint</code> עובר על כל קבצי Sprint 3</li>
+    <li><code>ruff check .</code> + <code>mypy</code> עוברים על backend</li>
+    <li>כל ה-PRs עוברים CI לפני merge</li>
+    <li>אין <code>@Input()</code> / <code>@Output()</code> — רק <code>input()</code> / <code>output()</code></li>
+    <li>אין <code>*ngIf</code> / <code>*ngFor</code> — רק <code>@if</code> / <code>@for</code></li>
+    <li>כל קומפוננטה חדשה (edit-post, report-button, pending-approval) היא standalone</li>
+  </ul>
+
+</div>
+
+<div style="text-align:center; padding:32px 0; color:#999; font-size:13px;">
+  אנו בניך · ספרינט 3 · 2026 · גרסה 1.0
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

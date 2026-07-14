@@ -73,6 +73,35 @@ class TestGetPendingRegistrations:
         assert [u.email for u in result] == [oldest.email, middle.email, newest.email]
 
 
+class TestGetActiveUsers:
+    def test_returns_only_active_users_with_role_user(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        _make_user(db_session, "active@example.com", AccountStatus.ACTIVE, now)
+        _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        _make_user(db_session, "suspended@example.com", AccountStatus.SUSPENDED, now)
+        _make_user(db_session, "rejected@example.com", AccountStatus.REJECTED, now)
+        _make_admin(db_session, "admin@example.com")
+
+        result = user_service.get_active_users(db_session)
+
+        emails = {u.email for u in result}
+        assert emails == {"active@example.com"}
+
+    def test_orders_by_created_at_ascending(self, db_session: Session) -> None:
+        base = datetime.now(UTC).replace(tzinfo=None)
+        newest = _make_user(
+            db_session, "newest@example.com", AccountStatus.ACTIVE, base + timedelta(minutes=2)
+        )
+        oldest = _make_user(db_session, "oldest@example.com", AccountStatus.ACTIVE, base)
+        middle = _make_user(
+            db_session, "middle@example.com", AccountStatus.ACTIVE, base + timedelta(minutes=1)
+        )
+
+        result = user_service.get_active_users(db_session)
+
+        assert [u.email for u in result] == [oldest.email, middle.email, newest.email]
+
+
 class TestApproveRegistration:
     def test_first_approval_sets_partially_approved(self, db_session: Session) -> None:
         now = datetime.now(UTC).replace(tzinfo=None)
@@ -226,3 +255,75 @@ class TestRejectRegistration:
         details = logs[0].details
         assert details is not None
         assert details["reason"] == "not enough documents"
+
+
+class TestSuspendUser:
+    def test_suspends_active_user(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "active@example.com", AccountStatus.ACTIVE, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        before = datetime.now(UTC)
+        result = user_service.suspend_user(db_session, user.id, admin, 48, "spam behaviour")
+        after = datetime.now(UTC)
+
+        assert result.account_status == AccountStatus.SUSPENDED
+        assert result.is_suspended is True
+        assert result.suspended_until is not None
+        suspended_until = result.suspended_until.replace(tzinfo=UTC)
+        assert before + timedelta(hours=48) <= suspended_until <= after + timedelta(hours=48)
+
+    def test_sends_suspension_notification_email(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_suspension_notification", lambda *a: sent.append(a)
+        )
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "active@example.com", AccountStatus.ACTIVE, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        user_service.suspend_user(db_session, user.id, admin, 48, "spam behaviour")
+
+        assert sent == [(user.email, 48, "spam behaviour")]
+
+    def test_creates_audit_log_entry(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "active@example.com", AccountStatus.ACTIVE, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        user_service.suspend_user(db_session, user.id, admin, 48, "spam behaviour")
+
+        logs = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).all()
+        assert len(logs) == 1
+        assert logs[0].action == AuditAction.USER_SUSPENDED
+        assert logs[0].actor_id == admin.id
+        details = logs[0].details
+        assert details is not None
+        assert details["hours"] == 48
+        assert details["reason"] == "spam behaviour"
+
+    def test_cannot_suspend_non_active_user(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.suspend_user(db_session, user.id, admin, 48, "spam behaviour")
+        assert exc_info.value.status_code == 400
+
+    def test_cannot_suspend_non_user_role(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin1@example.com")
+        other_admin = _make_admin(db_session, "admin2@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.suspend_user(db_session, other_admin.id, admin, 48, "spam behaviour")
+        assert exc_info.value.status_code == 400
+
+    def test_suspend_nonexistent_user_raises_404(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.suspend_user(db_session, "does-not-exist", admin, 48, "spam behaviour")
+        assert exc_info.value.status_code == 404

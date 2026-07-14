@@ -89,6 +89,16 @@ def reject_registration(
     return UserAdminView.model_validate(user)
 
 
+@router.get("/users/active", response_model=list[UserAdminView])
+def list_active_users(db: Session = Depends(get_db)) -> list[UserAdminView]:
+    """
+    Return all active users.
+    """
+    return [
+        UserAdminView.model_validate(user) for user in user_service.get_active_users(db)
+    ]
+
+
 @router.get("/professionals", response_model=list[UserProfile])
 def list_professionals(db: Session = Depends(get_db)) -> list[UserProfile]:
     """Return all professional users."""
@@ -108,20 +118,18 @@ def update_professional(
     raise NotImplementedError
 
 
-@router.post("/users/{user_id}/suspend")
+@router.post("/users/{user_id}/suspend", response_model=UserAdminView)
 def suspend_user(
     user_id: str,
     data: SuspendUserRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> UserAdminView:
     """
     Manually suspend a user.
-
-    TODO: call user_service.suspend_user(db, user_id, current_user, data.hours, data.reason)
     """
-    # TODO: implement
-    raise NotImplementedError
+    user = user_service.suspend_user(db, user_id, current_user, data.hours, data.reason)
+    return UserAdminView.model_validate(user)
 
 
 @router.get("/audit-log")

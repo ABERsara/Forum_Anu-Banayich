@@ -45,4 +45,29 @@ describe('AdminService', () => {
     req.flush(mockUser);
     expect(result).toEqual(mockUser);
   });
+
+  it('getActiveUsers GETs the active users endpoint', () => {
+    let result: UserAdminView[] | undefined;
+    service.getActiveUsers().subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/users/active`);
+    expect(req.request.method).toBe('GET');
+
+    const mockUsers = [{ id: 'u1' }] as UserAdminView[];
+    req.flush(mockUsers);
+    expect(result).toEqual(mockUsers);
+  });
+
+  it('suspendUser POSTs to the suspend endpoint with hours and reason', () => {
+    let result: UserAdminView | undefined;
+    service.suspendUser('u1', 48, 'הפרת כללי הפורום').subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/users/u1/suspend`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ hours: 48, reason: 'הפרת כללי הפורום' });
+
+    const mockUser = { id: 'u1' } as UserAdminView;
+    req.flush(mockUser);
+    expect(result).toEqual(mockUser);
+  });
 });

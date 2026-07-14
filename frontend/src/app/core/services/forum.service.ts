@@ -32,16 +32,9 @@ export class ForumService {
   private readonly api = inject(ApiService);
 
   getPosts(page = 1, pageSize = 20): Observable<ForumPostList> {
-    void page;
-    void pageSize;
-    /**
-     * TODO:
-     *   return this.api.get<ForumPostList>(`/forum/posts?page=${page}&page_size=${pageSize}`);
-     *
-     * The backend automatically filters by the user's group+sector.
-     * Do NOT add any client-side filtering.
-     */
-    throw new Error('getPosts() not yet implemented');
+    // The backend automatically filters by the user's group+sector.
+    // Do NOT add any client-side filtering.
+    return this.api.get<ForumPostList>(`/forum/posts?page=${page}&page_size=${pageSize}`);
   }
 
   getPost(id: string): Observable<ForumPost> {

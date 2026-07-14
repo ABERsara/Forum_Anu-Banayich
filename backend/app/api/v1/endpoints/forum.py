@@ -25,6 +25,7 @@ from app.schemas.forum import (
     ForumPostResponse,
 )
 from app.schemas.report import ReportCreate
+from app.services import forum_service
 
 router = APIRouter(tags=["Forum & Messages"])
 
@@ -44,11 +45,8 @@ def list_posts(
     """
     Return posts visible to the current user.
     Filtering is automatic – the user only sees their group+sector content.
-
-    TODO: call forum_service.get_posts(db, current_user, page, page_size)
     """
-    # TODO: implement
-    return ForumPostListResponse(items=[], total=0, page=page, page_size=page_size)
+    return forum_service.get_posts(db, current_user, page, page_size)
 
 
 @router.post("/forum/posts", response_model=ForumPostResponse, status_code=201)
