@@ -27,11 +27,7 @@ export class ProfessionalService {
   private readonly api = inject(ApiService);
 
   getProfessionals(): Observable<ProfessionalProfile[]> {
-    /**
-     * TODO:
-     *   return this.api.get<ProfessionalProfile[]>('/advice/professionals');
-     */
-    throw new Error('getProfessionals() not yet implemented');
+    return this.api.get<ProfessionalProfile[]>('/advice/professionals');
   }
 
   askQuestion(data: ProfessionalQueryCreate): Observable<ProfessionalQuery> {

@@ -8,7 +8,7 @@ TODO list for junior developer:
   [ ] implement reject_registration()
   [ ] implement get_pending_registrations()
   [x] implement suspend_user()
-  [ ] implement get_professionals_for_user() – filtered by sector+group
+  [x] implement get_professionals_for_user() – filtered by sector+group
 """
 
 from datetime import UTC, datetime, timedelta
@@ -177,17 +177,29 @@ def suspend_user(
     return user
 
 
-def get_professionals_for_user(db: Session, current_user: User) -> list[User]:
+def _visible_to_user(professional: User, current_user: User) -> bool:
     """
-    Return all active professionals visible to the given user.
-
     A professional is visible if:
       - professional_groups contains current_user.user_type OR contains "all"
       - professional_sectors contains current_user.sector OR contains "all"
-
-    TODO:
-      1. Query users where role=PROFESSIONAL and is_active_professional=True
-      2. Filter by the JSON arrays above (check if user_type/sector is in the list)
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_professionals_for_user() is not yet implemented")
+    groups = professional.professional_groups or []
+    sectors = professional.professional_sectors or []
+    group_match = "all" in groups or current_user.user_type in groups
+    sector_match = "all" in sectors or current_user.sector in sectors
+    return group_match and sector_match
+
+
+def get_professionals_for_user(db: Session, current_user: User) -> list[User]:
+    """
+    Return all active professionals visible to the given user.
+    """
+    professionals = (
+        db.query(User)
+        .filter(
+            User.role == UserRole.PROFESSIONAL, User.is_active_professional.is_(True)
+        )
+        .order_by(User.last_name.asc(), User.first_name.asc())
+        .all()
+    )
+    return [pro for pro in professionals if _visible_to_user(pro, current_user)]
