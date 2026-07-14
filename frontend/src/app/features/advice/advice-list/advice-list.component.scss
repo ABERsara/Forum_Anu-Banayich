@@ -5,6 +5,16 @@
   direction: rtl;
 }
 
+.top-links {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.separator {
+  color: $color-border;
+}
+
 .filter-bar {
   margin: $spacing-md 0;
 }
