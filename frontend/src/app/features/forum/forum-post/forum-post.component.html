@@ -1,0 +1,42 @@
+<div class="forum-post" dir="rtl">
+  <a routerLink="/forum">← חזרה לפורום</a>
+
+  @if (isLoading()) {
+    <app-loading-spinner size="md" />
+  } @else if (errorMessage(); as errorMsg) {
+    <app-error-display [message]="errorMsg" />
+  } @else if (post(); as post) {
+    <h1>{{ post.title }}</h1>
+    <p class="forum-post__meta">
+      {{ post.author.first_name }} {{ post.author.last_name }} | {{ post.created_at | date }}
+    </p>
+    <p class="forum-post__content">{{ post.content }}</p>
+
+    @if (post.attachment_url) {
+      <a [href]="post.attachment_url" target="_blank" rel="noopener">קובץ מצורף</a>
+    }
+
+    <!-- Report button (F5) is out of scope for ABF-45 — separate ticket -->
+
+    @if (canDelete()) {
+      <div class="forum-post__actions">
+        <button (click)="onDeleteClick()">מחיקה</button>
+      </div>
+    }
+
+    @if (deleteError(); as deleteErr) {
+      <app-error-display [message]="deleteErr" />
+    }
+  }
+
+  @if (showDeleteConfirm()) {
+    <app-confirm-dialog
+      title="מחיקת הודעה"
+      message="פעולה זו תמחק את ההודעה. לא ניתן לשחזר."
+      confirmText="מחיקה"
+      [isDestructive]="true"
+      (confirmed)="onDeleteConfirmed()"
+      (cancelled)="onDeleteCancelled()"
+    />
+  }
+</div>
