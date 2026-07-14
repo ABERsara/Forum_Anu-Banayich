@@ -16,7 +16,13 @@ from fastapi import HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Query, Session, joinedload
 
-from app.core.constants import GroupVisibility, PostStatus, SectorVisibility, UserRole
+from app.core.constants import (
+    AuditAction,
+    GroupVisibility,
+    PostStatus,
+    SectorVisibility,
+    UserRole,
+)
 from app.models.forum import DirectMessage, ForumPost
 from app.models.user import User
 from app.schemas.forum import (
@@ -25,6 +31,7 @@ from app.schemas.forum import (
     ForumPostListResponse,
     ForumPostResponse,
 )
+from app.services.audit_service import log_action
 
 
 def _content_filter(query: Query[ForumPost], current_user: User) -> Query[ForumPost]:
@@ -149,6 +156,49 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     )
     if not is_visible_to_user:
         raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
+
+    return post
+
+
+def delete_post(db: Session, post_id: str, current_user: User) -> ForumPost:
+    """
+    Soft-delete a forum post (status -> DELETED).
+
+    Permission: the post's author, any moderator, or an admin. Moderators are
+    NOT currently restricted to their own moderator_cells here – see the
+    ABF-45 notes: that restriction is expected to live in the reports-triage
+    layer once it's implemented, not in this function.
+
+    Idempotent: deleting an already-deleted post is a no-op (returns the post
+    as-is, no error, no duplicate audit log entry) rather than an error.
+    """
+    # Row-level lock: two people (e.g. the author and a moderator) hitting
+    # delete at the same time must not race on the same status update.
+    # No-op on SQLite (dev), enforced on PostgreSQL (production).
+    post = db.query(ForumPost).filter(ForumPost.id == post_id).with_for_update().first()
+    if post is None:
+        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+
+    is_author = current_user.id == post.author_id
+    is_privileged = current_user.role in (UserRole.MODERATOR, UserRole.ADMIN)
+    if not (is_author or is_privileged):
+        raise HTTPException(status_code=403, detail="אין לך הרשאה למחוק הודעה זו.")
+
+    if post.status == PostStatus.DELETED:
+        # Already deleted - nothing to do, and nothing new to audit-log.
+        return post
+
+    post.status = PostStatus.DELETED
+
+    log_action(
+        db,
+        actor=current_user,
+        action=AuditAction.POST_DELETED,
+        entity_type="ForumPost",
+        entity_id=post.id,
+        details={"author_id": post.author_id, "deleted_by_role": current_user.role.value},
+    )
+    db.refresh(post)
 
     return post
 
