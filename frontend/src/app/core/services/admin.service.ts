@@ -1,7 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { BroadcastCreate, ForumPost, SuspendUserRequest, UserAdminView } from '../models';
+import {
+  BroadcastCreate,
+  ForumPost,
+  RegistrationRejectRequest,
+  SuspendUserRequest,
+  UserAdminView,
+} from '../models';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -25,7 +31,8 @@ export class AdminService {
   }
 
   rejectRegistration(userId: string, reason: string): Observable<UserAdminView> {
-    return this.api.post<UserAdminView>(`/admin/registrations/${userId}/reject`, { reason });
+    const body: RegistrationRejectRequest = { reason };
+    return this.api.post<UserAdminView>(`/admin/registrations/${userId}/reject`, body);
   }
 
   getActiveUsers(): Observable<UserAdminView[]> {

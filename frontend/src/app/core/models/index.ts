@@ -59,6 +59,11 @@ export interface UserAdminView extends UserProfile {
   rejection_reason: string | null;
 }
 
+/** Admin rejects a pending registration. */
+export interface RegistrationRejectRequest {
+  reason: string;
+}
+
 /** Professional as shown in the professionals catalog. */
 export interface ProfessionalProfile {
   id: string;
