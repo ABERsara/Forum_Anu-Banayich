@@ -75,8 +75,12 @@ def _login_as(user: User) -> None:
 
 class TestGetPostEndpoint:
     async def test_success_returns_200_with_post_fields(self, client, db_session):
-        user = _make_user(db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC)
-        post = _make_post(db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC)
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
         _login_as(user)
 
         r = await client.get(f"{BASE}/{post.id}")
@@ -88,7 +92,9 @@ class TestGetPostEndpoint:
         assert body["author"]["id"] == user.id
 
     async def test_nonexistent_id_returns_404(self, client, db_session):
-        user = _make_user(db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
         _login_as(user)
 
         r = await client.get(f"{BASE}/no-such-id")
@@ -96,7 +102,9 @@ class TestGetPostEndpoint:
         assert r.status_code == 404
 
     async def test_mismatched_group_returns_403(self, client, db_session):
-        user = _make_user(db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
         other_author = _make_user(
             db_session, "widower@example.com", UserType.WIDOWER, Sector.HASIDIC
         )
@@ -114,8 +122,12 @@ class TestDeletePostEndpoint:
     async def test_author_delete_returns_200_with_deleted_status(
         self, client, db_session
     ):
-        user = _make_user(db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC)
-        post = _make_post(db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC)
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
         _login_as(user)
 
         r = await client.delete(f"{BASE}/{post.id}")
@@ -124,7 +136,9 @@ class TestDeletePostEndpoint:
         assert r.json()["status"] == "deleted"
 
     async def test_other_user_gets_403(self, client, db_session):
-        author = _make_user(db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        author = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
         other_user = _make_user(
             db_session, "widow2@example.com", UserType.WIDOW, Sector.HASIDIC
         )
