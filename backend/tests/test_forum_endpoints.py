@@ -108,3 +108,31 @@ class TestGetPostEndpoint:
         r = await client.get(f"{BASE}/{post.id}")
 
         assert r.status_code == 403
+
+
+class TestDeletePostEndpoint:
+    async def test_author_delete_returns_200_with_deleted_status(
+        self, client, db_session
+    ):
+        user = _make_user(db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC)
+        _login_as(user)
+
+        r = await client.delete(f"{BASE}/{post.id}")
+
+        assert r.status_code == 200
+        assert r.json()["status"] == "deleted"
+
+    async def test_other_user_gets_403(self, client, db_session):
+        author = _make_user(db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        other_user = _make_user(
+            db_session, "widow2@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+        _login_as(other_user)
+
+        r = await client.delete(f"{BASE}/{post.id}")
+
+        assert r.status_code == 403
