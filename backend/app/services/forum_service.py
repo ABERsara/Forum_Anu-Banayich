@@ -150,8 +150,9 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
         raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
 
     is_visible_to_user = (
-        _content_filter(db.query(ForumPost).filter(ForumPost.id == post_id), current_user)
-        .first()
+        _content_filter(
+            db.query(ForumPost).filter(ForumPost.id == post_id), current_user
+        ).first()
         is not None
     )
     if not is_visible_to_user:
@@ -196,7 +197,10 @@ def delete_post(db: Session, post_id: str, current_user: User) -> ForumPost:
         action=AuditAction.POST_DELETED,
         entity_type="ForumPost",
         entity_id=post.id,
-        details={"author_id": post.author_id, "deleted_by_role": current_user.role.value},
+        details={
+            "author_id": post.author_id,
+            "deleted_by_role": current_user.role.value,
+        },
     )
     db.refresh(post)
 
