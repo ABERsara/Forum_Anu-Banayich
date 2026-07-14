@@ -93,6 +93,21 @@ def login(db: Session, data: LoginRequest) -> TokenResponse:
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="אימות נכשל. בדוק/י מייל וסיסמה.")
+
+    if user.is_suspended:
+        still_suspended = (
+            user.suspended_until is not None
+            and user.suspended_until.replace(tzinfo=UTC) > datetime.now(UTC)
+        )
+        if still_suspended:
+            raise HTTPException(
+                status_code=403, detail="החשבון מושעה זמנית. נסה שוב מאוחר יותר."
+            )
+        user.account_status = AccountStatus.ACTIVE
+        user.is_suspended = False
+        user.suspended_until = None
+        db.commit()
+
     if user.account_status != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="החשבון אינו פעיל. פנה/י למנהל.")
     access = _create_token(
