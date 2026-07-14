@@ -104,6 +104,14 @@ export const GROUP_VISIBILITY_LABELS: Record<GroupVisibility, string> = {
   [GroupVisibility.ALL]: 'כולם',
 };
 
+export const SECTOR_VISIBILITY_LABELS: Record<SectorVisibility, string> = {
+  [SectorVisibility.HASIDIC]: 'חסידי',
+  [SectorVisibility.LITVISH]: 'ליטאי',
+  [SectorVisibility.SEPHARDIC]: 'ספרדי',
+  [SectorVisibility.GENERAL]: 'כללי',
+  [SectorVisibility.ALL]: 'כל המגזרים',
+};
+
 // ---------------------------------------------------------------------------
 // Forum post status
 // ---------------------------------------------------------------------------

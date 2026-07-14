@@ -68,6 +68,12 @@ export interface ProfessionalProfile {
   professional_description: string | null;
 }
 
+/** Admin suspends an active user for N hours. */
+export interface SuspendUserRequest {
+  hours: number;
+  reason: string;
+}
+
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------

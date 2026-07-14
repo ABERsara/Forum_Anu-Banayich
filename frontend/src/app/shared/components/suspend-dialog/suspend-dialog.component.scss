@@ -1,0 +1,106 @@
+@use '../../../../styles/variables' as *;
+@use 'sass:color';
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog {
+  background: $color-bg;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-lg;
+  padding: $spacing-xl;
+  max-width: 400px;
+  width: 100%;
+
+  &__title {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+    margin: 0 0 $spacing-sm;
+  }
+
+  &__message {
+    color: $color-text-muted;
+    margin: 0 0 $spacing-lg;
+  }
+
+  &__field {
+    margin: 0 0 $spacing-lg;
+  }
+
+  &__label {
+    display: block;
+    margin-bottom: $spacing-xs;
+    font-size: $font-size-sm;
+    color: $color-text;
+  }
+
+  &__input,
+  &__textarea {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: $spacing-sm;
+    font-family: inherit;
+    font-size: $font-size-base;
+    color: $color-text;
+    background-color: $color-bg;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    transition: border-color $transition-fast;
+
+    &:focus {
+      border-color: $color-primary;
+      outline: none;
+    }
+  }
+
+  &__textarea {
+    resize: vertical;
+  }
+
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+    justify-content: space-between;
+  }
+}
+
+.btn {
+  padding: $spacing-sm $spacing-md;
+  border: none;
+  border-radius: $radius-md;
+  font-size: $font-size-base;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+  transition: background-color $transition-fast;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &--danger {
+    background-color: $color-danger;
+    color: white;
+    &:hover {
+      background-color: color.adjust($color-danger, $lightness: -10%);
+    }
+  }
+
+  &--cancel {
+    background-color: $color-bg-subtle;
+    color: $color-text;
+    border: 1px solid $color-border;
+    &:hover {
+      background-color: $color-border;
+    }
+  }
+}

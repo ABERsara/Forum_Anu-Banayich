@@ -1,0 +1,21 @@
+@use '../../../../styles/variables' as *;
+
+.page {
+  padding: $spacing-md;
+  direction: rtl;
+}
+
+.error-message {
+  color: $color-danger;
+}
+
+.user-card {
+  border: 1px solid $color-border;
+  margin: $spacing-sm 0;
+  padding: $spacing-md;
+  border-radius: $radius-md;
+
+  &__actions {
+    margin-top: $spacing-sm;
+  }
+}

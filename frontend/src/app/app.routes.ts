@@ -164,6 +164,13 @@ export const routes: Routes = [
             (m) => m.BroadcastComponent,
           ),
       },
+      {
+        path: 'active-users',
+        loadComponent: () =>
+          import('./features/admin/active-users/active-users.component').then(
+            (m) => m.ActiveUsersComponent,
+          ),
+      },
     ],
   },
 
