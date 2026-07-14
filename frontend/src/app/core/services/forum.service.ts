@@ -42,8 +42,6 @@ export class ForumService {
   }
 
   deletePost(id: string): Observable<ForumPost> {
-    // Backend soft-deletes and returns the updated post (status: "deleted"),
-    // not an empty 204 — consistent with suspend/approve/reject elsewhere.
     return this.api.delete<ForumPost>(`/forum/posts/${id}`);
   }
 
