@@ -3,7 +3,6 @@ Integration tests for POST /forum/broadcast.
 """
 
 import pytest
-from sqlalchemy.orm import Session
 
 from app.core.constants import AuditAction, GroupVisibility, SectorVisibility, UserRole
 from app.core.dependencies import get_current_user
@@ -12,19 +11,6 @@ from app.models.audit import AuditLog
 from app.models.user import User
 
 BASE = "/api/v1/forum"
-
-
-def _make_user(db_session: Session, role: UserRole, email: str) -> User:
-    user = User(
-        email=email,
-        password_hash="hashed",
-        first_name="Test",
-        last_name="User",
-        role=role,
-    )
-    db_session.add(user)
-    db_session.commit()
-    return user
 
 
 @pytest.fixture
@@ -39,8 +25,8 @@ def as_user():
 
 
 class TestCreateBroadcast:
-    async def test_admin_can_send_broadcast(self, client, db_session, as_user):
-        admin = _make_user(db_session, UserRole.ADMIN, "admin@example.com")
+    async def test_admin_can_send_broadcast(self, client, make_user, as_user):
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
         as_user(admin)
 
         response = await client.post(
@@ -53,8 +39,10 @@ class TestCreateBroadcast:
         assert body["group_visibility"] == GroupVisibility.ALL
         assert body["sector_visibility"] == SectorVisibility.ALL
 
-    async def test_admin_broadcast_writes_audit_log(self, client, db_session, as_user):
-        admin = _make_user(db_session, UserRole.ADMIN, "admin@example.com")
+    async def test_admin_broadcast_writes_audit_log(
+        self, client, db_session, make_user, as_user
+    ):
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
         as_user(admin)
 
         response = await client.post(
@@ -67,10 +55,8 @@ class TestCreateBroadcast:
         assert logs[0].action == AuditAction.BROADCAST_SENT
         assert logs[0].actor_id == admin.id
 
-    async def test_regular_user_cannot_send_broadcast(
-        self, client, db_session, as_user
-    ):
-        user = _make_user(db_session, UserRole.USER, "user@example.com")
+    async def test_regular_user_cannot_send_broadcast(self, client, make_user, as_user):
+        user = make_user("user@example.com", role=UserRole.USER)
         as_user(user)
 
         response = await client.post(
@@ -79,8 +65,8 @@ class TestCreateBroadcast:
 
         assert response.status_code == 403
 
-    async def test_moderator_cannot_send_broadcast(self, client, db_session, as_user):
-        moderator = _make_user(db_session, UserRole.MODERATOR, "mod@example.com")
+    async def test_moderator_cannot_send_broadcast(self, client, make_user, as_user):
+        moderator = make_user("mod@example.com", role=UserRole.MODERATOR)
         as_user(moderator)
 
         response = await client.post(
@@ -89,8 +75,8 @@ class TestCreateBroadcast:
 
         assert response.status_code == 403
 
-    async def test_rejects_title_too_short(self, client, db_session, as_user):
-        admin = _make_user(db_session, UserRole.ADMIN, "admin@example.com")
+    async def test_rejects_title_too_short(self, client, make_user, as_user):
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
         as_user(admin)
 
         response = await client.post(

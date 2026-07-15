@@ -161,8 +161,7 @@ def create_broadcast_post(db: Session, data: BroadcastCreate, admin: User) -> Fo
         status=PostStatus.VISIBLE,
     )
     db.add(post)
-    db.commit()
-    db.refresh(post)
+    db.flush()
 
     audit_service.log_action(
         db,
@@ -173,6 +172,7 @@ def create_broadcast_post(db: Session, data: BroadcastCreate, admin: User) -> Fo
         details={"title": data.title},
     )
 
+    db.refresh(post)
     return post
 
 

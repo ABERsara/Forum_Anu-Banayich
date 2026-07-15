@@ -24,27 +24,6 @@ from app.schemas.forum import BroadcastCreate
 from app.services import forum_service
 
 
-def _make_user(
-    db_session: Session,
-    email: str,
-    user_type: UserType | None = None,
-    sector: Sector | None = None,
-    role: UserRole = UserRole.USER,
-) -> User:
-    user = User(
-        email=email,
-        password_hash="hashed",
-        first_name="Test",
-        last_name="User",
-        role=role,
-        user_type=user_type,
-        sector=sector,
-    )
-    db_session.add(user)
-    db_session.commit()
-    return user
-
-
 def _make_post(
     db_session: Session,
     author: User,
@@ -69,23 +48,21 @@ def _make_post(
 
 class TestGetPostsContentFilter:
     def test_user_sees_matching_group_and_sector_post(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC)
 
         result = forum_service.get_posts(db_session, user)
 
         assert result.total == 1
 
-    def test_user_does_not_see_other_group_post(self, db_session: Session) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        other_author = _make_user(
-            db_session, "widower@example.com", UserType.WIDOWER, Sector.HASIDIC
+    def test_user_does_not_see_other_group_post(
+        self, db_session: Session, make_user
+    ) -> None:
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        other_author = make_user(
+            "widower@example.com", UserType.WIDOWER, Sector.HASIDIC
         )
         _make_post(
             db_session, other_author, GroupVisibility.WIDOWERS, SectorVisibility.HASIDIC
@@ -95,12 +72,12 @@ class TestGetPostsContentFilter:
 
         assert result.total == 0
 
-    def test_user_does_not_see_other_sector_post(self, db_session: Session) -> None:
-        user = _make_user(
-            db_session, "widow-hasidic@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        other_author = _make_user(
-            db_session, "widow-litvish@example.com", UserType.WIDOW, Sector.LITVISH
+    def test_user_does_not_see_other_sector_post(
+        self, db_session: Session, make_user
+    ) -> None:
+        user = make_user("widow-hasidic@example.com", UserType.WIDOW, Sector.HASIDIC)
+        other_author = make_user(
+            "widow-litvish@example.com", UserType.WIDOW, Sector.LITVISH
         )
         _make_post(
             db_session, other_author, GroupVisibility.WIDOWS, SectorVisibility.LITVISH
@@ -111,12 +88,10 @@ class TestGetPostsContentFilter:
         assert result.total == 0
 
     def test_user_sees_post_visible_to_all_groups_and_sectors(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
         _make_post(db_session, admin, GroupVisibility.ALL, SectorVisibility.ALL)
 
         result = forum_service.get_posts(db_session, user)
@@ -124,11 +99,9 @@ class TestGetPostsContentFilter:
         assert result.total == 1
 
     def test_user_does_not_see_hidden_or_deleted_posts(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(
             db_session,
             user,
@@ -151,23 +124,19 @@ class TestGetPostsContentFilter:
 
 class TestGetPostsAdminBypass:
     def test_admin_sees_posts_from_other_groups_and_sectors(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        widow = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        widow = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(db_session, widow, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC)
 
         result = forum_service.get_posts(db_session, admin)
 
         assert result.total == 1
 
-    def test_admin_sees_hidden_posts(self, db_session: Session) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        widow = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_admin_sees_hidden_posts(self, db_session: Session, make_user) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        widow = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(
             db_session,
             widow,
@@ -180,11 +149,11 @@ class TestGetPostsAdminBypass:
 
         assert result.total == 1
 
-    def test_admin_does_not_see_deleted_posts(self, db_session: Session) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        widow = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_admin_does_not_see_deleted_posts(
+        self, db_session: Session, make_user
+    ) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        widow = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(
             db_session,
             widow,
@@ -200,11 +169,9 @@ class TestGetPostsAdminBypass:
 
 class TestGetPostsPagination:
     def test_total_counts_all_matching_posts_not_just_current_page(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         for _ in range(5):
             _make_post(
                 db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
@@ -216,11 +183,9 @@ class TestGetPostsPagination:
         assert len(result.items) == 2
 
     def test_offset_returns_correct_page_ordered_by_newest_first(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         base = datetime.now(UTC).replace(tzinfo=None)
         posts = [
             _make_post(
@@ -241,18 +206,18 @@ class TestGetPostsPagination:
 
 
 class TestGetPostsRoleGuard:
-    def test_moderator_gets_403_not_500(self, db_session: Session) -> None:
-        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+    def test_moderator_gets_403_not_500(self, db_session: Session, make_user) -> None:
+        moderator = make_user("mod@example.com", role=UserRole.MODERATOR)
 
         with pytest.raises(HTTPException) as exc_info:
             forum_service.get_posts(db_session, moderator)
 
         assert exc_info.value.status_code == 403
 
-    def test_professional_gets_403_not_500(self, db_session: Session) -> None:
-        professional = _make_user(
-            db_session, "pro@example.com", role=UserRole.PROFESSIONAL
-        )
+    def test_professional_gets_403_not_500(
+        self, db_session: Session, make_user
+    ) -> None:
+        professional = make_user("pro@example.com", role=UserRole.PROFESSIONAL)
 
         with pytest.raises(HTTPException) as exc_info:
             forum_service.get_posts(db_session, professional)
@@ -262,9 +227,9 @@ class TestGetPostsRoleGuard:
 
 class TestCreateBroadcastPost:
     def test_creates_post_visible_to_all_groups_and_sectors(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
         data = BroadcastCreate(title="הודעה חשובה", content="תוכן ההודעה לכלל המשתמשים")
 
         post = forum_service.create_broadcast_post(db_session, data, admin)
@@ -277,8 +242,8 @@ class TestCreateBroadcastPost:
         assert post.sector_visibility == SectorVisibility.ALL
         assert post.status == PostStatus.VISIBLE
 
-    def test_creates_audit_log_entry(self, db_session: Session) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+    def test_creates_audit_log_entry(self, db_session: Session, make_user) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
         data = BroadcastCreate(title="הודעה חשובה", content="תוכן ההודעה")
 
         post = forum_service.create_broadcast_post(db_session, data, admin)
@@ -293,9 +258,9 @@ class TestCreateBroadcastPost:
         assert details["title"] == "הודעה חשובה"
 
     def test_two_broadcasts_create_two_independent_posts_and_logs(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
 
         first = forum_service.create_broadcast_post(
             db_session, BroadcastCreate(title="ראשון", content="תוכן ראשון"), admin

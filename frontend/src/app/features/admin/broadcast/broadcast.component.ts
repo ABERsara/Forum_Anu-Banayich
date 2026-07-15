@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
@@ -12,6 +12,7 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
   imports: [ReactiveFormsModule, RouterLink, ErrorDisplayComponent, LoadingSpinnerComponent],
   templateUrl: './broadcast.component.html',
   styleUrl: './broadcast.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BroadcastComponent {
   private readonly fb = inject(FormBuilder);
@@ -27,7 +28,7 @@ export class BroadcastComponent {
   successMessage = signal('');
 
   get contentLength(): number {
-    return this.form.get('content')?.value?.length ?? 0;
+    return this.form.controls.content.value?.length ?? 0;
   }
 
   onSubmit(): void {
@@ -41,7 +42,7 @@ export class BroadcastComponent {
     this.successMessage.set('');
 
     this.adminService
-      .sendBroadcast(this.form.getRawValue() as { title: string; content: string })
+      .sendBroadcast({ title: this.form.value.title!, content: this.form.value.content! })
       .subscribe({
         next: () => {
           this.isLoading.set(false);
