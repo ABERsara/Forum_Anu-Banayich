@@ -81,7 +81,7 @@ def get_post(
 @router.delete("/forum/posts/{post_id}", response_model=ForumPostResponse)
 def delete_post(
     post_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """
