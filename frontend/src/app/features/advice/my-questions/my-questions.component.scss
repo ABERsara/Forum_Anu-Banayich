@@ -1,0 +1,55 @@
+@use '../../../../styles/variables' as *;
+
+:host {
+  display: block;
+  padding: $spacing-lg;
+  direction: rtl;
+}
+
+h1 {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $color-text;
+  margin: $spacing-lg 0;
+}
+
+.empty-state {
+  color: $color-text-muted;
+}
+
+.question-card {
+  background: $color-bg;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-md;
+}
+
+.question-content {
+  color: $color-text;
+  margin-bottom: $spacing-sm;
+}
+
+.question-meta {
+  display: flex;
+  gap: $spacing-md;
+  font-size: $font-size-sm;
+  color: $color-text-muted;
+  flex-wrap: wrap;
+}
+
+.question-status {
+  font-weight: $font-weight-medium;
+
+  &.status--open {
+    color: $color-primary;
+  }
+
+  &.status--answered {
+    color: $color-success;
+  }
+
+  &.status--closed {
+    color: $color-text-muted;
+  }
+}

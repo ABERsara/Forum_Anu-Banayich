@@ -17,7 +17,11 @@ import { ProfessionalService } from '../../../core/services/professional.service
   template: `
     <div class="page">
       <h1>ייעוץ מקצועי</h1>
-      <a routerLink="/advice/qa">לשאלות ותשובות ציבוריות</a>
+      <div class="top-links">
+        <a routerLink="/advice/qa">לשאלות ותשובות ציבוריות</a>
+        <span class="separator" aria-hidden="true">|</span>
+        <a routerLink="/advice/my-questions">השאלות שלי</a>
+      </div>
 
       @if (professionals().length > 0) {
         <div class="filter-bar">

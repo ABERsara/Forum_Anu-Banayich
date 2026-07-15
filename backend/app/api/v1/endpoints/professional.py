@@ -22,7 +22,7 @@ from app.schemas.professional import (
     PublicQAResponse,
 )
 from app.schemas.user import ProfessionalProfile
-from app.services import user_service
+from app.services import professional_service, user_service
 
 router = APIRouter(prefix="/advice", tags=["Professional Advisory"])
 
@@ -41,28 +41,32 @@ def list_professionals(
     ]
 
 
-@router.get("/questions", response_model=list[ProfessionalQueryResponse])
+@router.get(
+    "/questions",
+    response_model=list[ProfessionalQueryResponse],
+    dependencies=[Depends(require_role(UserRole.USER))],
+)
 def my_questions(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[ProfessionalQueryResponse]:
     """Return all questions asked by the current user."""
-    # TODO: call professional_service.get_my_questions(db, current_user)
-    return []
+    return professional_service.get_my_questions(db, current_user)
 
 
-@router.post("/questions", response_model=ProfessionalQueryResponse, status_code=201)
+@router.post(
+    "/questions",
+    response_model=ProfessionalQueryResponse,
+    status_code=201,
+    dependencies=[Depends(require_role(UserRole.USER))],
+)
 def ask_question(
     data: ProfessionalQueryCreate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ProfessionalQueryResponse:
-    """
-    Submit a professional question.
-
-    TODO: call professional_service.create_query(db, data, current_user)
-    """
-    raise NotImplementedError
+    """Submit a professional question."""
+    return professional_service.create_query(db, data, current_user)
 
 
 @router.get("/questions/public", response_model=list[PublicQAResponse])
