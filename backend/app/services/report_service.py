@@ -17,27 +17,113 @@ TODO list for junior developer:
   [ ] implement _check_frequent_false_reporter()
 """
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.constants import PostStatus, ReportTargetType, UserRole
+from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.report import ReportCreate, ReportDecideRequest
+from app.services.email_service import send_moderator_alert, send_urgent_moderator_alert
 
 
 def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     """
     File a new report on a piece of content.
 
-    TODO:
-      1. Verify target exists and reporter hasn't already reported this target
-      2. Create Report object, save to DB
-      3. Increment report_count on the target
-      4. If report_count == 1 → send email to moderator (find the right one)
-      5. If report_count == 2 → auto-hide content + send urgent notification
-      6. Return the report
+    Only FORUM_POST is supported today – DIRECT_MESSAGE and PROFESSIONAL_QUERY
+    reporting are out of scope for this sprint (no endpoint wires them yet).
     """
-    # TODO: implement this function
-    raise NotImplementedError("file_report() is not yet implemented")
+    if data.target_type != ReportTargetType.FORUM_POST:
+        raise HTTPException(
+            status_code=400, detail="סוג תוכן זה אינו נתמך לדיווח כרגע."
+        )
+
+    # Row-level lock: two reports racing on the same post must not lose an
+    # increment. No-op on SQLite (dev), enforced on PostgreSQL (production) –
+    # same pattern as forum_service.delete_post().
+    post = (
+        db.query(ForumPost)
+        .filter(ForumPost.id == data.target_id)
+        .with_for_update()
+        .first()
+    )
+    if post is None:
+        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+
+    _ensure_not_duplicate_report(db, reporter, data)
+
+    report = Report(
+        reporter_id=reporter.id,
+        target_type=data.target_type,
+        target_id=data.target_id,
+        reported_user_id=post.author_id,
+        reason=data.reason,
+        description=data.description,
+    )
+    db.add(report)
+    # report.id is a client-side default (uuid4) — only populated once flushed.
+    # _escalate() needs the real id for the moderator email, so flush now
+    # rather than waiting for the commit below.
+    db.flush()
+
+    post.report_count += 1
+    _escalate(db, post, report)
+
+    db.commit()
+    db.refresh(report)
+    return report
+
+
+def _ensure_not_duplicate_report(db: Session, reporter: User, data: ReportCreate) -> None:
+    """Block a second report from the same user on the same target."""
+    existing = (
+        db.query(Report)
+        .filter(
+            Report.reporter_id == reporter.id,
+            Report.target_type == data.target_type,
+            Report.target_id == data.target_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="כבר דיווחת על תוכן זה.")
+
+
+def _escalate(db: Session, post: ForumPost, report: Report) -> None:
+    """
+    Apply the three-stage escalation rule based on the post's updated
+    report_count (spec section 7.1):
+      1st report  → email to moderators
+      2nd report  → auto-hide + urgent email
+      3rd+ report → repeat urgent email
+    """
+    if post.report_count == 1:
+        for email in _moderator_emails_for(db):
+            send_moderator_alert(email, report.id, post.content[:100])
+    elif post.report_count == 2:
+        post.status = PostStatus.HIDDEN
+        for email in _moderator_emails_for(db):
+            send_urgent_moderator_alert(email, report.id)
+    elif post.report_count >= 3:
+        for email in _moderator_emails_for(db):
+            send_urgent_moderator_alert(email, report.id)
+
+
+def _moderator_emails_for(db: Session) -> list[str]:
+    """
+    Return contact addresses for all active moderators.
+
+    TEMPORARY: broadcasts to every moderator, regardless of which group/sector
+    they're actually responsible for — moderator_cells matching isn't
+    implemented anywhere yet. Sprint 4 will replace only this function's body
+    with a real lookup (e.g. get_moderator_for_cell(post.group_visibility,
+    post.sector_visibility)) once that mechanism exists; callers in
+    file_report()/_escalate() won't need to change.
+    """
+    moderators = db.query(User).filter(User.role == UserRole.MODERATOR).all()
+    return [m.alert_email or m.email for m in moderators]
 
 
 def decide_report(
