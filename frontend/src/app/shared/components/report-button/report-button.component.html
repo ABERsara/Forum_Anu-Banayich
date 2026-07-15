@@ -1,0 +1,56 @@
+<div class="report-button" dir="rtl">
+  @if (isSubmitted()) {
+    <p class="report-button__submitted">הדיווח נשלח, תודה.</p>
+  } @else {
+    <button type="button" (click)="onOpenClick()">דיווח</button>
+  }
+</div>
+
+@if (showDialog()) {
+  <div class="overlay">
+    <div class="dialog" dir="rtl">
+      <h2 class="dialog__title">דיווח על תוכן</h2>
+
+      <div class="dialog__field">
+        <label class="dialog__label" for="report-reason">סיבת הדיווח</label>
+        <select
+          id="report-reason"
+          class="dialog__select"
+          [value]="reason()"
+          (change)="onReasonChange($any($event.target).value)"
+        >
+          @for (option of reasonOptions; track option) {
+            <option [value]="option">{{ reasonLabels[option] }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="dialog__field">
+        <label class="dialog__label" for="report-description">פירוט (לא חובה)</label>
+        <textarea
+          id="report-description"
+          class="dialog__textarea"
+          rows="3"
+          [value]="description()"
+          (input)="onDescriptionChange($any($event.target).value)"
+        ></textarea>
+      </div>
+
+      @if (errorMessage(); as err) {
+        <app-error-display [message]="err" />
+      }
+
+      <div class="dialog__actions">
+        <button class="btn btn--cancel" type="button" (click)="onCancel()">ביטול</button>
+        <button
+          class="btn btn--primary"
+          type="button"
+          [disabled]="isSubmitting()"
+          (click)="onSubmit()"
+        >
+          שליחת דיווח
+        </button>
+      </div>
+    </div>
+  </div>
+}
