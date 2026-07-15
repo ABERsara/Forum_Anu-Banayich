@@ -76,7 +76,9 @@ def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     return report
 
 
-def _ensure_not_duplicate_report(db: Session, reporter: User, data: ReportCreate) -> None:
+def _ensure_not_duplicate_report(
+    db: Session, reporter: User, data: ReportCreate
+) -> None:
     """Block a second report from the same user on the same target."""
     existing = (
         db.query(Report)

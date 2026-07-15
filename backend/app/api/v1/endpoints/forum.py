@@ -93,7 +93,9 @@ def delete_post(
     return ForumPostResponse.model_validate(post)
 
 
-@router.post("/forum/posts/{post_id}/report", response_model=ReportResponse, status_code=201)
+@router.post(
+    "/forum/posts/{post_id}/report", response_model=ReportResponse, status_code=201
+)
 def report_post(
     post_id: str,
     data: ReportCreate,
