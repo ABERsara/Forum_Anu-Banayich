@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.constants import ProfessionalDomain, UserRole
-from app.core.dependencies import get_current_user, get_db, require_role
+from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.professional import (
     ProfessionalAnswerRequest,
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/advice", tags=["Professional Advisory"])
 
 @router.get("/professionals", response_model=list[ProfessionalProfile])
 def list_professionals(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[ProfessionalProfile]:
     """
@@ -43,7 +43,7 @@ def list_professionals(
 
 @router.get("/questions", response_model=list[ProfessionalQueryResponse])
 def my_questions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[ProfessionalQueryResponse]:
     """Return all questions asked by the current user."""
@@ -54,7 +54,7 @@ def my_questions(
 @router.post("/questions", response_model=ProfessionalQueryResponse, status_code=201)
 def ask_question(
     data: ProfessionalQueryCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ProfessionalQueryResponse:
     """
@@ -69,7 +69,7 @@ def ask_question(
 def public_qa_feed(
     domain: ProfessionalDomain | None = Query(None),
     page: int = Query(1, ge=1),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[PublicQAResponse]:
     """
@@ -86,7 +86,7 @@ def public_qa_feed(
     dependencies=[Depends(require_role(UserRole.PROFESSIONAL))],
 )
 def pending_questions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[ProfessionalQueryResponse]:
     """Questions waiting for the current professional to answer."""
@@ -102,7 +102,7 @@ def pending_questions(
 def answer_question(
     query_id: str,
     data: ProfessionalAnswerRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ProfessionalQueryResponse:
     """Professional submits an answer to a question."""
