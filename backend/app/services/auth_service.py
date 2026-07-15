@@ -38,14 +38,13 @@ def _create_token(
     return str(jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM))
 
 
-def _issue_otp(db: Session, user: User) -> None:
+def _generate_and_assign_otp(user: User) -> str:
     otp = _generate_otp()
     user.otp_code = otp
     user.otp_expires_at = datetime.now(UTC) + timedelta(
         minutes=settings.OTP_EXPIRE_MINUTES
     )
-    db.commit()
-    send_otp_email(user.email, otp)
+    return otp
 
 
 def register(db: Session, data: RegisterRequest) -> User:
@@ -67,10 +66,13 @@ def register(db: Session, data: RegisterRequest) -> User:
         role=UserRole.USER,
         account_status=AccountStatus.PENDING_OTP,
     )
+    otp = _generate_and_assign_otp(user)
     db.add(user)
     db.commit()
     db.refresh(user)
-    _issue_otp(db, user)
+    # PROD: sent after commit by design — the OTP is already persisted at this point,
+    # so a failed send is recoverable via resend_otp() rather than leaving orphaned state.
+    send_otp_email(user.email, otp)
     return user
 
 
@@ -151,4 +153,6 @@ def resend_otp(db: Session, email: str) -> None:
     if not user or user.account_status != AccountStatus.PENDING_OTP:
         # PROD: intentionally 400 instead of 404 — prevents User Enumeration Attack.
         raise HTTPException(status_code=400, detail="לא ניתן לשלוח קוד אימות")
-    _issue_otp(db, user)
+    otp = _generate_and_assign_otp(user)
+    db.commit()
+    send_otp_email(user.email, otp)
