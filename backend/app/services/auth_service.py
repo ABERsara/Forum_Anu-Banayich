@@ -38,6 +38,16 @@ def _create_token(
     return str(jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM))
 
 
+def _issue_otp(db: Session, user: User) -> None:
+    otp = _generate_otp()
+    user.otp_code = otp
+    user.otp_expires_at = datetime.now(UTC) + timedelta(
+        minutes=settings.OTP_EXPIRE_MINUTES
+    )
+    db.commit()
+    send_otp_email(user.email, otp)
+
+
 def register(db: Session, data: RegisterRequest) -> User:
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
@@ -60,13 +70,7 @@ def register(db: Session, data: RegisterRequest) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
-    otp = _generate_otp()
-    user.otp_code = otp
-    user.otp_expires_at = datetime.now(UTC) + timedelta(
-        minutes=settings.OTP_EXPIRE_MINUTES
-    )
-    db.commit()
-    send_otp_email(user.email, otp)
+    _issue_otp(db, user)
     return user
 
 
@@ -147,10 +151,4 @@ def resend_otp(db: Session, email: str) -> None:
     if not user or user.account_status != AccountStatus.PENDING_OTP:
         # PROD: intentionally 400 instead of 404 — prevents User Enumeration Attack.
         raise HTTPException(status_code=400, detail="לא ניתן לשלוח קוד אימות")
-    otp = _generate_otp()
-    user.otp_code = otp
-    user.otp_expires_at = datetime.now(UTC) + timedelta(
-        minutes=settings.OTP_EXPIRE_MINUTES
-    )
-    db.commit()
-    send_otp_email(user.email, otp)
+    _issue_otp(db, user)
