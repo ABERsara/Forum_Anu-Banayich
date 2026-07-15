@@ -91,12 +91,15 @@ def send_suspension_notification(email: str, hours: int, reason: str) -> None:
     # TODO: send real email
 
 
-def send_question_notification(
-    professional_email: str, query_id: str, is_general: bool
-) -> None:
-    """Notify a professional of a new question."""
-    label = "שאלה כללית" if is_general else "שאלה ישירה"
-    logger.info(f"[EMAIL] {label} {query_id} → {professional_email}")
+def send_direct_question_notification(professional_email: str, query_id: str) -> None:
+    """Notify a professional of a new question addressed to them directly."""
+    logger.info(f"[EMAIL] שאלה ישירה {query_id} → {professional_email}")
+    # TODO: send real email
+
+
+def send_domain_question_notification(professional_email: str, query_id: str) -> None:
+    """Notify a professional of a new general question in their domain."""
+    logger.info(f"[EMAIL] שאלה כללית {query_id} → {professional_email}")
     # TODO: send real email
 
 

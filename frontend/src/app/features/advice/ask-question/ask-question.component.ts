@@ -41,6 +41,11 @@ export class AskQuestionComponent implements OnInit {
 
   ngOnInit(): void {
     this.professionalId = this.route.snapshot.queryParamMap.get('professionalId');
+    if (!this.professionalId) {
+      const domainControl = this.form.controls.domain;
+      domainControl.addValidators(Validators.required);
+      domainControl.updateValueAndValidity();
+    }
   }
 
   onSubmit(): void {
@@ -63,7 +68,10 @@ export class AskQuestionComponent implements OnInit {
     };
 
     this.professionalService.askQuestion(data).subscribe({
-      next: () => this.router.navigate(['/advice']),
+      next: () => {
+        this.isLoading.set(false);
+        this.router.navigate(['/advice']);
+      },
       error: (err) => {
         this.errorMessage.set(err.error?.detail ?? 'שגיאה בשליחת השאלה.');
         this.isLoading.set(false);

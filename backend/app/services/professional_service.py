@@ -12,9 +12,9 @@ TODO list for junior developer:
 """
 
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from app.core.constants import UserRole
+from app.core.constants import ProfessionalDomain, UserRole
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import (
@@ -80,6 +80,39 @@ def _to_response(query: ProfessionalQuery) -> ProfessionalQueryResponse:
     )
 
 
+def _notify_professionals(
+    db: Session,
+    professional: User | None,
+    domain: ProfessionalDomain | None,
+    asker: User,
+    query_id: str,
+) -> None:
+    """
+    Send the new-question email notification(s):
+      - specific professional  → direct email
+      - general domain question → email to all matching professionals
+    """
+    if professional is not None:
+        email_service.send_direct_question_notification(professional.email, query_id)
+        return
+
+    if domain is None:
+        return
+
+    matching_professionals = (
+        db.query(User)
+        .filter(
+            User.role == UserRole.PROFESSIONAL,
+            User.professional_domain == domain,
+            User.is_active_professional.is_(True),
+        )
+        .all()
+    )
+    for candidate in matching_professionals:
+        if _professional_matches_asker(candidate, asker):
+            email_service.send_domain_question_notification(candidate.email, query_id)
+
+
 def create_query(
     db: Session, data: ProfessionalQueryCreate, asker: User
 ) -> ProfessionalQueryResponse:
@@ -89,9 +122,7 @@ def create_query(
     1. Validate: either professional_id OR domain must be set (not both None)
     2. If professional_id given: verify that professional serves asker's group/sector
     3. Create ProfessionalQuery object, save to DB
-    4. Send email notification:
-         - specific professional  → direct email
-         - general domain question → email to all matching professionals
+    4. Send email notification (see _notify_professionals)
     5. Return the query
     """
     if data.professional_id is None and data.domain is None:
@@ -126,26 +157,12 @@ def create_query(
     db.add(query)
     db.commit()
     db.refresh(query)
+    # professional/asker are already loaded in this scope — assign them directly
+    # instead of letting _to_response() trigger a lazy-load SELECT for each.
+    query.professional = professional
+    query.asker = asker
 
-    if professional is not None:
-        email_service.send_question_notification(
-            professional.email, query.id, is_general=False
-        )
-    elif data.domain is not None:
-        matching_professionals = (
-            db.query(User)
-            .filter(
-                User.role == UserRole.PROFESSIONAL,
-                User.professional_domain == data.domain,
-                User.is_active_professional.is_(True),
-            )
-            .all()
-        )
-        for candidate in matching_professionals:
-            if _professional_matches_asker(candidate, asker):
-                email_service.send_question_notification(
-                    candidate.email, query.id, is_general=True
-                )
+    _notify_professionals(db, professional, data.domain, asker, query.id)
 
     return _to_response(query)
 
@@ -199,6 +216,10 @@ def get_my_questions(db: Session, asker: User) -> list[ProfessionalQueryResponse
     """
     queries = (
         db.query(ProfessionalQuery)
+        .options(
+            joinedload(ProfessionalQuery.professional),
+            joinedload(ProfessionalQuery.asker),
+        )
         .filter(ProfessionalQuery.asker_id == asker.id)
         .order_by(ProfessionalQuery.created_at.desc())
         .all()

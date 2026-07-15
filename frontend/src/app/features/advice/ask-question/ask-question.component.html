@@ -19,6 +19,9 @@
               <option [ngValue]="domain">{{ domainLabels[domain] }}</option>
             }
           </select>
+          @if (form.controls.domain.invalid && form.controls.domain.touched) {
+            <span class="field-error">נא לבחור תחום</span>
+          }
         </div>
       }
 
