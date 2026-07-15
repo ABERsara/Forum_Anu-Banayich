@@ -39,6 +39,10 @@ def _create_token(
 
 
 def _generate_and_assign_otp(user: User) -> str:
+    # send_otp_email is intentionally not folded in here — register() and
+    # resend_otp() commit at different points (register only after db.add;
+    # resend_otp immediately), so each caller sends the email itself once
+    # its own commit has succeeded.
     otp = _generate_otp()
     user.otp_code = otp
     user.otp_expires_at = datetime.now(UTC) + timedelta(
