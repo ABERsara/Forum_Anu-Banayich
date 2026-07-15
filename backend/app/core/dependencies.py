@@ -106,9 +106,13 @@ def require_admin(current_user: "User" = Depends(get_current_active_user)) -> "U
     return require_role(UserRole.ADMIN)(current_user)
 
 
-def require_moderator(current_user: "User" = Depends(get_current_active_user)) -> "User":
+def require_moderator(
+    current_user: "User" = Depends(get_current_active_user),
+) -> "User":
     return require_role(UserRole.MODERATOR, UserRole.ADMIN)(current_user)
 
 
-def require_professional(current_user: "User" = Depends(get_current_active_user)) -> "User":
+def require_professional(
+    current_user: "User" = Depends(get_current_active_user),
+) -> "User":
     return require_role(UserRole.PROFESSIONAL)(current_user)
