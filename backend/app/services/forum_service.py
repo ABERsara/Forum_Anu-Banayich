@@ -189,7 +189,20 @@ def delete_post(db: Session, post_id: str, current_user: User) -> ForumPost:
     # Row-level lock: two people (e.g. the author and a moderator) hitting
     # delete at the same time must not race on the same status update.
     # No-op on SQLite (dev), enforced on PostgreSQL (production).
-    post = db.query(ForumPost).filter(ForumPost.id == post_id).with_for_update().first()
+    #
+    # joinedload(author) avoids a second (lazy-load) query when the response
+    # is serialized later - log_action()'s commit expires `post`, and
+    # db.refresh() below only reloads ForumPost's own columns, not author.
+    # with_for_update(of=ForumPost) keeps the lock scoped to forum_posts only
+    # - without `of=`, FOR UPDATE on a query with a JOIN locks every table in
+    # it, which would lock the author's User row for no reason.
+    post = (
+        db.query(ForumPost)
+        .options(joinedload(ForumPost.author))
+        .filter(ForumPost.id == post_id)
+        .with_for_update(of=ForumPost)
+        .first()
+    )
     if post is None:
         raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
 
