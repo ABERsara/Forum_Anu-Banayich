@@ -41,7 +41,11 @@ def list_professionals(
     ]
 
 
-@router.get("/questions", response_model=list[ProfessionalQueryResponse])
+@router.get(
+    "/questions",
+    response_model=list[ProfessionalQueryResponse],
+    dependencies=[Depends(require_role(UserRole.USER))],
+)
 def my_questions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -50,7 +54,12 @@ def my_questions(
     return professional_service.get_my_questions(db, current_user)
 
 
-@router.post("/questions", response_model=ProfessionalQueryResponse, status_code=201)
+@router.post(
+    "/questions",
+    response_model=ProfessionalQueryResponse,
+    status_code=201,
+    dependencies=[Depends(require_role(UserRole.USER))],
+)
 def ask_question(
     data: ProfessionalQueryCreate,
     current_user: User = Depends(get_current_user),
