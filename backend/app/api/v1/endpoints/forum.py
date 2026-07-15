@@ -12,9 +12,10 @@ POST   /messages              – send a direct message
 GET    /messages/{user_id}    – conversation with a specific user
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.constants import ReportTargetType
 from app.core.dependencies import get_current_user, get_db
 from app.models.user import User
 from app.schemas.forum import (
@@ -25,8 +26,8 @@ from app.schemas.forum import (
     ForumPostListResponse,
     ForumPostResponse,
 )
-from app.schemas.report import ReportCreate
-from app.services import forum_service
+from app.schemas.report import ReportCreate, ReportResponse
+from app.services import forum_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
 
@@ -92,20 +93,23 @@ def delete_post(
     return ForumPostResponse.model_validate(post)
 
 
-@router.post("/forum/posts/{post_id}/report", status_code=201)
+@router.post("/forum/posts/{post_id}/report", response_model=ReportResponse, status_code=201)
 def report_post(
     post_id: str,
     data: ReportCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> ReportResponse:
     """
-    Report a forum post.
-
-    TODO: call report_service.file_report(db, data, current_user)
+    Report a forum post. Rejects if the body's target doesn't match the
+    route's post_id, rather than silently overriding it.
     """
-    # TODO: implement
-    raise NotImplementedError
+    if data.target_type != ReportTargetType.FORUM_POST or data.target_id != post_id:
+        raise HTTPException(
+            status_code=400, detail="נתוני הדיווח אינם תואמים את ההודעה המבוקשת."
+        )
+    report = report_service.file_report(db, data, current_user)
+    return ReportResponse.model_validate(report)
 
 
 # ──────────────────────────────────────────────────────────
