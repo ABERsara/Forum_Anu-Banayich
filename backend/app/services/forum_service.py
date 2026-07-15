@@ -204,6 +204,9 @@ def delete_post(db: Session, post_id: str, current_user: User) -> ForumPost:
 
     post.status = PostStatus.DELETED
 
+    # log_action() calls db.commit() internally - this both writes the audit
+    # entry AND persists the post.status change above. There's no separate
+    # db.commit() in this function because of that.
     log_action(
         db,
         actor=current_user,
