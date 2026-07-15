@@ -114,6 +114,25 @@ def get_posts(
     )
 
 
+def _matches_content_filter(post: ForumPost, current_user: User) -> bool:
+    """
+    Python-side equivalent of _content_filter(), for checking a single
+    already-loaded post instead of querying again. Keep the two in sync —
+    same group/sector OR-logic, just evaluated in memory vs. compiled to SQL.
+    """
+    assert current_user.user_type is not None, (
+        "_matches_content_filter() requires a user with user_type set"
+    )
+    assert current_user.sector is not None, (
+        "_matches_content_filter() requires a user with sector set"
+    )
+    group_visibility = GroupVisibility(current_user.user_type.value)
+    sector_visibility = SectorVisibility(current_user.sector.value)
+    return post.group_visibility in (group_visibility, GroupVisibility.ALL) and (
+        post.sector_visibility in (sector_visibility, SectorVisibility.ALL)
+    )
+
+
 def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     """
     Return a single post.
@@ -149,13 +168,7 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     if post.status != PostStatus.VISIBLE:
         raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
 
-    is_visible_to_user = (
-        _content_filter(
-            db.query(ForumPost).filter(ForumPost.id == post_id), current_user
-        ).first()
-        is not None
-    )
-    if not is_visible_to_user:
+    if not _matches_content_filter(post, current_user):
         raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
 
     return post
