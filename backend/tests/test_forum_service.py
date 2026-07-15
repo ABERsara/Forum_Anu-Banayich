@@ -300,6 +300,19 @@ class TestGetPostByIdAsUser:
 
         assert result.id == post.id
 
+    def test_sees_post_visible_to_all_groups_and_sectors(
+        self, db_session: Session
+    ) -> None:
+        user = _make_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        post = _make_post(db_session, admin, GroupVisibility.ALL, SectorVisibility.ALL)
+
+        result = forum_service.get_post_by_id(db_session, post.id, user)
+
+        assert result.id == post.id
+
     def test_mismatched_group_gets_403(self, db_session: Session) -> None:
         user = _make_user(
             db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
