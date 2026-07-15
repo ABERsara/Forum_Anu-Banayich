@@ -27,16 +27,16 @@
     @if (deleteError(); as deleteErr) {
       <app-error-display [message]="deleteErr" />
     }
-  }
 
-  @if (showDeleteConfirm()) {
-    <app-confirm-dialog
-      title="מחיקת הודעה"
-      message="פעולה זו תמחק את ההודעה. לא ניתן לשחזר."
-      confirmText="מחיקה"
-      [isDestructive]="true"
-      (confirmed)="onDeleteConfirmed()"
-      (cancelled)="onDeleteCancelled()"
-    />
+    @if (showDeleteConfirm()) {
+      <app-confirm-dialog
+        title="מחיקת הודעה"
+        message="פעולה זו תמחק את ההודעה. לא ניתן לשחזר."
+        confirmText="מחיקה"
+        [isDestructive]="true"
+        (confirmed)="onDeleteConfirmed()"
+        (cancelled)="onDeleteCancelled()"
+      />
+    }
   }
 </div>
