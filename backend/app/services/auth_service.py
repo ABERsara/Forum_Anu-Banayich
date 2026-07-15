@@ -57,15 +57,14 @@ def register(db: Session, data: RegisterRequest) -> User:
         role=UserRole.USER,
         account_status=AccountStatus.PENDING_OTP,
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
     otp = _generate_otp()
     user.otp_code = otp
     user.otp_expires_at = datetime.now(UTC) + timedelta(
         minutes=settings.OTP_EXPIRE_MINUTES
     )
+    db.add(user)
     db.commit()
+    db.refresh(user)
     send_otp_email(user.email, otp)
     return user
 
