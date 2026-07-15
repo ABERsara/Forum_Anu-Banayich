@@ -26,6 +26,7 @@ from app.core.config import settings
 from app.core.constants import UserRole
 from app.core.security import decode_access_token
 from app.db.session import SessionLocal
+from app.services.user_service import ensure_account_active, get_user_by_id
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -54,8 +55,6 @@ def get_current_user(
 
     Raises 401 if the token is invalid or the user is not found.
     """
-    from app.services.user_service import get_user_by_id  # noqa: PLC0415
-
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="לא ניתן לאמת את הזהות. יש להתחבר מחדש.",
@@ -75,8 +74,6 @@ def get_current_user(
 
 def get_current_active_user(current_user: "User" = Depends(get_current_user)) -> "User":
     """Use when the endpoint requires a logged-in user with an ACTIVE account."""
-    from app.services.user_service import ensure_account_active  # noqa: PLC0415
-
     ensure_account_active(current_user)
     return current_user
 
