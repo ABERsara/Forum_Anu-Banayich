@@ -14,7 +14,7 @@ GET    /messages/{user_id}    – conversation with a specific user
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db
+from app.core.dependencies import get_current_active_user, get_db
 from app.models.user import User
 from app.schemas.forum import (
     ConversationSummary,
@@ -39,7 +39,7 @@ router = APIRouter(tags=["Forum & Messages"])
 def list_posts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostListResponse:
     """
@@ -52,7 +52,7 @@ def list_posts(
 @router.post("/forum/posts", response_model=ForumPostResponse, status_code=201)
 def create_post(
     data: ForumPostCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """
@@ -67,7 +67,7 @@ def create_post(
 @router.get("/forum/posts/{post_id}", response_model=ForumPostResponse)
 def get_post(
     post_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """
@@ -83,7 +83,7 @@ def get_post(
 def report_post(
     post_id: str,
     data: ReportCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> None:
     """
@@ -102,7 +102,7 @@ def report_post(
 
 @router.get("/messages", response_model=list[ConversationSummary])
 def get_inbox(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[ConversationSummary]:
     """
@@ -117,7 +117,7 @@ def get_inbox(
 @router.post("/messages", response_model=DirectMessageResponse, status_code=201)
 def send_message(
     data: DirectMessageCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> DirectMessageResponse:
     """
@@ -133,7 +133,7 @@ def send_message(
 def get_conversation(
     user_id: str,
     page: int = Query(1, ge=1),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[DirectMessageResponse]:
     """

@@ -19,12 +19,12 @@ from typing import TYPE_CHECKING
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from jose import JWTError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.constants import AccountStatus, UserRole
-from app.core.security import ALGORITHM
+from app.core.constants import UserRole
+from app.core.security import decode_access_token
 from app.db.session import SessionLocal
 
 if TYPE_CHECKING:
@@ -47,12 +47,14 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> "User":
     """
-    Decode JWT, load user from DB.
+    Decode JWT and load the corresponding user from DB.
+
+    Does NOT enforce account_status — use get_current_active_user (or check
+    the status yourself) if the endpoint requires an active account.
 
     Raises 401 if the token is invalid or the user is not found.
     """
-    # Import here to avoid circular imports
-    from app.models.user import User  # noqa: PLC0415
+    from app.services.user_service import get_user_by_id  # noqa: PLC0415
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -60,34 +62,28 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str | None = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
+        user_id = decode_access_token(token)
     except JWTError:
         raise credentials_exception from None
 
-    user = db.query(User).filter(User.id == user_id).first()
+    user = get_user_by_id(db, user_id)
     if user is None:
         raise credentials_exception
-
-    if user.account_status not in (AccountStatus.ACTIVE,):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="החשבון אינו פעיל.",
-        )
 
     return user
 
 
 def get_current_active_user(current_user: "User" = Depends(get_current_user)) -> "User":
-    """Alias – use when you just need any logged-in, active user."""
+    """Use when the endpoint requires a logged-in user with an ACTIVE account."""
+    from app.services.user_service import ensure_account_active  # noqa: PLC0415
+
+    ensure_account_active(current_user)
     return current_user
 
 
 def require_role(*roles: UserRole) -> Callable[..., "User"]:
     """
-    Returns a dependency that enforces one of the given roles.
+    Returns a dependency that enforces one of the given roles (implies active account).
 
     Usage:
         @router.get("/admin/...")
@@ -95,7 +91,7 @@ def require_role(*roles: UserRole) -> Callable[..., "User"]:
             ...
     """
 
-    def _check(current_user: "User" = Depends(get_current_user)) -> "User":
+    def _check(current_user: "User" = Depends(get_current_active_user)) -> "User":
         if current_user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -106,13 +102,13 @@ def require_role(*roles: UserRole) -> Callable[..., "User"]:
     return _check
 
 
-def require_admin(current_user: "User" = Depends(get_current_user)) -> "User":
+def require_admin(current_user: "User" = Depends(get_current_active_user)) -> "User":
     return require_role(UserRole.ADMIN)(current_user)
 
 
-def require_moderator(current_user: "User" = Depends(get_current_user)) -> "User":
+def require_moderator(current_user: "User" = Depends(get_current_active_user)) -> "User":
     return require_role(UserRole.MODERATOR, UserRole.ADMIN)(current_user)
 
 
-def require_professional(current_user: "User" = Depends(get_current_user)) -> "User":
+def require_professional(current_user: "User" = Depends(get_current_active_user)) -> "User":
     return require_role(UserRole.PROFESSIONAL)(current_user)
