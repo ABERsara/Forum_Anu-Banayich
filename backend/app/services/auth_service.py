@@ -44,6 +44,7 @@ def register(db: Session, data: RegisterRequest) -> User:
         # PROD: deviates from spec — spec defines 400, changed to 409 Conflict for semantic correctness (valid request conflicting with existing resource). Reconsider before PROD.
         raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
     hashed = get_password_hash(data.password)
+    otp = _generate_otp()
     user = User(
         email=data.email,
         password_hash=hashed,
@@ -56,16 +57,13 @@ def register(db: Session, data: RegisterRequest) -> User:
         id_number=data.id_number,
         role=UserRole.USER,
         account_status=AccountStatus.PENDING_OTP,
+        otp_code=otp,
+        otp_expires_at=datetime.now(UTC)
+        + timedelta(minutes=settings.OTP_EXPIRE_MINUTES),
     )
     db.add(user)
     db.commit()
     db.refresh(user)
-    otp = _generate_otp()
-    user.otp_code = otp
-    user.otp_expires_at = datetime.now(UTC) + timedelta(
-        minutes=settings.OTP_EXPIRE_MINUTES
-    )
-    db.commit()
     send_otp_email(user.email, otp)
     return user
 
