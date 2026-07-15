@@ -6,6 +6,7 @@ Each test runs against an isolated in-memory SQLite DB (see conftest.py).
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from jose import jwt as jose_jwt
 
 from app.core.config import settings
@@ -115,6 +116,21 @@ class TestRegister:
         payload = {k: v for k, v in VALID_PAYLOAD.items() if k != "first_name"}
         r = await _register(client, payload)
         assert r.status_code == 422
+
+    async def test_commit_failure_leaves_no_user_row(
+        self, client, db_session, monkeypatch
+    ):
+        """If db.commit() fails, the user INSERT must not be partially persisted."""
+
+        def _boom():
+            raise Exception("simulated commit failure")
+
+        monkeypatch.setattr(db_session, "commit", _boom)
+        with pytest.raises(Exception, match="simulated commit failure"):
+            await _register(client)
+
+        db_session.rollback()
+        assert _get_user(db_session) is None
 
 
 # ---------------------------------------------------------------------------
