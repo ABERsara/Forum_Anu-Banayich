@@ -65,6 +65,8 @@ def register(db: Session, data: RegisterRequest) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
+    # PROD: sent after commit by design — the OTP is already persisted at this point,
+    # so a failed send is recoverable via resend_otp() rather than leaving orphaned state.
     send_otp_email(user.email, otp)
     return user
 
