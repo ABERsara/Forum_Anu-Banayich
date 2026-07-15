@@ -38,12 +38,11 @@ export class ForumService {
   }
 
   getPost(id: string): Observable<ForumPost> {
-    void id;
-    /**
-     * TODO:
-     *   return this.api.get<ForumPost>(`/forum/posts/${id}`);
-     */
-    throw new Error('getPost() not yet implemented');
+    return this.api.get<ForumPost>(`/forum/posts/${id}`);
+  }
+
+  deletePost(id: string): Observable<ForumPost> {
+    return this.api.delete<ForumPost>(`/forum/posts/${id}`);
   }
 
   createPost(data: ForumPostCreate): Observable<ForumPost> {
