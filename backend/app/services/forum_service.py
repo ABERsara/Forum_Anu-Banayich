@@ -32,7 +32,7 @@ from app.schemas.forum import (
     ForumPostListResponse,
     ForumPostResponse,
 )
-from app.services import audit_service
+from app.services.audit_service import log_action
 
 
 def _content_filter(query: Query[ForumPost], current_user: User) -> Query[ForumPost]:
@@ -115,17 +115,126 @@ def get_posts(
     )
 
 
+def _matches_content_filter(post: ForumPost, current_user: User) -> bool:
+    """
+    Python-side equivalent of _content_filter(), for checking a single
+    already-loaded post instead of querying again. Keep the two in sync —
+    same group/sector OR-logic, just evaluated in memory vs. compiled to SQL.
+    """
+    assert current_user.user_type is not None, (
+        "_matches_content_filter() requires a user with user_type set"
+    )
+    assert current_user.sector is not None, (
+        "_matches_content_filter() requires a user with sector set"
+    )
+    group_visibility = GroupVisibility(current_user.user_type.value)
+    sector_visibility = SectorVisibility(current_user.sector.value)
+    return post.group_visibility in (group_visibility, GroupVisibility.ALL) and (
+        post.sector_visibility in (sector_visibility, SectorVisibility.ALL)
+    )
+
+
 def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     """
-    Return a single post – raise 404 if not found, 403 if not visible to user.
+    Return a single post.
 
-    TODO:
-      1. Query ForumPost by id
-      2. Check it passes _content_filter for this user
-      3. Check status != DELETED
+    Visibility rules (deliberately different from get_posts()'s list view):
+      - ADMIN sees any status, including DELETED.
+      - MODERATOR sees VISIBLE and HIDDEN (not DELETED), for any group/sector –
+        bypasses the content filter, since moderators don't have user_type/sector set.
+      - USER sees only VISIBLE posts within their own group/sector (content filter applies).
+
+    Raises 404 if the post doesn't exist, or exists but this user shouldn't know that
+    (wrong status for their role). Raises 403 if the post is VISIBLE but the user's
+    group/sector don't match (the post exists, they just can't read it).
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_post_by_id() is not yet implemented")
+    if current_user.role not in (UserRole.USER, UserRole.ADMIN, UserRole.MODERATOR):
+        raise HTTPException(status_code=403, detail="אין לך הרשאה לגשת לפורום הקהילתי.")
+
+    post = (
+        db.query(ForumPost)
+        .options(joinedload(ForumPost.author))
+        .filter(ForumPost.id == post_id)
+        .first()
+    )
+    if post is None:
+        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+
+    if current_user.role in (UserRole.ADMIN, UserRole.MODERATOR):
+        if post.status == PostStatus.DELETED and current_user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        return post
+
+    # הגענו לכאן רק אם role == USER (ADMIN/MODERATOR תמיד יוצאים למעלה, עם return או raise)
+    if post.status != PostStatus.VISIBLE:
+        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+
+    if not _matches_content_filter(post, current_user):
+        raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
+
+    return post
+
+
+def delete_post(db: Session, post_id: str, current_user: User) -> ForumPost:
+    """
+    Soft-delete a forum post (status -> DELETED).
+
+    Permission: the post's author, any moderator, or an admin. Moderators are
+    NOT currently restricted to their own moderator_cells here – see the
+    ABF-45 notes: that restriction is expected to live in the reports-triage
+    layer once it's implemented, not in this function.
+
+    Idempotent: deleting an already-deleted post is a no-op (returns the post
+    as-is, no error, no duplicate audit log entry) rather than an error.
+    """
+    # Row-level lock: two people (e.g. the author and a moderator) hitting
+    # delete at the same time must not race on the same status update.
+    # No-op on SQLite (dev), enforced on PostgreSQL (production).
+    #
+    # joinedload(author) avoids a second (lazy-load) query when the response
+    # is serialized later - log_action()'s commit expires `post`, and
+    # db.refresh() below only reloads ForumPost's own columns, not author.
+    # with_for_update(of=ForumPost) keeps the lock scoped to forum_posts only
+    # - without `of=`, FOR UPDATE on a query with a JOIN locks every table in
+    # it, which would lock the author's User row for no reason.
+    post = (
+        db.query(ForumPost)
+        .options(joinedload(ForumPost.author))
+        .filter(ForumPost.id == post_id)
+        .with_for_update(of=ForumPost)
+        .first()
+    )
+    if post is None:
+        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+
+    is_author = current_user.id == post.author_id
+    is_privileged = current_user.role in (UserRole.MODERATOR, UserRole.ADMIN)
+    if not (is_author or is_privileged):
+        raise HTTPException(status_code=403, detail="אין לך הרשאה למחוק הודעה זו.")
+
+    if post.status == PostStatus.DELETED:
+        # Already deleted - nothing to do, and nothing new to audit-log.
+        return post
+
+    post.status = PostStatus.DELETED
+
+    # log_action() calls db.commit() internally - this both writes the audit
+    # entry AND persists the post.status change above. There's no separate
+    # db.commit() in this function because of that.
+    log_action(
+        db,
+        actor=current_user,
+        action=AuditAction.POST_DELETED,
+        entity_type="ForumPost",
+        entity_id=post.id,
+        details={
+            "author_id": post.author_id,
+            "deleted_by_role": current_user.role.value,
+        },
+    )
+    db.refresh(post)
+
+    return post
 
 
 def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
@@ -163,7 +272,7 @@ def create_broadcast_post(db: Session, data: BroadcastCreate, admin: User) -> Fo
     db.add(post)
     db.flush()
 
-    audit_service.log_action(
+    log_action(
         db,
         actor=admin,
         action=AuditAction.BROADCAST_SENT,

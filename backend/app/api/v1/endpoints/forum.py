@@ -4,6 +4,7 @@ Forum endpoints.
 GET    /forum/posts           – list posts (auto-filtered by group+sector)
 POST   /forum/posts           – create a new post
 GET    /forum/posts/{id}      – single post
+DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
 POST   /forum/broadcast       – admin-only post visible to all users
 
@@ -74,11 +75,23 @@ def get_post(
 ) -> ForumPostResponse:
     """
     Return a single forum post.
-
-    TODO: call forum_service.get_post_by_id(db, post_id, current_user)
     """
-    # TODO: implement
-    raise NotImplementedError
+    post = forum_service.get_post_by_id(db, post_id, current_user)
+    return ForumPostResponse.model_validate(post)
+
+
+@router.delete("/forum/posts/{post_id}", response_model=ForumPostResponse)
+def delete_post(
+    post_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ForumPostResponse:
+    """
+    Delete (soft-delete) a forum post. Allowed for the post's author, any
+    moderator, or an admin.
+    """
+    post = forum_service.delete_post(db, post_id, current_user)
+    return ForumPostResponse.model_validate(post)
 
 
 @router.post("/forum/broadcast", response_model=ForumPostResponse, status_code=201)
