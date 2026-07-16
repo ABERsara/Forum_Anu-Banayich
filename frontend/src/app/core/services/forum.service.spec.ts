@@ -76,4 +76,35 @@ describe('ForumService', () => {
     req.flush(deletedPost);
     expect(result).toEqual(deletedPost);
   });
+
+  it('createPost POSTs to the forum posts endpoint with the given data', () => {
+    let result: ForumPost | undefined;
+    const data = {
+      title: 'כותרת',
+      content: 'תוכן',
+      group_visibility: GroupVisibility.WIDOWS,
+      sector_visibility: SectorVisibility.HASIDIC,
+    };
+    service.createPost(data).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/forum/posts`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(data);
+    req.flush(MOCK_POST);
+    expect(result).toEqual(MOCK_POST);
+  });
+
+  it('updatePost PATCHes the single post endpoint with the given data', () => {
+    let result: ForumPost | undefined;
+    const data = { title: 'כותרת מעודכנת' };
+    service.updatePost('post-1', data).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/forum/posts/post-1`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual(data);
+
+    const updatedPost: ForumPost = { ...MOCK_POST, title: 'כותרת מעודכנת' };
+    req.flush(updatedPost);
+    expect(result).toEqual(updatedPost);
+  });
 });

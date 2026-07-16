@@ -2,9 +2,6 @@
  * Forum service.
  *
  * TODO list for junior developer:
- *   [ ] implement getPosts() – GET /forum/posts
- *   [ ] implement getPost() – GET /forum/posts/:id
- *   [ ] implement createPost() – POST /forum/posts
  *   [ ] implement reportPost() – POST /forum/posts/:id/report
  *   [ ] implement getInbox() – GET /messages
  *   [ ] implement sendMessage() – POST /messages
@@ -22,6 +19,7 @@ import {
   ForumPost,
   ForumPostCreate,
   ForumPostList,
+  ForumPostUpdate,
   ReportCreate,
   UserPublic,
 } from '../models';
@@ -46,12 +44,11 @@ export class ForumService {
   }
 
   createPost(data: ForumPostCreate): Observable<ForumPost> {
-    void data;
-    /**
-     * TODO:
-     *   return this.api.post<ForumPost>('/forum/posts', data);
-     */
-    throw new Error('createPost() not yet implemented');
+    return this.api.post<ForumPost>('/forum/posts', data);
+  }
+
+  updatePost(id: string, data: ForumPostUpdate): Observable<ForumPost> {
+    return this.api.patch<ForumPost>(`/forum/posts/${id}`, data);
   }
 
   reportPost(postId: string, data: ReportCreate): Observable<unknown> {
