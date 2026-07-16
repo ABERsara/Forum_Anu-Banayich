@@ -7,10 +7,12 @@ Each test runs against an isolated in-memory SQLite DB (see conftest.py).
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from fastapi import HTTPException
 from jose import jwt as jose_jwt
 
 from app.core.config import settings
-from app.core.constants import AccountStatus
+from app.core.constants import AccountStatus, UserRole
+from app.core.dependencies import require_role
 from app.core.security import ALGORITHM
 from app.models.user import User
 
@@ -33,6 +35,7 @@ VALID_PAYLOAD = {
 # helpers
 # ---------------------------------------------------------------------------
 
+
 async def _register(client, payload=None):
     return await client.post(f"{BASE}/register", json=payload or VALID_PAYLOAD)
 
@@ -50,7 +53,9 @@ async def _register_and_verify(client, db_session, email=VALID_PAYLOAD["email"])
     return _get_user(db_session, email)
 
 
-async def _register_verify_and_activate(client, db_session, email=VALID_PAYLOAD["email"]):
+async def _register_verify_and_activate(
+    client, db_session, email=VALID_PAYLOAD["email"]
+):
     """Register + verify OTP + manually promote to ACTIVE (the approval step)."""
     user = await _register_and_verify(client, db_session, email)
     user.account_status = AccountStatus.ACTIVE
@@ -61,6 +66,7 @@ async def _register_verify_and_activate(client, db_session, email=VALID_PAYLOAD[
 # ---------------------------------------------------------------------------
 # register
 # ---------------------------------------------------------------------------
+
 
 class TestRegister:
     async def test_success_returns_201(self, client):
@@ -137,47 +143,78 @@ class TestRegister:
 # verify_otp
 # ---------------------------------------------------------------------------
 
+
 class TestVerifyOtp:
-    async def _register_and_get_otp(self, client, db_session, email=VALID_PAYLOAD["email"]):
+    async def _register_and_get_otp(
+        self, client, db_session, email=VALID_PAYLOAD["email"]
+    ):
         await _register(client, {**VALID_PAYLOAD, "email": email})
         return _get_user(db_session, email).otp_code
 
     async def test_correct_otp_returns_200(self, client, db_session):
         otp = await self._register_and_get_otp(client, db_session)
-        r = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": otp})
+        r = await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": otp},
+        )
         assert r.status_code == 200
 
-    async def test_correct_otp_status_becomes_pending_approval(self, client, db_session):
+    async def test_correct_otp_status_becomes_pending_approval(
+        self, client, db_session
+    ):
         otp = await self._register_and_get_otp(client, db_session)
-        await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": otp})
+        await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": otp},
+        )
         assert _get_user(db_session).account_status == AccountStatus.PENDING_APPROVAL
 
     async def test_correct_otp_clears_otp_from_db(self, client, db_session):
         otp = await self._register_and_get_otp(client, db_session)
-        await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": otp})
+        await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": otp},
+        )
         user = _get_user(db_session)
         assert user.otp_code is None
         assert user.otp_expires_at is None
 
     async def test_wrong_otp_returns_400(self, client, db_session):
         await self._register_and_get_otp(client, db_session)
-        r = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": "000000"})
+        r = await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": "000000"},
+        )
         assert r.status_code == 400
 
     async def test_wrong_otp_generic_message(self, client, db_session):
         await self._register_and_get_otp(client, db_session)
-        r = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": "000000"})
+        r = await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": "000000"},
+        )
         assert r.json()["detail"] == "הפרטים שהוזנו שגויים"
 
     async def test_nonexistent_email_returns_400(self, client):
-        r = await client.post(f"{BASE}/verify-otp", json={"email": "nobody@example.com", "otp_code": "123456"})
+        r = await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": "nobody@example.com", "otp_code": "123456"},
+        )
         assert r.status_code == 400
 
-    async def test_nonexistent_email_same_message_as_wrong_otp(self, client, db_session):
+    async def test_nonexistent_email_same_message_as_wrong_otp(
+        self, client, db_session
+    ):
         """User enumeration protection: identical response for missing user and wrong OTP."""
         await self._register_and_get_otp(client, db_session)
-        r_wrong = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": "000000"})
-        r_missing = await client.post(f"{BASE}/verify-otp", json={"email": "nobody@example.com", "otp_code": "000000"})
+        r_wrong = await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": "000000"},
+        )
+        r_missing = await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": "nobody@example.com", "otp_code": "000000"},
+        )
         assert r_wrong.status_code == r_missing.status_code
         assert r_wrong.json()["detail"] == r_missing.json()["detail"]
 
@@ -186,7 +223,10 @@ class TestVerifyOtp:
         user = _get_user(db_session)
         user.otp_expires_at = datetime.now(UTC) - timedelta(minutes=1)
         db_session.commit()
-        r = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": otp})
+        r = await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": otp},
+        )
         assert r.status_code == 400
 
     async def test_expired_otp_distinct_message(self, client, db_session):
@@ -194,7 +234,10 @@ class TestVerifyOtp:
         user = _get_user(db_session)
         user.otp_expires_at = datetime.now(UTC) - timedelta(minutes=1)
         db_session.commit()
-        r = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": otp})
+        r = await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": otp},
+        )
         assert r.json()["detail"] == "קוד האימות פג תוקף"
 
 
@@ -202,10 +245,13 @@ class TestVerifyOtp:
 # resend_otp
 # ---------------------------------------------------------------------------
 
+
 class TestResendOtp:
     async def test_success_returns_200(self, client):
         await _register(client)
-        r = await client.post(f"{BASE}/resend-otp", json={"email": VALID_PAYLOAD["email"]})
+        r = await client.post(
+            f"{BASE}/resend-otp", json={"email": VALID_PAYLOAD["email"]}
+        )
         assert r.status_code == 200
 
     async def test_resend_updates_otp_in_db(self, client, db_session):
@@ -222,19 +268,29 @@ class TestResendOtp:
         await _register(client)
         await client.post(f"{BASE}/resend-otp", json={"email": VALID_PAYLOAD["email"]})
         new_otp = _get_user(db_session).otp_code
-        r = await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": new_otp})
+        r = await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": new_otp},
+        )
         assert r.status_code == 200
 
     async def test_nonexistent_email_returns_400(self, client):
-        r = await client.post(f"{BASE}/resend-otp", json={"email": "nobody@example.com"})
+        r = await client.post(
+            f"{BASE}/resend-otp", json={"email": "nobody@example.com"}
+        )
         assert r.status_code == 400
 
     async def test_after_verify_resend_returns_400(self, client, db_session):
         """User in PENDING_APPROVAL cannot resend OTP."""
         await _register(client)
         otp = _get_user(db_session).otp_code
-        await client.post(f"{BASE}/verify-otp", json={"email": VALID_PAYLOAD["email"], "otp_code": otp})
-        r = await client.post(f"{BASE}/resend-otp", json={"email": VALID_PAYLOAD["email"]})
+        await client.post(
+            f"{BASE}/verify-otp",
+            json={"email": VALID_PAYLOAD["email"], "otp_code": otp},
+        )
+        r = await client.post(
+            f"{BASE}/resend-otp", json={"email": VALID_PAYLOAD["email"]}
+        )
         assert r.status_code == 400
 
 
@@ -255,7 +311,9 @@ class TestLogin:
         assert r.status_code == 422
 
     async def test_invalid_email_returns_422(self, client):
-        r = await client.post(f"{BASE}/login", json={"email": "not-an-email", "password": "StrongPass1!"})
+        r = await client.post(
+            f"{BASE}/login", json={"email": "not-an-email", "password": "StrongPass1!"}
+        )
         assert r.status_code == 422
 
     async def test_active_user_returns_200(self, client, db_session):
@@ -273,14 +331,25 @@ class TestLogin:
 
     async def test_wrong_password_returns_401(self, client, db_session):
         await _register_verify_and_activate(client, db_session)
-        r = await client.post(f"{BASE}/login", json={"email": VALID_PAYLOAD["email"], "password": "WrongPass1!"})
+        r = await client.post(
+            f"{BASE}/login",
+            json={"email": VALID_PAYLOAD["email"], "password": "WrongPass1!"},
+        )
         assert r.status_code == 401
 
-    async def test_nonexistent_email_same_response_as_wrong_password(self, client, db_session):
+    async def test_nonexistent_email_same_response_as_wrong_password(
+        self, client, db_session
+    ):
         """User enumeration protection: identical 401 for missing user and wrong password."""
         await _register_verify_and_activate(client, db_session)
-        r_wrong = await client.post(f"{BASE}/login", json={"email": VALID_PAYLOAD["email"], "password": "WrongPass1!"})
-        r_missing = await client.post(f"{BASE}/login", json={"email": "nobody@example.com", "password": "WrongPass1!"})
+        r_wrong = await client.post(
+            f"{BASE}/login",
+            json={"email": VALID_PAYLOAD["email"], "password": "WrongPass1!"},
+        )
+        r_missing = await client.post(
+            f"{BASE}/login",
+            json={"email": "nobody@example.com", "password": "WrongPass1!"},
+        )
         assert r_wrong.status_code == r_missing.status_code == 401
         assert r_wrong.json()["detail"] == r_missing.json()["detail"]
 
@@ -305,7 +374,9 @@ class TestLogin:
         r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
         assert r.status_code == 403
 
-    async def test_suspended_user_within_window_distinct_message(self, client, db_session):
+    async def test_suspended_user_within_window_distinct_message(
+        self, client, db_session
+    ):
         user = await _register_verify_and_activate(client, db_session)
         user.is_suspended = True
         user.account_status = AccountStatus.SUSPENDED
@@ -325,7 +396,9 @@ class TestLogin:
         r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
         assert r.status_code == 200
 
-    async def test_suspended_user_after_window_restores_active_status(self, client, db_session):
+    async def test_suspended_user_after_window_restores_active_status(
+        self, client, db_session
+    ):
         user = await _register_verify_and_activate(client, db_session)
         user.is_suspended = True
         user.account_status = AccountStatus.SUSPENDED
@@ -344,13 +417,16 @@ class TestLogin:
 # refresh
 # ---------------------------------------------------------------------------
 
+
 class TestRefresh:
     async def test_missing_token_returns_422(self, client):
         r = await client.post(f"{BASE}/refresh", json={})
         assert r.status_code == 422
 
     async def test_invalid_token_returns_401(self, client):
-        r = await client.post(f"{BASE}/refresh", json={"refresh_token": "not.a.valid.jwt"})
+        r = await client.post(
+            f"{BASE}/refresh", json={"refresh_token": "not.a.valid.jwt"}
+        )
         assert r.status_code == 401
 
     async def test_success_returns_new_access_token(self, client, db_session):
@@ -366,7 +442,9 @@ class TestRefresh:
         login_r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
         refresh_tok = login_r.json()["refresh_token"]
         r = await client.post(f"{BASE}/refresh", json={"refresh_token": refresh_tok})
-        payload = jose_jwt.decode(r.json()["access_token"], settings.SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jose_jwt.decode(
+            r.json()["access_token"], settings.SECRET_KEY, algorithms=[ALGORITHM]
+        )
         assert payload.get("type") == "access"
 
     async def test_same_refresh_token_returned(self, client, db_session):
@@ -420,3 +498,50 @@ class TestGetCurrentUser:
 
         r = await client.get(ME, headers={"Authorization": f"Bearer {access_tok}"})
         assert r.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# require_role (core/dependencies.py)
+#
+# _check() only reads current_user.role - it needs no DB/session, so these
+# call it directly with an in-memory User instead of going through the full
+# HTTP/JWT flow (unlike TestGetCurrentUser above, which is testing exactly
+# that flow).
+# ---------------------------------------------------------------------------
+
+
+def _user_with_role(role: UserRole) -> User:
+    return User(
+        email="role-check@example.com",
+        password_hash="hashed",
+        first_name="Test",
+        last_name="User",
+        role=role,
+    )
+
+
+class TestRequireRole:
+    def test_allows_matching_role(self) -> None:
+        user = _user_with_role(UserRole.ADMIN)
+        check = require_role(UserRole.ADMIN)
+
+        assert check(user) is user
+
+    def test_rejects_non_matching_role_with_403(self) -> None:
+        user = _user_with_role(UserRole.USER)
+        check = require_role(UserRole.ADMIN)
+
+        with pytest.raises(HTTPException) as exc_info:
+            check(user)
+
+        assert exc_info.value.status_code == 403
+
+    def test_allows_any_of_multiple_roles(self) -> None:
+        check = require_role(UserRole.MODERATOR, UserRole.ADMIN)
+
+        assert check(_user_with_role(UserRole.MODERATOR)) is not None
+        assert check(_user_with_role(UserRole.ADMIN)) is not None
+
+        with pytest.raises(HTTPException) as exc_info:
+            check(_user_with_role(UserRole.USER))
+        assert exc_info.value.status_code == 403
