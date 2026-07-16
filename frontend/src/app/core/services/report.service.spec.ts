@@ -53,13 +53,16 @@ describe('ReportService', () => {
     expect(result).toEqual(MOCK_REPORT);
   });
 
-  it('fileReport throws for target types without a wired endpoint yet', () => {
+  it('fileReport returns an error observable for target types without a wired endpoint yet', () => {
     const data: ReportCreate = {
       target_type: ReportTargetType.DIRECT_MESSAGE,
       target_id: 'msg-1',
       reason: ReportReason.SPAM,
     };
 
-    expect(() => service.fileReport(data)).toThrow();
+    let error: unknown;
+    service.fileReport(data).subscribe({ error: (err) => (error = err) });
+
+    expect(error).toBeInstanceOf(Error);
   });
 });

@@ -9,7 +9,7 @@
  */
 
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
 
 import { ReportTargetType } from '../constants';
 import { Report, ReportCreate, ReportDecideRequest, ReportList } from '../models';
@@ -23,7 +23,9 @@ export class ReportService {
     if (data.target_type === ReportTargetType.FORUM_POST) {
       return this.api.post<Report>(`/forum/posts/${data.target_id}/report`, data);
     }
-    throw new Error(`Reporting ${data.target_type} content is not supported yet.`);
+    return throwError(
+      () => new Error(`Reporting ${data.target_type} content is not supported yet.`),
+    );
   }
 
   getPendingReports(): Observable<ReportList> {
