@@ -261,7 +261,7 @@ class TestApproveRegistration:
 
         logs = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).all()
         assert len(logs) == 1
-        assert logs[0].action == AuditAction.USER_APPROVED
+        assert logs[0].action == AuditAction.USER_PARTIALLY_APPROVED
         assert logs[0].actor_id == admin.id
         details = logs[0].details
         assert details is not None
@@ -293,6 +293,63 @@ class TestApproveRegistration:
         assert details is not None
         assert details["previous_status"] == AccountStatus.PARTIALLY_APPROVED
         assert details["new_status"] == AccountStatus.ACTIVE
+
+
+class TestApplyFirstApproval:
+    def test_marks_partially_approved_without_sending_email(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_approval_email", lambda *a: sent.append(a)
+        )
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(
+            db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now
+        )
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        user_service._apply_first_approval(
+            db_session, user, admin, AccountStatus.PENDING_APPROVAL
+        )
+
+        assert user.account_status == AccountStatus.PARTIALLY_APPROVED
+        assert user.first_approver_id == admin.id
+        assert user.approved_at is None
+        assert sent == []
+
+        log = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).one()
+        assert log.action == AuditAction.USER_PARTIALLY_APPROVED
+
+
+class TestApplySecondApproval:
+    def test_activates_account_sets_approved_at_and_sends_email(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_approval_email", lambda *a: sent.append(a)
+        )
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(
+            db_session, "partial@example.com", AccountStatus.PARTIALLY_APPROVED, now
+        )
+        admin_a = _make_admin(db_session, "admin1@example.com")
+        admin_b = _make_admin(db_session, "admin2@example.com")
+        user.first_approver_id = admin_a.id
+        db_session.commit()
+
+        user_service._apply_second_approval(
+            db_session, user, admin_b, AccountStatus.PARTIALLY_APPROVED
+        )
+
+        assert user.account_status == AccountStatus.ACTIVE
+        assert user.second_approver_id == admin_b.id
+        assert user.approved_at is not None
+        assert sent == [(user.email, user.first_name)]
+
+        log = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).one()
+        assert log.action == AuditAction.USER_APPROVED
 
 
 class TestRejectRegistration:

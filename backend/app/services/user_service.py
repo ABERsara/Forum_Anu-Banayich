@@ -4,9 +4,9 @@ User management service.
 Handles registration approval, suspension, profile retrieval.
 
 TODO list for junior developer:
-  [ ] implement approve_registration() – first or second admin approves
-  [ ] implement reject_registration()
-  [ ] implement get_pending_registrations()
+  [x] implement approve_registration() – first or second admin approves
+  [x] implement reject_registration()
+  [x] implement get_pending_registrations()
   [x] implement suspend_user()
   [x] implement get_professionals_for_user() – filtered by sector+group
 """
@@ -71,21 +71,55 @@ def get_active_users(db: Session) -> list[User]:
     )
 
 
+def _apply_first_approval(
+    db: Session, user: User, admin: User, previous_status: AccountStatus
+) -> None:
+    """
+    First admin approval: mark partially approved, no email yet.
+    """
+    user.first_approver_id = admin.id
+    user.account_status = AccountStatus.PARTIALLY_APPROVED
+
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.USER_PARTIALLY_APPROVED,
+        entity_type="User",
+        entity_id=user.id,
+        details={"previous_status": previous_status, "new_status": user.account_status},
+    )
+    db.refresh(user)
+
+
+def _apply_second_approval(
+    db: Session, user: User, admin: User, previous_status: AccountStatus
+) -> None:
+    """
+    Second admin approval: activate the account and notify the user by email.
+    """
+    user.second_approver_id = admin.id
+    user.account_status = AccountStatus.ACTIVE
+    user.approved_at = datetime.now(UTC)
+
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.USER_APPROVED,
+        entity_type="User",
+        entity_id=user.id,
+        details={"previous_status": previous_status, "new_status": user.account_status},
+    )
+    db.refresh(user)
+
+    send_approval_email(user.email, user.first_name)
+
+
 def approve_registration(db: Session, user_id: str, admin: User) -> User:
     """
     Admin approves a pending registration.
 
-    Logic:
-      - If no first approver yet → set first_approver_id, status = PARTIALLY_APPROVED
-      - If first approver already exists (and it's a different admin) →
-        set second_approver_id, status = ACTIVE, send welcome email
-      - An admin cannot approve their own approval twice
-
-    TODO:
-      1. Load user, verify status is PENDING_APPROVAL or PARTIALLY_APPROVED
-      2. Apply the logic above
-      3. Log to audit_log
-      4. Return updated user
+    Validates the user and status, then dispatches to the first or second
+    approval transition (an admin cannot approve the same registration twice).
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
@@ -101,37 +135,16 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
     previous_status = user.account_status
 
     if user.first_approver_id is None:
-        user.first_approver_id = admin.id
-        user.account_status = AccountStatus.PARTIALLY_APPROVED
+        _apply_first_approval(db, user, admin, previous_status)
     else:
-        user.second_approver_id = admin.id
-        user.account_status = AccountStatus.ACTIVE
-        user.approved_at = datetime.now(UTC)
-
-    log_action(
-        db,
-        actor=admin,
-        action=AuditAction.USER_APPROVED,
-        entity_type="User",
-        entity_id=user.id,
-        details={"previous_status": previous_status, "new_status": user.account_status},
-    )
-    db.refresh(user)
-
-    if user.account_status == AccountStatus.ACTIVE:
-        send_approval_email(user.email, user.first_name)
+        _apply_second_approval(db, user, admin, previous_status)
 
     return user
 
 
 def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> User:
     """
-    Admin rejects a registration.
-
-    TODO:
-      1. Load user, set status = REJECTED, save reason
-      2. Send rejection email with reason
-      3. Log to audit_log
+    Admin rejects a registration, records the reason, and notifies the user by email.
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
