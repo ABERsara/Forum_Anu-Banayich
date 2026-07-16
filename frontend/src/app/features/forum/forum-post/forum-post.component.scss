@@ -12,6 +12,41 @@
   }
 
   &__actions {
+    display: flex;
+    gap: $spacing-sm;
     margin-top: $spacing-md;
+  }
+
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    padding: $spacing-xs $spacing-sm;
+    border: none;
+    border-radius: $radius-sm;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &--edit {
+      background: $color-primary;
+      color: $color-white;
+
+      &:hover {
+        background: $color-primary-dark;
+      }
+    }
+
+    &--delete {
+      background: $color-bg;
+      color: $color-danger;
+      border: 1px solid $color-danger;
+
+      &:hover {
+        background: rgba($color-danger, 0.08);
+      }
+    }
   }
 }

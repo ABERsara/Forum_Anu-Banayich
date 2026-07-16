@@ -18,9 +18,25 @@
 
     <app-report-button [contentType]="reportTargetType" [contentId]="post.id" />
 
-    @if (canDelete()) {
+    @if (canEdit() || canDelete()) {
       <div class="forum-post__actions">
-        <button (click)="onDeleteClick()">מחיקה</button>
+        @if (canEdit()) {
+          <a
+            class="forum-post__btn forum-post__btn--edit"
+            [routerLink]="['/forum', post.id, 'edit']"
+          >
+            עריכה
+          </a>
+        }
+        @if (canDelete()) {
+          <button
+            type="button"
+            class="forum-post__btn forum-post__btn--delete"
+            (click)="onDeleteClick()"
+          >
+            מחיקה
+          </button>
+        }
       </div>
     }
 

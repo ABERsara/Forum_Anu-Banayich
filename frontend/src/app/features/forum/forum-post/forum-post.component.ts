@@ -57,6 +57,13 @@ export class ForumPostComponent implements OnInit {
     );
   });
 
+  // Unlike delete, editing is author-only (ABF-48 AC).
+  canEdit = computed(() => {
+    const post = this.post();
+    const user = this.authService.currentUser();
+    return !!post && !!user && post.author.id === user.id;
+  });
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) return;
