@@ -109,21 +109,35 @@ def _ensure_not_duplicate_report(
 
 def _notify_moderators(db: Session, post: ForumPost, report: Report) -> None:
     """
-    Send the escalation email(s) for this report, based on the post's
-    already-committed report_count (spec section 7.1):
-      1st report  → email to moderators
-      2nd+ report → urgent email (repeated on every report from here on)
+    Thin dispatcher to the escalation notification policy for this report,
+    based on the post's already-committed report_count (spec section 7.1).
+    Adding a future policy means adding one handler + one dispatch line here
+    — not touching the existing handlers.
 
     Runs strictly after file_report()'s db.commit() — if the commit had
     failed, a moderator must never be alerted about a report that was never
-    actually saved.
+    actually saved. (Any DB state that must change together with the commit
+    — e.g. post.status on the 2nd report — lives in file_report() itself,
+    before the commit, not here.)
     """
     if post.report_count == 1:
-        for email in _moderator_emails_for(db):
-            send_moderator_alert(email, report.id, post.content[:100])
+        _handle_first_report_notification(db, post, report)
     elif post.report_count >= 2:
-        for email in _moderator_emails_for(db):
-            send_urgent_moderator_alert(email, report.id)
+        _handle_second_plus_report_notification(db, post, report)
+
+
+def _handle_first_report_notification(db: Session, post: ForumPost, report: Report) -> None:
+    """1st report → regular email to moderators."""
+    for email in _moderator_emails_for(db):
+        send_moderator_alert(email, report.id, post.content[:100])
+
+
+def _handle_second_plus_report_notification(
+    db: Session, post: ForumPost, report: Report
+) -> None:
+    """2nd+ report → urgent email, repeated on every report from here on."""
+    for email in _moderator_emails_for(db):
+        send_urgent_moderator_alert(email, report.id)
 
 
 def _moderator_emails_for(db: Session) -> list[str]:
