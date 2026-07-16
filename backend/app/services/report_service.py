@@ -135,7 +135,7 @@ def _moderator_emails_for(db: Session) -> list[str]:
     implemented anywhere yet. Sprint 4 will replace only this function's body
     with a real lookup (e.g. get_moderator_for_cell(post.group_visibility,
     post.sector_visibility)) once that mechanism exists; callers in
-    file_report()/_escalate() won't need to change.
+    file_report()/_notify_moderators() won't need to change.
     """
     moderators = db.query(User).filter(User.role == UserRole.MODERATOR).all()
     return [m.alert_email or m.email for m in moderators]
