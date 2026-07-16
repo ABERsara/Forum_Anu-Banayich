@@ -1,5 +1,5 @@
 """
-Unit tests for forum_service.get_posts() and its content filter.
+Unit tests for forum_service.get_posts(), its content filter, and create_broadcast_post().
 """
 
 from datetime import UTC, datetime, timedelta
@@ -21,31 +21,8 @@ from app.core.constants import (
 from app.models.audit import AuditLog
 from app.models.forum import ForumPost
 from app.models.user import User
-from app.schemas.forum import ForumPostCreate, ForumPostUpdate
+from app.schemas.forum import BroadcastCreate, ForumPostCreate, ForumPostUpdate
 from app.services import forum_service
-
-
-def _make_user(
-    db_session: Session,
-    email: str,
-    user_type: UserType | None = None,
-    sector: Sector | None = None,
-    role: UserRole = UserRole.USER,
-    account_status: AccountStatus = AccountStatus.PENDING_OTP,
-) -> User:
-    user = User(
-        email=email,
-        password_hash="hashed",
-        first_name="Test",
-        last_name="User",
-        role=role,
-        user_type=user_type,
-        sector=sector,
-        account_status=account_status,
-    )
-    db_session.add(user)
-    db_session.commit()
-    return user
 
 
 def _make_post(
@@ -72,23 +49,21 @@ def _make_post(
 
 class TestGetPostsContentFilter:
     def test_user_sees_matching_group_and_sector_post(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC)
 
         result = forum_service.get_posts(db_session, user)
 
         assert result.total == 1
 
-    def test_user_does_not_see_other_group_post(self, db_session: Session) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        other_author = _make_user(
-            db_session, "widower@example.com", UserType.WIDOWER, Sector.HASIDIC
+    def test_user_does_not_see_other_group_post(
+        self, db_session: Session, make_user
+    ) -> None:
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        other_author = make_user(
+            "widower@example.com", UserType.WIDOWER, Sector.HASIDIC
         )
         _make_post(
             db_session, other_author, GroupVisibility.WIDOWERS, SectorVisibility.HASIDIC
@@ -98,12 +73,12 @@ class TestGetPostsContentFilter:
 
         assert result.total == 0
 
-    def test_user_does_not_see_other_sector_post(self, db_session: Session) -> None:
-        user = _make_user(
-            db_session, "widow-hasidic@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        other_author = _make_user(
-            db_session, "widow-litvish@example.com", UserType.WIDOW, Sector.LITVISH
+    def test_user_does_not_see_other_sector_post(
+        self, db_session: Session, make_user
+    ) -> None:
+        user = make_user("widow-hasidic@example.com", UserType.WIDOW, Sector.HASIDIC)
+        other_author = make_user(
+            "widow-litvish@example.com", UserType.WIDOW, Sector.LITVISH
         )
         _make_post(
             db_session, other_author, GroupVisibility.WIDOWS, SectorVisibility.LITVISH
@@ -114,12 +89,10 @@ class TestGetPostsContentFilter:
         assert result.total == 0
 
     def test_user_sees_post_visible_to_all_groups_and_sectors(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
         _make_post(db_session, admin, GroupVisibility.ALL, SectorVisibility.ALL)
 
         result = forum_service.get_posts(db_session, user)
@@ -127,11 +100,9 @@ class TestGetPostsContentFilter:
         assert result.total == 1
 
     def test_user_does_not_see_hidden_or_deleted_posts(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(
             db_session,
             user,
@@ -154,23 +125,19 @@ class TestGetPostsContentFilter:
 
 class TestGetPostsAdminBypass:
     def test_admin_sees_posts_from_other_groups_and_sectors(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        widow = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        widow = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(db_session, widow, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC)
 
         result = forum_service.get_posts(db_session, admin)
 
         assert result.total == 1
 
-    def test_admin_sees_hidden_posts(self, db_session: Session) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        widow = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_admin_sees_hidden_posts(self, db_session: Session, make_user) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        widow = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(
             db_session,
             widow,
@@ -183,11 +150,11 @@ class TestGetPostsAdminBypass:
 
         assert result.total == 1
 
-    def test_admin_does_not_see_deleted_posts(self, db_session: Session) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        widow = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_admin_does_not_see_deleted_posts(
+        self, db_session: Session, make_user
+    ) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        widow = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         _make_post(
             db_session,
             widow,
@@ -203,11 +170,9 @@ class TestGetPostsAdminBypass:
 
 class TestGetPostsPagination:
     def test_total_counts_all_matching_posts_not_just_current_page(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         for _ in range(5):
             _make_post(
                 db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
@@ -219,11 +184,9 @@ class TestGetPostsPagination:
         assert len(result.items) == 2
 
     def test_offset_returns_correct_page_ordered_by_newest_first(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         base = datetime.now(UTC).replace(tzinfo=None)
         posts = [
             _make_post(
@@ -244,18 +207,18 @@ class TestGetPostsPagination:
 
 
 class TestGetPostsRoleGuard:
-    def test_moderator_gets_403_not_500(self, db_session: Session) -> None:
-        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+    def test_moderator_gets_403_not_500(self, db_session: Session, make_user) -> None:
+        moderator = make_user("mod@example.com", role=UserRole.MODERATOR)
 
         with pytest.raises(HTTPException) as exc_info:
             forum_service.get_posts(db_session, moderator)
 
         assert exc_info.value.status_code == 403
 
-    def test_professional_gets_403_not_500(self, db_session: Session) -> None:
-        professional = _make_user(
-            db_session, "pro@example.com", role=UserRole.PROFESSIONAL
-        )
+    def test_professional_gets_403_not_500(
+        self, db_session: Session, make_user
+    ) -> None:
+        professional = make_user("pro@example.com", role=UserRole.PROFESSIONAL)
 
         with pytest.raises(HTTPException) as exc_info:
             forum_service.get_posts(db_session, professional)
@@ -263,14 +226,63 @@ class TestGetPostsRoleGuard:
         assert exc_info.value.status_code == 403
 
 
+class TestCreateBroadcastPost:
+    def test_creates_post_visible_to_all_groups_and_sectors(
+        self, db_session: Session, make_user
+    ) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        data = BroadcastCreate(title="הודעה חשובה", content="תוכן ההודעה לכלל המשתמשים")
+
+        post = forum_service.create_broadcast_post(db_session, data, admin)
+
+        assert post.id is not None
+        assert post.author_id == admin.id
+        assert post.title == "הודעה חשובה"
+        assert post.content == "תוכן ההודעה לכלל המשתמשים"
+        assert post.group_visibility == GroupVisibility.ALL
+        assert post.sector_visibility == SectorVisibility.ALL
+        assert post.status == PostStatus.VISIBLE
+
+    def test_creates_audit_log_entry(self, db_session: Session, make_user) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        data = BroadcastCreate(title="הודעה חשובה", content="תוכן ההודעה")
+
+        post = forum_service.create_broadcast_post(db_session, data, admin)
+
+        logs = db_session.query(AuditLog).filter(AuditLog.entity_id == post.id).all()
+        assert len(logs) == 1
+        assert logs[0].action == AuditAction.BROADCAST_SENT
+        assert logs[0].actor_id == admin.id
+        assert logs[0].entity_type == "ForumPost"
+        details = logs[0].details
+        assert details is not None
+        assert details["title"] == "הודעה חשובה"
+
+    def test_two_broadcasts_create_two_independent_posts_and_logs(
+        self, db_session: Session, make_user
+    ) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+
+        first = forum_service.create_broadcast_post(
+            db_session, BroadcastCreate(title="ראשון", content="תוכן ראשון"), admin
+        )
+        second = forum_service.create_broadcast_post(
+            db_session, BroadcastCreate(title="שני", content="תוכן שני"), admin
+        )
+
+        assert first.id != second.id
+        logs = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == AuditAction.BROADCAST_SENT)
+            .all()
+        )
+        assert len(logs) == 2
+
+
 class TestGetPostByIdRoleGuard:
-    def test_professional_gets_403(self, db_session: Session) -> None:
-        professional = _make_user(
-            db_session, "pro@example.com", role=UserRole.PROFESSIONAL
-        )
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_professional_gets_403(self, db_session: Session, make_user) -> None:
+        professional = make_user("pro@example.com", role=UserRole.PROFESSIONAL)
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -280,10 +292,8 @@ class TestGetPostByIdRoleGuard:
 
         assert exc_info.value.status_code == 403
 
-    def test_nonexistent_id_gets_404(self, db_session: Session) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_nonexistent_id_gets_404(self, db_session: Session, make_user) -> None:
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
 
         with pytest.raises(HTTPException) as exc_info:
             forum_service.get_post_by_id(db_session, "no-such-id", user)
@@ -292,10 +302,10 @@ class TestGetPostByIdRoleGuard:
 
 
 class TestGetPostByIdAsUser:
-    def test_sees_own_group_and_sector_post(self, db_session: Session) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_sees_own_group_and_sector_post(
+        self, db_session: Session, make_user
+    ) -> None:
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, user, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -305,24 +315,20 @@ class TestGetPostByIdAsUser:
         assert result.id == post.id
 
     def test_sees_post_visible_to_all_groups_and_sectors(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
         post = _make_post(db_session, admin, GroupVisibility.ALL, SectorVisibility.ALL)
 
         result = forum_service.get_post_by_id(db_session, post.id, user)
 
         assert result.id == post.id
 
-    def test_mismatched_group_gets_403(self, db_session: Session) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        other_author = _make_user(
-            db_session, "widower@example.com", UserType.WIDOWER, Sector.HASIDIC
+    def test_mismatched_group_gets_403(self, db_session: Session, make_user) -> None:
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        other_author = make_user(
+            "widower@example.com", UserType.WIDOWER, Sector.HASIDIC
         )
         post = _make_post(
             db_session,
@@ -336,10 +342,8 @@ class TestGetPostByIdAsUser:
 
         assert exc_info.value.status_code == 403
 
-    def test_hidden_post_gets_404(self, db_session: Session) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_hidden_post_gets_404(self, db_session: Session, make_user) -> None:
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session,
             user,
@@ -353,10 +357,8 @@ class TestGetPostByIdAsUser:
 
         assert exc_info.value.status_code == 404
 
-    def test_deleted_post_gets_404(self, db_session: Session) -> None:
-        user = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_deleted_post_gets_404(self, db_session: Session, make_user) -> None:
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session,
             user,
@@ -372,11 +374,9 @@ class TestGetPostByIdAsUser:
 
 
 class TestGetPostByIdAsAdmin:
-    def test_sees_deleted_post(self, db_session: Session) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_sees_deleted_post(self, db_session: Session, make_user) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session,
             author,
@@ -389,11 +389,9 @@ class TestGetPostByIdAsAdmin:
 
         assert result.id == post.id
 
-    def test_sees_hidden_post(self, db_session: Session) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_sees_hidden_post(self, db_session: Session, make_user) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session,
             author,
@@ -406,11 +404,11 @@ class TestGetPostByIdAsAdmin:
 
         assert result.id == post.id
 
-    def test_sees_post_from_other_group_and_sector(self, db_session: Session) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_sees_post_from_other_group_and_sector(
+        self, db_session: Session, make_user
+    ) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -421,11 +419,9 @@ class TestGetPostByIdAsAdmin:
 
 
 class TestGetPostByIdAsModerator:
-    def test_sees_hidden_post(self, db_session: Session) -> None:
-        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_sees_hidden_post(self, db_session: Session, make_user) -> None:
+        moderator = make_user("mod@example.com", role=UserRole.MODERATOR)
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session,
             author,
@@ -438,11 +434,9 @@ class TestGetPostByIdAsModerator:
 
         assert result.id == post.id
 
-    def test_deleted_post_gets_404(self, db_session: Session) -> None:
-        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_deleted_post_gets_404(self, db_session: Session, make_user) -> None:
+        moderator = make_user("mod@example.com", role=UserRole.MODERATOR)
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session,
             author,
@@ -456,11 +450,11 @@ class TestGetPostByIdAsModerator:
 
         assert exc_info.value.status_code == 404
 
-    def test_sees_post_from_other_group_and_sector(self, db_session: Session) -> None:
-        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_sees_post_from_other_group_and_sector(
+        self, db_session: Session, make_user
+    ) -> None:
+        moderator = make_user("mod@example.com", role=UserRole.MODERATOR)
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -471,10 +465,8 @@ class TestGetPostByIdAsModerator:
 
 
 class TestDeletePost:
-    def test_author_can_delete_own_post(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_author_can_delete_own_post(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -484,12 +476,10 @@ class TestDeletePost:
         assert result.status == PostStatus.DELETED
 
     def test_moderator_can_delete_post_from_other_group_and_sector(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        moderator = make_user("mod@example.com", role=UserRole.MODERATOR)
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -498,11 +488,9 @@ class TestDeletePost:
 
         assert result.status == PostStatus.DELETED
 
-    def test_admin_can_delete_any_post(self, db_session: Session) -> None:
-        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_admin_can_delete_any_post(self, db_session: Session, make_user) -> None:
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -511,13 +499,9 @@ class TestDeletePost:
 
         assert result.status == PostStatus.DELETED
 
-    def test_other_regular_user_gets_403(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        other_user = _make_user(
-            db_session, "widow2@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_other_regular_user_gets_403(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        other_user = make_user("widow2@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -527,10 +511,8 @@ class TestDeletePost:
 
         assert exc_info.value.status_code == 403
 
-    def test_nonexistent_id_gets_404(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_nonexistent_id_gets_404(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
 
         with pytest.raises(HTTPException) as exc_info:
             forum_service.delete_post(db_session, "no-such-id", author)
@@ -538,11 +520,9 @@ class TestDeletePost:
         assert exc_info.value.status_code == 404
 
     def test_deleting_already_deleted_post_is_idempotent(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session,
             author,
@@ -555,10 +535,10 @@ class TestDeletePost:
 
         assert result.status == PostStatus.DELETED
 
-    def test_delete_writes_a_single_audit_log_entry(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_delete_writes_a_single_audit_log_entry(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -577,11 +557,9 @@ class TestDeletePost:
         assert entries[0].actor_id == author.id
 
     def test_repeat_delete_does_not_duplicate_audit_log(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -602,10 +580,9 @@ class TestDeletePost:
 
 class TestCreatePost:
     def test_active_author_can_post_to_own_group_and_sector(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        author = _make_user(
-            db_session,
+        author = make_user(
             "widow@example.com",
             UserType.WIDOW,
             Sector.HASIDIC,
@@ -627,10 +604,9 @@ class TestCreatePost:
         assert result.status == PostStatus.VISIBLE
 
     def test_active_author_can_post_to_all_groups_and_sectors(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        author = _make_user(
-            db_session,
+        author = make_user(
             "widow@example.com",
             UserType.WIDOW,
             Sector.HASIDIC,
@@ -650,9 +626,8 @@ class TestCreatePost:
 
         assert result.group_visibility == GroupVisibility.ALL
 
-    def test_non_active_author_gets_403(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session,
+    def test_non_active_author_gets_403(self, db_session: Session, make_user) -> None:
+        author = make_user(
             "widow@example.com",
             UserType.WIDOW,
             Sector.HASIDIC,
@@ -673,9 +648,10 @@ class TestCreatePost:
 
         assert exc_info.value.status_code == 403
 
-    def test_posting_to_a_different_group_gets_403(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session,
+    def test_posting_to_a_different_group_gets_403(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user(
             "widow@example.com",
             UserType.WIDOW,
             Sector.HASIDIC,
@@ -696,9 +672,10 @@ class TestCreatePost:
 
         assert exc_info.value.status_code == 403
 
-    def test_posting_to_a_different_sector_gets_403(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session,
+    def test_posting_to_a_different_sector_gets_403(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user(
             "widow@example.com",
             UserType.WIDOW,
             Sector.HASIDIC,
@@ -721,10 +698,10 @@ class TestCreatePost:
 
 
 class TestUpdatePost:
-    def test_author_can_update_title_and_content(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_author_can_update_title_and_content(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -740,11 +717,9 @@ class TestUpdatePost:
         assert result.content == "תוכן חדש"
 
     def test_partial_update_title_only_leaves_content_unchanged(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -757,11 +732,9 @@ class TestUpdatePost:
         assert result.content == "Content"
 
     def test_partial_update_content_only_leaves_title_unchanged(
-        self, db_session: Session
+        self, db_session: Session, make_user
     ) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -773,10 +746,10 @@ class TestUpdatePost:
         assert result.title == "Title"
         assert result.content == "תוכן חדש"
 
-    def test_updated_at_advances_past_created_at(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_updated_at_advances_past_created_at(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session,
             author,
@@ -791,13 +764,9 @@ class TestUpdatePost:
 
         assert result.updated_at > result.created_at
 
-    def test_non_author_gets_403(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
-        other_user = _make_user(
-            db_session, "widow2@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_non_author_gets_403(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        other_user = make_user("widow2@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
         )
@@ -809,10 +778,8 @@ class TestUpdatePost:
 
         assert exc_info.value.status_code == 403
 
-    def test_nonexistent_id_gets_404(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_nonexistent_id_gets_404(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
 
         with pytest.raises(HTTPException) as exc_info:
             forum_service.update_post(
@@ -821,10 +788,8 @@ class TestUpdatePost:
 
         assert exc_info.value.status_code == 404
 
-    def test_deleted_post_gets_404(self, db_session: Session) -> None:
-        author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
-        )
+    def test_deleted_post_gets_404(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
         post = _make_post(
             db_session,
             author,

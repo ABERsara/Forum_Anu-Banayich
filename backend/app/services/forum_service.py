@@ -26,6 +26,7 @@ from app.core.constants import (
 from app.models.forum import DirectMessage, ForumPost
 from app.models.user import User
 from app.schemas.forum import (
+    BroadcastCreate,
     DirectMessageCreate,
     ForumPostCreate,
     ForumPostListResponse,
@@ -308,6 +309,35 @@ def update_post(
     db.commit()
     db.refresh(post)
 
+    return post
+
+
+def create_broadcast_post(db: Session, data: BroadcastCreate, admin: User) -> ForumPost:
+    """
+    Create an admin broadcast post – visible to every active user
+    regardless of group or sector.
+    """
+    post = ForumPost(
+        author_id=admin.id,
+        group_visibility=GroupVisibility.ALL,
+        sector_visibility=SectorVisibility.ALL,
+        title=data.title,
+        content=data.content,
+        status=PostStatus.VISIBLE,
+    )
+    db.add(post)
+    db.flush()
+
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.BROADCAST_SENT,
+        entity_type="ForumPost",
+        entity_id=post.id,
+        details={"title": data.title},
+    )
+
+    db.refresh(post)
     return post
 
 

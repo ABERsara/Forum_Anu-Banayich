@@ -27,6 +27,13 @@ class ForumPostUpdate(BaseModel):
     content: str | None = Field(None, min_length=1, max_length=5000)
 
 
+class BroadcastCreate(BaseModel):
+    """POST /forum/broadcast – admin-only post visible to all users."""
+
+    title: str = Field(..., min_length=2, max_length=256)
+    content: str = Field(..., min_length=1, max_length=5000)
+
+
 class ForumPostResponse(BaseModel):
     """Single post as returned to the client."""
 
