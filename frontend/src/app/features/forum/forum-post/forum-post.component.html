@@ -16,7 +16,7 @@
       <a [href]="post.attachment_url" target="_blank" rel="noopener">קובץ מצורף</a>
     }
 
-    <!-- Report button (F5) is out of scope for ABF-45 — separate ticket -->
+    <app-report-button [contentType]="reportTargetType" [contentId]="post.id" />
 
     @if (canDelete()) {
       <div class="forum-post__actions">

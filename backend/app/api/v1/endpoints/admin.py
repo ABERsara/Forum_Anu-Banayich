@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.constants import UserRole
-from app.core.dependencies import get_current_user, get_db, require_role
+from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.user import (
     ProfessionalUpdateRequest,
@@ -65,7 +65,7 @@ def get_registration(user_id: str, db: Session = Depends(get_db)) -> UserAdminVi
 @router.post("/registrations/{user_id}/approve", response_model=UserAdminView)
 def approve_registration(
     user_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> UserAdminView:
     """
@@ -79,7 +79,7 @@ def approve_registration(
 def reject_registration(
     user_id: str,
     data: RegistrationRejectRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> UserAdminView:
     """
@@ -110,7 +110,7 @@ def list_professionals(db: Session = Depends(get_db)) -> list[UserProfile]:
 def update_professional(
     user_id: str,
     data: ProfessionalUpdateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> None:
     """Update a professional's profile (domain, sectors, groups, description)."""
@@ -122,7 +122,7 @@ def update_professional(
 def suspend_user(
     user_id: str,
     data: SuspendUserRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> UserAdminView:
     """

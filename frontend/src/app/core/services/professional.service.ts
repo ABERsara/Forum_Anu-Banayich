@@ -31,20 +31,11 @@ export class ProfessionalService {
   }
 
   askQuestion(data: ProfessionalQueryCreate): Observable<ProfessionalQuery> {
-    void data;
-    /**
-     * TODO:
-     *   return this.api.post<ProfessionalQuery>('/advice/questions', data);
-     */
-    throw new Error('askQuestion() not yet implemented');
+    return this.api.post<ProfessionalQuery>('/advice/questions', data);
   }
 
   getMyQuestions(): Observable<ProfessionalQuery[]> {
-    /**
-     * TODO:
-     *   return this.api.get<ProfessionalQuery[]>('/advice/questions');
-     */
-    throw new Error('getMyQuestions() not yet implemented');
+    return this.api.get<ProfessionalQuery[]>('/advice/questions');
   }
 
   getPublicQA(domain?: ProfessionalDomain, page = 1): Observable<PublicQA[]> {

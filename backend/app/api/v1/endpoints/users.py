@@ -10,7 +10,7 @@ GET  /users/search        – search users for DM (same group only)
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db
+from app.core.dependencies import get_current_active_user, get_db
 from app.models.user import User
 from app.schemas.user import UserProfile, UserPublic
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get("/me", response_model=UserProfile)
-def get_my_profile(current_user: User = Depends(get_current_user)) -> User:
+def get_my_profile(current_user: User = Depends(get_current_active_user)) -> User:
     """Return the currently authenticated user's profile."""
     return current_user
 
@@ -26,7 +26,7 @@ def get_my_profile(current_user: User = Depends(get_current_user)) -> User:
 @router.get("/search", response_model=list[UserPublic])
 def search_users(
     name: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[UserPublic]:
     """
@@ -43,7 +43,7 @@ def search_users(
 
 @router.delete("/me", status_code=204)
 def delete_my_account(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> None:
     """

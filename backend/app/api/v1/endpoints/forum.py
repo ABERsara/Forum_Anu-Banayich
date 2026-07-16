@@ -13,10 +13,10 @@ POST   /messages              – send a direct message
 GET    /messages/{user_id}    – conversation with a specific user
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db, require_admin
+from app.core.dependencies import get_current_active_user, get_db, require_admin
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
@@ -27,8 +27,8 @@ from app.schemas.forum import (
     ForumPostListResponse,
     ForumPostResponse,
 )
-from app.schemas.report import ReportCreate
-from app.services import forum_service
+from app.schemas.report import ReportCreate, ReportResponse
+from app.services import forum_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
 
@@ -42,7 +42,7 @@ router = APIRouter(tags=["Forum & Messages"])
 def list_posts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostListResponse:
     """
@@ -55,7 +55,7 @@ def list_posts(
 @router.post("/forum/posts", response_model=ForumPostResponse, status_code=201)
 def create_post(
     data: ForumPostCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """
@@ -70,7 +70,7 @@ def create_post(
 @router.get("/forum/posts/{post_id}", response_model=ForumPostResponse)
 def get_post(
     post_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """
@@ -83,7 +83,7 @@ def get_post(
 @router.delete("/forum/posts/{post_id}", response_model=ForumPostResponse)
 def delete_post(
     post_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """
@@ -108,20 +108,26 @@ def create_broadcast(
     return ForumPostResponse.model_validate(post)
 
 
-@router.post("/forum/posts/{post_id}/report", status_code=201)
+@router.post(
+    "/forum/posts/{post_id}/report", response_model=ReportResponse, status_code=201
+)
 def report_post(
     post_id: str,
     data: ReportCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> ReportResponse:
     """
-    Report a forum post.
-
-    TODO: call report_service.file_report(db, data, current_user)
+    Report a forum post. Rejects if the body's target doesn't match the
+    route's post_id, rather than silently overriding it. target_type support
+    is validated by report_service.file_report() itself.
     """
-    # TODO: implement
-    raise NotImplementedError
+    if data.target_id != post_id:
+        raise HTTPException(
+            status_code=400, detail="נתוני הדיווח אינם תואמים את ההודעה המבוקשת."
+        )
+    report = report_service.file_report(db, data, current_user)
+    return ReportResponse.model_validate(report)
 
 
 # ──────────────────────────────────────────────────────────
@@ -131,7 +137,7 @@ def report_post(
 
 @router.get("/messages", response_model=list[ConversationSummary])
 def get_inbox(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[ConversationSummary]:
     """
@@ -146,7 +152,7 @@ def get_inbox(
 @router.post("/messages", response_model=DirectMessageResponse, status_code=201)
 def send_message(
     data: DirectMessageCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> DirectMessageResponse:
     """
@@ -162,7 +168,7 @@ def send_message(
 def get_conversation(
     user_id: str,
     page: int = Query(1, ge=1),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[DirectMessageResponse]:
     """

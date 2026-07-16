@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.constants import UserRole
-from app.core.dependencies import get_current_user, get_db, require_role
+from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.report import ReportDecideRequest, ReportListResponse, ReportResponse
 
@@ -25,7 +25,7 @@ router = APIRouter(
 
 @router.get("/reports", response_model=ReportListResponse)
 def list_pending_reports(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ReportListResponse:
     """
@@ -41,7 +41,7 @@ def list_pending_reports(
 @router.get("/reports/{report_id}", response_model=ReportResponse)
 def get_report(
     report_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
     """
@@ -60,7 +60,7 @@ def get_report(
 def decide_report(
     report_id: str,
     data: ReportDecideRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
     """

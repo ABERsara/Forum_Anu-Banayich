@@ -99,6 +99,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/advice/qa-feed/qa-feed.component').then((m) => m.QaFeedComponent),
       },
+      {
+        path: 'my-questions',
+        loadComponent: () =>
+          import('./features/advice/my-questions/my-questions.component').then(
+            (m) => m.MyQuestionsComponent,
+          ),
+      },
     ],
   },
   {
