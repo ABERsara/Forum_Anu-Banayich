@@ -83,7 +83,7 @@ def _apply_first_approval(
     log_action(
         db,
         actor=admin,
-        action=AuditAction.USER_APPROVED,
+        action=AuditAction.USER_PARTIALLY_APPROVED,
         entity_type="User",
         entity_id=user.id,
         details={"previous_status": previous_status, "new_status": user.account_status},
@@ -144,12 +144,7 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
 
 def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> User:
     """
-    Admin rejects a registration.
-
-    TODO:
-      1. Load user, set status = REJECTED, save reason
-      2. Send rejection email with reason
-      3. Log to audit_log
+    Admin rejects a registration, records the reason, and notifies the user by email.
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:

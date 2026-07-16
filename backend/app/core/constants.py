@@ -142,6 +142,7 @@ class AuditAction(enum.StrEnum):
     """Sensitive admin/moderator actions that must be logged."""
 
     USER_APPROVED = "user_approved"
+    USER_PARTIALLY_APPROVED = "user_partially_approved"
     USER_REJECTED = "user_rejected"
     USER_SUSPENDED = "user_suspended"
     USER_CANCELLED = "user_cancelled"
