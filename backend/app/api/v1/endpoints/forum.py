@@ -95,10 +95,15 @@ def delete_post(
     return ForumPostResponse.model_validate(post)
 
 
-@router.post("/forum/broadcast", response_model=ForumPostResponse, status_code=201)
+@router.post(
+    "/forum/broadcast",
+    response_model=ForumPostResponse,
+    status_code=201,
+    dependencies=[Depends(require_role(UserRole.ADMIN))],
+)
 def create_broadcast(
     data: BroadcastCreate,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """
