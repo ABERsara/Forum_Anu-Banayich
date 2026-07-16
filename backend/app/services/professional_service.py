@@ -14,7 +14,12 @@ TODO list for junior developer:
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.constants import ProfessionalDomain, UserRole
+from app.core.constants import (
+    SECTOR_LABELS,
+    USER_TYPE_LABELS,
+    ProfessionalDomain,
+    UserRole,
+)
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import (
@@ -32,8 +37,6 @@ def _build_alias(user: User) -> str:
     Build the alias shown to the professional for a private query.
     Example: "אלמנה – ספרדי"
     """
-    from app.core.constants import SECTOR_LABELS, USER_TYPE_LABELS  # noqa: PLC0415
-
     user_type_label = USER_TYPE_LABELS.get(user.user_type, "")  # type: ignore[arg-type]
     sector_label = SECTOR_LABELS.get(user.sector, "")  # type: ignore[arg-type]
     return f"{user_type_label} – {sector_label}"
