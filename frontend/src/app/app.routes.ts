@@ -68,6 +68,11 @@ export const routes: Routes = [
           import('./features/forum/new-post/new-post.component').then((m) => m.NewPostComponent),
       },
       {
+        path: ':id/edit',
+        loadComponent: () =>
+          import('./features/forum/edit-post/edit-post.component').then((m) => m.EditPostComponent),
+      },
+      {
         path: ':id',
         loadComponent: () =>
           import('./features/forum/forum-post/forum-post.component').then(

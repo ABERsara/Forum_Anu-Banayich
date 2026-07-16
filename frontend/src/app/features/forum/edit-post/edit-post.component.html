@@ -1,0 +1,44 @@
+<div class="edit-post-page" dir="rtl">
+  <a routerLink="/forum">← חזרה לפורום</a>
+
+  @if (isLoading()) {
+    <app-loading-spinner size="md" />
+  } @else if (loadError(); as err) {
+    <app-error-display [message]="err" />
+  } @else if (!isAuthor()) {
+    <app-error-display message="אין לך הרשאה לערוך הודעה זו." />
+  } @else {
+    <div class="edit-post-card">
+      <h1 class="edit-post-title">עריכת הודעה</h1>
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <div class="form-field">
+          <label for="title">כותרת</label>
+          <input id="title" type="text" formControlName="title" />
+          @if (form.controls.title.invalid && form.controls.title.touched) {
+            <span class="field-error">נא להזין כותרת (2 עד 256 תווים)</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label for="content">תוכן</label>
+          <textarea id="content" rows="8" formControlName="content"></textarea>
+          <span class="char-counter">{{ contentLength }} / 5000</span>
+          @if (form.controls.content.invalid && form.controls.content.touched) {
+            <span class="field-error">נא להזין תוכן (עד 5000 תווים)</span>
+          }
+        </div>
+
+        <app-error-display [message]="saveError()" />
+
+        @if (isSaving()) {
+          <app-loading-spinner message="שומר..." />
+        }
+
+        <button type="submit" class="btn-submit" [disabled]="form.invalid || isSaving()">
+          שמירה
+        </button>
+      </form>
+    </div>
+  }
+</div>
