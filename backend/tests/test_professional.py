@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.core.constants import ProfessionalDomain, Sector, UserRole, UserType
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_active_user, get_current_user
 from app.main import app
 from app.models.user import User
 
@@ -38,13 +38,15 @@ def _make_user(
 
 @pytest.fixture
 def as_user():
-    """Override get_current_user to return the given user, for the duration of the test."""
+    """Override get_current_user and get_current_active_user to return the given user."""
 
     def _apply(user: User):
         app.dependency_overrides[get_current_user] = lambda: user
+        app.dependency_overrides[get_current_active_user] = lambda: user
 
     yield _apply
     app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_current_active_user, None)
 
 
 class TestAskQuestion:
