@@ -112,3 +112,13 @@ def send_answer_notification(asker_email: str, query_id: str) -> None:
     """Notify the asker that their question was answered."""
     logger.info(f"[EMAIL] Answer received for query {query_id} → {asker_email}")
     # TODO: send real email
+
+
+def send_sla_escalation_alert(
+    admin_email: str, user_id: str, pending_email: str
+) -> None:
+    """Notify a senior admin that a registration has been pending 7+ days."""
+    logger.info(
+        f"[EMAIL] SLA escalation for registration {user_id} ({pending_email}) → {admin_email}"
+    )
+    # TODO: send real email
