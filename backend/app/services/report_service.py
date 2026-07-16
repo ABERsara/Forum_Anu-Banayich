@@ -17,6 +17,8 @@ TODO list for junior developer:
   [ ] implement _check_frequent_false_reporter()
 """
 
+import logging
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -26,6 +28,8 @@ from app.models.report import Report
 from app.models.user import User
 from app.schemas.report import ReportCreate, ReportDecideRequest
 from app.services.email_service import send_moderator_alert, send_urgent_moderator_alert
+
+logger = logging.getLogger(__name__)
 
 
 def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
@@ -64,15 +68,25 @@ def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     )
     db.add(report)
     # report.id is a client-side default (uuid4) — only populated once flushed.
-    # _escalate() needs the real id for the moderator email, so flush now
-    # rather than waiting for the commit below.
     db.flush()
 
     post.report_count += 1
-    _escalate(db, post, report)
+    if post.report_count == 2:
+        post.status = PostStatus.HIDDEN
 
     db.commit()
     db.refresh(report)
+
+    # Notifications run strictly after the commit: if the commit had failed,
+    # a moderator must never be alerted about a report that was never saved.
+    # A failure to notify must equally never turn an already-saved report
+    # into a failed request — log it and move on, same policy as
+    # send_otp_email()'s SMTP failure handling.
+    try:
+        _notify_moderators(db, post, report)
+    except Exception:
+        logger.exception("Failed to notify moderators for report %s", report.id)
+
     return report
 
 
@@ -93,22 +107,21 @@ def _ensure_not_duplicate_report(
         raise HTTPException(status_code=409, detail="כבר דיווחת על תוכן זה.")
 
 
-def _escalate(db: Session, post: ForumPost, report: Report) -> None:
+def _notify_moderators(db: Session, post: ForumPost, report: Report) -> None:
     """
-    Apply the three-stage escalation rule based on the post's updated
-    report_count (spec section 7.1):
+    Send the escalation email(s) for this report, based on the post's
+    already-committed report_count (spec section 7.1):
       1st report  → email to moderators
-      2nd report  → auto-hide + urgent email
-      3rd+ report → repeat urgent email
+      2nd+ report → urgent email (repeated on every report from here on)
+
+    Runs strictly after file_report()'s db.commit() — if the commit had
+    failed, a moderator must never be alerted about a report that was never
+    actually saved.
     """
     if post.report_count == 1:
         for email in _moderator_emails_for(db):
             send_moderator_alert(email, report.id, post.content[:100])
-    elif post.report_count == 2:
-        post.status = PostStatus.HIDDEN
-        for email in _moderator_emails_for(db):
-            send_urgent_moderator_alert(email, report.id)
-    elif post.report_count >= 3:
+    elif post.report_count >= 2:
         for email in _moderator_emails_for(db):
             send_urgent_moderator_alert(email, report.id)
 
