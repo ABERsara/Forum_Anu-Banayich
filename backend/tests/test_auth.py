@@ -383,3 +383,40 @@ class TestRefresh:
         access_tok = login_r.json()["access_token"]
         r = await client.post(f"{BASE}/refresh", json={"refresh_token": access_tok})
         assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# get_current_user / get_current_active_user (core/dependencies.py)
+# ---------------------------------------------------------------------------
+
+ME = "/api/v1/users/me"
+
+
+class TestGetCurrentUser:
+    async def test_active_user_returns_200(self, client, db_session):
+        await _register_verify_and_activate(client, db_session)
+        login_r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        access_tok = login_r.json()["access_token"]
+        r = await client.get(ME, headers={"Authorization": f"Bearer {access_tok}"})
+        assert r.status_code == 200
+
+    async def test_missing_token_returns_401(self, client):
+        r = await client.get(ME)
+        assert r.status_code == 401
+
+    async def test_invalid_token_returns_401(self, client):
+        r = await client.get(ME, headers={"Authorization": "Bearer not.a.valid.jwt"})
+        assert r.status_code == 401
+
+    async def test_suspended_account_returns_403(self, client, db_session):
+        """ensure_account_active must reject a logged-in user once their
+        account is suspended, even though their access token is still valid."""
+        user = await _register_verify_and_activate(client, db_session)
+        login_r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        access_tok = login_r.json()["access_token"]
+
+        user.account_status = AccountStatus.SUSPENDED
+        db_session.commit()
+
+        r = await client.get(ME, headers={"Authorization": f"Bearer {access_tok}"})
+        assert r.status_code == 403

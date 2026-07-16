@@ -20,7 +20,7 @@ from app.core.constants import (
     UserRole,
     UserType,
 )
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_active_user, get_current_user
 from app.main import app
 from app.models.forum import ForumPost
 from app.models.user import User
@@ -71,10 +71,12 @@ def _make_post(
 
 def _login_as(user: User) -> None:
     """
-    Bypass real JWT auth for these tests – override get_current_user directly,
-    the same way conftest.py's `client` fixture overrides get_db.
+    Bypass real JWT auth for these tests – override get_current_user and
+    get_current_active_user directly, the same way conftest.py's `client`
+    fixture overrides get_db.
     """
     app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_current_active_user] = lambda: user
 
 
 class TestGetPostEndpoint:
