@@ -264,8 +264,16 @@ class TestFileReportThirdPlusReportEscalation:
         assert calls == [reports[1].id, reports[2].id, reports[3].id]
 
 
-class TestModeratorEmailsFor:
-    def test_broadcasts_to_all_moderators(self, db_session: Session) -> None:
+class TestFileReportModeratorBroadcast:
+    def test_broadcasts_to_all_moderators(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[str] = []
+        monkeypatch.setattr(
+            report_service,
+            "send_moderator_alert",
+            lambda email, report_id, content_preview: calls.append(email),
+        )
         _make_user(
             db_session, "mod1@example.com", role=UserRole.MODERATOR, alert_email="alert1@example.com"
         )
@@ -273,14 +281,28 @@ class TestModeratorEmailsFor:
             db_session, "mod2@example.com", role=UserRole.MODERATOR, alert_email="alert2@example.com"
         )
         _make_user(db_session, "user@example.com")  # not a moderator
+        author = _make_user(db_session, "author@example.com")
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
 
-        emails = report_service._moderator_emails_for(db_session)
+        report_service.file_report(db_session, _report_data(post.id), reporter)
 
-        assert sorted(emails) == ["alert1@example.com", "alert2@example.com"]
+        assert sorted(calls) == ["alert1@example.com", "alert2@example.com"]
 
-    def test_falls_back_to_email_when_alert_email_missing(self, db_session: Session) -> None:
+    def test_falls_back_to_email_when_alert_email_missing(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[str] = []
+        monkeypatch.setattr(
+            report_service,
+            "send_moderator_alert",
+            lambda email, report_id, content_preview: calls.append(email),
+        )
         _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR, alert_email=None)
+        author = _make_user(db_session, "author@example.com")
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
 
-        emails = report_service._moderator_emails_for(db_session)
+        report_service.file_report(db_session, _report_data(post.id), reporter)
 
-        assert emails == ["mod@example.com"]
+        assert calls == ["mod@example.com"]
