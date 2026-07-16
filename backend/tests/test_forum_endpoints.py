@@ -1,12 +1,16 @@
 """
-Integration tests for GET /forum/posts/{id}.
+Integration tests for GET/DELETE /forum/posts/{id} and POST .../report.
 
-test_forum_service.py already covers the visibility rules in full via unit
-tests on forum_service.get_post_by_id() directly. These tests instead go
-through the real HTTP route, to catch wiring mistakes that unit tests on the
-service function can't see: the response_model conversion, the path param
-binding, and the actual status code returned over the wire.
+test_forum_service.py / test_report_service.py already cover the underlying
+business rules in full via unit tests on the service functions directly.
+These tests instead go through the real HTTP route, to catch wiring mistakes
+that unit tests on the service layer can't see: the response_model
+conversion, the path param binding, and the actual status code returned over
+the wire.
 """
+
+from httpx import AsyncClient
+from sqlalchemy.orm import Session
 
 from app.core.constants import (
     GroupVisibility,
@@ -152,3 +156,88 @@ class TestDeletePostEndpoint:
         r = await client.delete(f"{BASE}/{post.id}")
 
         assert r.status_code == 403
+
+
+class TestReportPostEndpoint:
+    async def test_success_returns_201_with_report_fields(
+        self, client: AsyncClient, db_session: Session
+    ) -> None:
+        author = _make_user(
+            db_session, "author@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        reporter = _make_user(
+            db_session, "reporter@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+        _login_as(reporter)
+
+        r = await client.post(
+            f"{BASE}/{post.id}/report",
+            json={"target_type": "forum_post", "target_id": post.id, "reason": "harassment"},
+        )
+
+        assert r.status_code == 201
+        body = r.json()
+        assert body["reporter_id"] == reporter.id
+        assert body["target_id"] == post.id
+        assert body["reason"] == "harassment"
+        assert body["decision"] == "pending"
+
+    async def test_mismatched_target_id_returns_400(
+        self, client: AsyncClient, db_session: Session
+    ) -> None:
+        author = _make_user(
+            db_session, "author@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        reporter = _make_user(
+            db_session, "reporter@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+        _login_as(reporter)
+
+        r = await client.post(
+            f"{BASE}/{post.id}/report",
+            json={"target_type": "forum_post", "target_id": "some-other-id", "reason": "spam"},
+        )
+
+        assert r.status_code == 400
+
+    async def test_nonexistent_post_returns_404(
+        self, client: AsyncClient, db_session: Session
+    ) -> None:
+        reporter = _make_user(
+            db_session, "reporter@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        _login_as(reporter)
+
+        r = await client.post(
+            f"{BASE}/no-such-id/report",
+            json={"target_type": "forum_post", "target_id": "no-such-id", "reason": "spam"},
+        )
+
+        assert r.status_code == 404
+
+    async def test_duplicate_report_returns_409(
+        self, client: AsyncClient, db_session: Session
+    ) -> None:
+        author = _make_user(
+            db_session, "author@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        reporter = _make_user(
+            db_session, "reporter@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+        _login_as(reporter)
+        payload = {"target_type": "forum_post", "target_id": post.id, "reason": "spam"}
+
+        first = await client.post(f"{BASE}/{post.id}/report", json=payload)
+        second = await client.post(f"{BASE}/{post.id}/report", json=payload)
+
+        assert first.status_code == 201
+        assert second.status_code == 409

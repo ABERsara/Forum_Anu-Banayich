@@ -9,8 +9,9 @@
  */
 
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
 
+import { ReportTargetType } from '../constants';
 import { Report, ReportCreate, ReportDecideRequest, ReportList } from '../models';
 import { ApiService } from './api.service';
 
@@ -19,12 +20,12 @@ export class ReportService {
   private readonly api = inject(ApiService);
 
   fileReport(data: ReportCreate): Observable<Report> {
-    void data;
-    /**
-     * TODO:
-     *   return this.api.post<Report>('/reports', data);
-     */
-    throw new Error('fileReport() not yet implemented');
+    if (data.target_type === ReportTargetType.FORUM_POST) {
+      return this.api.post<Report>(`/forum/posts/${data.target_id}/report`, data);
+    }
+    return throwError(
+      () => new Error(`Reporting ${data.target_type} content is not supported yet.`),
+    );
   }
 
   getPendingReports(): Observable<ReportList> {

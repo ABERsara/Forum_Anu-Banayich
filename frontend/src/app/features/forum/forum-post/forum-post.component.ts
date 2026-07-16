@@ -7,12 +7,14 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
+import { ReportTargetType } from '../../../core/constants';
 import { ForumPost } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+import { ReportButtonComponent } from '../../../shared/components/report-button/report-button.component';
 
 @Component({
   selector: 'app-forum-post',
@@ -23,6 +25,7 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
     LoadingSpinnerComponent,
     ErrorDisplayComponent,
     ConfirmDialogComponent,
+    ReportButtonComponent,
   ],
   templateUrl: './forum-post.component.html',
   styleUrl: './forum-post.component.scss',
@@ -32,6 +35,8 @@ export class ForumPostComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly forumService = inject(ForumService);
   private readonly authService = inject(AuthService);
+
+  readonly reportTargetType = ReportTargetType.FORUM_POST;
 
   post = signal<ForumPost | null>(null);
   isLoading = signal(false);
