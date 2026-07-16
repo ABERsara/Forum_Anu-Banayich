@@ -102,6 +102,13 @@ class User(Base):
     alert_email: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     # ------------------------------------------------------------------
+    # SLA escalation tracking (registration lifecycle)
+    # ------------------------------------------------------------------
+    sla_escalation_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+
+    # ------------------------------------------------------------------
     # PROFESSIONAL role
     # ------------------------------------------------------------------
     professional_domain: Mapped[ProfessionalDomain | None] = mapped_column(

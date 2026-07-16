@@ -167,6 +167,171 @@ class TestGetActiveUsers:
         assert [u.email for u in result] == [oldest.email, middle.email, newest.email]
 
 
+class TestCheckSlaEscalations:
+    def _make_stuck_user(
+        self,
+        db_session: Session,
+        email: str,
+        status: AccountStatus,
+        updated_at: datetime,
+    ) -> User:
+        user = User(
+            email=email,
+            password_hash="hashed",
+            first_name="Test",
+            last_name="User",
+            account_status=status,
+        )
+        db_session.add(user)
+        db_session.commit()
+        user.updated_at = updated_at
+        db_session.commit()
+        return user
+
+    def _make_senior_admin(
+        self, db_session: Session, email: str, alert_email: str
+    ) -> User:
+        admin = _make_admin(db_session, email)
+        admin.alert_email = alert_email
+        db_session.commit()
+        return admin
+
+    def test_escalates_pending_request_older_than_7_days(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_sla_escalation_alert", lambda *a: sent.append(a)
+        )
+        self._make_senior_admin(db_session, "admin1@example.com", "senior@example.com")
+        stale = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=8)
+        user = self._make_stuck_user(
+            db_session, "stuck@example.com", AccountStatus.PENDING_APPROVAL, stale
+        )
+
+        result = user_service.check_sla_escalations(db_session)
+
+        assert [u.id for u in result] == [user.id]
+        assert sent == [("senior@example.com", user.id, user.email)]
+        db_session.refresh(user)
+        assert user.sla_escalation_sent_at is not None
+
+    def test_escalates_partially_approved_request_older_than_7_days(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_sla_escalation_alert", lambda *a: sent.append(a)
+        )
+        self._make_senior_admin(db_session, "admin1@example.com", "senior@example.com")
+        stale = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=10)
+        user = self._make_stuck_user(
+            db_session, "stuck@example.com", AccountStatus.PARTIALLY_APPROVED, stale
+        )
+
+        result = user_service.check_sla_escalations(db_session)
+
+        assert [u.id for u in result] == [user.id]
+        assert sent == [("senior@example.com", user.id, user.email)]
+
+    def test_does_not_escalate_request_within_7_days(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_sla_escalation_alert", lambda *a: sent.append(a)
+        )
+        self._make_senior_admin(db_session, "admin1@example.com", "senior@example.com")
+        recent = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=2)
+        self._make_stuck_user(
+            db_session, "fresh@example.com", AccountStatus.PENDING_APPROVAL, recent
+        )
+
+        result = user_service.check_sla_escalations(db_session)
+
+        assert result == []
+        assert sent == []
+
+    def test_does_not_escalate_handled_requests(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_sla_escalation_alert", lambda *a: sent.append(a)
+        )
+        self._make_senior_admin(db_session, "admin1@example.com", "senior@example.com")
+        stale = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=8)
+        self._make_stuck_user(
+            db_session, "active@example.com", AccountStatus.ACTIVE, stale
+        )
+        self._make_stuck_user(
+            db_session, "rejected@example.com", AccountStatus.REJECTED, stale
+        )
+
+        result = user_service.check_sla_escalations(db_session)
+
+        assert result == []
+        assert sent == []
+
+    def test_does_not_resend_once_already_escalated(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_sla_escalation_alert", lambda *a: sent.append(a)
+        )
+        self._make_senior_admin(db_session, "admin1@example.com", "senior@example.com")
+        stale = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=8)
+        user = self._make_stuck_user(
+            db_session, "stuck@example.com", AccountStatus.PENDING_APPROVAL, stale
+        )
+        user.sla_escalation_sent_at = datetime.now(UTC).replace(tzinfo=None)
+        db_session.commit()
+
+        result = user_service.check_sla_escalations(db_session)
+
+        assert result == []
+        assert sent == []
+
+    def test_no_senior_admin_configured_sends_nothing(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_sla_escalation_alert", lambda *a: sent.append(a)
+        )
+        stale = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=8)
+        user = self._make_stuck_user(
+            db_session, "stuck@example.com", AccountStatus.PENDING_APPROVAL, stale
+        )
+
+        result = user_service.check_sla_escalations(db_session)
+
+        assert result == []
+        assert sent == []
+        db_session.refresh(user)
+        assert user.sla_escalation_sent_at is None
+
+    def test_notifies_every_senior_admin_with_alert_email(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent = []
+        monkeypatch.setattr(
+            user_service, "send_sla_escalation_alert", lambda *a: sent.append(a)
+        )
+        self._make_senior_admin(db_session, "admin1@example.com", "senior1@example.com")
+        self._make_senior_admin(db_session, "admin2@example.com", "senior2@example.com")
+        stale = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=8)
+        self._make_stuck_user(
+            db_session, "stuck@example.com", AccountStatus.PENDING_APPROVAL, stale
+        )
+
+        user_service.check_sla_escalations(db_session)
+
+        recipients = {call[0] for call in sent}
+        assert recipients == {"senior1@example.com", "senior2@example.com"}
+
+
 class TestApproveRegistration:
     def test_first_approval_sets_partially_approved(self, db_session: Session) -> None:
         now = datetime.now(UTC).replace(tzinfo=None)
