@@ -4,6 +4,7 @@ Forum endpoints.
 GET    /forum/posts           – list posts (auto-filtered by group+sector)
 POST   /forum/posts           – create a new post
 GET    /forum/posts/{id}      – single post
+DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
 
 GET    /messages              – inbox (list of conversations)
@@ -14,7 +15,7 @@ GET    /messages/{user_id}    – conversation with a specific user
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db
+from app.core.dependencies import get_current_active_user, get_db
 from app.models.user import User
 from app.schemas.forum import (
     ConversationSummary,
@@ -39,7 +40,7 @@ router = APIRouter(tags=["Forum & Messages"])
 def list_posts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostListResponse:
     """
@@ -52,7 +53,7 @@ def list_posts(
 @router.post("/forum/posts", response_model=ForumPostResponse, status_code=201)
 def create_post(
     data: ForumPostCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """
@@ -67,23 +68,35 @@ def create_post(
 @router.get("/forum/posts/{post_id}", response_model=ForumPostResponse)
 def get_post(
     post_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """
     Return a single forum post.
-
-    TODO: call forum_service.get_post_by_id(db, post_id, current_user)
     """
-    # TODO: implement
-    raise NotImplementedError
+    post = forum_service.get_post_by_id(db, post_id, current_user)
+    return ForumPostResponse.model_validate(post)
+
+
+@router.delete("/forum/posts/{post_id}", response_model=ForumPostResponse)
+def delete_post(
+    post_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> ForumPostResponse:
+    """
+    Delete (soft-delete) a forum post. Allowed for the post's author, any
+    moderator, or an admin.
+    """
+    post = forum_service.delete_post(db, post_id, current_user)
+    return ForumPostResponse.model_validate(post)
 
 
 @router.post("/forum/posts/{post_id}/report", status_code=201)
 def report_post(
     post_id: str,
     data: ReportCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> None:
     """
@@ -102,7 +115,7 @@ def report_post(
 
 @router.get("/messages", response_model=list[ConversationSummary])
 def get_inbox(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[ConversationSummary]:
     """
@@ -117,7 +130,7 @@ def get_inbox(
 @router.post("/messages", response_model=DirectMessageResponse, status_code=201)
 def send_message(
     data: DirectMessageCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> DirectMessageResponse:
     """
@@ -133,7 +146,7 @@ def send_message(
 def get_conversation(
     user_id: str,
     page: int = Query(1, ge=1),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[DirectMessageResponse]:
     """

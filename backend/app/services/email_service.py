@@ -20,12 +20,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-def send_otp_email(email: str, otp_code: str) -> None:
-    """Send OTP verification code to a new registrant."""
-    if not settings.SMTP_HOST:
-        logger.info(f"[DEV EMAIL] OTP {otp_code} -> {email}")
-        return
-
+def _build_otp_message(email: str, otp_code: str) -> MIMEText:
     html = (
         f'<div dir="rtl">'
         f"<p>שלום,</p>"
@@ -35,12 +30,22 @@ def send_otp_email(email: str, otp_code: str) -> None:
         f"<p>לא נרשמת? פשוט התעלם מהמייל הזה.</p>"
         f"</div>"
     )
-    # PROD: single MIMEText, no MIMEMultipart("alternative") — there's no plain-text
+    # single MIMEText, no MIMEMultipart("alternative") — there's no plain-text
     # alternative to choose between yet. Add one back if a plain-text fallback is added.
     msg = MIMEText(html, "html", "utf-8")
     msg["Subject"] = 'קוד אימות – עמותת "אנו בניך"'
     msg["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>"
     msg["To"] = email
+    return msg
+
+
+def send_otp_email(email: str, otp_code: str) -> None:
+    """Send OTP verification code to a new registrant."""
+    if not settings.SMTP_HOST:
+        logger.info(f"[DEV EMAIL] OTP {otp_code} -> {email}")
+        return
+
+    msg = _build_otp_message(email, otp_code)
 
     try:
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as s:
@@ -91,12 +96,15 @@ def send_suspension_notification(email: str, hours: int, reason: str) -> None:
     # TODO: send real email
 
 
-def send_question_notification(
-    professional_email: str, query_id: str, is_general: bool
-) -> None:
-    """Notify a professional of a new question."""
-    label = "שאלה כללית" if is_general else "שאלה ישירה"
-    logger.info(f"[EMAIL] {label} {query_id} → {professional_email}")
+def send_direct_question_notification(professional_email: str, query_id: str) -> None:
+    """Notify a professional of a new question addressed to them directly."""
+    logger.info(f"[EMAIL] שאלה ישירה {query_id} → {professional_email}")
+    # TODO: send real email
+
+
+def send_domain_question_notification(professional_email: str, query_id: str) -> None:
+    """Notify a professional of a new general question in their domain."""
+    logger.info(f"[EMAIL] שאלה כללית {query_id} → {professional_email}")
     # TODO: send real email
 
 

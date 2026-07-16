@@ -6,6 +6,7 @@ Each test runs against an isolated in-memory SQLite DB (see conftest.py).
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from jose import jwt as jose_jwt
 
 from app.core.config import settings
@@ -115,6 +116,21 @@ class TestRegister:
         payload = {k: v for k, v in VALID_PAYLOAD.items() if k != "first_name"}
         r = await _register(client, payload)
         assert r.status_code == 422
+
+    async def test_commit_failure_leaves_no_user_row(
+        self, client, db_session, monkeypatch
+    ):
+        """If db.commit() fails, the user INSERT must not be partially persisted."""
+
+        def _boom():
+            raise Exception("simulated commit failure")
+
+        monkeypatch.setattr(db_session, "commit", _boom)
+        with pytest.raises(Exception, match="simulated commit failure"):
+            await _register(client)
+
+        db_session.rollback()
+        assert _get_user(db_session) is None
 
 
 # ---------------------------------------------------------------------------
@@ -367,3 +383,40 @@ class TestRefresh:
         access_tok = login_r.json()["access_token"]
         r = await client.post(f"{BASE}/refresh", json={"refresh_token": access_tok})
         assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# get_current_user / get_current_active_user (core/dependencies.py)
+# ---------------------------------------------------------------------------
+
+ME = "/api/v1/users/me"
+
+
+class TestGetCurrentUser:
+    async def test_active_user_returns_200(self, client, db_session):
+        await _register_verify_and_activate(client, db_session)
+        login_r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        access_tok = login_r.json()["access_token"]
+        r = await client.get(ME, headers={"Authorization": f"Bearer {access_tok}"})
+        assert r.status_code == 200
+
+    async def test_missing_token_returns_401(self, client):
+        r = await client.get(ME)
+        assert r.status_code == 401
+
+    async def test_invalid_token_returns_401(self, client):
+        r = await client.get(ME, headers={"Authorization": "Bearer not.a.valid.jwt"})
+        assert r.status_code == 401
+
+    async def test_suspended_account_returns_403(self, client, db_session):
+        """ensure_account_active must reject a logged-in user once their
+        account is suspended, even though their access token is still valid."""
+        user = await _register_verify_and_activate(client, db_session)
+        login_r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        access_tok = login_r.json()["access_token"]
+
+        user.account_status = AccountStatus.SUSPENDED
+        db_session.commit()
+
+        r = await client.get(ME, headers={"Authorization": f"Bearer {access_tok}"})
+        assert r.status_code == 403

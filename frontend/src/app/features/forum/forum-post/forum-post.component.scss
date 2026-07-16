@@ -1,0 +1,17 @@
+@use '../../../../styles/variables' as *;
+
+.forum-post {
+  padding: $spacing-md;
+
+  &__meta {
+    color: $color-text-muted;
+  }
+
+  &__content {
+    white-space: pre-wrap;
+  }
+
+  &__actions {
+    margin-top: $spacing-md;
+  }
+}

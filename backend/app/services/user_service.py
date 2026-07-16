@@ -26,6 +26,23 @@ from app.services.email_service import (
 )
 
 
+def get_user_by_id(db: Session, user_id: str) -> User | None:
+    """
+    Fetch a user by id, or None if no such user exists.
+    """
+    return db.query(User).filter(User.id == user_id).first()
+
+
+def ensure_account_active(user: User) -> None:
+    """
+    Business rule: only ACTIVE accounts may proceed.
+
+    Raises 403 otherwise (e.g. suspended/pending/cancelled accounts).
+    """
+    if user.account_status != AccountStatus.ACTIVE:
+        raise HTTPException(status_code=403, detail="החשבון אינו פעיל.")
+
+
 def get_pending_registrations(db: Session) -> list[User]:
     """
     Return all users awaiting admin approval.

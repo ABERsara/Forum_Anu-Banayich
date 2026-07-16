@@ -158,6 +158,12 @@ export enum QueryStatus {
   CLOSED = 'closed',
 }
 
+export const QUERY_STATUS_LABELS: Record<QueryStatus, string> = {
+  [QueryStatus.OPEN]: 'פתוח',
+  [QueryStatus.ANSWERED]: 'נענה',
+  [QueryStatus.CLOSED]: 'סגור',
+};
+
 // ---------------------------------------------------------------------------
 // Reports
 // ---------------------------------------------------------------------------

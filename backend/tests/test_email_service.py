@@ -56,6 +56,17 @@ def _reset_smtp_settings(monkeypatch):
     yield
 
 
+class TestBuildOtpMessage:
+    def test_message_structure(self):
+        msg = email_service._build_otp_message("test@example.com", "654321")
+
+        assert msg["To"] == "test@example.com"
+        assert msg["Subject"] == 'קוד אימות – עמותת "אנו בניך"'
+        html = msg.get_payload(decode=True).decode("utf-8")
+        assert "654321" in html
+        assert 'dir="rtl"' in html
+
+
 class TestSendOtpEmailDevFallback:
     def test_logs_otp_code(self, caplog):
         with caplog.at_level(logging.INFO):
