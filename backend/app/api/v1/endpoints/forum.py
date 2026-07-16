@@ -15,7 +15,6 @@ GET    /messages/{user_id}    – conversation with a specific user
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.constants import ReportTargetType
 from app.core.dependencies import get_current_user, get_db
 from app.models.user import User
 from app.schemas.forum import (
@@ -104,9 +103,10 @@ def report_post(
 ) -> ReportResponse:
     """
     Report a forum post. Rejects if the body's target doesn't match the
-    route's post_id, rather than silently overriding it.
+    route's post_id, rather than silently overriding it. target_type support
+    is validated by report_service.file_report() itself.
     """
-    if data.target_type != ReportTargetType.FORUM_POST or data.target_id != post_id:
+    if data.target_id != post_id:
         raise HTTPException(
             status_code=400, detail="נתוני הדיווח אינם תואמים את ההודעה המבוקשת."
         )
