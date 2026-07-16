@@ -1,0 +1,67 @@
+<div class="ask-question-page" dir="rtl">
+  <a routerLink="/advice">← חזרה לרשימת אנשי מקצוע</a>
+
+  <div class="ask-question-card">
+    <h1 class="ask-question-title">שאלה מקצועית</h1>
+    @if (professionalId) {
+      <p class="ask-question-hint">השאלה תישלח לאיש המקצוע הנבחר.</p>
+    } @else {
+      <p class="ask-question-hint">בחר/י תחום — השאלה תישלח לכל אנשי המקצוע בתחום זה.</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+      @if (!professionalId) {
+        <div class="form-field">
+          <label for="domain">תחום</label>
+          <select id="domain" formControlName="domain">
+            <option [ngValue]="null">בחר/י תחום</option>
+            @for (domain of domainOptions; track domain) {
+              <option [ngValue]="domain">{{ domainLabels[domain] }}</option>
+            }
+          </select>
+          @if (form.controls.domain.invalid && form.controls.domain.touched) {
+            <span class="field-error">נא לבחור תחום</span>
+          }
+        </div>
+      }
+
+      <div class="form-field">
+        <label for="content">השאלה שלך</label>
+        <textarea
+          id="content"
+          rows="8"
+          formControlName="content"
+          placeholder="פרט/י את שאלתך (10 עד 2000 תווים)"
+        ></textarea>
+        <span class="char-counter">{{ contentLength }} / 2000</span>
+        @if (form.controls.content.invalid && form.controls.content.touched) {
+          <span class="field-error">נא להזין שאלה (10 עד 2000 תווים)</span>
+        }
+      </div>
+
+      <div class="form-field form-field--checkbox">
+        <label>
+          <input type="checkbox" formControlName="is_public" />
+          האם לפרסם את השאלה והתשובה לחברי הקהילה?
+        </label>
+      </div>
+
+      <div class="form-field form-field--checkbox">
+        <label>
+          <input type="checkbox" formControlName="show_real_name" />
+          הצג/י את שמי האמיתי לאיש המקצוע
+        </label>
+      </div>
+
+      <app-error-display [message]="errorMessage()" />
+
+      @if (isLoading()) {
+        <app-loading-spinner message="שולח שאלה..." />
+      }
+
+      <button type="submit" class="btn-submit" [disabled]="form.invalid || isLoading()">
+        שלח שאלה
+      </button>
+    </form>
+  </div>
+</div>
