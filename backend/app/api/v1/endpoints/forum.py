@@ -6,6 +6,7 @@ POST   /forum/posts           – create a new post
 GET    /forum/posts/{id}      – single post
 DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
+POST   /forum/broadcast       – admin-only post visible to all users
 
 GET    /messages              – inbox (list of conversations)
 POST   /messages              – send a direct message
@@ -15,9 +16,10 @@ GET    /messages/{user_id}    – conversation with a specific user
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_active_user, get_db
+from app.core.dependencies import get_current_active_user, get_db, require_admin
 from app.models.user import User
 from app.schemas.forum import (
+    BroadcastCreate,
     ConversationSummary,
     DirectMessageCreate,
     DirectMessageResponse,
@@ -89,6 +91,20 @@ def delete_post(
     moderator, or an admin.
     """
     post = forum_service.delete_post(db, post_id, current_user)
+    return ForumPostResponse.model_validate(post)
+
+
+@router.post("/forum/broadcast", response_model=ForumPostResponse, status_code=201)
+def create_broadcast(
+    data: BroadcastCreate,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> ForumPostResponse:
+    """
+    Publish an admin broadcast post, visible to all users regardless of
+    group or sector.
+    """
+    post = forum_service.create_broadcast_post(db, data, current_user)
     return ForumPostResponse.model_validate(post)
 
 

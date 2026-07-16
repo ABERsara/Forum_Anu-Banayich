@@ -165,6 +165,13 @@ export const routes: Routes = [
           import('./features/admin/audit-log/audit-log.component').then((m) => m.AuditLogComponent),
       },
       {
+        path: 'broadcast',
+        loadComponent: () =>
+          import('./features/admin/broadcast/broadcast.component').then(
+            (m) => m.BroadcastComponent,
+          ),
+      },
+      {
         path: 'active-users',
         loadComponent: () =>
           import('./features/admin/active-users/active-users.component').then(

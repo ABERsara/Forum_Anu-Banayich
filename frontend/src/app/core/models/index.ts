@@ -122,6 +122,11 @@ export interface ForumPostCreate {
   sector_visibility: SectorVisibility;
 }
 
+export interface BroadcastCreate {
+  title: string;
+  content: string;
+}
+
 export interface ForumPost {
   id: string;
   title: string;
