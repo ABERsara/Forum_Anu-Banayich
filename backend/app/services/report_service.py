@@ -126,7 +126,9 @@ def _notify_moderators(db: Session, post: ForumPost, report: Report) -> None:
         _handle_second_plus_report_notification(db, post, report)
 
 
-def _handle_first_report_notification(db: Session, post: ForumPost, report: Report) -> None:
+def _handle_first_report_notification(
+    db: Session, post: ForumPost, report: Report
+) -> None:
     """1st report → regular email to moderators."""
     for email in _moderator_emails_for(db):
         send_moderator_alert(email, report.id, post.content[:100])
