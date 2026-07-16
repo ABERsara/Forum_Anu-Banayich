@@ -17,7 +17,8 @@ GET    /messages/{user_id}    – conversation with a specific user
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_active_user, get_db, require_admin
+from app.core.constants import UserRole
+from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
@@ -108,10 +109,15 @@ def delete_post(
     return ForumPostResponse.model_validate(post)
 
 
-@router.post("/forum/broadcast", response_model=ForumPostResponse, status_code=201)
+@router.post(
+    "/forum/broadcast",
+    response_model=ForumPostResponse,
+    status_code=201,
+    dependencies=[Depends(require_role(UserRole.ADMIN))],
+)
 def create_broadcast(
     data: BroadcastCreate,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> ForumPostResponse:
     """

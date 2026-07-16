@@ -10,7 +10,7 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 @router.get("/admin/stuff")
-def admin_only(current_user: User = Depends(require_admin)):
+def admin_only(current_user: User = Depends(require_role(UserRole.ADMIN))):
     ...
 """
 
@@ -97,19 +97,3 @@ def require_role(*roles: UserRole) -> Callable[..., "User"]:
         return current_user
 
     return _check
-
-
-def require_admin(current_user: "User" = Depends(get_current_active_user)) -> "User":
-    return require_role(UserRole.ADMIN)(current_user)
-
-
-def require_moderator(
-    current_user: "User" = Depends(get_current_active_user),
-) -> "User":
-    return require_role(UserRole.MODERATOR, UserRole.ADMIN)(current_user)
-
-
-def require_professional(
-    current_user: "User" = Depends(get_current_active_user),
-) -> "User":
-    return require_role(UserRole.PROFESSIONAL)(current_user)
