@@ -74,6 +74,7 @@ export class NewPostComponent {
   }
 
   onFileSelected(file: File): void {
+    this.fileError.set('');
     this.form.controls.attachment.setValue(file);
   }
 
@@ -99,7 +100,10 @@ export class NewPostComponent {
         sector_visibility: sector_visibility ?? SectorVisibility.ALL,
       })
       .subscribe({
-        next: (post) => this.router.navigate(['/forum', post.id]),
+        next: (post) => {
+          this.isLoading.set(false);
+          this.router.navigate(['/forum', post.id]);
+        },
         error: (err) => {
           this.errorMessage.set(err.error?.detail ?? 'אירעה שגיאה בפרסום ההודעה.');
           this.isLoading.set(false);

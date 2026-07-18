@@ -69,7 +69,10 @@ export class EditPostComponent implements OnInit {
     this.forumService
       .updatePost(this.postId, { title: title ?? '', content: content ?? '' })
       .subscribe({
-        next: () => this.router.navigate(['/forum', this.postId]),
+        next: () => {
+          this.isSaving.set(false);
+          this.router.navigate(['/forum', this.postId]);
+        },
         error: (err: HttpErrorResponse) => {
           this.saveError.set(this.messageForError(err));
           this.isSaving.set(false);

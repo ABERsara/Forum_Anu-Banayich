@@ -276,9 +276,13 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
     )
     db.add(post)
     db.commit()
-    db.refresh(post)
 
-    return post
+    return (
+        db.query(ForumPost)
+        .options(joinedload(ForumPost.author))
+        .filter(ForumPost.id == post.id)
+        .one()
+    )
 
 
 def update_post(

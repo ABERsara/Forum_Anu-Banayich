@@ -332,7 +332,11 @@ class TestCreatePostEndpoint:
 class TestUpdatePostEndpoint:
     async def test_author_update_returns_200_with_new_content(self, client, db_session):
         author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+            db_session,
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
         )
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
@@ -347,10 +351,18 @@ class TestUpdatePostEndpoint:
 
     async def test_other_user_gets_403(self, client, db_session):
         author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+            db_session,
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
         )
         other_user = _make_user(
-            db_session, "widow2@example.com", UserType.WIDOW, Sector.HASIDIC
+            db_session,
+            "widow2@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
         )
         post = _make_post(
             db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
@@ -363,7 +375,11 @@ class TestUpdatePostEndpoint:
 
     async def test_nonexistent_id_returns_404(self, client, db_session):
         author = _make_user(
-            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+            db_session,
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
         )
         _login_as(author)
 
