@@ -91,6 +91,9 @@ class User(Base):
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sla_escalation_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
 
     # ------------------------------------------------------------------
     # MODERATOR role – which cells (group+sector) this moderator oversees
@@ -100,13 +103,6 @@ class User(Base):
         JSON, nullable=True
     )
     alert_email: Mapped[str | None] = mapped_column(String(256), nullable=True)
-
-    # ------------------------------------------------------------------
-    # SLA escalation tracking (registration lifecycle)
-    # ------------------------------------------------------------------
-    sla_escalation_sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime, nullable=True
-    )
 
     # ------------------------------------------------------------------
     # PROFESSIONAL role

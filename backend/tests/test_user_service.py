@@ -167,7 +167,7 @@ class TestGetActiveUsers:
         assert [u.email for u in result] == [oldest.email, middle.email, newest.email]
 
 
-class TestCheckSlaEscalations:
+class TestEscalateOverdueRegistrations:
     def _make_stuck_user(
         self,
         db_session: Session,
@@ -209,7 +209,7 @@ class TestCheckSlaEscalations:
             db_session, "stuck@example.com", AccountStatus.PENDING_APPROVAL, stale
         )
 
-        result = user_service.check_sla_escalations(db_session)
+        result = user_service.escalate_overdue_registrations(db_session)
 
         assert [u.id for u in result] == [user.id]
         assert sent == [("senior@example.com", user.id, user.email)]
@@ -229,7 +229,7 @@ class TestCheckSlaEscalations:
             db_session, "stuck@example.com", AccountStatus.PARTIALLY_APPROVED, stale
         )
 
-        result = user_service.check_sla_escalations(db_session)
+        result = user_service.escalate_overdue_registrations(db_session)
 
         assert [u.id for u in result] == [user.id]
         assert sent == [("senior@example.com", user.id, user.email)]
@@ -247,7 +247,7 @@ class TestCheckSlaEscalations:
             db_session, "fresh@example.com", AccountStatus.PENDING_APPROVAL, recent
         )
 
-        result = user_service.check_sla_escalations(db_session)
+        result = user_service.escalate_overdue_registrations(db_session)
 
         assert result == []
         assert sent == []
@@ -268,7 +268,7 @@ class TestCheckSlaEscalations:
             db_session, "rejected@example.com", AccountStatus.REJECTED, stale
         )
 
-        result = user_service.check_sla_escalations(db_session)
+        result = user_service.escalate_overdue_registrations(db_session)
 
         assert result == []
         assert sent == []
@@ -288,7 +288,7 @@ class TestCheckSlaEscalations:
         user.sla_escalation_sent_at = datetime.now(UTC).replace(tzinfo=None)
         db_session.commit()
 
-        result = user_service.check_sla_escalations(db_session)
+        result = user_service.escalate_overdue_registrations(db_session)
 
         assert result == []
         assert sent == []
@@ -305,7 +305,7 @@ class TestCheckSlaEscalations:
             db_session, "stuck@example.com", AccountStatus.PENDING_APPROVAL, stale
         )
 
-        result = user_service.check_sla_escalations(db_session)
+        result = user_service.escalate_overdue_registrations(db_session)
 
         assert result == []
         assert sent == []
@@ -326,7 +326,7 @@ class TestCheckSlaEscalations:
             db_session, "stuck@example.com", AccountStatus.PENDING_APPROVAL, stale
         )
 
-        user_service.check_sla_escalations(db_session)
+        user_service.escalate_overdue_registrations(db_session)
 
         recipients = {call[0] for call in sent}
         assert recipients == {"senior1@example.com", "senior2@example.com"}

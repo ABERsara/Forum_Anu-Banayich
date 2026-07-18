@@ -62,7 +62,7 @@ def get_pending_registrations(db: Session) -> list[User]:
     )
 
 
-def check_sla_escalations(db: Session) -> list[User]:
+def escalate_overdue_registrations(db: Session) -> list[User]:
     """
     Find registrations stuck 7+ days without a status update and email the
     senior admin(s) once per request.
@@ -98,8 +98,10 @@ def check_sla_escalations(db: Session) -> list[User]:
     escalated: list[User] = []
     for user in stuck_users:
         for admin in senior_admins:
-            if admin.alert_email:
-                send_sla_escalation_alert(admin.alert_email, user.id, user.email)
+            assert admin.alert_email is not None, (
+                "senior_admins is filtered to alert_email IS NOT NULL above"
+            )
+            send_sla_escalation_alert(admin.alert_email, user.id, user.email)
         user.sla_escalation_sent_at = datetime.now(UTC).replace(tzinfo=None)
         escalated.append(user)
 
