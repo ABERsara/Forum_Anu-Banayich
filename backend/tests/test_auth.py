@@ -535,6 +535,7 @@ class TestRequireRole:
             check(user)
 
         assert exc_info.value.status_code == 403
+        assert exc_info.value.detail == "אין לך הרשאה לבצע פעולה זו."
 
     def test_allows_any_of_multiple_roles(self) -> None:
         check = require_role(UserRole.MODERATOR, UserRole.ADMIN)
@@ -545,3 +546,4 @@ class TestRequireRole:
         with pytest.raises(HTTPException) as exc_info:
             check(_user_with_role(UserRole.USER))
         assert exc_info.value.status_code == 403
+        assert exc_info.value.detail == "אין לך הרשאה לבצע פעולה זו."
