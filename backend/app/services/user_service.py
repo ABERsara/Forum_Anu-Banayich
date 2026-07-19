@@ -22,8 +22,11 @@ from app.services.audit_service import log_action
 from app.services.email_service import (
     send_approval_email,
     send_rejection_email,
+    send_sla_escalation_alert,
     send_suspension_notification,
 )
+
+SLA_ESCALATION_DAYS = 7
 
 
 def get_user_by_id(db: Session, user_id: str) -> User | None:
@@ -57,6 +60,53 @@ def get_pending_registrations(db: Session) -> list[User]:
         .order_by(User.created_at.asc())
         .all()
     )
+
+
+def escalate_overdue_registrations(db: Session) -> list[User]:
+    """
+    Find registrations stuck 7+ days without a status update and email the
+    senior admin(s) once per request.
+
+    Meant to be called by any scheduler (cron, Celery, etc.); it is a plain
+    function so it can also be invoked directly from tests.
+    """
+    threshold = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+        days=SLA_ESCALATION_DAYS
+    )
+    stuck_users = (
+        db.query(User)
+        .filter(
+            User.account_status.in_(
+                [AccountStatus.PENDING_APPROVAL, AccountStatus.PARTIALLY_APPROVED]
+            ),
+            User.updated_at <= threshold,
+            User.sla_escalation_sent_at.is_(None),
+        )
+        .all()
+    )
+    if not stuck_users:
+        return []
+
+    senior_admins = (
+        db.query(User)
+        .filter(User.role == UserRole.ADMIN, User.alert_email.isnot(None))
+        .all()
+    )
+    if not senior_admins:
+        return []
+
+    escalated: list[User] = []
+    for user in stuck_users:
+        for admin in senior_admins:
+            assert admin.alert_email is not None, (
+                "senior_admins is filtered to alert_email IS NOT NULL above"
+            )
+            send_sla_escalation_alert(admin.alert_email, user.id, user.email)
+        user.sla_escalation_sent_at = datetime.now(UTC).replace(tzinfo=None)
+        escalated.append(user)
+
+    db.commit()
+    return escalated
 
 
 def get_active_users(db: Session) -> list[User]:
