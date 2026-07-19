@@ -1,0 +1,65 @@
+<div class="new-post-page" dir="rtl">
+  <a routerLink="/forum">← חזרה לפורום</a>
+
+  <div class="new-post-card">
+    <h1 class="new-post-title">פרסום הודעה חדשה</h1>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+      <div class="form-field">
+        <label for="title">כותרת</label>
+        <input id="title" type="text" formControlName="title" />
+        @if (form.controls.title.invalid && form.controls.title.touched) {
+          <span class="field-error">נא להזין כותרת (2 עד 256 תווים)</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="content">תוכן</label>
+        <textarea id="content" rows="8" formControlName="content"></textarea>
+        <span class="char-counter">{{ contentLength }} / 5000</span>
+        @if (form.controls.content.invalid && form.controls.content.touched) {
+          <span class="field-error">נא להזין תוכן (עד 5000 תווים)</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="group_visibility">קהל יעד – קבוצה</label>
+        <select id="group_visibility" formControlName="group_visibility">
+          @for (option of groupOptions(); track option) {
+            <option [ngValue]="option">{{ groupVisibilityLabels[option] }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="form-field">
+        <label for="sector_visibility">קהל יעד – מגזר</label>
+        <select id="sector_visibility" formControlName="sector_visibility">
+          @for (option of sectorOptions(); track option) {
+            <option [ngValue]="option">{{ sectorVisibilityLabels[option] }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="form-field">
+        <app-file-upload
+          label="צירוף קובץ (אופציונלי)"
+          (fileSelected)="onFileSelected($event)"
+          (validationError)="onFileError($event)"
+        />
+        @if (fileError(); as fileErr) {
+          <app-error-display [message]="fileErr" />
+        }
+      </div>
+
+      <app-error-display [message]="errorMessage()" />
+
+      @if (isLoading()) {
+        <app-loading-spinner message="מפרסם..." />
+      }
+
+      <button type="submit" class="btn-submit" [disabled]="form.invalid || isLoading()">
+        פרסם
+      </button>
+    </form>
+  </div>
+</div>

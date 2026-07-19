@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
+    AccountStatus,
     AuditAction,
     GroupVisibility,
     PostStatus,
@@ -20,7 +21,7 @@ from app.core.constants import (
 from app.models.audit import AuditLog
 from app.models.forum import ForumPost
 from app.models.user import User
-from app.schemas.forum import BroadcastCreate
+from app.schemas.forum import BroadcastCreate, ForumPostCreate, ForumPostUpdate
 from app.services import forum_service
 
 
@@ -575,3 +576,231 @@ class TestDeletePost:
             .all()
         )
         assert len(entries) == 1
+
+
+class TestCreatePost:
+    def test_active_author_can_post_to_own_group_and_sector(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user(
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        result = forum_service.create_post(
+            db_session,
+            ForumPostCreate(
+                title="כותרת",
+                content="תוכן",
+                group_visibility=GroupVisibility.WIDOWS,
+                sector_visibility=SectorVisibility.HASIDIC,
+            ),
+            author,
+        )
+
+        assert result.author_id == author.id
+        assert result.status == PostStatus.VISIBLE
+
+    def test_active_author_can_post_to_all_groups_and_sectors(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user(
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        result = forum_service.create_post(
+            db_session,
+            ForumPostCreate(
+                title="כותרת",
+                content="תוכן",
+                group_visibility=GroupVisibility.ALL,
+                sector_visibility=SectorVisibility.ALL,
+            ),
+            author,
+        )
+
+        assert result.group_visibility == GroupVisibility.ALL
+
+    def test_non_active_author_gets_403(self, db_session: Session, make_user) -> None:
+        author = make_user(
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.PENDING_APPROVAL,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.create_post(
+                db_session,
+                ForumPostCreate(
+                    title="כותרת",
+                    content="תוכן",
+                    group_visibility=GroupVisibility.WIDOWS,
+                    sector_visibility=SectorVisibility.HASIDIC,
+                ),
+                author,
+            )
+
+        assert exc_info.value.status_code == 403
+
+    def test_posting_to_a_different_group_gets_403(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user(
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.create_post(
+                db_session,
+                ForumPostCreate(
+                    title="כותרת",
+                    content="תוכן",
+                    group_visibility=GroupVisibility.WIDOWERS,
+                    sector_visibility=SectorVisibility.HASIDIC,
+                ),
+                author,
+            )
+
+        assert exc_info.value.status_code == 403
+
+    def test_posting_to_a_different_sector_gets_403(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user(
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.create_post(
+                db_session,
+                ForumPostCreate(
+                    title="כותרת",
+                    content="תוכן",
+                    group_visibility=GroupVisibility.WIDOWS,
+                    sector_visibility=SectorVisibility.LITVISH,
+                ),
+                author,
+            )
+
+        assert exc_info.value.status_code == 403
+
+
+class TestUpdatePost:
+    def test_author_can_update_title_and_content(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        result = forum_service.update_post(
+            db_session,
+            post.id,
+            ForumPostUpdate(title="כותרת חדשה", content="תוכן חדש"),
+            author,
+        )
+
+        assert result.title == "כותרת חדשה"
+        assert result.content == "תוכן חדש"
+
+    def test_partial_update_title_only_leaves_content_unchanged(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        result = forum_service.update_post(
+            db_session, post.id, ForumPostUpdate(title="כותרת חדשה"), author
+        )
+
+        assert result.title == "כותרת חדשה"
+        assert result.content == "Content"
+
+    def test_partial_update_content_only_leaves_title_unchanged(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        result = forum_service.update_post(
+            db_session, post.id, ForumPostUpdate(content="תוכן חדש"), author
+        )
+
+        assert result.title == "Title"
+        assert result.content == "תוכן חדש"
+
+    def test_updated_at_advances_past_created_at(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session,
+            author,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=5),
+        )
+
+        result = forum_service.update_post(
+            db_session, post.id, ForumPostUpdate(title="כותרת חדשה"), author
+        )
+
+        assert result.updated_at > result.created_at
+
+    def test_non_author_gets_403(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        other_user = make_user("widow2@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.update_post(
+                db_session, post.id, ForumPostUpdate(title="כותרת חדשה"), other_user
+            )
+
+        assert exc_info.value.status_code == 403
+
+    def test_nonexistent_id_gets_404(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.update_post(
+                db_session, "no-such-id", ForumPostUpdate(title="כותרת חדשה"), author
+            )
+
+        assert exc_info.value.status_code == 404
+
+    def test_deleted_post_gets_404(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session,
+            author,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            status=PostStatus.DELETED,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.update_post(
+                db_session, post.id, ForumPostUpdate(title="כותרת חדשה"), author
+            )
+
+        assert exc_info.value.status_code == 404

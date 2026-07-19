@@ -4,6 +4,7 @@ Forum endpoints.
 GET    /forum/posts           – list posts (auto-filtered by group+sector)
 POST   /forum/posts           – create a new post
 GET    /forum/posts/{id}      – single post
+PATCH  /forum/posts/{id}      – edit a post (author only)
 DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
 POST   /forum/broadcast       – admin-only post visible to all users
@@ -27,6 +28,7 @@ from app.schemas.forum import (
     ForumPostCreate,
     ForumPostListResponse,
     ForumPostResponse,
+    ForumPostUpdate,
 )
 from app.schemas.report import ReportCreate, ReportResponse
 from app.services import forum_service, report_service
@@ -61,11 +63,9 @@ def create_post(
 ) -> ForumPostResponse:
     """
     Publish a new forum post.
-
-    TODO: call forum_service.create_post(db, data, current_user)
     """
-    # TODO: implement
-    raise NotImplementedError
+    post = forum_service.create_post(db, data, current_user)
+    return ForumPostResponse.model_validate(post)
 
 
 @router.get("/forum/posts/{post_id}", response_model=ForumPostResponse)
@@ -78,6 +78,20 @@ def get_post(
     Return a single forum post.
     """
     post = forum_service.get_post_by_id(db, post_id, current_user)
+    return ForumPostResponse.model_validate(post)
+
+
+@router.patch("/forum/posts/{post_id}", response_model=ForumPostResponse)
+def update_post(
+    post_id: str,
+    data: ForumPostUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> ForumPostResponse:
+    """
+    Edit a forum post's title and/or content. Author only.
+    """
+    post = forum_service.update_post(db, post_id, data, current_user)
     return ForumPostResponse.model_validate(post)
 
 

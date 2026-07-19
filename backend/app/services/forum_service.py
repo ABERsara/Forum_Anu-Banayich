@@ -7,7 +7,6 @@ Forum service.
 
 TODO list for junior developer:
   [ ] implement get_posts() – with content filter + pagination
-  [ ] implement create_post()
   [ ] implement get_post_by_id() – verify user can see it
   [ ] implement search_users_for_dm() – name search within same group/sector
 """
@@ -17,6 +16,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Query, Session, joinedload
 
 from app.core.constants import (
+    AccountStatus,
     AuditAction,
     GroupVisibility,
     PostStatus,
@@ -31,6 +31,7 @@ from app.schemas.forum import (
     ForumPostCreate,
     ForumPostListResponse,
     ForumPostResponse,
+    ForumPostUpdate,
 )
 from app.services.audit_service import log_action
 
@@ -245,15 +246,74 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
       - Author must be ACTIVE
       - If group_visibility targets a specific group, it must match author's user_type
         (a widow cannot post in the widowers group)
-
-    TODO:
-      1. Validate visibility is not "broader" than author's actual group/sector
-      2. Create ForumPost object
-      3. db.add(), db.commit(), db.refresh()
-      4. Return the post
     """
-    # TODO: implement this function
-    raise NotImplementedError("create_post() is not yet implemented")
+    if author.account_status != AccountStatus.ACTIVE:
+        raise HTTPException(status_code=403, detail="רק משתמש פעיל יכול לפרסם הודעה.")
+
+    if data.group_visibility != GroupVisibility.ALL and (
+        author.user_type is None
+        or data.group_visibility != GroupVisibility(author.user_type.value)
+    ):
+        raise HTTPException(
+            status_code=403, detail="לא ניתן לפרסם הודעה לקבוצה שאינה שלך."
+        )
+
+    if data.sector_visibility != SectorVisibility.ALL and (
+        author.sector is None
+        or data.sector_visibility != SectorVisibility(author.sector.value)
+    ):
+        raise HTTPException(
+            status_code=403, detail="לא ניתן לפרסם הודעה למגזר שאינו שלך."
+        )
+
+    post = ForumPost(
+        author_id=author.id,
+        title=data.title,
+        content=data.content,
+        group_visibility=data.group_visibility,
+        sector_visibility=data.sector_visibility,
+        status=PostStatus.VISIBLE,
+    )
+    db.add(post)
+    db.commit()
+
+    return (
+        db.query(ForumPost)
+        .options(joinedload(ForumPost.author))
+        .filter(ForumPost.id == post.id)
+        .one()
+    )
+
+
+def update_post(
+    db: Session, post_id: str, data: ForumPostUpdate, current_user: User
+) -> ForumPost:
+    """
+    Edit an existing post's title and/or content.
+
+    Permission: author only. Editing a deleted post is treated as not-found,
+    matching get_post_by_id()'s "don't reveal deleted posts" behavior.
+    """
+    post = (
+        db.query(ForumPost)
+        .options(joinedload(ForumPost.author))
+        .filter(ForumPost.id == post_id)
+        .with_for_update(of=ForumPost)
+        .first()
+    )
+    if post is None or post.status == PostStatus.DELETED:
+        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+
+    if current_user.id != post.author_id:
+        raise HTTPException(status_code=403, detail="רק המחבר יכול לערוך הודעה זו.")
+
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(post, field, value)
+
+    db.commit()
+    db.refresh(post)
+
+    return post
 
 
 def create_broadcast_post(db: Session, data: BroadcastCreate, admin: User) -> ForumPost:

@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401 — registers all models with Base.metadata
-from app.core.constants import Sector, UserRole, UserType
+from app.core.constants import AccountStatus, Sector, UserRole, UserType
 from app.core.dependencies import get_db
 from app.db.base import Base
 from app.main import app
@@ -57,6 +57,7 @@ def make_user(db_session):
         user_type: UserType | None = None,
         sector: Sector | None = None,
         role: UserRole = UserRole.USER,
+        account_status: AccountStatus = AccountStatus.PENDING_OTP,
     ) -> User:
         user = User(
             email=email,
@@ -66,6 +67,7 @@ def make_user(db_session):
             role=role,
             user_type=user_type,
             sector=sector,
+            account_status=account_status,
         )
         db_session.add(user)
         db_session.commit()

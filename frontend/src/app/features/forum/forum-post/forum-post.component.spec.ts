@@ -157,6 +157,26 @@ describe('ForumPostComponent', () => {
     });
   });
 
+  describe('canEdit', () => {
+    it('is true for the post author', () => {
+      setup(makeUser({ id: 'author-1' }));
+
+      expect(component.canEdit()).toBe(true);
+    });
+
+    it('is false for a moderator who is not the author', () => {
+      setup(makeUser({ id: 'someone-else', role: UserRole.MODERATOR }), true, false);
+
+      expect(component.canEdit()).toBe(false);
+    });
+
+    it('is false for an admin who is not the author', () => {
+      setup(makeUser({ id: 'someone-else', role: UserRole.ADMIN }), false, true);
+
+      expect(component.canEdit()).toBe(false);
+    });
+  });
+
   describe('delete flow', () => {
     it('opens the confirm dialog on delete click', () => {
       setup(makeUser());

@@ -13,6 +13,7 @@ from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
+    AccountStatus,
     GroupVisibility,
     PostStatus,
     Sector,
@@ -34,6 +35,7 @@ def _make_user(
     user_type: UserType | None = None,
     sector: Sector | None = None,
     role: UserRole = UserRole.USER,
+    account_status: AccountStatus = AccountStatus.PENDING_OTP,
 ) -> User:
     user = User(
         email=email,
@@ -43,6 +45,7 @@ def _make_user(
         role=role,
         user_type=user_type,
         sector=sector,
+        account_status=account_status,
     )
     db_session.add(user)
     db_session.commit()
@@ -175,7 +178,11 @@ class TestReportPostEndpoint:
 
         r = await client.post(
             f"{BASE}/{post.id}/report",
-            json={"target_type": "forum_post", "target_id": post.id, "reason": "harassment"},
+            json={
+                "target_type": "forum_post",
+                "target_id": post.id,
+                "reason": "harassment",
+            },
         )
 
         assert r.status_code == 201
@@ -201,7 +208,11 @@ class TestReportPostEndpoint:
 
         r = await client.post(
             f"{BASE}/{post.id}/report",
-            json={"target_type": "forum_post", "target_id": "some-other-id", "reason": "spam"},
+            json={
+                "target_type": "forum_post",
+                "target_id": "some-other-id",
+                "reason": "spam",
+            },
         )
 
         assert r.status_code == 400
@@ -216,7 +227,11 @@ class TestReportPostEndpoint:
 
         r = await client.post(
             f"{BASE}/no-such-id/report",
-            json={"target_type": "forum_post", "target_id": "no-such-id", "reason": "spam"},
+            json={
+                "target_type": "forum_post",
+                "target_id": "no-such-id",
+                "reason": "spam",
+            },
         )
 
         assert r.status_code == 404
@@ -241,3 +256,133 @@ class TestReportPostEndpoint:
 
         assert first.status_code == 201
         assert second.status_code == 409
+
+
+class TestCreatePostEndpoint:
+    async def test_success_returns_201_with_post_fields(self, client, db_session):
+        author = _make_user(
+            db_session,
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+        _login_as(author)
+
+        r = await client.post(
+            BASE,
+            json={
+                "title": "כותרת",
+                "content": "תוכן",
+                "group_visibility": "widow",
+                "sector_visibility": "hasidic",
+            },
+        )
+
+        assert r.status_code == 201
+        body = r.json()
+        assert body["title"] == "כותרת"
+        assert body["author"]["id"] == author.id
+        assert body["status"] == "visible"
+
+    async def test_mismatched_group_returns_403(self, client, db_session):
+        author = _make_user(
+            db_session,
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+        _login_as(author)
+
+        r = await client.post(
+            BASE,
+            json={
+                "title": "כותרת",
+                "content": "תוכן",
+                "group_visibility": "widower",
+                "sector_visibility": "hasidic",
+            },
+        )
+
+        assert r.status_code == 403
+
+    async def test_missing_title_returns_422(self, client, db_session):
+        author = _make_user(
+            db_session,
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+        _login_as(author)
+
+        r = await client.post(
+            BASE,
+            json={
+                "content": "תוכן",
+                "group_visibility": "widow",
+                "sector_visibility": "hasidic",
+            },
+        )
+
+        assert r.status_code == 422
+
+
+class TestUpdatePostEndpoint:
+    async def test_author_update_returns_200_with_new_content(self, client, db_session):
+        author = _make_user(
+            db_session,
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+        _login_as(author)
+
+        r = await client.patch(f"{BASE}/{post.id}", json={"title": "כותרת מעודכנת"})
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["title"] == "כותרת מעודכנת"
+
+    async def test_other_user_gets_403(self, client, db_session):
+        author = _make_user(
+            db_session,
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+        other_user = _make_user(
+            db_session,
+            "widow2@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+        _login_as(other_user)
+
+        r = await client.patch(f"{BASE}/{post.id}", json={"title": "כותרת מעודכנת"})
+
+        assert r.status_code == 403
+
+    async def test_nonexistent_id_returns_404(self, client, db_session):
+        author = _make_user(
+            db_session,
+            "widow@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+        _login_as(author)
+
+        r = await client.patch(f"{BASE}/no-such-id", json={"title": "כותרת מעודכנת"})
+
+        assert r.status_code == 404

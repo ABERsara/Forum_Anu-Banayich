@@ -20,6 +20,13 @@ class ForumPostCreate(BaseModel):
     # attachment_url is set by the backend after upload – not sent by the client directly
 
 
+class ForumPostUpdate(BaseModel):
+    """PATCH /forum/posts/{id} – edit an existing post's title and/or content."""
+
+    title: str | None = Field(None, min_length=2, max_length=256)
+    content: str | None = Field(None, min_length=1, max_length=5000)
+
+
 class BroadcastCreate(BaseModel):
     """POST /forum/broadcast – admin-only post visible to all users."""
 
