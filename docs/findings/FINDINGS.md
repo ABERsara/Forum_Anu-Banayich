@@ -5,9 +5,9 @@
 
 1. בחרי את **מודול** הממצא (סעיף בטבלה) — לא לפי ספרינט, לפי מודול פונקציונלי.
 2. בדקי שאין שורה קיימת על אותו **קובץ + תיאור** לפני הוספה — למנוע כפילויות.
-3. הוסיפי שורה עם המספר הבא בסדרה של אותו מודול (`מ1-01`, `מ1-02` וכן הלאה).
+3. הוסיפי שורה עם המספר הבא בסדרה של אותו מודול (`A-01`, `A-02` וכן הלאה).
 4. מלאי **"סעיף"** לפי `SPEC.md` — לדוגמה `§4.2`, `§7.1`. אם עדיין לא קיים — כיתבי `TBD`.
-5. commit: `docs: add finding מ[X]-[NN] — [תיאור קצר]`
+5. commit: `docs: add finding [XX]-[NN] — [תיאור קצר]`
 
 ---
 
@@ -42,87 +42,87 @@
 
 ---
 
-## מ-1 | Auth & הרשמה
+## A | Auth & הרשמה
 
 > קבצים עיקריים: `backend/app/api/v1/endpoints/auth.py` · `services/auth_service.py`
 > · `frontend/src/app/features/auth/` · `core/guards/` · `core/interceptors/`
 
 | # | קובץ / קומפוננטה | סוג | סעיף | תיאור הממצא | חומרה | סטטוס |
 |---|---|---|---|---|---|---|
-| מ1-01 | | | | | | |
+| A-01 | | | | | | |
 
 ---
 
-## מ-2 | Admin Dashboard
+## AD | Admin Dashboard
 
 > קבצים עיקריים: `endpoints/admin.py` · `services/user_service.py` · `services/audit_service.py`
 > · `frontend/src/app/features/admin/`
 
 | # | קובץ / קומפוננטה | סוג | סעיף | תיאור הממצא | חומרה | סטטוס |
 |---|---|---|---|---|---|---|
-| מ2-01 | | | | | | |
+| AD-01 | | | | | | |
 
 ---
 
-## מ-3 | Forum
+## F | Forum
 
 > קבצים עיקריים: `endpoints/forum.py` · `services/forum_service.py`
 > · `frontend/src/app/features/forum/` · `shared/components/report-button/`
 
 | # | קובץ / קומפוננטה | סוג | סעיף | תיאור הממצא | חומרה | סטטוס |
 |---|---|---|---|---|---|---|
-| מ3-01 | `shared/components/report-button/` | חסר | TBD | כפתור הדיווח קיים ב-UI אך `reportPost()` ב-`forum.service.ts` זורק `Error` — לחיצה לא עושה כלום | 🟠 גבוה | פתוח |
+| F-01 | `shared/components/report-button/` | חסר | TBD | כפתור הדיווח קיים ב-UI אך `reportPost()` ב-`forum.service.ts` זורק `Error` — לחיצה לא עושה כלום | 🟠 גבוה | פתוח |
 
 ---
 
-## מ-4 | Moderator
+## M | Moderator
 
 > קבצים עיקריים: `endpoints/moderator.py` · `services/report_service.py`
 > · `frontend/src/app/features/moderator/`
 
 | # | קובץ / קומפוננטה | סוג | סעיף | תיאור הממצא | חומרה | סטטוס |
 |---|---|---|---|---|---|---|
-| מ4-01 | | | | | | |
+| M-01 | | | | | | |
 
 ---
 
-## מ-5 | ייעוץ מקצועי
+## P | ייעוץ מקצועי
 
 > קבצים עיקריים: `endpoints/professional.py` · `services/professional_service.py`
 > · `frontend/src/app/features/advice/`
 
 | # | קובץ / קומפוננטה | סוג | סעיף | תיאור הממצא | חומרה | סטטוס |
 |---|---|---|---|---|---|---|
-| מ5-01 | | | | | | |
+| P-01 | | | | | | |
 
 ---
 
-## מ-6 | הודעות פרטיות
+## DM | הודעות פרטיות
 
 > קבצים עיקריים: `endpoints/messages.py` (עדיין לא קיים — Sprint 5)
 > · `frontend/src/app/features/messages/`
 
 | # | קובץ / קומפוננטה | סוג | סעיף | תיאור הממצא | חומרה | סטטוס |
 |---|---|---|---|---|---|---|
-| מ6-01 | | | | | | |
+| DM-01 | | | | | | |
 
 ---
 
-## מ-7 | תשתית, DevOps ואבטחה
+## I | תשתית, DevOps ואבטחה
 
 > קבצים עיקריים: `core/security.py` · `core/dependencies.py`
 > · `.github/workflows/` · `docker-compose.yml` · `Dockerfile`s
 
 | # | קובץ / קומפוננטה | סוג | סעיף | תיאור הממצא | חומרה | סטטוס |
 |---|---|---|---|---|---|---|
-| מ7-01 | | | | | | |
+| I-01 | | | | | | |
 
 ---
 
-## מ-8 | Shared Components & Cross-Cutting
+## S | Shared Components & Cross-Cutting
 
 > קומפוננטות משותפות, routing, guards, interceptors, מודלים, Enums
 
 | # | קובץ / קומפוננטה | סוג | סעיף | תיאור הממצא | חומרה | סטטוס |
 |---|---|---|---|---|---|---|
-| מ8-01 | | | | | | |
+| S-01 | | | | | | |
