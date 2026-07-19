@@ -80,6 +80,20 @@ class TestCreateBroadcast:
 
         assert response.status_code == 403
 
+    async def test_missing_token_returns_401(self, client):
+        response = await client.post(
+            f"{BASE}/broadcast", json={"title": "הודעה חשובה", "content": "תוכן ההודעה"}
+        )
+        assert response.status_code == 401
+
+    async def test_invalid_token_returns_401(self, client):
+        response = await client.post(
+            f"{BASE}/broadcast",
+            json={"title": "הודעה חשובה", "content": "תוכן ההודעה"},
+            headers={"Authorization": "Bearer not.a.valid.jwt"},
+        )
+        assert response.status_code == 401
+
     async def test_rejects_title_too_short(self, client, make_user, as_user):
         admin = make_user("admin@example.com", role=UserRole.ADMIN)
         as_user(admin)
