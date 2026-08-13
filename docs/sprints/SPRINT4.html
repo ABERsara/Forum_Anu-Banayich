@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ספרינט 4 — ייעוץ מקצועי + מבקרים + פריסה לענן | אנו בניך</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f5f5f0;
+    color: #222;
+    direction: rtl;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  .cover {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%);
+    color: white;
+    padding: 70px 40px;
+    text-align: center;
+  }
+  .cover h1 { font-size: 38px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1px; }
+  .cover .sprint-title {
+    font-size: 22px; opacity: 0.85; margin-bottom: 8px;
+    background: rgba(255,255,255,0.12); border-radius: 10px;
+    display: inline-block; padding: 6px 24px;
+  }
+  .cover .subtitle { font-size: 17px; opacity: 0.75; margin-bottom: 28px; }
+  .cover .meta {
+    display: inline-flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+    background: rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 28px;
+  }
+  .cover .meta span { font-size: 13px; opacity: 0.85; }
+  .cover .meta strong { opacity: 1; }
+
+  .goal-banner {
+    background: linear-gradient(90deg, #2563eb, #2563eb);
+    color: white; padding: 24px 40px;
+    text-align: center; font-size: 17px; line-height: 1.6;
+  }
+  .goal-banner strong { font-size: 19px; display: block; margin-bottom: 6px; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
+
+  .toc {
+    background: white; border-radius: 16px; padding: 28px 32px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 40px;
+  }
+  .toc h2 { font-size: 18px; color: #2563eb; margin-bottom: 16px; border-bottom: 2px solid #e8e8e8; padding-bottom: 10px; }
+  .toc ol { padding-right: 20px; columns: 2; column-gap: 32px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: #2563eb; text-decoration: none; font-size: 14px; }
+  .toc a:hover { text-decoration: underline; }
+
+  .section {
+    background: white; border-radius: 16px; padding: 32px 36px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 28px;
+  }
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 24px; padding-bottom: 14px;
+    border-bottom: 3px solid #f0f0f0;
+  }
+  .section-number {
+    background: #2563eb; color: white; border-radius: 50%;
+    width: 36px; height: 36px; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .section-number.red    { background: #dc2626; }
+  .section-number.green  { background: #16a34a; }
+  .section-number.purple { background: #7c3aed; }
+  .section h2 { font-size: 22px; color: #2563eb; }
+  .section h3 { font-size: 17px; color: #1e3a8a; margin: 22px 0 10px; padding-right: 12px; border-right: 4px solid #2563eb; }
+  .section h4 { font-size: 15px; color: #444; margin: 16px 0 8px; font-weight: 600; }
+  .section p  { margin-bottom: 12px; color: #333; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th { background: #2563eb; color: white; padding: 10px 14px; text-align: right; font-weight: 600; }
+  td { padding: 9px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) { background: #f8f9ff; }
+  tr:hover { background: #eff6ff; }
+
+  code {
+    background: #eff6ff; color: #2563eb; padding: 2px 6px;
+    border-radius: 4px; font-size: 13px; font-family: 'Courier New', monospace;
+  }
+
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 600; margin: 2px;
+  }
+  .badge-green  { background: #d4edda; color: #155724; }
+  .badge-red    { background: #f8d7da; color: #721c24; }
+  .badge-blue   { background: #d1ecf1; color: #0c5460; }
+  .badge-orange { background: #fff3cd; color: #856404; }
+  .badge-purple { background: #e8d5f5; color: #6a0dad; }
+  .badge-grey   { background: #e9ecef; color: #495057; }
+
+  .callout {
+    border-radius: 10px; padding: 16px 20px; margin: 14px 0;
+    border-right: 5px solid; font-size: 14px;
+  }
+  .callout-blue   { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+  .callout-green  { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+  .callout-orange { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+  .callout-red    { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+  .callout-purple { background: #faf5ff; border-color: #a855f7; color: #581c87; }
+
+  .task-card { border-radius: 12px; border: 2px solid #e0e8ff; margin-bottom: 28px; overflow: hidden; }
+  .task-card-header {
+    padding: 16px 22px; display: flex; align-items: center; gap: 12px;
+  }
+  .task-card-header.color-red    { background: #fee2e2; border-bottom: 2px solid #fecaca; }
+  .task-card-header.color-blue   { background: #dbeafe; border-bottom: 2px solid #bfdbfe; }
+  .task-card-header.color-green  { background: #dcfce7; border-bottom: 2px solid #bbf7d0; }
+  .task-card-header.color-purple { background: #ede9fe; border-bottom: 2px solid #ddd6fe; }
+  .task-card-header.color-orange { background: #ffedd5; border-bottom: 2px solid #fed7aa; }
+  .task-card-header.color-grey   { background: #f1f5f9; border-bottom: 2px solid #e2e8f0; }
+  .task-card-body { padding: 20px 22px; }
+  .task-jira { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 6px; background: rgba(0,0,0,0.08); }
+  .task-title { font-size: 18px; font-weight: 700; flex: 1; }
+  .task-effort { font-size: 13px; opacity: 0.75; }
+
+  .checklist { list-style: none; padding: 0; margin: 10px 0; }
+  .checklist li {
+    padding: 6px 0 6px 28px; border-bottom: 1px solid #f0f0f0;
+    font-size: 14px; position: relative;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before {
+    content: '☐'; position: absolute; left: 4px;
+    color: #2563eb; font-size: 16px;
+  }
+
+  .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  .before-card { background: #fff5f5; border: 2px solid #fecaca; border-radius: 10px; padding: 18px 20px; }
+  .after-card  { background: #f0fdf4; border: 2px solid #bbf7d0; border-radius: 10px; padding: 18px 20px; }
+  .before-card h4 { color: #991b1b; margin-bottom: 10px; }
+  .after-card h4  { color: #166534; margin-bottom: 10px; }
+  .before-card ul, .after-card ul { padding-right: 18px; font-size: 14px; }
+  .before-card li, .after-card li { margin-bottom: 6px; }
+
+  .dep-graph {
+    background: #f8f9ff; border-radius: 12px; padding: 28px 20px;
+    margin: 14px 0; direction: ltr; text-align: center;
+  }
+  .dep-node {
+    background: white; border: 2px solid #2563eb; border-radius: 10px;
+    padding: 10px 16px; font-size: 13px; font-weight: 600; color: #2563eb;
+    display: inline-block; min-width: 150px; text-align: center; margin: 4px;
+  }
+  .dep-node small { display: block; font-size: 11px; font-weight: 400; opacity: 0.75; margin-top: 2px; }
+  .dep-node.blocker { border-color: #dc2626; color: #dc2626; background: #fff5f5; }
+  .dep-node.teal    { border-color: #0d9488; color: #0d9488; background: #f0fdfa; }
+  .dep-node.purple  { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }
+  .dep-node.grey    { border-color: #94a3b8; color: #64748b; background: #f8fafc; }
+  .dep-node.green   { border-color: #16a34a; color: #166534; background: #f0fdf4; }
+  .dep-row { display: flex; justify-content: center; align-items: flex-start; gap: 12px; margin: 4px 0; }
+  .dep-arrow { color: #94a3b8; font-size: 20px; line-height: 1; margin: 2px 0; display: block; text-align: center; }
+  .dep-col { display: flex; flex-direction: column; align-items: center; }
+
+  .timeline { position: relative; padding: 0; margin: 20px 0; }
+  .timeline-item { display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
+  .timeline-dot {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: white; margin-top: 2px;
+  }
+  .timeline-dot.blue   { background: #2563eb; }
+  .timeline-dot.red    { background: #dc2626; }
+  .timeline-dot.green  { background: #16a34a; }
+  .timeline-dot.purple { background: #7c3aed; }
+  .timeline-dot.orange { background: #d97706; }
+  .timeline-content { flex: 1; }
+  .timeline-content h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .timeline-content p  { font-size: 14px; color: #555; margin: 0; }
+
+  .app-screens { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+  .app-frame {
+    width: 300px; background: #f9fafb; border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(37,99,235,0.13), 0 2px 8px rgba(0,0,0,0.07);
+    overflow: hidden; border: 1px solid #e5e7eb; direction: rtl;
+  }
+  .app-topbar { background: #2563eb; color: white; padding: 14px 18px; font-weight: 700; font-size: 15px; text-align: center; }
+  .app-topbar-row { background: #2563eb; color: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .app-topbar-logo { font-weight: 700; font-size: 14px; }
+  .app-topbar-user { font-size: 12px; opacity: 0.9; }
+  .app-topbar-logout { background: rgba(255,255,255,0.2); border-radius: 6px; padding: 3px 9px; font-size: 11px; }
+  .app-body { padding: 20px 18px; }
+  .app-page-title { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 16px; text-align: center; }
+  .app-label { font-size: 11px; font-weight: 600; color: #6b7280; margin-bottom: 4px; display: block; }
+  .app-field { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #9ca3af; margin-bottom: 11px; }
+  .app-select { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #374151; margin-bottom: 11px; display: flex; justify-content: space-between; align-items: center; }
+  .app-select-arrow { color: #9ca3af; font-size: 11px; }
+  .app-btn { border-radius: 8px; padding: 10px; text-align: center; font-weight: 700; font-size: 13px; margin: 5px 0; }
+  .app-btn-primary { background: #2563eb; color: white; }
+  .app-btn-outline { background: white; border: 1.5px solid #e5e7eb; color: #374151; }
+  .app-btn-danger  { background: #dc2626; color: white; }
+  .app-btn-success { background: #16a34a; color: white; }
+  .app-btn-row { display: flex; gap: 8px; margin-top: 4px; }
+  .app-btn-row .app-btn { flex: 1; }
+  .app-link { text-align: center; font-size: 12px; color: #2563eb; margin-top: 10px; }
+  .app-home-card { background: white; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 13px 15px; margin-bottom: 9px; }
+  .app-home-card-title { font-size: 13px; font-weight: 700; color: #2563eb; }
+  .app-home-card-desc { font-size: 11px; color: #6b7280; margin-top: 3px; }
+  .app-caption { font-size: 12px; color: #6b7280; text-align: center; padding: 10px; background: white; border-top: 1px solid #e5e7eb; font-style: italic; }
+  .app-note { background: #eff6ff; color: #1d4ed8; border-radius: 8px; padding: 9px 12px; font-size: 11px; margin-top: 8px; text-align: center; }
+  .app-list-row { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-bottom: 7px; display: flex; justify-content: space-between; align-items: center; }
+  .app-list-name { font-size: 13px; font-weight: 600; color: #111827; }
+  .app-list-meta { font-size: 11px; color: #6b7280; }
+  .app-status-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; }
+  .app-status-pending { background: #fef3c7; color: #92400e; }
+  .app-status-partial { background: #dbeafe; color: #1e40af; }
+  .app-pending-box { background: #eff6ff; border: 2px solid #bfdbfe; border-radius: 12px; padding: 24px 18px; text-align: center; margin: 8px 0; }
+  .app-pending-icon { font-size: 32px; margin-bottom: 8px; }
+  .app-pending-title { font-size: 15px; font-weight: 700; color: #1e3a8a; margin-bottom: 6px; }
+  .app-pending-desc { font-size: 12px; color: #6b7280; line-height: 1.5; }
+  .app-forum-card { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 11px 13px; margin-bottom: 8px; }
+  .app-forum-title { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 3px; }
+  .app-forum-meta  { font-size: 11px; color: #6b7280; display: flex; gap: 8px; align-items: center; }
+  .app-forum-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #e0e7ff; color: #3730a3; }
+  .app-count-badge { background: #dc2626; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+  .app-textarea { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #9ca3af; margin-bottom: 11px; min-height: 70px; }
+  .app-table-row { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .app-table-name { font-size: 12px; font-weight: 700; color: #111827; flex: 1; }
+  .app-table-role { font-size: 10px; color: #6b7280; }
+  .app-icon-btn { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: #f1f5f9; color: #374151; border: 1px solid #e2e8f0; }
+
+  .sync-box {
+    background: #fefce8; border: 2px solid #fde047; border-radius: 10px;
+    padding: 16px 20px; margin: 12px 0; font-size: 14px;
+  }
+  .sync-box strong { color: #713f12; }
+
+  .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+  .rule-card {
+    border-radius: 10px; padding: 16px 18px;
+    border: 2px solid #e0e8ff; background: #f8f9ff;
+  }
+  .rule-card h5 { font-size: 13px; font-weight: 700; color: #2563eb; margin-bottom: 8px; }
+  .rule-card p  { font-size: 13px; color: #444; margin: 0; }
+
+  .feature-divider {
+    display: flex; align-items: center; gap: 14px; margin: 32px 0 16px;
+  }
+  .feature-divider-line { flex: 1; height: 2px; background: #e5e7eb; }
+  .feature-divider-label {
+    font-size: 13px; font-weight: 700; color: #6b7280;
+    text-transform: uppercase; letter-spacing: 1px;
+    background: white; padding: 4px 14px; border-radius: 20px;
+    border: 1.5px solid #e5e7eb;
+  }
+
+  @media (max-width: 640px) {
+    .cover h1 { font-size: 26px; }
+    .toc ol { columns: 1; }
+    .section { padding: 20px; }
+    .before-after, .rules-grid { grid-template-columns: 1fr; }
+  }
+  @media print {
+    body { background: white; }
+    .section { box-shadow: none; border: 1px solid #ddd; }
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>ספרינט 4</h1>
+  <div class="sprint-title">ייעוץ מקצועי + מבקרים + פריסה לענן</div>
+  <div class="subtitle">אנו בניך — פלטפורמת קהילה לאלמנים ויתומים | פרקטיקום סניף</div>
+  <div class="meta">
+    <span><strong>שבועות 7–8</strong></span>
+    <span><strong>~20 משימות</strong></span>
+    <span><strong>ABF-51 עד ABF-70</strong></span>
+    <span><strong>RBAC מלא + פריסה לענן</strong></span>
+  </div>
+</div>
+
+<!-- GOAL BANNER -->
+<div class="goal-banner">
+  <strong>מטרת הספרינט</strong>
+  מעגל ה-RBAC נסגר — איש מקצוע עונה לשאלות, מבקר מחליט על דיווחים, מנהל מנהל מבקרים. המערכת עולה לענן.
+</div>
+
+<div class="container">
+
+<!-- TOC -->
+<div class="toc">
+  <h2>תוכן עניינים</h2>
+  <ol>
+    <li><a href="#s-before-after">לפני ואחרי — מה משנים</a></li>
+    <li><a href="#s-deps">מפת תלויות — סדר עבודה</a></li>
+    <li><a href="#s-timeline">ציר זמן — 2 שבועות</a></li>
+    <li><a href="#s-angular">חוקי Angular — תזכורת</a></li>
+    <li><a href="#s-abf51">ABF-51 Professional Answer Flow</a></li>
+    <li><a href="#s-abf52">ABF-52 Moderator Dashboard</a></li>
+    <li><a href="#s-abf53">ABF-53 Admin — Manage Moderators</a></li>
+    <li><a href="#s-abf54">ABF-54 Admin — Manage Professionals</a></li>
+    <li><a href="#s-abf55">ABF-55 Email Notifications</a></li>
+    <li><a href="#s-abf56">ABF-56 Cloud Deployment</a></li>
+    <li><a href="#s-abf57">ABF-57 Professional Catalog UI</a></li>
+    <li><a href="#s-abf58">ABF-58 Ask Question Form</a></li>
+    <li><a href="#s-sync">נקודות סנכרון</a></li>
+    <li><a href="#s-mockup">האפליקציה בסוף הספרינט</a></li>
+    <li><a href="#s-dod">Definition of Done</a></li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 1 — BEFORE / AFTER                  -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-before-after">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2>לפני ואחרי — מה משנים</h2>
+  </div>
+
+  <h3>Backend</h3>
+  <table>
+    <tr><th>קובץ</th><th>עכשיו</th><th>אחרי Sprint 4</th><th>משימה</th></tr>
+    <tr>
+      <td><code>services/professional_service.py</code></td>
+      <td><span class="badge badge-orange">stubs: answer_query, get_pending_queries</span></td>
+      <td>ממושמים</td>
+      <td>ABF-51</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/professional.py</code></td>
+      <td><span class="badge badge-orange">stubs</span></td>
+      <td>POST /queries/{id}/answer, GET /queries/pending מחוברים</td>
+      <td>ABF-51</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/moderator.py</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>GET /moderator/reports, POST /moderator/reports/{id}/decide מוסמים</td>
+      <td>ABF-52</td>
+    </tr>
+    <tr>
+      <td><code>services/report_service.py</code></td>
+      <td><span class="badge badge-blue">לוגיקת 3 שלבים קיימת</span></td>
+      <td>get_pending_reports + decide ממושמים</td>
+      <td>ABF-52</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/admin.py</code></td>
+      <td><span class="badge badge-orange">manage-moderators stubs</span></td>
+      <td>GET/POST/PATCH/DELETE /admin/moderators מחוברים</td>
+      <td>ABF-53</td>
+    </tr>
+    <tr>
+      <td><code>services/user_service.py</code></td>
+      <td><span class="badge badge-orange">manage-moderators stub</span></td>
+      <td>CRUD מבקרים ממושם</td>
+      <td>ABF-53</td>
+    </tr>
+    <tr>
+      <td><code>api/v1/endpoints/admin.py</code></td>
+      <td><span class="badge badge-orange">manage-professionals stub</span></td>
+      <td>POST/PATCH /admin/professionals מחוברים</td>
+      <td>ABF-54</td>
+    </tr>
+    <tr>
+      <td><code>services/email_service.py</code></td>
+      <td><span class="badge badge-orange">logger stubs בלבד</span></td>
+      <td>מיילים: שאלה חדשה לפרופסיונל, תשובה לשואל, דחייה/אישור</td>
+      <td>ABF-55</td>
+    </tr>
+    <tr>
+      <td><code>backend/ Dockerfile + render.yaml</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>פריסה ל-Render ממוגדרת</td>
+      <td>ABF-56</td>
+    </tr>
+    <tr>
+      <td><code>frontend/ vercel.json</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>פריסה ל-Vercel ממוגדרת</td>
+      <td>ABF-56</td>
+    </tr>
+  </table>
+
+  <h3>Frontend</h3>
+  <table>
+    <tr><th>קובץ</th><th>עכשיו</th><th>אחרי Sprint 4</th><th>משימה</th></tr>
+    <tr>
+      <td><code>features/advice/advice-list/</code></td>
+      <td><span class="badge badge-blue">service ✅, UI stub</span></td>
+      <td>קטלוג אנשי מקצוע מוצג לפי קבוצה/מגזר</td>
+      <td>ABF-57</td>
+    </tr>
+    <tr>
+      <td><code>features/advice/ask-question/</code></td>
+      <td><span class="badge badge-blue">service ✅, UI stub</span></td>
+      <td>טופס שאלה מלא: ספציפי/תחום, ציבורי/פרטי, checkbox "חשוף שמי"</td>
+      <td>ABF-58</td>
+    </tr>
+    <tr>
+      <td><code>features/advice/professional-answer/</code></td>
+      <td><span class="badge badge-red">❌ לא קיים</span></td>
+      <td>תצוגת ממתינים + טופס תשובה לאיש מקצוע</td>
+      <td>ABF-51</td>
+    </tr>
+    <tr>
+      <td><code>features/moderator/reports/</code></td>
+      <td><span class="badge badge-red">🔴 stub</span></td>
+      <td>לוח בקרת מבקר: רשימת דיווחים ממתינים + כפתורי החלטה</td>
+      <td>ABF-52</td>
+    </tr>
+    <tr>
+      <td><code>features/moderator/user-card/</code></td>
+      <td><span class="badge badge-red">🔴 stub</span></td>
+      <td>כרטיס משתמש — סטטיסטיקות דיווחים + כפתור השעיה</td>
+      <td>ABF-52</td>
+    </tr>
+    <tr>
+      <td><code>features/admin/manage-professionals/</code></td>
+      <td><span class="badge badge-red">🔴 stub</span></td>
+      <td>טבלת אנשי מקצוע + הוסף/ערוך (Admin)</td>
+      <td>ABF-54</td>
+    </tr>
+    <tr>
+      <td><code>features/admin/manage-moderators/</code></td>
+      <td><span class="badge badge-red">🔴 stub</span></td>
+      <td>טבלת מבקרים + הוסף/ערוך/הסר (Admin)</td>
+      <td>ABF-53</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 2 — DEPENDENCY MAP                  -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-deps">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <h2>מפת תלויות — סדר עבודה</h2>
+  </div>
+
+  <div class="dep-graph">
+    <div class="dep-row">
+      <div class="dep-col">
+        <div class="dep-node blocker">ABF-55<small>Email Service</small></div>
+      </div>
+      <div class="dep-col">
+        <div class="dep-node blocker">ABF-56<small>Cloud Deployment</small></div>
+      </div>
+    </div>
+    <div class="dep-arrow">↑ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↑</div>
+    <div class="dep-row">
+      <div class="dep-col">
+        <div class="dep-node">ABF-51<small>Professional Answer</small></div>
+        <span class="dep-arrow">↑</span>
+        <div class="dep-node grey">ABF-57<small>Catalog UI</small></div>
+      </div>
+      <div class="dep-col">
+        <div class="dep-node purple">ABF-52<small>Moderator Dashboard</small></div>
+      </div>
+      <div class="dep-col">
+        <div class="dep-node teal">ABF-53<small>Manage Moderators</small></div>
+        <span class="dep-arrow">↑</span>
+        <div class="dep-node teal">ABF-54<small>Manage Professionals</small></div>
+      </div>
+      <div class="dep-col">
+        <div class="dep-node green">ABF-58<small>Ask Question Form</small></div>
+      </div>
+    </div>
+  </div>
+
+  <p>טבלת self-select — לפי בחירה עצמית:</p>
+  <table>
+    <tr>
+      <th>משימה</th><th>Jira</th><th>גודל</th><th>תלויה ב</th><th>הערה</th>
+    </tr>
+    <tr>
+      <td>Email Service — שאלה/תשובה/דחייה</td>
+      <td>ABF-55</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>—</td>
+      <td>חוסמת ABF-51 ו-ABF-52</td>
+    </tr>
+    <tr>
+      <td>Cloud Deployment — Vercel + Render</td>
+      <td>ABF-56</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>—</td>
+      <td>עצמאית לגמרי — ניתן להתחיל ביום 1</td>
+    </tr>
+    <tr>
+      <td>Professional Answer Flow — Backend + Frontend</td>
+      <td>ABF-51</td>
+      <td><span class="badge badge-red">L</span></td>
+      <td>ABF-55</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Moderator Dashboard — Backend + Frontend</td>
+      <td>ABF-52</td>
+      <td><span class="badge badge-red">L</span></td>
+      <td>ABF-55</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Admin — Manage Moderators</td>
+      <td>ABF-53</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Admin — Manage Professionals</td>
+      <td>ABF-54</td>
+      <td><span class="badge badge-orange">M</span></td>
+      <td>ABF-53</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Professional Catalog UI</td>
+      <td>ABF-57</td>
+      <td><span class="badge badge-green">S</span></td>
+      <td>ABF-51</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Ask Question Form</td>
+      <td>ABF-58</td>
+      <td><span class="badge badge-green">S</span></td>
+      <td>—</td>
+      <td>עצמאית — ניתן לקחת מיד</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 3 — TIMELINE                        -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-timeline">
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <h2>ציר זמן — 2 שבועות</h2>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-dot red">יום 1</div>
+      <div class="timeline-content">
+        <h4>פתיחת ספרינט — מקבילות</h4>
+        <p>ABF-55 (Email Service) ו-ABF-56 (Deployment) מתחילות ביום הראשון — שתיהן חסמות עצמאיות. ABF-53 (Manage Moderators) יכולה להתחיל במקביל.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot blue">ימים 2–4</div>
+      <div class="timeline-content">
+        <h4>שבוע 7 — Backend עיקרי</h4>
+        <p>לאחר ABF-55: פותחים ABF-51 (Professional Answer) ו-ABF-52 (Moderator Dashboard). ABF-58 (Ask Question Form) — Frontend עצמאי.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot purple">ימים 5–6</div>
+      <div class="timeline-content">
+        <h4>שבוע 7 סיום — Admin + Frontend</h4>
+        <p>ABF-54 (Manage Professionals) נפתח אחרי ABF-53. Frontend: features/moderator/reports ו-features/advice/professional-answer.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot green">ימים 7–8</div>
+      <div class="timeline-content">
+        <h4>שבוע 8 — השלמות ו-UI</h4>
+        <p>ABF-57 (Professional Catalog UI) נפתח לאחר ABF-51. בדיקות אינטגרציה, הרצה על Vercel + Render, תיקוני עמודה.</p>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot orange">יום 9–10</div>
+      <div class="timeline-content">
+        <h4>סיום ו-Demo</h4>
+        <p>בדיקות E2E על URL ציבורי, אימות DoD לכל משימה, הכנה לדמו ללקוח.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 4 — ANGULAR RULES                   -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-angular">
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <h2>חוקי Angular — תזכורת</h2>
+  </div>
+
+  <div class="rules-grid">
+    <div class="rule-card">
+      <h5>Smart / Dumb Components</h5>
+      <p>Container component אחד לכל feature — הוא מביא נתונים ומעביר ל-Presentational components. Presentational components לא קוראים ל-service ישירות.</p>
+    </div>
+    <div class="rule-card">
+      <h5>Services ו-HTTP</h5>
+      <p>כל קריאת HTTP יוצאת אך ורק מ-service. Component לא קורא ל-HttpClient ישירות. השגיאה מטופלת ב-service ומועברת למעלה.</p>
+    </div>
+    <div class="rule-card">
+      <h5>Route Guards</h5>
+      <p>כל route מוגן ב-RoleGuard. מבקר רואה רק /moderator/**, איש מקצוע — /professional/**, מנהל — /admin/**. נתיב ללא guard לא עולה ל-PR.</p>
+    </div>
+    <div class="rule-card">
+      <h5>Reactive Forms</h5>
+      <p>טפסים עם שדות מרובים (שאלה, תשובה, הוספת מבקר) בנויים עם ReactiveFormsModule. Template-driven forms — רק לטפסים של שדה אחד.</p>
+    </div>
+    <div class="rule-card">
+      <h5>Interceptors</h5>
+      <p>ה-AuthInterceptor מוסיף את ה-token לכל בקשה. אין לשלוח header ידני מה-component. ה-interceptor כבר מוגדר — פשוט להשתמש ב-service.</p>
+    </div>
+    <div class="rule-card">
+      <h5>Privacy by Design</h5>
+      <p>שם מלא של שואל לא מוצג לאיש מקצוע אלא אם checkbox "חשוף שמי" סומן. קטלוג מציג שמות ותחומים בלבד — ללא פרטי קשר.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- TASK CARDS                                   -->
+<!-- ──────────────────────────────────────────── -->
+
+<!-- ABF-51 -->
+<div class="section" id="s-abf51">
+  <div class="section-header">
+    <div class="section-number purple">5</div>
+    <h2>ABF-51 — Professional Answer Flow</h2>
+  </div>
+
+  <div class="task-card">
+    <div class="task-card-header color-purple">
+      <span class="task-jira">ABF-51</span>
+      <span class="task-title">Professional Answer Flow — Backend + Frontend</span>
+      <span class="task-effort">גודל: L</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>professional_service.py — answer_query ו-get_pending_queries הם stubs</li>
+            <li>professional.py endpoint — מחזיר [] ללא לוגיקה</li>
+            <li>features/advice/professional-answer/ לא קיים</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>POST /queries/{id}/answer ממושם — שומר תשובה ומפעיל מייל</li>
+            <li>GET /queries/pending מחזיר שאלות לפי תחום המקצוע</li>
+            <li>Component: תצוגת שאלות ממתינות + טופס תשובה</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>קבצים לעריכה — Backend</h4>
+      <ul class="checklist">
+        <li><code>backend/services/professional_service.py</code> — answer_query + get_pending_queries</li>
+        <li><code>backend/api/v1/endpoints/professional.py</code> — חיבור ל-service + validation</li>
+      </ul>
+
+      <h4>קבצים לעריכה — Frontend</h4>
+      <ul class="checklist">
+        <li><code>frontend/src/app/features/advice/professional-answer/</code> — component חדש</li>
+        <li><code>frontend/src/app/core/services/advice.service.ts</code> — הוספת getMyPending + submitAnswer</li>
+      </ul>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>POST /queries/{id}/answer מחזיר תשובה + מייל נשלח לשואל</li>
+        <li>GET /queries/pending מחזיר רק שאלות הרלוונטיות לתחום איש המקצוע</li>
+        <li>שואל מוצג כ-"קבוצה – מגזר" אלא אם בחר לחשוף שם</li>
+        <li>Route מוגן ב-RoleGuard לתפקיד professional</li>
+        <li>בדיקות Python עוברות בלי שגיאות</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-52 -->
+<div class="section" id="s-abf52">
+  <div class="section-header">
+    <div class="section-number red">6</div>
+    <h2>ABF-52 — Moderator Dashboard</h2>
+  </div>
+
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <span class="task-jira">ABF-52</span>
+      <span class="task-title">Moderator Dashboard — Backend + Frontend</span>
+      <span class="task-effort">גודל: L</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>moderator.py endpoint — לא קיים</li>
+            <li>report_service.py — get_pending_reports ו-decide לא ממושמים</li>
+            <li>features/moderator/reports/ ו-user-card/ — stubs ריקים</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>GET /moderator/reports מחזיר דיווחים בתאים של המבקר בלבד</li>
+            <li>POST /moderator/reports/{id}/decide משנה סטטוס</li>
+            <li>לוח בקרת מבקר: רשימה + כפתורי החלטה + כרטיס משתמש</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>קבצים לעריכה — Backend</h4>
+      <ul class="checklist">
+        <li><code>backend/api/v1/endpoints/moderator.py</code> — קובץ חדש עם 2 endpoints</li>
+        <li><code>backend/services/report_service.py</code> — get_pending_reports + decide</li>
+        <li><code>backend/api/v1/router.py</code> — רישום moderator router</li>
+      </ul>
+
+      <h4>קבצים לעריכה — Frontend</h4>
+      <ul class="checklist">
+        <li><code>frontend/src/app/features/moderator/reports/</code> — component רשימת דיווחים</li>
+        <li><code>frontend/src/app/features/moderator/user-card/</code> — component כרטיס משתמש</li>
+        <li><code>frontend/src/app/core/services/moderator.service.ts</code> — service חדש</li>
+      </ul>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>GET /moderator/reports מחזיר רק דיווחים בתאים האחראיים של המבקר</li>
+        <li>POST /moderator/reports/{id}/decide משנה סטטוס דיווח</li>
+        <li>לוח בקרת מבקר מציג badge עם מספר דיווחים ממתינים</li>
+        <li>כרטיס משתמש כולל סטטיסטיקות דיווחים + כפתור השעיה</li>
+        <li>Route מוגן ב-RoleGuard לתפקיד moderator</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-53 -->
+<div class="section" id="s-abf53">
+  <div class="section-header">
+    <div class="section-number">7</div>
+    <h2>ABF-53 — Admin Manage Moderators</h2>
+  </div>
+
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <span class="task-jira">ABF-53</span>
+      <span class="task-title">Admin — Manage Moderators</span>
+      <span class="task-effort">גודל: M</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>admin.py — manage-moderators stubs מחזירים []</li>
+            <li>user_service.py — CRUD מבקרים לא ממושם</li>
+            <li>features/admin/manage-moderators/ — stub ריק</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>GET/POST/PATCH/DELETE /admin/moderators ממושמים</li>
+            <li>טבלת מבקרים עם פעולות הוסף/ערוך/הסר</li>
+            <li>שינוי מיידי בממשק עם כל פעולה</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>קבצים לעריכה — Backend</h4>
+      <ul class="checklist">
+        <li><code>backend/api/v1/endpoints/admin.py</code> — CRUD moderators מחובר</li>
+        <li><code>backend/services/user_service.py</code> — CRUD מבקרים ממושם</li>
+      </ul>
+
+      <h4>קבצים לעריכה — Frontend</h4>
+      <ul class="checklist">
+        <li><code>frontend/src/app/features/admin/manage-moderators/</code> — טבלה + מודל הוספה/עריכה</li>
+        <li><code>frontend/src/app/core/services/admin.service.ts</code> — הוספת מתודות moderator CRUD</li>
+      </ul>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>CRUD מלא — הוספה, עריכה, הסרה של מבקר</li>
+        <li>Admin מוסיף מבקר — שינוי מופיע מיידית בטבלה</li>
+        <li>Route מוגן ב-RoleGuard לתפקיד admin</li>
+        <li>בדיקות Python עוברות</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-54 -->
+<div class="section" id="s-abf54">
+  <div class="section-header">
+    <div class="section-number">8</div>
+    <h2>ABF-54 — Admin Manage Professionals</h2>
+  </div>
+
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <span class="task-jira">ABF-54</span>
+      <span class="task-title">Admin — Manage Professionals</span>
+      <span class="task-effort">גודל: M | תלויה ב-ABF-53</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>admin.py — manage-professionals stub</li>
+            <li>features/admin/manage-professionals/ — stub ריק</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>POST/PATCH /admin/professionals ממושמים</li>
+            <li>טבלת אנשי מקצוע עם הוסף/ערוך (Admin)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>קבצים לעריכה — Backend</h4>
+      <ul class="checklist">
+        <li><code>backend/api/v1/endpoints/admin.py</code> — חיבור manage-professionals</li>
+        <li><code>backend/services/user_service.py</code> — הוספה/עריכה של איש מקצוע</li>
+      </ul>
+
+      <h4>קבצים לעריכה — Frontend</h4>
+      <ul class="checklist">
+        <li><code>frontend/src/app/features/admin/manage-professionals/</code> — טבלה + מודל</li>
+        <li><code>frontend/src/app/core/services/admin.service.ts</code> — הוספת מתודות professional</li>
+      </ul>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>POST /admin/professionals מוסיף איש מקצוע עם תחום ומגזר</li>
+        <li>PATCH /admin/professionals/{id} מעדכן פרטים</li>
+        <li>טבלת אנשי מקצוע מציגה שמות ותחומים בלבד</li>
+        <li>Route מוגן ב-RoleGuard לתפקיד admin</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-55 -->
+<div class="section" id="s-abf55">
+  <div class="section-header">
+    <div class="section-number red">9</div>
+    <h2>ABF-55 — Email Notifications</h2>
+  </div>
+
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <span class="task-jira">ABF-55</span>
+      <span class="task-title">Email Notifications — שאלה/תשובה/החלטה</span>
+      <span class="task-effort">גודל: M | חוסמת ABF-51 + ABF-52</span>
+    </div>
+    <div class="task-card-body">
+      <div class="callout callout-red">
+        💡 יש להתחיל ב-ABF-55 ביום הראשון — ABF-51 ו-ABF-52 תלויות בה לצורך שליחת מיילים.
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>email_service.py — כל המתודות עושות logger.info בלבד</li>
+            <li>לא נשלח מייל אמיתי בשום אירוע</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>מייל לאיש מקצוע — שאלה חדשה הגיעה בתחום שלו</li>
+            <li>מייל לשואל — תשובה התקבלה</li>
+            <li>מייל לנדון — דחייה/אישור של דיווח</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>קבצים לעריכה</h4>
+      <ul class="checklist">
+        <li><code>backend/services/email_service.py</code> — מימוש 3 סוגי מיילים</li>
+        <li><code>backend/core/config.py</code> — ודאי שמשתני SMTP מוגדרים</li>
+      </ul>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>שליחת מייל לאיש מקצוע כאשר שאלה חדשה בתחום שלו נוצרת</li>
+        <li>שליחת מייל לשואל כאשר תשובה מתקבלת</li>
+        <li>שליחת מייל לנדון כאשר דיווח מטופל (דחייה/אישור)</li>
+        <li>שגיאת שליחה לא קורסת את הבקשה — מטופלת בשקט</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-56 -->
+<div class="section" id="s-abf56">
+  <div class="section-header">
+    <div class="section-number green">10</div>
+    <h2>ABF-56 — Cloud Deployment</h2>
+  </div>
+
+  <div class="task-card">
+    <div class="task-card-header color-green">
+      <span class="task-jira">ABF-56</span>
+      <span class="task-title">Cloud Deployment — Vercel + Render</span>
+      <span class="task-effort">גודל: M | עצמאית</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>backend/ — אין Dockerfile, אין render.yaml</li>
+            <li>frontend/ — אין vercel.json</li>
+            <li>האתר נגיש רק locally</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>Backend על Render — URL ציבורי</li>
+            <li>Frontend על Vercel — URL ציבורי</li>
+            <li>הגדרות environment variables בענן</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>קבצים ליצירה / עריכה</h4>
+      <ul class="checklist">
+        <li><code>backend/Dockerfile</code> — הגדרת image לבקאנד</li>
+        <li><code>backend/render.yaml</code> — הגדרת Render service</li>
+        <li><code>frontend/vercel.json</code> — הגדרת Vercel deployment</li>
+      </ul>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>Backend נגיש בURL ציבורי על Render</li>
+        <li>Frontend נגיש בURL ציבורי על Vercel</li>
+        <li>Login + הרשמה עובדים בURL הציבורי</li>
+        <li>Environment variables מוגדרים בפאנל הענן (לא ב-code)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-57 -->
+<div class="section" id="s-abf57">
+  <div class="section-header">
+    <div class="section-number">11</div>
+    <h2>ABF-57 — Professional Catalog UI</h2>
+  </div>
+
+  <div class="task-card">
+    <div class="task-card-header color-grey">
+      <span class="task-jira">ABF-57</span>
+      <span class="task-title">Professional Catalog — קטלוג אנשי מקצוע</span>
+      <span class="task-effort">גודל: S | תלויה ב-ABF-51</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>features/advice/advice-list/ — service קיים, UI stub בלבד</li>
+            <li>הקטלוג לא מציג נתונים אמיתיים</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>קטלוג מציג שמות ותחומים לפי קבוצה ומגזר</li>
+            <li>ללא פרטי קשר — שם ותחום בלבד</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>קבצים לעריכה</h4>
+      <ul class="checklist">
+        <li><code>frontend/src/app/features/advice/advice-list/advice-list.component.ts</code> — חיבור ל-service</li>
+        <li><code>frontend/src/app/features/advice/advice-list/advice-list.component.html</code> — תצוגה לפי קבוצה/מגזר</li>
+      </ul>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>קטלוג מציג שמות ותחומים בלבד — ללא פרטי קשר</li>
+        <li>סינון לפי קבוצה ומגזר עובד</li>
+        <li>המסך נטען עם spinner בזמן טעינה</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-58 -->
+<div class="section" id="s-abf58">
+  <div class="section-header">
+    <div class="section-number green">12</div>
+    <h2>ABF-58 — Ask Question Form</h2>
+  </div>
+
+  <div class="task-card">
+    <div class="task-card-header color-green">
+      <span class="task-jira">ABF-58</span>
+      <span class="task-title">Ask Question Form — טופס שאלה מלא</span>
+      <span class="task-effort">גודל: S | עצמאית</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>features/advice/ask-question/ — service קיים, UI stub בלבד</li>
+            <li>הטופס לא כולל שדות מלאים</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>בחירת שאלה ספציפית/תחומית</li>
+            <li>בחירת ציבורי/פרטי</li>
+            <li>checkbox "חשוף שמי לאיש המקצוע"</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>קבצים לעריכה</h4>
+      <ul class="checklist">
+        <li><code>frontend/src/app/features/advice/ask-question/ask-question.component.ts</code> — ReactiveForm + submit</li>
+        <li><code>frontend/src/app/features/advice/ask-question/ask-question.component.html</code> — שדות טופס מלאים</li>
+      </ul>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>טופס כולל: שאלה ספציפית/תחומית, ציבורי/פרטי, checkbox חשיפת שם</li>
+        <li>validation — שדה שאלה חובה, תחום חובה</li>
+        <li>שליחה מצליחה מנווטת חזרה לרשימת השאלות שלי</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 13 — SYNC POINTS                    -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-sync">
+  <div class="section-header">
+    <div class="section-number orange">13</div>
+    <h2>נקודות סנכרון</h2>
+  </div>
+
+  <div class="sync-box">
+    <strong>סנכרון 1 — Email Service עם Professional Answer ו-Moderator Dashboard</strong><br>
+    לאחר שABF-55 מוכן — מי שעובדת על ABF-51 ומי שעובדת על ABF-52 מוודאות שה-email_service מופעל נכון מה-service שלהן. נבדוק ביחד שהחתימה של הפונקציות תואמת.
+  </div>
+
+  <div class="sync-box">
+    <strong>סנכרון 2 — Admin CRUD עם Frontend</strong><br>
+    לאחר ש-ABF-53 (Manage Moderators) Backend מוכן — הפרונטאנד (ABF-53 Frontend ו-ABF-54) מוודאות שמבנה ה-JSON של הresponse תואם את ה-interface ב-TypeScript.
+  </div>
+
+  <div class="sync-box">
+    <strong>סנכרון 3 — Deployment משותף</strong><br>
+    ABF-56 נבנה על-ידי שתי המפתחות ביחד — הגדרת environment variables ב-Render + Vercel דורשת תיאום כדי לוודא שה-CORS ו-DATABASE_URL נכונים לשני הצדדים.
+  </div>
+
+  <div class="sync-box">
+    <strong>סנכרון 4 — Privacy Check לפני Demo</strong><br>
+    לפני הדמו: לבדוק ביחד שקטלוג אנשי מקצוע לא חושף פרטי קשר, ושאיש מקצוע רואה שם שואל רק אם checkbox "חשוף שמי" סומן.
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 14 — MOCKUPS                        -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-mockup">
+  <div class="section-header">
+    <div class="section-number purple">14</div>
+    <h2>האפליקציה בסוף הספרינט</h2>
+  </div>
+
+  <div class="app-screens">
+
+    <!-- MOCKUP 1: Moderator Dashboard -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <span class="app-topbar-logo">אנו בניך</span>
+        <span class="app-topbar-user">מבקר: רחל כ.</span>
+        <span class="app-topbar-logout">יציאה</span>
+      </div>
+      <div class="app-body">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div class="app-page-title" style="margin:0;">לוח בקרת מבקר</div>
+          <span class="app-count-badge">3</span>
+        </div>
+
+        <div class="app-forum-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <div class="app-forum-title" style="font-size:12px;">דיווח על: יעקב ל.</div>
+            <span class="app-status-badge app-status-pending">ממתין</span>
+          </div>
+          <div class="app-forum-meta">תחום: פורום | סיבה: תוכן פוגעני</div>
+          <div class="app-btn-row" style="margin-top:8px;">
+            <div class="app-btn app-btn-success" style="font-size:11px; padding:6px;">אישור</div>
+            <div class="app-btn app-btn-danger" style="font-size:11px; padding:6px;">דחייה</div>
+            <div class="app-btn app-btn-outline" style="font-size:11px; padding:6px;">החלט</div>
+          </div>
+        </div>
+
+        <div class="app-forum-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <div class="app-forum-title" style="font-size:12px;">דיווח על: שרה מ.</div>
+            <span class="app-status-badge app-status-pending">ממתין</span>
+          </div>
+          <div class="app-forum-meta">תחום: פורום | סיבה: ספאם</div>
+          <div class="app-btn-row" style="margin-top:8px;">
+            <div class="app-btn app-btn-success" style="font-size:11px; padding:6px;">אישור</div>
+            <div class="app-btn app-btn-danger" style="font-size:11px; padding:6px;">דחייה</div>
+            <div class="app-btn app-btn-outline" style="font-size:11px; padding:6px;">החלט</div>
+          </div>
+        </div>
+
+        <div class="app-note">מוצגים דיווחים בתאים שלך בלבד</div>
+      </div>
+      <div class="app-caption">לוח בקרת מבקר</div>
+    </div>
+
+    <!-- MOCKUP 2: Professional Answer -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <span class="app-topbar-logo">אנו בניך</span>
+        <span class="app-topbar-user">ד"ר משה ה.</span>
+        <span class="app-topbar-logout">יציאה</span>
+      </div>
+      <div class="app-body">
+        <div class="app-page-title">שאלות ממתינות</div>
+
+        <div class="app-forum-card" style="border-color:#bfdbfe; background:#eff6ff;">
+          <div class="app-label">שואל</div>
+          <div class="app-forum-title" style="color:#1e3a8a; margin-bottom:6px;">אלמנה – ספרדי</div>
+          <div class="app-label" style="margin-top:8px;">שאלה</div>
+          <div style="font-size:12px; color:#374151; margin-bottom:10px;">כיצד ניתן להסדיר ירושה כאשר אין צוואה והילדים מתחת לגיל 18?</div>
+          <div class="app-label">תחום</div>
+          <div class="app-forum-badge" style="display:inline-block; font-size:11px; padding:3px 10px;">משפטי</div>
+        </div>
+
+        <div class="app-label" style="margin-top:12px;">תשובתך</div>
+        <div class="app-textarea">כתוב תשובה מקצועית...</div>
+
+        <div class="app-btn app-btn-primary" style="margin-top:4px;">שלח תשובה</div>
+        <div class="app-note">השואל יקבל מייל עם תשובתך</div>
+      </div>
+      <div class="app-caption">ממשק תשובה לשאלה</div>
+    </div>
+
+    <!-- MOCKUP 3: Admin Manage Moderators -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <span class="app-topbar-logo">אנו בניך</span>
+        <span class="app-topbar-user">מנהל: Admin</span>
+        <span class="app-topbar-logout">יציאה</span>
+      </div>
+      <div class="app-body">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div class="app-page-title" style="margin:0; font-size:15px;">ניהול מבקרים</div>
+          <div class="app-btn app-btn-primary" style="font-size:11px; padding:5px 10px; margin:0;">+ הוסף</div>
+        </div>
+
+        <div class="app-table-row">
+          <div>
+            <div class="app-table-name">רחל כהן</div>
+            <div class="app-table-role">אשכנזי — פורום</div>
+          </div>
+          <div style="display:flex; gap:4px;">
+            <span class="app-icon-btn">ערוך</span>
+            <span class="app-icon-btn" style="background:#fef2f2; color:#dc2626; border-color:#fecaca;">הסר</span>
+          </div>
+        </div>
+
+        <div class="app-table-row">
+          <div>
+            <div class="app-table-name">דוד לוי</div>
+            <div class="app-table-role">ספרדי — פורום</div>
+          </div>
+          <div style="display:flex; gap:4px;">
+            <span class="app-icon-btn">ערוך</span>
+            <span class="app-icon-btn" style="background:#fef2f2; color:#dc2626; border-color:#fecaca;">הסר</span>
+          </div>
+        </div>
+
+        <div class="app-table-row">
+          <div>
+            <div class="app-table-name">מרים אביב</div>
+            <div class="app-table-role">תימני — ייעוץ</div>
+          </div>
+          <div style="display:flex; gap:4px;">
+            <span class="app-icon-btn">ערוך</span>
+            <span class="app-icon-btn" style="background:#fef2f2; color:#dc2626; border-color:#fecaca;">הסר</span>
+          </div>
+        </div>
+
+        <div class="app-note">שינויים מופעלים מיידית</div>
+      </div>
+      <div class="app-caption">ניהול מבקרים</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<!-- SECTION 15 — DEFINITION OF DONE             -->
+<!-- ──────────────────────────────────────────── -->
+<div class="section" id="s-dod">
+  <div class="section-header">
+    <div class="section-number green">15</div>
+    <h2>Definition of Done — ספרינט 4</h2>
+  </div>
+
+  <h3>Backend</h3>
+  <ul class="checklist">
+    <li>POST /queries/{id}/answer מחזיר תשובה + מייל נשלח לשואל</li>
+    <li>GET /moderator/reports מחזיר רק דיווחים בתאים של המבקר</li>
+    <li>POST /moderator/reports/{id}/decide משנה סטטוס דיווח</li>
+    <li>/admin/moderators — CRUD מלא (GET/POST/PATCH/DELETE)</li>
+    <li>/admin/professionals — הוספה + עריכה</li>
+    <li>email_service — 3 סוגי מיילים ממושמים</li>
+    <li>כל endpoint מוגן ב-JWT + Role dependency</li>
+    <li>בדיקות Python עוברות ב-CI</li>
+  </ul>
+
+  <h3>Frontend</h3>
+  <ul class="checklist">
+    <li>קטלוג אנשי מקצוע מציג שמות ותחומים בלבד — ללא פרטי קשר</li>
+    <li>שואל מוצג לאיש מקצוע כ-"קבוצה – מגזר" אלא אם בחר לחשוף שם</li>
+    <li>מבקר רואה רק דיווחים בתאים האחראיים שלו</li>
+    <li>Admin מוסיף/מסיר מבקר — שינוי מופיע מיידי בטבלה</li>
+    <li>כל route חדש מוגן ב-RoleGuard המתאים</li>
+    <li>טפסים (שאלה, תשובה, הוספת מבקר) בנויים עם ReactiveFormsModule</li>
+  </ul>
+
+  <h3>Deployment</h3>
+  <ul class="checklist">
+    <li>Frontend נגיש בURL ציבורי על Vercel</li>
+    <li>Backend נגיש בURL ציבורי על Render</li>
+    <li>Login, הרשמה, ופורום עובדים על ה-URL הציבורי</li>
+    <li>Environment variables מוגדרים בפאנל הענן — לא ב-code</li>
+  </ul>
+
+  <div class="callout callout-green" style="margin-top:20px;">
+    ✅ סיום ספרינט 4 = האפליקציה נגישה לכולם, עם RBAC מלא — שלושת התפקידים (מקצוען, מבקר, מנהל) מחוברים ועובדים.
+  </div>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ספרינט 6 — שיחות קבוצתיות וידאו | אנו בניך</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f0; color: #222; direction: rtl; font-size: 15px; line-height: 1.7; }
+
+  .cover { background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 55%, #6d28d9 100%); color: white; padding: 70px 40px; text-align: center; }
+  .cover h1 { font-size: 38px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1px; }
+  .cover .sprint-title { font-size: 22px; opacity: 0.85; margin-bottom: 8px; background: rgba(255,255,255,0.12); border-radius: 10px; display: inline-block; padding: 6px 24px; }
+  .cover .subtitle { font-size: 17px; opacity: 0.75; margin-bottom: 28px; }
+  .cover .meta { display: inline-flex; gap: 24px; flex-wrap: wrap; justify-content: center; background: rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 28px; }
+  .cover .meta span { font-size: 13px; opacity: 0.85; }
+  .cover .meta strong { opacity: 1; }
+
+  .goal-banner { background: linear-gradient(90deg, #6d28d9, #7c3aed); color: white; padding: 24px 40px; text-align: center; font-size: 17px; line-height: 1.6; }
+  .goal-banner strong { font-size: 19px; display: block; margin-bottom: 6px; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
+
+  .section { background: white; border-radius: 16px; padding: 32px 36px; box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 28px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 14px; border-bottom: 3px solid #f0f0f0; }
+  .section-number { background: #7c3aed; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .section-number.green { background: #059669; }
+  .section-number.blue  { background: #2563eb; }
+  .section h2 { font-size: 22px; color: #7c3aed; }
+  .section h3 { font-size: 17px; color: #4c1d95; margin: 22px 0 10px; padding-right: 12px; border-right: 4px solid #7c3aed; }
+  .section p  { margin-bottom: 12px; color: #333; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th { background: #7c3aed; color: white; padding: 10px 14px; text-align: right; font-weight: 600; }
+  td { padding: 9px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) { background: #faf5ff; }
+  tr:hover { background: #f3e8ff; }
+
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin: 2px; }
+  .badge-green  { background: #d1fae5; color: #065f46; }
+  .badge-red    { background: #fee2e2; color: #991b1b; }
+  .badge-blue   { background: #dbeafe; color: #1e40af; }
+  .badge-orange { background: #fef3c7; color: #92400e; }
+  .badge-purple { background: #ede9fe; color: #4c1d95; }
+  .badge-grey   { background: #e9ecef; color: #495057; }
+
+  .callout { border-radius: 10px; padding: 16px 20px; margin: 14px 0; border-right: 5px solid; font-size: 14px; }
+  .callout-blue   { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+  .callout-green  { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+  .callout-orange { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+  .callout-purple { background: #faf5ff; border-color: #a855f7; color: #581c87; }
+
+  .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 20px 0; }
+  .module-card { border: 2px solid #ede9fe; border-radius: 12px; padding: 20px; background: #faf5ff; }
+  .module-card h4 { color: #6d28d9; font-size: 15px; margin-bottom: 8px; }
+  .module-card p  { font-size: 13px; color: #555; margin: 0; line-height: 1.5; }
+
+  .dep-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 16px 0; padding: 18px; background: #faf5ff; border-radius: 12px; font-size: 14px; }
+  .dep-box  { background: #7c3aed; color: white; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; }
+  .dep-box.done { background: #059669; }
+  .dep-arrow { color: #7c3aed; font-size: 20px; font-weight: 700; }
+
+  /* Mockup styles */
+  .mockup-wrap { background: #f8fafc; border-radius: 14px; padding: 20px; margin: 20px 0; border: 1px solid #e2e8f0; }
+  .mockup-label { font-size: 12px; color: #888; text-align: center; margin-bottom: 10px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .app-frame { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; }
+  .app-header { background: #7c3aed; color: white; padding: 12px 20px; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .app-body { padding: 20px; }
+  .call-card { border: 2px solid #ede9fe; border-radius: 10px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .call-card-info h4 { font-size: 14px; color: #333; margin-bottom: 4px; }
+  .call-card-info p  { font-size: 12px; color: #777; margin: 0; }
+  .btn { padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
+  .btn-join { background: #059669; color: white; }
+  .btn-open { background: #7c3aed; color: white; }
+  .btn-grey { background: #e5e7eb; color: #555; }
+  .schedule-form { border: 1px solid #ede9fe; border-radius: 10px; padding: 16px; margin-top: 16px; }
+  .schedule-form h4 { font-size: 14px; color: #6d28d9; margin-bottom: 12px; }
+  .form-row { margin-bottom: 10px; }
+  .form-row label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; }
+  .form-input { width: 100%; border: 1px solid #d8b4fe; border-radius: 6px; padding: 7px 10px; font-size: 13px; color: #333; background: #faf5ff; }
+  .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+
+  .dod-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .dod-item { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; font-size: 14px; color: #166534; display: flex; gap: 10px; align-items: flex-start; }
+  .dod-check { color: #059669; font-weight: 700; flex-shrink: 0; }
+
+  .jira-badge { display: inline-block; background: #ede9fe; color: #6d28d9; border-radius: 6px; padding: 4px 12px; font-size: 13px; font-weight: 600; margin: 2px; border: 1px solid #ddd6fe; }
+
+  @media (max-width: 700px) {
+    .module-grid, .dod-grid { grid-template-columns: 1fr; }
+    .dep-flow { flex-direction: column; align-items: flex-start; }
+    .cover { padding: 40px 20px; }
+    .section { padding: 22px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="sprint-title">ספרינט 6</div>
+  <h1>שיחות קבוצתיות וידאו</h1>
+  <p class="subtitle">Zoom API / Google Meet API — השלמת המערכת</p>
+  <div class="meta">
+    <span><strong>שבועות</strong> 11–12</span>
+    <span><strong>צוות</strong> 3 מפתחות</span>
+    <span><strong>ספרינט</strong> אחרון</span>
+    <span><strong>Jira</strong> ABF-89–ABF-100</span>
+  </div>
+</div>
+
+<!-- GOAL -->
+<div class="goal-banner">
+  <strong>מטרת הספרינט</strong>
+  להוסיף את שכבת הוידאו האחרונה — מקצוען או מנהל פותח פגישת Zoom/Meet, המשתתפים מוזמנים דרך המערכת, וה-URL חד-פעמי ובלתי ניתן להעברה. עם סיום ספרינט זה, המערכת מוכנה לשימוש מלא.
+</div>
+
+<div class="container">
+
+<!-- 1. BEFORE / AFTER -->
+<div class="section" id="state">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2>מה קיים לפני הספרינט ומה נוסף</h2>
+  </div>
+
+  <table>
+    <thead><tr><th>תחום</th><th>לפני ספרינט 6</th><th>אחרי ספרינט 6</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>שיחות וידאו</strong></td>
+        <td><span class="badge badge-red">לא קיים</span></td>
+        <td><span class="badge badge-green">מלא — Zoom/Meet API</span></td>
+      </tr>
+      <tr>
+        <td><strong>פתיחת פגישה</strong></td>
+        <td><span class="badge badge-red">אין</span></td>
+        <td><span class="badge badge-green">מקצוען / מנהל פותח דרך ממשק</span></td>
+      </tr>
+      <tr>
+        <td><strong>הזמנת משתתפים</strong></td>
+        <td><span class="badge badge-red">אין</span></td>
+        <td><span class="badge badge-green">הזמנה דרך המערכת לפי קבוצה/מגזר</span></td>
+      </tr>
+      <tr>
+        <td><strong>אבטחת הקישור</strong></td>
+        <td><span class="badge badge-red">אין</span></td>
+        <td><span class="badge badge-green">קישור חד-פעמי, לא ניתן להעברה</span></td>
+      </tr>
+      <tr>
+        <td><strong>כל שאר המודולים</strong></td>
+        <td><span class="badge badge-green">מלאים (S1–S5)</span></td>
+        <td><span class="badge badge-green">ללא שינוי</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 2. MODULES -->
+<div class="section" id="modules">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <h2>מודולים שנבנים בספרינט</h2>
+  </div>
+
+  <div class="callout callout-purple">
+    <strong>מה הצוות בוחר:</strong> Zoom API או Google Meet API — המפתחות יבחרו את האפשרות הפשוטה יותר לאינטגרציה. אין העדפת לקוח. (SPEC §11.1)
+  </div>
+
+  <div class="module-grid">
+    <div class="module-card">
+      <h4>Backend — יצירת פגישה</h4>
+      <p>endpoint חדש שיוצר פגישה דרך Zoom/Meet REST API ומחזיר קישור הצטרפות. שומר מזהה הפגישה + timestamp + תא רלוונטי. מגביל גישה: מקצוען או מנהל בלבד.</p>
+    </div>
+    <div class="module-card">
+      <h4>Backend — שליחת הזמנות</h4>
+      <p>לאחר יצירת הפגישה — שליחת הזמנת מייל לכל חברי הקבוצה/מגזר המדויקים. הקישור חד-פעמי. AuditLog על כל פגישה שנפתחה.</p>
+    </div>
+    <div class="module-card">
+      <h4>Frontend — פתיחת פגישה</h4>
+      <p>ממשק לפתיחת פגישה — בורר קבוצה/מגזר, שדה נושא, כפתור "פתח שיחה". גלוי למקצוען ולמנהל בלבד. מציג אישור עם הקישור לאחר היצירה.</p>
+    </div>
+    <div class="module-card">
+      <h4>Frontend — הצטרפות לפגישה</h4>
+      <p>לחצן "הצטרף לשיחה" מופיע בממשק המשתמש כאשר יש פגישה פעילה לקבוצה שלו. הקישור עובר דרך המערכת ולא משותף ישירות.</p>
+    </div>
+  </div>
+
+  <h3>גבולות סקופ ברורים</h3>
+  <table>
+    <thead><tr><th>כלול בספרינט 6</th><th>לא כלול</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>פתיחת פגישה + שליחת הזמנה למשתתפים לפי קבוצה/מגזר</td>
+        <td>הקלטת פגישות (כבויה כברירת מחדל; Zoom Free אינו תומך)</td>
+      </tr>
+      <tr>
+        <td>הצטרפות דרך קישור המערכת</td>
+        <td>ממשק ניהול פגישות מתקדם (עריכה, ביטול, לוח שנה)</td>
+      </tr>
+      <tr>
+        <td>פגישה עד 100 משתתפים, 40 דקות (Free Tier)</td>
+        <td>שדרוג לתשלום / ממשק Zoom מוטמע בתוך האפליקציה</td>
+      </tr>
+      <tr>
+        <td>AuditLog על כל פגישה שנפתחה</td>
+        <td>הקלטה, chat, breakout rooms</td>
+      </tr>
+      <tr>
+        <td>בדיקת קישורי Zoom/Meet מול נטפרי (SPEC §9.6)</td>
+        <td>תאימות עם אתרוג/רימון (לא בסקופ שלנו)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-orange">
+    <strong>מגבלת Free Tier לזכור:</strong> Zoom Free — 100 משתתפים, 40 דקות לפגישה. לפני דמו ללקוח — לציין את המגבלה. שדרוג ל-Pro: כ-₪55/חודש, ללא הגבלת זמן. (SPEC §11.1)
+  </div>
+</div>
+
+<!-- 3. MOCKUP -->
+<div class="section" id="mockup">
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <h2>מוקאפ — ממשק שיחות וידאו</h2>
+  </div>
+
+  <div class="mockup-wrap">
+    <div class="mockup-label">ממשק מקצוען — פתיחה והצטרפות לשיחות קבוצתיות</div>
+    <div class="app-frame">
+      <div class="app-header">
+        <span>שיחות קבוצתיות — ייעוץ וידאו</span>
+      </div>
+      <div class="app-body">
+
+        <div class="call-card">
+          <div class="call-card-info">
+            <h4>שיחת תמיכה — אלמנות ספרדיות</h4>
+            <p>פתוחה עכשיו &nbsp;·&nbsp; עו"ד מרים כהן &nbsp;·&nbsp; 12 משתתפים</p>
+          </div>
+          <button class="btn btn-join">הצטרפות לשיחה</button>
+        </div>
+
+        <div class="call-card" style="border-color:#e5e7eb;">
+          <div class="call-card-info">
+            <h4>ייעוץ פסיכולוגי — יתומות חסידיות</h4>
+            <p>הסתיימה לפני 2 שעות &nbsp;·&nbsp; פסיכולוג יוסף לוי</p>
+          </div>
+          <button class="btn btn-grey">הסתיימה</button>
+        </div>
+
+        <div class="schedule-form">
+          <h4>פתיחת שיחה חדשה</h4>
+          <div class="form-row">
+            <label>נושא השיחה</label>
+            <input class="form-input" type="text" value="שאלות ירושה ומזונות — מענה קהילתי" readonly>
+          </div>
+          <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <label>קבוצה</label>
+              <select class="form-input" disabled><option>אלמנות</option></select>
+            </div>
+            <div>
+              <label>מגזר</label>
+              <select class="form-input" disabled><option>ספרדי</option></select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-grey">ביטול</button>
+            <button class="btn btn-open">פתיחת שיחה ושליחת הזמנות</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. DEPENDENCY MAP -->
+<div class="section" id="dependencies">
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <h2>מפת תלויות</h2>
+  </div>
+
+  <p>ספרינט 6 הוא הספרינט האחרון ומסתמך על כל התשתית שנבנתה:</p>
+
+  <div class="dep-flow">
+    <div class="dep-box done">S1: Auth + RBAC</div>
+    <div class="dep-arrow">←</div>
+    <div class="dep-box done">S2: Admin Approval</div>
+    <div class="dep-arrow">←</div>
+    <div class="dep-box done">S3: Forum + Report</div>
+    <div class="dep-arrow">←</div>
+    <div class="dep-box done">S4: Professionals + Moderators</div>
+    <div class="dep-arrow">←</div>
+    <div class="dep-box done">S5: DM + AI + i18n</div>
+    <div class="dep-arrow">←</div>
+    <div class="dep-box">S6: Video Calls</div>
+  </div>
+
+  <h3>תלויות ספציפיות לספרינט 6</h3>
+  <table>
+    <thead><tr><th>תלות</th><th>מאין?</th><th>למה נדרש</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>RBAC — role=PROFESSIONAL / ADMIN</td>
+        <td>S1 ✓</td>
+        <td>רק מקצוען/מנהל יכול לפתוח פגישה</td>
+      </tr>
+      <tr>
+        <td>Group/Sector filtering (§4)</td>
+        <td>S2–S3 ✓</td>
+        <td>הפגישה נגישה לחברי הקבוצה/מגזר הנכון בלבד</td>
+      </tr>
+      <tr>
+        <td>Email service (real SMTP)</td>
+        <td>S4 ✓</td>
+        <td>שליחת הזמנות וידאו למשתתפים</td>
+      </tr>
+      <tr>
+        <td>AuditLog</td>
+        <td>S1 ✓</td>
+        <td>רישום כל פגישה שנפתחה</td>
+      </tr>
+      <tr>
+        <td>NetFree domain approval</td>
+        <td>S4 (post-deploy) ✓</td>
+        <td>קישורי Zoom/Meet חייבים לעבור דרך הפילטר (SPEC §9.6)</td>
+      </tr>
+      <tr>
+        <td>Cloud deployment (URL קבוע)</td>
+        <td>S4 ✓</td>
+        <td>Zoom/Meet OAuth callback דורש domain פעיל</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-blue">
+    <strong>בדיקת נטפרי לקישורי Zoom/Meet:</strong> לפי SPEC §9.6, יש לאמת שקישורי Zoom/Meet עוברים דרך פילטרי התוכן. לבצע לאחר קבלת אישור נטפרי לדומיין (שמתקבל לאחר S4).
+  </div>
+</div>
+
+<!-- 5. PERMISSIONS -->
+<div class="section" id="permissions">
+  <div class="section-header">
+    <div class="section-number">5</div>
+    <h2>כללי הרשאות — שיחות וידאו</h2>
+  </div>
+
+  <table>
+    <thead><tr><th>פעולה</th><th>Admin</th><th>Professional</th><th>Moderator</th><th>User</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>פתיחת שיחה קבוצתית</td>
+        <td style="text-align:center">✅</td>
+        <td style="text-align:center">✅</td>
+        <td style="text-align:center">❌</td>
+        <td style="text-align:center">❌</td>
+      </tr>
+      <tr>
+        <td>קבלת הזמנה + הצטרפות</td>
+        <td style="text-align:center">✅</td>
+        <td style="text-align:center">✅</td>
+        <td style="text-align:center">❌</td>
+        <td style="text-align:center">✅ (לפי קבוצה/מגזר)</td>
+      </tr>
+      <tr>
+        <td>צפייה ברשימת פגישות עבר</td>
+        <td style="text-align:center">✅</td>
+        <td style="text-align:center">✅ (שלו)</td>
+        <td style="text-align:center">❌</td>
+        <td style="text-align:center">✅ (שהוזמן אליהן)</td>
+      </tr>
+      <tr>
+        <td>העברת קישור חיצונית</td>
+        <td colspan="4" style="text-align:center; color:#991b1b; font-weight:600;">❌ לא ניתן — קישור חד-פעמי, מחובר לחשבון</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 6. DOD -->
+<div class="section" id="dod">
+  <div class="section-header">
+    <div class="section-number green">6</div>
+    <h2>Definition of Done — ספרינט 6</h2>
+  </div>
+
+  <div class="dod-grid">
+    <div class="dod-item"><span class="dod-check">✓</span> מקצוען פותח פגישת Zoom/Meet דרך ממשק המערכת — מקבל אישור עם קישור</div>
+    <div class="dod-item"><span class="dod-check">✓</span> חברי הקבוצה/מגזר הנכון מקבלים מייל הזמנה עם קישור הצטרפות</div>
+    <div class="dod-item"><span class="dod-check">✓</span> קישור שאינו שייך למשתמש — לא ניתן להצטרף דרכו</div>
+    <div class="dod-item"><span class="dod-check">✓</span> AuditLog מכיל רשומה על כל פגישה שנפתחה (מי פתח, מתי, לאיזה תא)</div>
+    <div class="dod-item"><span class="dod-check">✓</span> קישורי Zoom/Meet עוברים דרך נטפרי — אומת מעשית</div>
+    <div class="dod-item"><span class="dod-check">✓</span> מגבלת 40 דקות + 100 משתתפים מתועדת ב-README</div>
+    <div class="dod-item"><span class="dod-check">✓</span> CI עובר + PR נסקר ומאושר ע"י TL לפני מיזוג</div>
+    <div class="dod-item"><span class="dod-check">✓</span> אין 501 / NotImplementedError בשום מקום בקוד כולו</div>
+  </div>
+
+  <div class="callout callout-green" style="margin-top:20px;">
+    <strong>סיום ספרינט 6 = המערכת מוכנה לשימוש מלא.</strong> כל המודולים מ-SPEC.md מיושמים. ניתן לפנות ללקוח לדמו סופי.
+  </div>
+</div>
+
+<!-- 7. JIRA -->
+<div class="section" id="jira">
+  <div class="section-header">
+    <div class="section-number blue">7</div>
+    <h2>Jira — טווח כרטיסים מוצע</h2>
+  </div>
+
+  <p>טווח מוצע: <strong>ABF-89 — ABF-100</strong></p>
+
+  <table>
+    <thead><tr><th>מודול</th><th>כרטיסים מוצעים</th><th>כיסוי</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Backend — Zoom/Meet API integration</td>
+        <td><span class="jira-badge">ABF-89</span> <span class="jira-badge">ABF-90</span></td>
+        <td>יצירת פגישה, Alembic migration לטבלת meetings</td>
+      </tr>
+      <tr>
+        <td>Backend — שליחת הזמנות + AuditLog</td>
+        <td><span class="jira-badge">ABF-91</span> <span class="jira-badge">ABF-92</span></td>
+        <td>מייל הזמנה + רישום</td>
+      </tr>
+      <tr>
+        <td>Frontend — פתיחת פגישה (מקצוען/מנהל)</td>
+        <td><span class="jira-badge">ABF-93</span> <span class="jira-badge">ABF-94</span></td>
+        <td>טופס + service + component</td>
+      </tr>
+      <tr>
+        <td>Frontend — הצטרפות למשתמש</td>
+        <td><span class="jira-badge">ABF-95</span> <span class="jira-badge">ABF-96</span></td>
+        <td>הזמנה ב-inbox + כפתור הצטרפות</td>
+      </tr>
+      <tr>
+        <td>בדיקות + NetFree verification</td>
+        <td><span class="jira-badge">ABF-97</span> <span class="jira-badge">ABF-98</span></td>
+        <td>e2e testing + אימות פילטרים</td>
+      </tr>
+      <tr>
+        <td>תיעוד + גיבוש גרסה סופית</td>
+        <td><span class="jira-badge">ABF-99</span> <span class="jira-badge">ABF-100</span></td>
+        <td>README, CHANGELOG, הכנה לדמו</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>
