@@ -70,6 +70,12 @@ class Settings(BaseSettings):
     PRESIGNED_URL_EXPIRE_SECONDS: int = 900
 
     # ------------------------------------------------------------------
+    # Google / Firebase OAuth
+    # Required for POST /auth/google – find this in Firebase Console → Project settings
+    # ------------------------------------------------------------------
+    FIREBASE_PROJECT_ID: str = ""
+
+    # ------------------------------------------------------------------
     # Moderation thresholds (can be tuned without code changes)
     # ------------------------------------------------------------------
     AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide
