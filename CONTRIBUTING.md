@@ -1,0 +1,465 @@
+# CONTRIBUTING — אנו בניך
+
+> מדריך זה מגדיר **איך** כותבים קוד בפרויקט. לפני כל PR — עיינו ב-[CHECKLIST.md](./CHECKLIST.md).
+
+## תוכן עניינים
+
+1. [עקרונות ארכיטקטורה](#1-עקרונות-ארכיטקטורה)
+2. [Backend — FastAPI](#2-backend--fastapi)
+3. [Frontend — Angular](#3-frontend--angular)
+4. [RBAC ואבטחה](#4-rbac-ואבטחה)
+5. [נגישות](#5-נגישות)
+6. [i18n — רב-לשוניות](#6-i18n--רב-לשוניות)
+7. [איכות קוד](#7-איכות-קוד)
+8. [Git Workflow](#8-git-workflow)
+9. [בדיקות](#9-בדיקות)
+10. [פריסה ו-CI/CD](#10-פריסה-ו-cicd)
+
+---
+
+## 1. עקרונות ארכיטקטורה
+
+### SRP — Single Responsibility Principle
+
+כל קובץ עושה **דבר אחד בלבד**. שם הקובץ צריך לתאר אותו באופן מלא.
+
+| קובץ | אחריות יחידה |
+|---|---|
+| `endpoints/*.py` | HTTP contract — קבלת בקשה, אימות צורה, האצלה לשירות, החזרת תשובה |
+| `services/*.py` | לוגיקת עסקים — שאילתות, כללים, הצפנה, שליחת מייל, audit |
+| `models/*.py` | הגדרת הסכמה ב-DB — עמודות וקשרים בלבד |
+| `schemas/*.py` | קלט/פלט של ה-API — חוזה Pydantic |
+| `core/services/*.ts` | קריאות HTTP ומצב משותף |
+| Feature component | תצוגה ואינטראקציה עם המשתמש |
+| `shared/components/` | UI גנרי, ניתן לשימוש חוזר, ללא תלות ב-feature |
+
+### כיוון תלות — One-Way
+
+```
+Backend:   Endpoint → Service → Model
+Frontend:  Component → Core Service → ApiService → HTTP
+```
+
+**לא הפוך, לא מעגלי.** Service לא מייבא `HTTPException`. Model לא מכיל לוגיקה עסקית. Component לא קורא ל-`HttpClient` ישירות.
+
+### חוזים מפורשים
+
+כל חיבור בין שכבות עובר דרך חוזה מוגדר:
+
+- **Backend:** Pydantic schema (`ForumPostCreate`, `ForumPostOut`) בין endpoint לשירות ולקורא
+- **Frontend:** TypeScript interface מתוך `core/models/` בין service לקומפוננטה
+
+---
+
+## 2. Backend — FastAPI
+
+### שכבות ואחריויות
+
+```
+backend/app/
+├── api/v1/endpoints/   ← HTTP layer — thin
+├── services/           ← business logic — fat
+├── models/             ← SQLAlchemy — data only
+├── schemas/            ← Pydantic — contracts
+└── core/               ← utilities (security, config, dependencies)
+```
+
+### Endpoint — thin
+
+Endpoint מקבל, מאמת צורה, מאציל, מחזיר. **שום דבר אחר.**
+
+```python
+# ✅ נכון — endpoint דק
+@router.post("/forum/posts", response_model=ForumPostOut, status_code=201)
+async def create_post(
+    payload: ForumPostCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> ForumPostOut:
+    return await forum_service.create_post(db, payload, author=current_user)
+
+
+# ❌ שגוי — לוגיקה עסקית בתוך endpoint
+@router.post("/forum/posts")
+async def create_post(payload: ForumPostCreate, current_user: User = ...):
+    if current_user.sector != payload.target_sector:  # שייך לשירות
+        raise HTTPException(...)
+    post = ForumPost(**payload.dict())                 # שייך לשירות
+    db.add(post)
+    await db.commit()
+    return post
+```
+
+### Service — business logic
+
+Service מכיל כל לוגיקה: סינון visibility, הצפנה, שליחת מייל, audit. **לא מייבא FastAPI** — לא `Request`, לא `Depends`, לא `HTTPException`.
+
+```python
+# ✅ נכון — service מעלה ValueError/PermissionError; endpoint תופס ומתרגם ל-HTTPException
+async def create_post(
+    db: AsyncSession,
+    payload: ForumPostCreate,
+    author: User,
+) -> ForumPost:
+    if not _author_may_post_to(author, payload):
+        raise PermissionError("sector_mismatch")
+
+    post = ForumPost(author_id=author.id, **payload.model_dump())
+    db.add(post)
+    await db.flush()
+
+    await audit_service.log_action(
+        db, actor=author, action="forum.post.create", entity_id=post.id
+    )
+    await db.commit()
+    return post
+```
+
+### Model — data only
+
+Model מגדיר עמודות וקשרים. Property מחושבת על שדות עצמם — OK. לוגיקה עסקית — לא כאן.
+
+```python
+# ✅ OK — computed property
+@property
+def full_name(self) -> str:
+    return f"{self.first_name} {self.last_name}"
+
+# ❌ שגוי — לוגיקה עסקית שייכת לשירות
+def can_send_broadcast(self) -> bool:
+    return self.role in (Role.ADMIN, Role.PROFESSIONAL)
+```
+
+### Schema — Pydantic
+
+**שם לפי פעולה, לא לפי ישות:**
+
+```python
+# ✅
+class ForumPostCreate(BaseModel): ...   # קלט ליצירה
+class ForumPostUpdate(BaseModel): ...   # קלט לעדכון
+class ForumPostOut(BaseModel): ...      # פלט בקריאה
+
+# ❌
+class ForumPost(BaseModel): ...         # לא ברור מה כולל
+```
+
+### Migrations — Alembic
+
+- כל שינוי סכמה = **migration חדש בנפרד**. אין לשנות migration קיים.
+- שם תיאורי: `alembic revision --autogenerate -m "add_google_uid_to_users"`
+- PR לא ממוזג לפני שה-migration נבדק locally עם `alembic upgrade head`.
+
+### Audit Trail — חובה
+
+כל פעולה admin/רגישה **חייבת** קריאה ל-`audit_service.log_action()`. זו דרישה חוקית (SPEC §9.3), לא אופציונלי.
+
+```python
+await audit_service.log_action(
+    db,
+    actor=current_user,
+    action="admin.user.suspend",
+    entity_type="user",
+    entity_id=target_user_id,
+    # אין תוכן רגיש בלוג — entity_id בלבד
+)
+```
+
+### Content Visibility — חוק ברזל
+
+**כל שאילתה שמחזירה תוכן פורום / DM / Q&A** חייבת לכלול WHERE מפורש:
+
+```python
+.where(
+    or_(
+        ForumPost.group_visibility == author.group,
+        ForumPost.group_visibility == "all",
+    ),
+    or_(
+        ForumPost.sector_visibility == author.sector,
+        ForumPost.sector_visibility == "all",
+    ),
+)
+```
+
+זה נאכף ב-**service**, לא ב-endpoint ולא ב-model. תמיד לבדוק בפיצ'רים חדשים.
+
+---
+
+## 3. Frontend — Angular
+
+### מבנה תיקיות
+
+```
+frontend/src/app/
+├── features/           ← קומפוננטות feature-specific; תיקייה לכל feature
+│   ├── forum/
+│   ├── admin/
+│   ├── advice/
+│   └── ...
+├── core/
+│   ├── services/       ← כל קריאות ה-API + shared state
+│   ├── models/         ← TypeScript interfaces (ממופות על schema הבאקאנד)
+│   ├── guards/         ← auth.guard + role.guard
+│   └── interceptors/   ← auth token injection
+├── shared/
+│   └── components/     ← UI גנרי, שימושי ב-2+ features
+└── layout/             ← shell (header, nav) — אין לוגיקה עסקית
+```
+
+### שאלת מיקום
+
+> "האם הקומפוננטה תשמש feature אחד בלבד?" → `features/[name]/`
+> "האם תשמש שניים ויותר?" → `shared/components/`
+> "האם היא קריאה ל-API?" → `core/services/`
+> "האם היא TypeScript type?" → `core/models/`
+
+### Shared Component — דמה (Dumb)
+
+קומפוננטה shared **לא מזריקה שירות**. מקבלת נתונים דרך `input()`, מדווחת דרך `output()`.
+
+```typescript
+// ✅ נכון — shared component
+export class CopyTextComponent {
+  text = input.required<string>();
+  copied = output<void>();
+}
+
+// ❌ שגוי — shared component שמכירה feature
+export class PostCardComponent {
+  constructor(private forumService: ForumService) {} // feature knowledge!
+}
+```
+
+קומפוננטת reference: [shared/components/copy-text/](./frontend/src/app/shared/components/copy-text/)
+
+### Core Service — fat
+
+Service מטפל בקריאות HTTP, ממפה שגיאות, מנהל cache/state. **Component לא קורא ל-`HttpClient` ישירות.**
+
+```typescript
+// ✅ נכון
+@Injectable({ providedIn: 'root' })
+export class ForumService {
+  constructor(private api: ApiService) {}
+
+  getPosts(params: ForumParams): Observable<ForumPost[]> {
+    return this.api.get<ForumPost[]>('/forum/posts', { params });
+  }
+}
+```
+
+### Routing — Lazy Loading
+
+**כל עמוד חדש נטען lazy** דרך `loadComponent` ב-`app.routes.ts`:
+
+```typescript
+{
+  path: 'moderator/reports',
+  loadComponent: () =>
+    import('./features/moderator/reports/reports.component')
+      .then(m => m.ReportsComponent),
+  canActivate: [AuthGuard, RoleGuard],
+  data: { roles: ['moderator', 'admin'] },
+},
+```
+
+### SCSS
+
+- תמיד `@use '../../../../styles/variables' as *;` + `@use '../../../../styles/mixins' as *;`
+- **BEM:** `.block__element--modifier`
+- אין magic numbers — כל ערך מתוך `_variables.scss`
+- כיוון: `margin-inline-start/end` במקום `margin-left/right` (RTL-safe)
+- אין `!important`
+
+### Signals + Change Detection
+
+```typescript
+// ✅ דפוס החדש — signal-based API
+export class MyComponent {
+  title = input.required<string>();
+  size  = input<'sm' | 'md'>('md');
+  clicked = output<void>();
+
+  isOpen = signal(false);        // local state
+}
+```
+
+- `ChangeDetectionStrategy.OnPush` על כל קומפוננטה חדשה ב-`shared/`
+- `signal()` למצב מקומי; לא `BehaviorSubject` לדברים פשוטים
+
+---
+
+## 4. RBAC ואבטחה
+
+### Backend — כלל הזהב
+
+**כל endpoint מוגן** = `Depends(get_current_active_user)` + בדיקת תפקיד מפורשת. לא לסמוך על המידע שהלקוח שולח.
+
+```python
+async def suspend_user(..., current_user: User = Depends(get_current_active_user)):
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403)
+```
+
+### Frontend — Guards
+
+```typescript
+// כל מסלול מוגן — שני גארדים
+canActivate: [AuthGuard, RoleGuard],
+data: { roles: ['admin'] },
+```
+
+`AuthGuard` בודק JWT. `RoleGuard` בודק `data.roles`. **אף פעם לא פותחים מסלול מוגן בלי שניהם.**
+
+### אין PII בלוגים
+
+- לא לוגים תוכן הודעות, ת"ז, מייל, טלפון, שמות — ב-backend וב-frontend כאחד.
+- `audit_service.log_action()` רושם **פעולה + entity_id** בלבד.
+
+### Secrets
+
+- הכל דרך `.env` + `core/config.py`. `.env` לא נכנס ל-git.
+- כל secret חדש → מעדכן `.env.example` + מוסיף ל-GitHub Secrets.
+
+---
+
+## 5. נגישות
+
+**תקן חובה: ת"י 5568 / WCAG 2.1 AA** — זו חובה חוקית (SPEC §9.5), לא nice-to-have.
+
+| דרישה | כיצד |
+|---|---|
+| כפתורים | `type="button"` תמיד; לא `<div>` כפתור |
+| תיוג | `aria-label` / `aria-labelledby` על כל element שהטקסט לא מסביר אותו |
+| Focus | `:focus-visible` עם `@include focus-ring` מ-`_mixins.scss` |
+| ניגודיות | 4.5:1 לטקסט רגיל — `$color-text` על `$color-bg` עומד בתקן |
+| כיוון | `<html lang="he" dir="rtl">` קיים; אין לשנות |
+| תמונות | `alt` תיאורי — לא "תמונה", לא ריק אלא אם דקורטיבי (`alt=""`) |
+| היררכיית כותרות | h1→h2→h3 בסדר, לא מדלגים |
+
+---
+
+## 6. i18n — רב-לשוניות
+
+> ספרינט 5 יוסיף תמיכה מלאה. אנחנו מכינים את התשתית **עכשיו** כדי למנוע שכתוב מאוחר.
+
+**לא לכתוב טקסט hardcoded בתוך templates.** הכל דרך מפתח תרגום:
+
+```html
+<!-- ✅ -->
+<span>{{ 'common.copy' | translate }}</span>
+<button>{{ 'forum.report.button' | translate }}</button>
+
+<!-- ❌ -->
+<span>העתק</span>
+```
+
+קבצי תרגום: `frontend/src/assets/i18n/he.json`, `en.json`.
+מפתח חסר ב-EN — OK בינתיים. העיקר שה-hook קיים.
+
+---
+
+## 7. איכות קוד
+
+### Backend
+
+```bash
+ruff check backend/
+ruff format --check backend/
+mypy backend/
+```
+
+שלושתם חייבים לעבור לפני PR. `mypy` עובד עם `strict = true` כמוגדר ב-`pyproject.toml`.
+
+### Frontend
+
+```bash
+npm run lint
+npm run format:check
+```
+
+- אין `console.log` בקוד שמוזג
+- אין `// TODO` ללא ticket מספר
+
+---
+
+## 8. Git Workflow
+
+### שמות ענפים
+
+```
+feat/ABF-101-google-oauth
+fix/ABF-99-missing-sector-filter
+chore/upgrade-angular-19
+docs/update-contributing
+```
+
+### סנכרון מ-main — Merge, לא Rebase
+
+```bash
+git checkout feat/my-branch
+git merge main        # ✅ שומר על היסטוריה קריאה
+# לא: git rebase main ❌
+```
+
+### Pull Request
+
+- **כותרת:** אנגלית, עד 70 תווים, תיאורית
+- **גוף:** אנגלית (ראה CHECKLIST.md לפורמט)
+- **PR = שינוי לוגי אחד.** לא לאגד פיצ'רים שונים ב-PR אחד
+- לאחר מיזוג — מחיקת הענף
+
+---
+
+## 9. בדיקות
+
+### Backend (pytest)
+
+```bash
+pytest --tb=short          # לפני כל PR
+pytest tests/test_forum_service.py -v   # לבדיקה ספציפית
+```
+
+- **Unit tests** על כל service method חדש ב-`tests/test_*_service.py`
+- **Integration tests** עם DB אמיתי (test DB) — **לא mock**; mock ה-DB הוביל בעבר לבאגים בפרודקשן
+- מה לא לבדוק: endpoint routing, framework internals
+
+### Frontend (Vitest)
+
+```bash
+npm test -- --run          # לפני כל PR
+```
+
+- **Unit tests** על shared components (`*.spec.ts` לצד הקובץ)
+- בודקים **behavior** — לא markup. מה המשתמש רואה/שומע, לא איך ה-HTML בנוי
+
+---
+
+## 10. פריסה ו-CI/CD
+
+### NetFree Compliance — חובה
+
+> **⚠️ רוב המשתמשים מסונן דרך נטפרי — אתר שאינו מאושר אינו נגיש להם.**
+
+- **אין CDN חיצוניים:** גופנים, CSS, JS — הכל self-hosted או inline
+- תמונות UI: webp מכווץ, ב-`assets/`
+- API calls: רק לדומיין שלנו (Render backend) + שירותים מאושרים בלבד
+- ראה SPEC §9.6 לסדר הפעולות לאישור דומיין
+
+### Environment Variables
+
+| שם | תיאור |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SECRET_KEY` | JWT signing key |
+| `SENDGRID_API_KEY` | שליחת מיילים |
+| `API_URL` | כתובת backend (frontend) |
+
+כל secret חדש → `.env.example` מתעדכן + נוסף ל-GitHub Secrets.
+
+### CI/CD
+
+`.github/workflows/ci.yml` מריץ: `pytest`, `ruff`, `mypy`, `npm test`, `npm run lint`.
+
+**PR שה-CI שלו נכשל — לא ממוזג, לא ביד.**

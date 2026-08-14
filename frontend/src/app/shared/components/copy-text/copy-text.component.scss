@@ -1,0 +1,50 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+.copy-btn {
+  @include flex-center;
+  gap: $spacing-xs;
+  padding: $spacing-xs $spacing-sm;
+  background: transparent;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+  transition:
+    color $transition-fast,
+    border-color $transition-fast,
+    background-color $transition-fast;
+
+  &:hover {
+    color: $color-primary;
+    border-color: $color-primary;
+    background-color: rgba($color-primary, 0.06);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &--copied {
+    color: $color-success;
+    border-color: $color-success;
+
+    &:hover {
+      color: $color-success;
+      border-color: $color-success;
+      background-color: rgba($color-success, 0.06);
+    }
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  &__label {
+    white-space: nowrap;
+  }
+}
