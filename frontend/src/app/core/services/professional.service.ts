@@ -2,12 +2,12 @@
  * Professional advisory service.
  *
  * TODO list for junior developer:
- *   [ ] implement getProfessionals()
- *   [ ] implement askQuestion()
- *   [ ] implement getMyQuestions()
+ *   [x] implement getProfessionals()
+ *   [x] implement askQuestion()
+ *   [x] implement getMyQuestions()
  *   [ ] implement getPublicQA()
- *   [ ] implement getPendingQuestions() (for professional users)
- *   [ ] implement answerQuestion() (for professional users)
+ *   [x] implement getPendingQuestions() (for professional users)
+ *   [x] implement answerQuestion() (for professional users)
  */
 
 import { Injectable, inject } from '@angular/core';
@@ -49,21 +49,13 @@ export class ProfessionalService {
     throw new Error('getPublicQA() not yet implemented');
   }
 
+  /** Questions still waiting for the logged-in professional. Professional role only. */
   getPendingQuestions(): Observable<ProfessionalQuery[]> {
-    /**
-     * TODO: (professional role only)
-     *   return this.api.get<ProfessionalQuery[]>('/advice/questions/pending');
-     */
-    throw new Error('getPendingQuestions() not yet implemented');
+    return this.api.get<ProfessionalQuery[]>('/advice/questions/pending');
   }
 
+  /** Submit an answer to a pending question. Professional role only. */
   answerQuestion(queryId: string, answer: string): Observable<ProfessionalQuery> {
-    void queryId;
-    void answer;
-    /**
-     * TODO: (professional role only)
-     *   return this.api.put<ProfessionalQuery>(`/advice/questions/${queryId}/answer`, { answer });
-     */
-    throw new Error('answerQuestion() not yet implemented');
+    return this.api.put<ProfessionalQuery>(`/advice/questions/${queryId}/answer`, { answer });
   }
 }

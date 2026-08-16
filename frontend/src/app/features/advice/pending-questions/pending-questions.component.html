@@ -1,0 +1,63 @@
+<div class="pending-questions" dir="rtl">
+  <a routerLink="/home">← חזרה לעמוד הבית</a>
+  <h1 class="pending-questions__title">שאלות ממתינות לתשובה</h1>
+  <p class="pending-questions__intro">
+    השאלות מוצגות לפי סדר הגעתן — הוותיקה ביותר ראשונה. פרטי השואל/ת חסויים.
+  </p>
+
+  <app-error-display [message]="errorMessage()" />
+
+  @if (successMessage()) {
+    <p class="pending-questions__success" role="status">{{ successMessage() }}</p>
+  }
+
+  @if (isLoading()) {
+    <app-loading-spinner message="טוען שאלות ממתינות..." />
+  } @else if (questions().length === 0) {
+    <p class="pending-questions__empty">אין כרגע שאלות שממתינות לתשובתך.</p>
+  } @else {
+    <form [formGroup]="answers">
+      @for (question of questions(); track question.id) {
+        @let control = answerControl(question);
+
+        <article class="question-card">
+          <div class="question-card__meta">
+            <h2 class="question-card__asker">{{ askerLabel(question) }}</h2>
+            @if (topic(question)) {
+              <span class="question-card__topic">{{ topic(question) }}</span>
+            }
+            <span>נשאלה ב-{{ question.created_at | date: 'dd/MM/yyyy' }}</span>
+          </div>
+
+          <p class="question-card__content">{{ question.content }}</p>
+
+          <div class="question-card__field">
+            <label [attr.for]="'answer-' + question.id">התשובה שלך</label>
+            <textarea
+              [id]="'answer-' + question.id"
+              [formControlName]="question.id"
+              [attr.maxlength]="answerMaxLength"
+              rows="6"
+              placeholder="כתוב/כתבי כאן את התשובה (10 עד 5000 תווים)"
+            ></textarea>
+            <span class="question-card__counter">
+              {{ control.value.length }} / {{ answerMaxLength }}
+            </span>
+            @if (control.invalid && control.touched) {
+              <span class="question-card__error">נא להזין תשובה באורך 10 עד 5000 תווים</span>
+            }
+          </div>
+
+          <button
+            type="button"
+            class="question-card__submit"
+            [disabled]="control.invalid || submittingId() === question.id"
+            (click)="submit(question)"
+          >
+            {{ submittingId() === question.id ? 'שולח תשובה...' : 'שליחת תשובה' }}
+          </button>
+        </article>
+      }
+    </form>
+  }
+</div>

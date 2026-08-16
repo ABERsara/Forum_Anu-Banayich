@@ -1,0 +1,130 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+:host {
+  display: block;
+  padding: $spacing-lg;
+  direction: rtl;
+}
+
+.pending-questions {
+  &__title {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+    margin: $spacing-lg 0 $spacing-xs;
+  }
+
+  &__intro,
+  &__empty {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-lg;
+  }
+
+  &__success {
+    color: $color-success;
+    font-weight: $font-weight-medium;
+    margin-bottom: $spacing-md;
+  }
+}
+
+.question-card {
+  background: $color-bg;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-md;
+  max-width: 720px;
+
+  &__meta {
+    display: flex;
+    align-items: baseline;
+    gap: $spacing-md;
+    flex-wrap: wrap;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+
+  &__asker {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+    margin: 0;
+  }
+
+  &__topic {
+    color: $color-primary;
+    font-weight: $font-weight-medium;
+  }
+
+  &__content {
+    color: $color-text;
+    margin: $spacing-md 0 $spacing-lg;
+    white-space: pre-line;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    label {
+      font-weight: $font-weight-medium;
+      color: $color-text;
+      font-size: $font-size-base;
+    }
+
+    textarea {
+      padding: $spacing-sm $spacing-md;
+      border: 1px solid $color-border;
+      border-radius: $radius-md;
+      font-size: $font-size-base;
+      font-family: inherit;
+      resize: vertical;
+      transition: border-color $transition-fast;
+
+      &:focus-visible {
+        @include focus-ring;
+        border-color: $color-primary;
+      }
+    }
+  }
+
+  &__counter {
+    align-self: flex-end;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  &__error {
+    font-size: $font-size-xs;
+    color: $color-danger;
+  }
+
+  &__submit {
+    margin-top: $spacing-md;
+    padding: $spacing-sm $spacing-xl;
+    background: $color-primary;
+    color: $color-white;
+    border: none;
+    border-radius: $radius-md;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover:not(:disabled) {
+      background: $color-primary-dark;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
