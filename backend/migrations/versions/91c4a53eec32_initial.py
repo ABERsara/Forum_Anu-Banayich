@@ -24,7 +24,7 @@ def upgrade() -> None:
     op.create_table('audit_logs',
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('actor_id', sa.String(length=36), nullable=False),
-    sa.Column('action', sa.Enum('USER_APPROVED', 'USER_REJECTED', 'USER_SUSPENDED', 'USER_CANCELLED', 'POST_DELETED', 'REPORT_DECIDED', 'PROFESSIONAL_ADDED', 'PROFESSIONAL_UPDATED', 'MODERATOR_ASSIGNED', 'DATA_EXPORTED', 'USER_LOGIN', 'USER_LOGOUT', name='auditaction'), nullable=False),
+    sa.Column('action', sa.Enum('USER_APPROVED', 'USER_PARTIALLY_APPROVED', 'USER_REJECTED', 'USER_SUSPENDED', 'USER_CANCELLED', 'POST_DELETED', 'BROADCAST_SENT', 'REPORT_DECIDED', 'PROFESSIONAL_ADDED', 'PROFESSIONAL_UPDATED', 'MODERATOR_ASSIGNED', 'DATA_EXPORTED', 'USER_LOGIN', 'USER_LOGOUT', name='auditaction'), nullable=False),
     sa.Column('entity_type', sa.String(length=64), nullable=False),
     sa.Column('entity_id', sa.String(length=36), nullable=False),
     sa.Column('details', sa.JSON(), nullable=True),
