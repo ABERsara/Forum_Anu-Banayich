@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import {
   BroadcastCreate,
   ForumPost,
+  RegistrationDetail,
   RegistrationRejectRequest,
   SuspendUserRequest,
   UserAdminView,
@@ -22,8 +23,14 @@ export class AdminService {
     return this.api.post<ForumPost>('/forum/broadcast', data);
   }
 
-  getRegistration(userId: string): Observable<UserAdminView> {
-    return this.api.get<UserAdminView>(`/admin/registrations/${userId}`);
+  /**
+   * One registration from the queue, with the documents filed with it.
+   *
+   * Answers 403 once the registration is no longer waiting for a decision —
+   * another admin got there first, and the queue in this browser is stale.
+   */
+  getRegistration(userId: string): Observable<RegistrationDetail> {
+    return this.api.get<RegistrationDetail>(`/admin/registrations/${userId}`);
   }
 
   approveRegistration(userId: string): Observable<UserAdminView> {

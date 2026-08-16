@@ -1,83 +1,53 @@
 /**
- * Pending registrations – admin approval queue.
+ * Pending registrations – the admin approval queue and the review of a single
+ * request.
  *
- * TODO (G2c):
- *   1. "בדיקה" button → expand to show details + documents
- *   2. Expanded view shows:
- *      - All personal details
- *      - Document links (presigned URLs from backend)
+ * The queue lists who is waiting; opening a row loads that registration in
+ * full (GET /admin/registrations/{id}) so the admin can weigh the applicant's
+ * details and the documents filed with them before approving or rejecting.
  *
- * Remember: Two admins must approve. The backend tracks who already approved.
+ * Documents are metadata only — what was uploaded, when, and until when it is
+ * valid. The presigned URLs that open the files themselves (SPEC §9.1) are
+ * still in the backlog, so nothing here is a link.
+ *
+ * Remember: two admins must approve. The backend tracks who already approved,
+ * and the open row shows how far that got.
  */
 
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import { UserAdminView } from '../../../core/models';
+import { DocumentAdminView, RegistrationDetail, UserAdminView } from '../../../core/models';
 import {
   AccountStatus,
   ACCOUNT_STATUS_LABELS,
+  DOCUMENT_TYPE_LABELS,
   SECTOR_LABELS,
   USER_TYPE_LABELS,
 } from '../../../core/constants';
 import { AdminService } from '../../../core/services/admin.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
+import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+
+/** Stands in for a detail the applicant did not provide. */
+const NOT_PROVIDED = 'לא צוין';
 
 @Component({
   selector: 'app-pending-registrations',
   standalone: true,
-  imports: [RouterLink, DatePipe, ConfirmDialogComponent],
+  imports: [
+    RouterLink,
+    DatePipe,
+    ConfirmDialogComponent,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
+  templateUrl: './pending-registrations.component.html',
   styleUrl: './pending-registrations.component.scss',
-  template: `
-    <div style="padding: 1rem; direction: rtl">
-      <a routerLink="/admin">← חזרה ללוח הבקרה</a>
-      <h1>הרשמות ממתינות לאישור</h1>
-
-      @if (actionError()) {
-        <p class="error-message">{{ actionError() }}</p>
-      }
-
-      @if (isLoading()) {
-        <p>טוען...</p>
-      } @else if (hasError()) {
-        <p>אירעה שגיאה בטעינת ההרשמות. נסי לרענן את הדף.</p>
-      } @else if (registrations().length === 0) {
-        <p>אין הרשמות ממתינות כרגע.</p>
-      } @else {
-        @for (reg of registrations(); track reg.id) {
-          <div style="border: 1px solid #ccc; margin: 0.5rem 0; padding: 1rem; border-radius: 8px">
-            <strong>{{ reg.first_name }} {{ reg.last_name }}</strong>
-            <span> | {{ reg.email }}</span>
-            <span> | {{ userTypeLabels[reg.user_type!] }} | {{ sectorLabels[reg.sector!] }}</span>
-            <span> | {{ reg.created_at | date }}</span>
-            <span> | {{ statusLabels[reg.account_status] }}</span>
-            <!-- TODO: expand to show documents (G2c) -->
-            <div>
-              <button (click)="approve(reg.id)">אישור</button>
-              <button (click)="reject(reg.id)">דחייה</button>
-            </div>
-          </div>
-        }
-      }
-
-      @if (rejectingId()) {
-        <app-confirm-dialog
-          title="דחיית הרשמה"
-          message="פעולה זו תדחה את ההרשמה ותשלח למועמד הודעה עם הסיבה."
-          confirmText="דחייה"
-          [isDestructive]="true"
-          [requireInput]="true"
-          inputLabel="סיבת הדחייה"
-          inputPlaceholder="לדוגמה: מסמכים חסרים"
-          [inputMinLength]="5"
-          (confirmed)="confirmReject($event)"
-          (cancelled)="cancelReject()"
-        />
-      }
-    </div>
-  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PendingRegistrationsComponent implements OnInit {
   private readonly adminService = inject(AdminService);
@@ -87,9 +57,19 @@ export class PendingRegistrationsComponent implements OnInit {
   hasError = signal(false);
   actionError = signal<string | null>(null);
   rejectingId = signal<string | null>(null);
+
+  /** The registration whose details are open; null while every row is collapsed. */
+  readonly openId = signal<string | null>(null);
+  /** The open registration in full. Null while it is still loading, or failed to. */
+  readonly detail = signal<RegistrationDetail | null>(null);
+  readonly isDetailLoading = signal(false);
+  readonly detailError = signal('');
+
   readonly userTypeLabels = USER_TYPE_LABELS;
   readonly sectorLabels = SECTOR_LABELS;
   readonly statusLabels = ACCOUNT_STATUS_LABELS;
+  readonly documentTypeLabels = DOCUMENT_TYPE_LABELS;
+  readonly notProvided = NOT_PROVIDED;
 
   ngOnInit(): void {
     this.isLoading.set(true);
@@ -106,12 +86,109 @@ export class PendingRegistrationsComponent implements OnInit {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Reviewing one registration
+  // ---------------------------------------------------------------------------
+
+  isOpen(userId: string): boolean {
+    return this.openId() === userId;
+  }
+
+  /**
+   * Opens a registration for review, or closes it if it is already open.
+   *
+   * One row at a time: the details are what the admin is deciding on, and two
+   * applicants open side by side is how the wrong one gets approved. Each
+   * opening refetches — another admin may have approved or rejected the
+   * request since this queue was loaded.
+   */
+  toggleDetail(userId: string): void {
+    if (this.isOpen(userId)) {
+      this.closeDetail();
+      return;
+    }
+
+    this.openId.set(userId);
+    this.detail.set(null);
+    this.detailError.set('');
+    this.isDetailLoading.set(true);
+
+    this.adminService.getRegistration(userId).subscribe({
+      next: (detail) => {
+        // A second click may have moved on to another row while this was in
+        // flight; that row's own response is the one that belongs on screen.
+        if (!this.isOpen(userId)) {
+          return;
+        }
+        this.detail.set(detail);
+        this.isDetailLoading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        if (!this.isOpen(userId)) {
+          return;
+        }
+        this.detailError.set(
+          this.messageFrom(err, 'אירעה שגיאה בטעינת פרטי הבקשה. נסי לרענן את הדף.'),
+        );
+        this.isDetailLoading.set(false);
+      },
+    });
+  }
+
+  closeDetail(): void {
+    this.openId.set(null);
+    this.detail.set(null);
+    this.detailError.set('');
+    this.isDetailLoading.set(false);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reading helpers for the open registration
+  // ---------------------------------------------------------------------------
+
+  fullName(registration: UserAdminView): string {
+    return `${registration.first_name} ${registration.last_name}`;
+  }
+
+  /** A detail the applicant may have left empty reads as "לא צוין", never blank. */
+  orNotProvided(value: string | null): string {
+    return value?.trim() ? value : NOT_PROVIDED;
+  }
+
+  /**
+   * The bereavement group and the sector are nullable on the model — the
+   * sector especially, because it is the admin who assigns the final cell
+   * while reviewing (SPEC §8.1), so a request can reach this screen without one.
+   */
+  userTypeLabel(registration: UserAdminView): string {
+    return registration.user_type ? this.userTypeLabels[registration.user_type] : NOT_PROVIDED;
+  }
+
+  sectorLabel(registration: UserAdminView): string {
+    return registration.sector ? this.sectorLabels[registration.sector] : NOT_PROVIDED;
+  }
+
+  /** Where this request stands in the two-admin approval (SPEC §8.2). */
+  approvalProgress(registration: UserAdminView): string {
+    return registration.first_approver_id
+      ? 'מנהל אחד כבר אישר — נדרש אישור של מנהל נוסף.'
+      : 'טרם אושרה — נדרשים אישורים של שני מנהלים.';
+  }
+
+  documentLabel(document: DocumentAdminView): string {
+    return this.documentTypeLabels[document.doc_type];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Approve / reject
+  // ---------------------------------------------------------------------------
+
   approve(userId: string): void {
     this.actionError.set(null);
     this.adminService.approveRegistration(userId).subscribe({
       next: (updated) => this.applyUpdate(updated),
       error: (err: HttpErrorResponse) =>
-        this.actionError.set(err.error?.detail ?? 'אירעה שגיאה באישור ההרשמה. נסה שוב.'),
+        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה באישור ההרשמה. נסה שוב.')),
     });
   }
 
@@ -135,7 +212,7 @@ export class PendingRegistrationsComponent implements OnInit {
         this.rejectingId.set(null);
       },
       error: (err: HttpErrorResponse) =>
-        this.actionError.set(err.error?.detail ?? 'אירעה שגיאה בדחיית ההרשמה. נסה שוב.'),
+        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בדחיית ההרשמה. נסה שוב.')),
     });
   }
 
@@ -150,5 +227,23 @@ export class PendingRegistrationsComponent implements OnInit {
         ? this.registrations().map((reg) => (reg.id === updated.id ? updated : reg))
         : this.registrations().filter((reg) => reg.id !== updated.id),
     );
+
+    if (!this.isOpen(updated.id)) {
+      return;
+    }
+    if (stillPending) {
+      // The decision just made is part of what the open panel reports, and the
+      // documents it already holds did not change.
+      this.detail.update((open) => (open ? { ...open, ...updated } : open));
+    } else {
+      // Reviewing a settled registration is what the endpoint refuses (403),
+      // so the panel closes with the row it belonged to.
+      this.closeDetail();
+    }
+  }
+
+  private messageFrom(err: HttpErrorResponse, fallback: string): string {
+    const detail: unknown = err.error?.detail;
+    return typeof detail === 'string' ? detail : fallback;
   }
 }

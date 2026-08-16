@@ -1,0 +1,177 @@
+<div class="page">
+  <a routerLink="/admin">← חזרה ללוח הבקרה</a>
+
+  <h1>הרשמות ממתינות לאישור</h1>
+  <p class="page__hint">
+    כל הרשמה טעונה אישור של שני מנהלים. יש לפתוח את הבקשה, לבחון את הפרטים והמסמכים שהוגשו, ורק אז
+    לאשר או לדחות.
+  </p>
+
+  <app-error-display [message]="actionError() ?? ''" />
+
+  @if (isLoading()) {
+    <app-loading-spinner message="טוען הרשמות..." />
+  } @else if (hasError()) {
+    <app-error-display message="אירעה שגיאה בטעינת ההרשמות. נסי לרענן את הדף." />
+  } @else if (registrations().length === 0) {
+    <p>אין הרשמות ממתינות כרגע.</p>
+  } @else {
+    <ul class="queue">
+      @for (reg of registrations(); track reg.id) {
+        <li class="queue__item">
+          <div class="queue__row">
+            <div class="queue__summary">
+              <h2 class="queue__name">{{ fullName(reg) }}</h2>
+              <p class="queue__meta">
+                <span>{{ reg.email }}</span>
+                @if (reg.user_type) {
+                  <span> · {{ userTypeLabels[reg.user_type] }}</span>
+                }
+                @if (reg.sector) {
+                  <span> · {{ sectorLabels[reg.sector] }}</span>
+                }
+                <span> · הוגשה ב-{{ reg.created_at | date: 'dd/MM/yyyy' }}</span>
+              </p>
+              <span class="badge">{{ statusLabels[reg.account_status] }}</span>
+            </div>
+
+            <div class="queue__actions">
+              <button
+                type="button"
+                class="btn"
+                [attr.aria-expanded]="isOpen(reg.id)"
+                [attr.aria-controls]="'registration-detail-' + reg.id"
+                [attr.aria-label]="
+                  (isOpen(reg.id) ? 'סגירת פרטי הבקשה של ' : 'בדיקת הבקשה של ') + fullName(reg)
+                "
+                (click)="toggleDetail(reg.id)"
+              >
+                {{ isOpen(reg.id) ? 'סגירה' : 'בדיקה' }}
+              </button>
+              <button
+                type="button"
+                class="btn btn--primary"
+                [attr.aria-label]="'אישור הבקשה של ' + fullName(reg)"
+                (click)="approve(reg.id)"
+              >
+                אישור
+              </button>
+              <button
+                type="button"
+                class="btn btn--danger"
+                [attr.aria-label]="'דחיית הבקשה של ' + fullName(reg)"
+                (click)="reject(reg.id)"
+              >
+                דחייה
+              </button>
+            </div>
+          </div>
+
+          <!-- ───────────────── פרטי הבקשה שנפתחה לבדיקה ───────────────── -->
+          @if (isOpen(reg.id)) {
+            <section
+              class="detail"
+              [id]="'registration-detail-' + reg.id"
+              [attr.aria-label]="'פרטי הבקשה של ' + fullName(reg)"
+            >
+              @if (isDetailLoading()) {
+                <app-loading-spinner message="טוען את פרטי הבקשה..." />
+              } @else if (detailError()) {
+                <app-error-display [message]="detailError()" />
+              } @else if (detail(); as request) {
+                <p class="detail__progress">{{ approvalProgress(request) }}</p>
+
+                <h3 class="detail__title">פרטי המבקש/ת</h3>
+                <dl class="detail__fields">
+                  <div class="detail__field">
+                    <dt>שם מלא</dt>
+                    <dd>{{ fullName(request) }}</dd>
+                  </div>
+                  <div class="detail__field">
+                    <dt>סוג משתמש</dt>
+                    <dd>{{ userTypeLabel(request) }}</dd>
+                  </div>
+                  <div class="detail__field">
+                    <dt>מגזר</dt>
+                    <dd>{{ sectorLabel(request) }}</dd>
+                  </div>
+                  <div class="detail__field">
+                    <dt>תעודת זהות</dt>
+                    <dd>
+                      {{ orNotProvided(request.id_number) }}
+                      <span class="detail__note">מוצגת כפי שנשמרה — הערך מוצפן במסד הנתונים.</span>
+                    </dd>
+                  </div>
+                  <div class="detail__field">
+                    <dt>תאריך לידה</dt>
+                    <dd>
+                      {{
+                        request.birth_date ? (request.birth_date | date: 'dd/MM/yyyy') : notProvided
+                      }}
+                    </dd>
+                  </div>
+                  <div class="detail__field">
+                    <dt>דוא"ל</dt>
+                    <dd>{{ request.email }}</dd>
+                  </div>
+                  <div class="detail__field">
+                    <dt>טלפון</dt>
+                    <dd>{{ orNotProvided(request.phone) }}</dd>
+                  </div>
+                  <div class="detail__field">
+                    <dt>תאריך הגשה</dt>
+                    <dd>{{ request.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
+                  </div>
+                  <div class="detail__field">
+                    <dt>סטטוס</dt>
+                    <dd>{{ statusLabels[request.account_status] }}</dd>
+                  </div>
+                </dl>
+
+                <h3 class="detail__title">מסמכים שהועלו</h3>
+                @if (request.documents.length === 0) {
+                  <p class="detail__empty">לא הועלו מסמכים עם הבקשה.</p>
+                } @else {
+                  <ul class="documents">
+                    @for (document of request.documents; track document.id) {
+                      <li class="documents__item">
+                        <span class="badge">{{ documentLabel(document) }}</span>
+                        <span class="documents__uploaded">
+                          הועלה ב-{{ document.uploaded_at | date: 'dd/MM/yyyy HH:mm' }}
+                        </span>
+                        @if (document.expires_on) {
+                          <span class="documents__expiry">
+                            בתוקף עד {{ document.expires_on | date: 'dd/MM/yyyy' }}
+                          </span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+                <p class="detail__note">
+                  בשלב זה מוצגים פרטי המסמכים בלבד. צפייה בקבצים עצמם תתאפשר בקישור מאובטח ומוגבל
+                  בזמן, בגרסה הבאה.
+                </p>
+              }
+            </section>
+          }
+        </li>
+      }
+    </ul>
+  }
+
+  @if (rejectingId()) {
+    <app-confirm-dialog
+      title="דחיית הרשמה"
+      message="פעולה זו תדחה את ההרשמה ותשלח למועמד הודעה עם הסיבה."
+      confirmText="דחייה"
+      [isDestructive]="true"
+      [requireInput]="true"
+      inputLabel="סיבת הדחייה"
+      inputPlaceholder="לדוגמה: מסמכים חסרים"
+      [inputMinLength]="5"
+      (confirmed)="confirmReject($event)"
+      (cancelled)="cancelReject()"
+    />
+  }
+</div>
