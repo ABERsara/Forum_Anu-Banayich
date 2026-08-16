@@ -2,8 +2,6 @@
  * Report service.
  *
  * TODO list for junior developer:
- *   [ ] implement fileReport() – used from any content component
- *   [ ] implement getPendingReports() – moderator use
  *   [ ] implement decideReport() – moderator use
  *   [ ] implement getAuditLog() – admin use
  */
@@ -29,11 +27,7 @@ export class ReportService {
   }
 
   getPendingReports(): Observable<ReportList> {
-    /**
-     * TODO: (moderator role)
-     *   return this.api.get<ReportList>('/moderator/reports');
-     */
-    throw new Error('getPendingReports() not yet implemented');
+    return this.api.get<ReportList>('/moderator/reports');
   }
 
   decideReport(reportId: string, data: ReportDecideRequest): Observable<Report> {

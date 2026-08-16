@@ -20,9 +20,10 @@ TODO list for junior developer:
 import logging
 
 from fastapi import HTTPException
+from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session
 
-from app.core.constants import PostStatus, ReportTargetType, UserRole
+from app.core.constants import PostStatus, ReportDecision, ReportTargetType, UserRole
 from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
@@ -130,7 +131,7 @@ def _handle_first_report_notification(
     db: Session, post: ForumPost, report: Report
 ) -> None:
     """1st report → regular email to moderators."""
-    for email in _moderator_emails_for(db):
+    for email in _moderator_emails_for(db, post):
         send_moderator_alert(email, report.id, post.content[:100])
 
 
@@ -138,23 +139,52 @@ def _handle_second_plus_report_notification(
     db: Session, post: ForumPost, report: Report
 ) -> None:
     """2nd+ report → urgent email, repeated on every report from here on."""
-    for email in _moderator_emails_for(db):
+    for email in _moderator_emails_for(db, post):
         send_urgent_moderator_alert(email, report.id)
 
 
-def _moderator_emails_for(db: Session) -> list[str]:
+def _cell_match_filter(cells: list[dict[str, str]]) -> ColumnElement[bool]:
     """
-    Return contact addresses for all active moderators.
+    Build an OR-of-ANDs SQLAlchemy filter matching User.user_type/sector
+    against a moderator's list of {"group", "sector"} cells (spec §4.3).
+    Shared by get_pending_reports() and get_report_for_moderator() — both
+    start from "these are my cells" and query outward for matching users.
+    (_moderator_emails_for() runs the opposite direction — one known author,
+    searching moderators' JSON cell lists — so it can't reuse this filter.)
+    """
+    return or_(
+        *(
+            and_(User.user_type == cell["group"], User.sector == cell["sector"])
+            for cell in cells
+        )
+    )
 
-    TEMPORARY: broadcasts to every moderator, regardless of which group/sector
-    they're actually responsible for — moderator_cells matching isn't
-    implemented anywhere yet. Sprint 4 will replace only this function's body
-    with a real lookup (e.g. get_moderator_for_cell(post.group_visibility,
-    post.sector_visibility)) once that mechanism exists; callers in
-    file_report()/_notify_moderators() won't need to change.
+
+def _moderator_emails_for(db: Session, post: ForumPost) -> list[str]:
     """
-    moderators = db.query(User).filter(User.role == UserRole.MODERATOR).all()
-    return [m.alert_email or m.email for m in moderators]
+    Return contact addresses for moderators responsible for this post's
+    author's cell (group + sector), per moderator.moderator_cells.
+    """
+    author = post.author
+    if author.user_type is None or author.sector is None:
+        return []
+
+    moderators = (
+        db.query(User)
+        .filter(User.role == UserRole.MODERATOR)
+        .filter(User.moderator_cells.isnot(None))
+        .all()
+    )
+    matching = [
+        m
+        for m in moderators
+        if m.moderator_cells
+        and any(
+            cell["group"] == author.user_type and cell["sector"] == author.sector
+            for cell in m.moderator_cells
+        )
+    ]
+    return [m.alert_email or m.email for m in matching]
 
 
 def decide_report(
@@ -186,15 +216,58 @@ def decide_report(
 def get_pending_reports(db: Session, moderator: User) -> list[Report]:
     """
     Return pending reports for the moderator's assigned cells.
+    ADMIN sees every pending report, unscoped (spec §3.2 — admin has "הכל"
+    for report handling; MODERATOR is scoped to "אחריותו" only).
 
-    TODO:
-      1. Load moderator.moderator_cells (JSON list of {group, sector} dicts)
-      2. For each cell, find reports on content authored by users in that cell
-      3. Filter decision == PENDING
-      4. Order by report_count DESC (most-reported first)
+    Only FORUM_POST reports exist today (file_report() rejects other target
+    types), so this joins Report -> reported User -> ForumPost and matches
+    the reported user's (user_type, sector) against moderator.moderator_cells.
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_pending_reports() is not yet implemented")
+    query = (
+        db.query(Report)
+        .join(User, Report.reported_user_id == User.id)
+        .join(ForumPost, Report.target_id == ForumPost.id)
+        .filter(Report.target_type == ReportTargetType.FORUM_POST)
+        .filter(Report.decision == ReportDecision.PENDING)
+    )
+
+    if moderator.role != UserRole.ADMIN:
+        cells = moderator.moderator_cells or []
+        if not cells:
+            return []
+        query = query.filter(_cell_match_filter(cells))
+
+    return query.order_by(ForumPost.report_count.desc()).all()
+
+
+def get_report_for_moderator(db: Session, report_id: str, moderator: User) -> Report:
+    """
+    Load a single report, enforcing that the moderator is responsible for
+    its cell (ADMIN bypasses this check — see require_role on the router).
+
+    Raises 404 if the report doesn't exist, 403 if the moderator's cells
+    don't cover it.
+    """
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if report is None:
+        raise HTTPException(status_code=404, detail="הדיווח לא נמצא.")
+
+    if moderator.role == UserRole.MODERATOR:
+        cells = moderator.moderator_cells or []
+        # An empty cells list must mean "authorized for nothing" — an empty
+        # or_() clause is a SQL no-op (matches every row), not "match none",
+        # so it has to be special-cased here rather than left to the filter.
+        covered = bool(cells) and (
+            db.query(User)
+            .filter(User.id == report.reported_user_id)
+            .filter(_cell_match_filter(cells))
+            .first()
+            is not None
+        )
+        if not covered:
+            raise HTTPException(status_code=403, detail="אין הרשאה לצפות בדיווח זה.")
+
+    return report
 
 
 def _check_auto_suspension(db: Session, reported_user: User) -> None:

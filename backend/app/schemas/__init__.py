@@ -29,6 +29,7 @@ from app.schemas.report import (
     ReportDecideRequest,
     ReportListResponse,
     ReportResponse,
+    ReportWithContent,
 )
 from app.schemas.user import (
     ProfessionalProfile,
@@ -64,4 +65,5 @@ __all__ = [
     "ReportResponse",
     "ReportDecideRequest",
     "ReportListResponse",
+    "ReportWithContent",
 ]
