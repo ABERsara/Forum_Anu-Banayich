@@ -56,8 +56,8 @@ export class NewPostComponent {
   form = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(256)]],
     content: ['', [Validators.required, Validators.maxLength(5000)]],
-    group_visibility: [GroupVisibility.ALL, Validators.required],
-    sector_visibility: [SectorVisibility.ALL, Validators.required],
+    group_visibility: [this.groupOptions()[0], Validators.required],
+    sector_visibility: [this.sectorOptions()[0], Validators.required],
     // Optional, part of the form group per design, but never sent to the
     // backend: ForumPostCreate has no attachment field, and there's no
     // upload endpoint yet (out of scope – S3 is backlog, see ABF-48 notes).

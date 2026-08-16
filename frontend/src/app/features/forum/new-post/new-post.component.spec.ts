@@ -80,6 +80,13 @@ describe('NewPostComponent', () => {
     expect(component.sectorOptions()).toEqual([SectorVisibility.HASIDIC, SectorVisibility.ALL]);
   });
 
+  it('defaults the form to the user’s own group/sector, not "all"', async () => {
+    await setup(makeUser({ user_type: UserType.WIDOW, sector: Sector.HASIDIC }));
+
+    expect(component.form.value.group_visibility).toBe(GroupVisibility.WIDOWS);
+    expect(component.form.value.sector_visibility).toBe(SectorVisibility.HASIDIC);
+  });
+
   it('does not submit an invalid form', async () => {
     await setup();
 
