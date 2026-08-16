@@ -651,6 +651,7 @@ class TestCreatePost:
 
         assert result.group_visibility == GroupVisibility.ALL
         assert result.sector_visibility == SectorVisibility.ALL
+        assert result.author_id == admin.id
 
     def test_non_active_author_gets_403(self, db_session: Session, make_user) -> None:
         author = make_user(
