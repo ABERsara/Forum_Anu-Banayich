@@ -4,6 +4,9 @@ import { Observable } from 'rxjs';
 import {
   BroadcastCreate,
   ForumPost,
+  ProfessionalAdminView,
+  ProfessionalCreateRequest,
+  ProfessionalUpdateRequest,
   RegistrationRejectRequest,
   SuspendUserRequest,
   UserAdminView,
@@ -42,5 +45,21 @@ export class AdminService {
   suspendUser(userId: string, hours: number, reason: string): Observable<UserAdminView> {
     const body: SuspendUserRequest = { hours, reason };
     return this.api.post<UserAdminView>(`/admin/users/${userId}/suspend`, body);
+  }
+
+  /** The whole catalog, including professionals currently unlisted. */
+  getProfessionals(): Observable<ProfessionalAdminView[]> {
+    return this.api.get<ProfessionalAdminView[]>('/admin/professionals');
+  }
+
+  addProfessional(data: ProfessionalCreateRequest): Observable<ProfessionalAdminView> {
+    return this.api.post<ProfessionalAdminView>('/admin/professionals', data);
+  }
+
+  updateProfessional(
+    userId: string,
+    data: ProfessionalUpdateRequest,
+  ): Observable<ProfessionalAdminView> {
+    return this.api.put<ProfessionalAdminView>(`/admin/professionals/${userId}`, data);
   }
 }

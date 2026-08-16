@@ -1,0 +1,260 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+.page {
+  padding: $spacing-md;
+  direction: rtl;
+
+  &__header {
+    @include flex-between;
+
+    flex-wrap: wrap;
+    gap: $spacing-md;
+    margin-top: $spacing-md;
+  }
+
+  &__hint {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-md;
+  }
+}
+
+.success-message {
+  color: $color-success;
+  margin-bottom: $spacing-md;
+}
+
+// ---------------------------------------------------------------------------
+// Add / edit panel
+// ---------------------------------------------------------------------------
+
+.panel {
+  background: $color-bg-subtle;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+
+  &__title {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    margin-bottom: $spacing-md;
+  }
+
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+    margin-top: $spacing-md;
+  }
+}
+
+.form-row {
+  display: grid;
+  gap: $spacing-md;
+
+  @include responsive(md) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin-bottom: $spacing-md;
+
+  label {
+    font-weight: $font-weight-medium;
+  }
+
+  input,
+  select,
+  textarea {
+    padding: $spacing-sm;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    font-size: $font-size-base;
+    font-family: inherit;
+    background: $color-bg;
+    resize: vertical;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+}
+
+.char-counter {
+  align-self: flex-start;
+  font-size: $font-size-xs;
+  color: $color-text-muted;
+}
+
+.field-error {
+  font-size: $font-size-xs;
+  color: $color-danger;
+}
+
+.checkbox-group {
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  padding: $spacing-sm $spacing-md $spacing-md;
+  margin-bottom: $spacing-md;
+
+  legend {
+    font-weight: $font-weight-medium;
+    padding-inline: $spacing-xs;
+  }
+
+  &__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-sm $spacing-md;
+  }
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  cursor: pointer;
+
+  input:focus-visible {
+    @include focus-ring;
+  }
+
+  &--standalone {
+    margin-bottom: $spacing-md;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Catalog list
+// ---------------------------------------------------------------------------
+
+.catalog {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  &__item {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: $spacing-md;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    margin-bottom: $spacing-sm;
+    background: $color-bg;
+
+    &--inactive {
+      background: $color-bg-subtle;
+    }
+  }
+
+  &__main {
+    flex: 1 1 260px;
+  }
+
+  &__heading {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  &__name {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-bold;
+    margin: 0;
+  }
+
+  &__domain {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: $spacing-xs 0;
+  }
+
+  &__description {
+    margin: $spacing-xs 0;
+  }
+
+  &__audience {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: $spacing-xs $spacing-sm;
+    margin: $spacing-sm 0 0;
+    font-size: $font-size-sm;
+
+    dt {
+      color: $color-text-muted;
+    }
+
+    dd {
+      margin: 0;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-sm;
+  }
+}
+
+.badge {
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+
+  &--active {
+    background: rgba($color-success, 0.12);
+    color: $color-success;
+  }
+
+  &--inactive {
+    background: rgba($color-text-muted, 0.12);
+    color: $color-text-muted;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Buttons
+// ---------------------------------------------------------------------------
+
+.btn {
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: $color-bg;
+  color: $color-text;
+  font-size: $font-size-base;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover:not(:disabled) {
+    background: $color-bg-subtle;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    background: $color-primary;
+    border-color: $color-primary;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background: $color-primary-dark;
+    }
+  }
+}

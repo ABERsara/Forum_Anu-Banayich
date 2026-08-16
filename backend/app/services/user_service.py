@@ -1,7 +1,8 @@
 """
 User management service.
 
-Handles registration approval, suspension, profile retrieval.
+Handles registration approval, suspension, profile retrieval and the admin-side
+professional catalog (SPEC §6.1).
 
 TODO list for junior developer:
   [x] implement approve_registration() – first or second admin approves
@@ -9,15 +10,22 @@ TODO list for junior developer:
   [x] implement get_pending_registrations()
   [x] implement suspend_user()
   [x] implement get_professionals_for_user() – filtered by sector+group
+  [x] implement get_professionals() / create_professional() / update_professional()
 """
 
+import secrets
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.constants import AccountStatus, AuditAction, UserRole
+from app.core.security import get_password_hash
 from app.models.user import User
+from app.schemas.user import ProfessionalCreateRequest, ProfessionalUpdateRequest
 from app.services.audit_service import log_action
 from app.services.email_service import (
     send_approval_email,
@@ -27,6 +35,10 @@ from app.services.email_service import (
 )
 
 SLA_ESCALATION_DAYS = 7
+
+#: Bytes of entropy behind the unusable placeholder credential of a professional
+#: created by an admin. See create_professional() for why there is one at all.
+PLACEHOLDER_PASSWORD_BYTES = 32
 
 
 def get_user_by_id(db: Session, user_id: str) -> User | None:
@@ -283,3 +295,148 @@ def get_professionals_for_user(db: Session, current_user: User) -> list[User]:
         .all()
     )
     return [pro for pro in professionals if _visible_to_user(pro, current_user)]
+
+
+# ---------------------------------------------------------------------------
+# Professional catalog – admin side (SPEC §6.1)
+#
+# get_professionals_for_user() above is the member's view: active professionals
+# whose group/sector routing matches them. The admin's view below is the whole
+# catalog, including the ones no member can currently see.
+# ---------------------------------------------------------------------------
+
+#: Fields whose values reach the DB as JSON lists of plain strings.
+_PROFESSIONAL_LIST_FIELDS = ("professional_groups", "professional_sectors")
+
+
+def _as_values(items: Sequence[StrEnum]) -> list[str]:
+    """
+    Unwrap the enums the API validated into the plain strings the JSON columns
+    hold — the same shape _visible_to_user() matches against.
+    """
+    return [item.value for item in items]
+
+
+def get_professionals(db: Session) -> list[User]:
+    """
+    Return the full professional catalog for the admin, listed and unlisted
+    alike, so an admin can find a deactivated professional and re-activate them.
+    """
+    return (
+        db.query(User)
+        .filter(User.role == UserRole.PROFESSIONAL)
+        .order_by(User.last_name.asc(), User.first_name.asc())
+        .all()
+    )
+
+
+def create_professional(
+    db: Session, data: ProfessionalCreateRequest, admin: User
+) -> User:
+    """
+    Add a professional to the catalog.
+
+    The account is ACTIVE on creation: the OTP and the two-admin approval flow
+    exist to vet bereaved members registering themselves, and an admin adding a
+    vetted professional already is that check.
+
+    It is created with a random placeholder password nobody holds — the column
+    is NOT NULL and an empty hash would accept an empty password. The
+    professional receives real credentials through the invitation flow (Sprint
+    5); until then the account exists in the catalog but cannot be signed into.
+    """
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
+
+    professional = User(
+        email=data.email,
+        password_hash=get_password_hash(
+            secrets.token_urlsafe(PLACEHOLDER_PASSWORD_BYTES)
+        ),
+        first_name=data.first_name,
+        last_name=data.last_name,
+        phone=data.phone,
+        role=UserRole.PROFESSIONAL,
+        account_status=AccountStatus.ACTIVE,
+        professional_domain=data.professional_domain,
+        professional_groups=_as_values(data.professional_groups),
+        professional_sectors=_as_values(data.professional_sectors),
+        professional_description=data.professional_description,
+        is_active_professional=data.is_active_professional,
+    )
+    db.add(professional)
+    db.flush()  # assigns the id the audit entry has to reference
+
+    # log_action() commits, so the professional and their audit trail land in
+    # the same transaction — the catalog can never gain an unlogged entry.
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.PROFESSIONAL_ADDED,
+        entity_type="User",
+        entity_id=professional.id,
+        details={
+            "professional_domain": professional.professional_domain,
+            "is_active_professional": professional.is_active_professional,
+        },
+    )
+    db.refresh(professional)
+
+    return professional
+
+
+def _apply_professional_updates(
+    professional: User, updates: dict[str, Any]
+) -> list[str]:
+    """
+    Write the submitted fields onto the row and return the ones that really
+    changed, so a re-save of identical values is not logged as an edit.
+    """
+    changed: list[str] = []
+    for field, value in updates.items():
+        new_value = _as_values(value) if field in _PROFESSIONAL_LIST_FIELDS else value
+        if getattr(professional, field) != new_value:
+            setattr(professional, field, new_value)
+            changed.append(field)
+    return changed
+
+
+def update_professional(
+    db: Session, user_id: str, data: ProfessionalUpdateRequest, admin: User
+) -> User:
+    """
+    Update a professional's catalog entry (domain, groups, sectors, description,
+    active flag).
+
+    Only the fields present in the request are touched — see
+    ProfessionalUpdateRequest. The audit entry records which fields changed and
+    the resulting listing state; it deliberately carries no field *contents*,
+    because the description is free text and audit logs hold no PII
+    (CONTRIBUTING §4).
+    """
+    professional = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if not professional:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if professional.role != UserRole.PROFESSIONAL:
+        raise HTTPException(status_code=400, detail="ניתן לערוך אנשי מקצוע בלבד")
+
+    changed = _apply_professional_updates(
+        professional, data.model_dump(exclude_unset=True)
+    )
+    if not changed:
+        return professional
+
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.PROFESSIONAL_UPDATED,
+        entity_type="User",
+        entity_id=professional.id,
+        details={
+            "updated_fields": sorted(changed),
+            "is_active_professional": professional.is_active_professional,
+        },
+    )
+    db.refresh(professional)
+
+    return professional

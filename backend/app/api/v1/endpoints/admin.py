@@ -23,11 +23,12 @@ from app.core.constants import UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.user import (
+    ProfessionalAdminView,
+    ProfessionalCreateRequest,
     ProfessionalUpdateRequest,
     RegistrationRejectRequest,
     SuspendUserRequest,
     UserAdminView,
-    UserProfile,
 )
 from app.services import user_service
 
@@ -99,23 +100,36 @@ def list_active_users(db: Session = Depends(get_db)) -> list[UserAdminView]:
     ]
 
 
-@router.get("/professionals", response_model=list[UserProfile])
-def list_professionals(db: Session = Depends(get_db)) -> list[UserProfile]:
-    """Return all professional users."""
-    # TODO: query users where role=PROFESSIONAL
-    return []
+@router.get("/professionals", response_model=list[ProfessionalAdminView])
+def list_professionals(db: Session = Depends(get_db)) -> list[ProfessionalAdminView]:
+    """Return the full professional catalog, listed and unlisted alike."""
+    return [
+        ProfessionalAdminView.model_validate(professional)
+        for professional in user_service.get_professionals(db)
+    ]
 
 
-@router.put("/professionals/{user_id}")
+@router.post("/professionals", response_model=ProfessionalAdminView, status_code=201)
+def add_professional(
+    data: ProfessionalCreateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> ProfessionalAdminView:
+    """Add a professional to the catalog."""
+    professional = user_service.create_professional(db, data, current_user)
+    return ProfessionalAdminView.model_validate(professional)
+
+
+@router.put("/professionals/{user_id}", response_model=ProfessionalAdminView)
 def update_professional(
     user_id: str,
     data: ProfessionalUpdateRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> ProfessionalAdminView:
     """Update a professional's profile (domain, sectors, groups, description)."""
-    # TODO: implement + audit log
-    raise NotImplementedError
+    professional = user_service.update_professional(db, user_id, data, current_user)
+    return ProfessionalAdminView.model_validate(professional)
 
 
 @router.post("/users/{user_id}/suspend", response_model=UserAdminView)

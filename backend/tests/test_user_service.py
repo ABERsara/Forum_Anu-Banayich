@@ -18,6 +18,7 @@ from app.core.constants import (
 )
 from app.models.audit import AuditLog
 from app.models.user import User
+from app.schemas.user import ProfessionalCreateRequest, ProfessionalUpdateRequest
 from app.services import user_service
 
 
@@ -656,6 +657,384 @@ class TestGetProfessionalsForUser:
         assert result == []
 
         
+def _create_request(**overrides: object) -> ProfessionalCreateRequest:
+    """A valid POST /admin/professionals body, with per-test overrides."""
+    payload: dict[str, object] = {
+        "first_name": "Israel",
+        "last_name": "Cohen",
+        "email": "cohen.law@example.com",
+        "phone": "0501234567",
+        "professional_domain": ProfessionalDomain.LAWYER,
+        "professional_groups": ["all"],
+        "professional_sectors": ["all"],
+        "professional_description": "עורך דין לענייני ירושה",
+    }
+    payload.update(overrides)
+    return ProfessionalCreateRequest(**payload)  # type: ignore[arg-type]
+
+
+class TestGetProfessionals:
+    def test_returns_listed_and_unlisted_professionals(
+        self, db_session: Session
+    ) -> None:
+        listed = _make_professional(
+            db_session, "listed@example.com", "Listed", ["all"], ["all"]
+        )
+        unlisted = _make_professional(
+            db_session,
+            "unlisted@example.com",
+            "Unlisted",
+            ["all"],
+            ["all"],
+            is_active_professional=False,
+        )
+
+        result = user_service.get_professionals(db_session)
+
+        assert {p.id for p in result} == {listed.id, unlisted.id}
+
+    def test_excludes_every_other_role(self, db_session: Session) -> None:
+        _make_admin(db_session, "admin@example.com")
+        _make_regular_user(
+            db_session, "member@example.com", UserType.WIDOW, Sector.GENERAL
+        )
+        professional = _make_professional(
+            db_session, "pro@example.com", "Cohen", ["all"], ["all"]
+        )
+
+        result = user_service.get_professionals(db_session)
+
+        assert [p.id for p in result] == [professional.id]
+
+    def test_orders_by_last_name(self, db_session: Session) -> None:
+        _make_professional(db_session, "c@example.com", "Cohen", ["all"], ["all"])
+        _make_professional(db_session, "a@example.com", "Abramson", ["all"], ["all"])
+        _make_professional(db_session, "b@example.com", "Bloch", ["all"], ["all"])
+
+        result = user_service.get_professionals(db_session)
+
+        assert [p.last_name for p in result] == ["Abramson", "Bloch", "Cohen"]
+
+
+class TestCreateProfessional:
+    def test_creates_an_active_professional_account(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+
+        result = user_service.create_professional(
+            db_session, _create_request(), admin
+        )
+
+        assert result.id is not None
+        assert result.role == UserRole.PROFESSIONAL
+        assert result.account_status == AccountStatus.ACTIVE
+        assert result.professional_domain == ProfessionalDomain.LAWYER
+        assert result.professional_description == "עורך דין לענייני ירושה"
+        assert result.is_active_professional is True
+
+    def test_stores_groups_and_sectors_as_plain_strings(
+        self, db_session: Session
+    ) -> None:
+        """
+        The JSON columns are matched against user_type/sector strings in
+        _visible_to_user(), so enum members must not leak into the DB.
+        """
+        admin = _make_admin(db_session, "admin@example.com")
+
+        result = user_service.create_professional(
+            db_session,
+            _create_request(
+                professional_groups=["widow", "orphan_female"],
+                professional_sectors=["hasidic"],
+            ),
+            admin,
+        )
+
+        assert result.professional_groups == ["widow", "orphan_female"]
+        assert result.professional_sectors == ["hasidic"]
+
+    def test_is_created_without_a_shared_or_guessable_password(
+        self, db_session: Session
+    ) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+
+        first = user_service.create_professional(
+            db_session, _create_request(email="a@example.com"), admin
+        )
+        second = user_service.create_professional(
+            db_session, _create_request(email="b@example.com"), admin
+        )
+
+        assert first.password_hash
+        assert first.password_hash != second.password_hash
+
+    def test_duplicate_email_is_rejected(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+        user_service.create_professional(
+            db_session, _create_request(email="taken@example.com"), admin
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.create_professional(
+                db_session, _create_request(email="taken@example.com"), admin
+            )
+        assert exc_info.value.status_code == 409
+
+    def test_creates_audit_log_entry(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+
+        result = user_service.create_professional(
+            db_session, _create_request(), admin
+        )
+
+        log = db_session.query(AuditLog).filter(AuditLog.entity_id == result.id).one()
+        assert log.action == AuditAction.PROFESSIONAL_ADDED
+        assert log.actor_id == admin.id
+        assert log.entity_type == "User"
+        details = log.details
+        assert details is not None
+        assert details["professional_domain"] == ProfessionalDomain.LAWYER
+        assert details["is_active_professional"] is True
+
+    def test_new_professional_appears_in_the_matching_member_catalog(
+        self, db_session: Session
+    ) -> None:
+        """End-to-end of the feature: added by an admin → seen by the member."""
+        admin = _make_admin(db_session, "admin@example.com")
+        member = _make_regular_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+
+        created = user_service.create_professional(
+            db_session,
+            _create_request(
+                professional_groups=["widow"], professional_sectors=["hasidic"]
+            ),
+            admin,
+        )
+
+        catalog = user_service.get_professionals_for_user(db_session, member)
+        assert [p.id for p in catalog] == [created.id]
+
+    def test_inactive_professional_stays_out_of_the_member_catalog(
+        self, db_session: Session
+    ) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+        member = _make_regular_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+
+        user_service.create_professional(
+            db_session, _create_request(is_active_professional=False), admin
+        )
+
+        assert user_service.get_professionals_for_user(db_session, member) == []
+
+
+class TestUpdateProfessional:
+    def test_updates_every_catalog_field(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+        professional = _make_professional(
+            db_session, "pro@example.com", "Cohen", ["widower"], ["litvish"]
+        )
+
+        result = user_service.update_professional(
+            db_session,
+            professional.id,
+            ProfessionalUpdateRequest(
+                professional_domain=ProfessionalDomain.PSYCHOLOGIST,
+                professional_groups=["widow"],  # type: ignore[list-item]
+                professional_sectors=["hasidic", "all"],  # type: ignore[list-item]
+                professional_description="מטפלת בטראומה",
+                is_active_professional=False,
+            ),
+            admin,
+        )
+
+        assert result.professional_domain == ProfessionalDomain.PSYCHOLOGIST
+        assert result.professional_groups == ["widow"]
+        assert result.professional_sectors == ["hasidic", "all"]
+        assert result.professional_description == "מטפלת בטראומה"
+        assert result.is_active_professional is False
+
+    def test_omitted_fields_are_left_untouched(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+        professional = _make_professional(
+            db_session, "pro@example.com", "Cohen", ["widower"], ["litvish"]
+        )
+
+        result = user_service.update_professional(
+            db_session,
+            professional.id,
+            ProfessionalUpdateRequest(is_active_professional=False),
+            admin,
+        )
+
+        assert result.is_active_professional is False
+        assert result.professional_description == "desc"
+        assert result.professional_groups == ["widower"]
+        assert result.professional_domain == ProfessionalDomain.LAWYER
+
+    def test_explicit_null_clears_the_description(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+        professional = _make_professional(
+            db_session, "pro@example.com", "Cohen", ["all"], ["all"]
+        )
+
+        result = user_service.update_professional(
+            db_session,
+            professional.id,
+            ProfessionalUpdateRequest.model_validate(
+                {"professional_description": None}
+            ),
+            admin,
+        )
+
+        assert result.professional_description is None
+
+    def test_reactivating_returns_the_professional_to_the_member_catalog(
+        self, db_session: Session
+    ) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+        member = _make_regular_user(
+            db_session, "widow@example.com", UserType.WIDOW, Sector.GENERAL
+        )
+        professional = _make_professional(
+            db_session,
+            "pro@example.com",
+            "Cohen",
+            ["all"],
+            ["all"],
+            is_active_professional=False,
+        )
+
+        user_service.update_professional(
+            db_session,
+            professional.id,
+            ProfessionalUpdateRequest(is_active_professional=True),
+            admin,
+        )
+
+        catalog = user_service.get_professionals_for_user(db_session, member)
+        assert [p.id for p in catalog] == [professional.id]
+
+    def test_update_nonexistent_user_raises_404(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.update_professional(
+                db_session,
+                "does-not-exist",
+                ProfessionalUpdateRequest(is_active_professional=False),
+                admin,
+            )
+        assert exc_info.value.status_code == 404
+
+    def test_cannot_turn_a_member_into_a_professional(
+        self, db_session: Session
+    ) -> None:
+        """The catalog endpoint must not become a back door to role changes."""
+        admin = _make_admin(db_session, "admin@example.com")
+        member = _make_regular_user(
+            db_session, "member@example.com", UserType.WIDOW, Sector.GENERAL
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.update_professional(
+                db_session,
+                member.id,
+                ProfessionalUpdateRequest(
+                    professional_domain=ProfessionalDomain.RABBI
+                ),
+                admin,
+            )
+        assert exc_info.value.status_code == 400
+        db_session.refresh(member)
+        assert member.professional_domain is None
+
+    def test_creates_audit_log_entry_naming_the_changed_fields(
+        self, db_session: Session
+    ) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+        professional = _make_professional(
+            db_session, "pro@example.com", "Cohen", ["widower"], ["litvish"]
+        )
+
+        user_service.update_professional(
+            db_session,
+            professional.id,
+            ProfessionalUpdateRequest(
+                professional_sectors=["all"],  # type: ignore[list-item]
+                is_active_professional=False,
+            ),
+            admin,
+        )
+
+        log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.entity_id == professional.id)
+            .one()
+        )
+        assert log.action == AuditAction.PROFESSIONAL_UPDATED
+        assert log.actor_id == admin.id
+        details = log.details
+        assert details is not None
+        assert details["updated_fields"] == [
+            "is_active_professional",
+            "professional_sectors",
+        ]
+        assert details["is_active_professional"] is False
+
+    def test_audit_details_never_carry_the_free_text_description(
+        self, db_session: Session
+    ) -> None:
+        """Audit logs record what changed, never PII or free text (CONTRIBUTING §4)."""
+        admin = _make_admin(db_session, "admin@example.com")
+        professional = _make_professional(
+            db_session, "pro@example.com", "Cohen", ["all"], ["all"]
+        )
+
+        user_service.update_professional(
+            db_session,
+            professional.id,
+            ProfessionalUpdateRequest(professional_description="סודי ביותר"),
+            admin,
+        )
+
+        log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.entity_id == professional.id)
+            .one()
+        )
+        assert "סודי ביותר" not in str(log.details)
+
+    def test_resubmitting_identical_values_is_not_logged_as_an_edit(
+        self, db_session: Session
+    ) -> None:
+        admin = _make_admin(db_session, "admin@example.com")
+        professional = _make_professional(
+            db_session, "pro@example.com", "Cohen", ["all"], ["all"]
+        )
+
+        result = user_service.update_professional(
+            db_session,
+            professional.id,
+            ProfessionalUpdateRequest(
+                professional_domain=ProfessionalDomain.LAWYER,
+                professional_groups=["all"],  # type: ignore[list-item]
+                is_active_professional=True,
+            ),
+            admin,
+        )
+
+        assert result.id == professional.id
+        assert (
+            db_session.query(AuditLog)
+            .filter(AuditLog.entity_id == professional.id)
+            .count()
+            == 0
+        )
+
+
 class TestSuspendUser:
     def test_suspends_active_user(self, db_session: Session) -> None:
         now = datetime.now(UTC).replace(tzinfo=None)
