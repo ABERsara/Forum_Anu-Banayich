@@ -1,0 +1,192 @@
+<div class="page">
+  <a routerLink="/admin">← חזרה ללוח הבקרה</a>
+
+  <div class="page__header">
+    <h1>ניהול ממונים</h1>
+    @if (!isFormOpen()) {
+      <button type="button" class="btn btn--primary" (click)="openAddForm()">הוספת ממונה</button>
+    }
+  </div>
+
+  <p class="page__hint">
+    ממונה מקבל התראה על דיווחים בתאים שהוצאו לו. תא הוא הצלבה של קבוצה ומגזר, למשל "אלמנות – ספרדי".
+  </p>
+
+  <app-error-display [message]="actionError()" />
+
+  @if (successMessage()) {
+    <p class="success-message" role="status">{{ successMessage() }}</p>
+  }
+
+  <!-- ─────────────────────────── טופס הוספה / עריכה ─────────────────────────── -->
+  @if (isFormOpen()) {
+    <section class="panel" [attr.aria-label]="editing() ? 'עריכת ממונה' : 'הוספת ממונה'">
+      <h2 class="panel__title">
+        {{ editing() ? 'עריכת ' + fullName(editing()!) : 'הוספת ממונה' }}
+      </h2>
+
+      <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+        @if (!editing()) {
+          <div class="form-row">
+            <div class="form-field">
+              <label for="first_name">שם פרטי</label>
+              <input id="first_name" type="text" formControlName="first_name" autocomplete="off" />
+              @if (form.controls.first_name.invalid && form.controls.first_name.touched) {
+                <span class="field-error">נא להזין שם פרטי (2 עד 100 תווים)</span>
+              }
+            </div>
+
+            <div class="form-field">
+              <label for="last_name">שם משפחה</label>
+              <input id="last_name" type="text" formControlName="last_name" autocomplete="off" />
+              @if (form.controls.last_name.invalid && form.controls.last_name.touched) {
+                <span class="field-error">נא להזין שם משפחה (2 עד 100 תווים)</span>
+              }
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="email">דוא"ל</label>
+            <input id="email" type="email" formControlName="email" autocomplete="off" />
+            @if (form.controls.email.invalid && form.controls.email.touched) {
+              <span class="field-error">נא להזין כתובת דוא"ל תקינה</span>
+            }
+          </div>
+        }
+
+        <div class="form-field">
+          <label for="alert_email">דוא"ל להתראות (רשות)</label>
+          <input id="alert_email" type="email" formControlName="alert_email" autocomplete="off" />
+          <span class="field-hint">אם לא יוזן, ההתראות יישלחו לכתובת הדוא"ל של הממונה.</span>
+          @if (form.controls.alert_email.invalid && form.controls.alert_email.touched) {
+            <span class="field-error">נא להזין כתובת דוא"ל תקינה</span>
+          }
+        </div>
+
+        <!-- מטריצת התאים: שורה לכל קבוצה, עמודה לכל מגזר -->
+        <fieldset class="matrix">
+          <legend>תאים שבאחריות הממונה</legend>
+
+          <div class="matrix__scroll">
+            <table class="matrix__table">
+              <caption class="matrix__caption">
+                יש לסמן כל תא שבאחריות הממונה. נבחרו
+                {{
+                  selectedCellCount()
+                }}
+                תאים.
+              </caption>
+              <thead>
+                <tr>
+                  <td></td>
+                  @for (sector of sectors; track sector) {
+                    <th scope="col">{{ sectorLabels[sector] }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (group of groups; track group) {
+                  <tr>
+                    <th scope="row">{{ groupLabels[group] }}</th>
+                    @for (sector of sectors; track sector) {
+                      <td>
+                        <input
+                          type="checkbox"
+                          class="matrix__checkbox"
+                          [checked]="isCellSelected(group, sector)"
+                          [attr.aria-label]="groupLabels[group] + ' – ' + sectorLabels[sector]"
+                          (change)="toggleCell(group, sector)"
+                        />
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if (form.controls.moderator_cells.invalid && form.controls.moderator_cells.touched) {
+            <span class="field-error">נא לבחור לפחות תא אחד</span>
+          }
+        </fieldset>
+
+        @if (isSaving()) {
+          <app-loading-spinner message="שומר..." />
+        }
+
+        <div class="panel__actions">
+          <button type="submit" class="btn btn--primary" [disabled]="isSaving()">
+            {{ editing() ? 'שמירת שינויים' : 'הוספת ממונה' }}
+          </button>
+          <button type="button" class="btn" (click)="closeForm()" [disabled]="isSaving()">
+            ביטול
+          </button>
+        </div>
+      </form>
+    </section>
+  }
+
+  <!-- ───────────────────────────── רשימת הממונים ───────────────────────────── -->
+  @if (isLoading()) {
+    <app-loading-spinner message="טוען ממונים..." />
+  } @else if (hasError()) {
+    <app-error-display message="אירעה שגיאה בטעינת הממונים. נסה לרענן את הדף." />
+  } @else if (moderators().length === 0) {
+    <p>עדיין לא מונו ממונים.</p>
+  } @else {
+    <ul class="roster">
+      @for (moderator of moderators(); track moderator.id) {
+        <li class="roster__item">
+          <div class="roster__main">
+            <h2 class="roster__name">{{ fullName(moderator) }}</h2>
+            <p class="roster__alert">התראות נשלחות אל: {{ alertAddress(moderator) }}</p>
+
+            <h3 class="roster__cells-title">תאים באחריותו/ה</h3>
+            @if (moderator.moderator_cells.length === 0) {
+              <p class="roster__no-cells">לא הוצאו תאים.</p>
+            } @else {
+              <ul class="roster__cells">
+                @for (cell of moderator.moderator_cells; track cell.group + '|' + cell.sector) {
+                  <li class="badge">{{ cellLabel(cell) }}</li>
+                }
+              </ul>
+            }
+          </div>
+
+          <div class="roster__actions">
+            <button
+              type="button"
+              class="btn"
+              [attr.aria-label]="'עריכת ' + fullName(moderator)"
+              (click)="openEditForm(moderator)"
+            >
+              עריכה
+            </button>
+            <button
+              type="button"
+              class="btn btn--danger"
+              [disabled]="isRemoving() && pendingRemoval()?.id === moderator.id"
+              [attr.aria-label]="'הסרת ' + fullName(moderator)"
+              (click)="askRemove(moderator)"
+            >
+              הסרה
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+
+  @if (pendingRemoval(); as moderator) {
+    <app-confirm-dialog
+      title="הסרת ממונה"
+      [message]="
+        fullName(moderator) + ' יוסר/תוסר מרשימת הממונים ולא יקבל/תקבל עוד התראות על דיווחים.'
+      "
+      confirmText="הסרה"
+      [isDestructive]="true"
+      (confirmed)="confirmRemove()"
+      (cancelled)="cancelRemove()"
+    />
+  }
+</div>

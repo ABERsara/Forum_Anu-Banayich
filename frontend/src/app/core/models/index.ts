@@ -80,6 +80,59 @@ export interface SuspendUserRequest {
 }
 
 // ---------------------------------------------------------------------------
+// Moderator roster (admin side)
+// ---------------------------------------------------------------------------
+
+/**
+ * One cell of the group×sector matrix a moderator oversees, e.g. widows in
+ * the Sephardic sector.
+ *
+ * Both axes are the concrete enums, never the "all" wildcard the content
+ * visibility enums carry: a moderator answers for named cells, so "every
+ * cell" is expressed by ticking them.
+ */
+export interface ModeratorCell {
+  group: UserType;
+  sector: Sector;
+}
+
+/**
+ * A moderator as the admin managing the roster sees them: who they are, the
+ * cells they were assigned, and where their alerts are sent.
+ */
+export interface ModeratorAdminView {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: UserRole;
+  account_status: AccountStatus;
+  moderator_cells: ModeratorCell[];
+  /** Where report alerts go. Null means they go to `email`. */
+  alert_email: string | null;
+  created_at: string;
+}
+
+/** Admin appoints a moderator over the given cells. */
+export interface ModeratorCreateRequest {
+  first_name: string;
+  last_name: string;
+  email: string;
+  moderator_cells: ModeratorCell[];
+  alert_email: string | null;
+}
+
+/**
+ * Admin edits a moderator. Partial by design: an omitted key is left
+ * untouched, so `{ alert_email: 'x@y.z' }` only moves where alerts are sent.
+ * An explicit `null` alert_email clears it; the cell list cannot be emptied.
+ */
+export interface ModeratorUpdateRequest {
+  moderator_cells?: ModeratorCell[];
+  alert_email?: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 

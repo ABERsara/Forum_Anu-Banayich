@@ -10,6 +10,10 @@ POST /admin/registrations/{id}/reject  – reject a registration
 GET  /admin/professionals            – all professionals
 POST /admin/professionals            – add a professional
 PUT  /admin/professionals/{id}       – update professional profile
+GET    /admin/moderators             – the moderator roster
+POST   /admin/moderators             – appoint a moderator
+PATCH  /admin/moderators/{id}        – update a moderator's cells / alert email
+DELETE /admin/moderators/{id}        – remove a moderator from the roster
 GET  /admin/audit-log                – full audit log
 POST /admin/users/{id}/suspend       – suspend a user manually
 """
@@ -23,6 +27,9 @@ from app.core.constants import UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.user import (
+    ModeratorAdminView,
+    ModeratorCreateRequest,
+    ModeratorUpdateRequest,
     ProfessionalUpdateRequest,
     RegistrationRejectRequest,
     SuspendUserRequest,
@@ -116,6 +123,53 @@ def update_professional(
     """Update a professional's profile (domain, sectors, groups, description)."""
     # TODO: implement + audit log
     raise NotImplementedError
+
+
+@router.get("/moderators", response_model=list[ModeratorAdminView])
+def list_moderators(db: Session = Depends(get_db)) -> list[ModeratorAdminView]:
+    """Return the moderator roster with the cells assigned to each moderator."""
+    return [
+        ModeratorAdminView.model_validate(moderator)
+        for moderator in user_service.get_moderators(db)
+    ]
+
+
+@router.post("/moderators", response_model=ModeratorAdminView, status_code=201)
+def add_moderator(
+    data: ModeratorCreateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> ModeratorAdminView:
+    """Appoint a moderator over the given cells."""
+    moderator = user_service.create_moderator(db, data, current_user)
+    return ModeratorAdminView.model_validate(moderator)
+
+
+@router.patch("/moderators/{user_id}", response_model=ModeratorAdminView)
+def update_moderator(
+    user_id: str,
+    data: ModeratorUpdateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> ModeratorAdminView:
+    """Update a moderator's assigned cells and/or their alert email."""
+    moderator = user_service.update_moderator(db, user_id, data, current_user)
+    return ModeratorAdminView.model_validate(moderator)
+
+
+@router.delete("/moderators/{user_id}", status_code=204)
+def remove_moderator(
+    user_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """
+    Remove a moderator from the roster.
+
+    204, no body: the roster no longer holds this moderator, so there is
+    nothing about them left for the client to render.
+    """
+    user_service.remove_moderator(db, user_id, current_user)
 
 
 @router.post("/users/{user_id}/suspend", response_model=UserAdminView)
