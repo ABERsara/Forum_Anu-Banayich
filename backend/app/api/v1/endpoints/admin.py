@@ -24,6 +24,7 @@ from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.user import (
     ProfessionalUpdateRequest,
+    RegistrationDetailView,
     RegistrationRejectRequest,
     SuspendUserRequest,
     UserAdminView,
@@ -51,15 +52,23 @@ def list_pending_registrations(
     ]
 
 
-@router.get("/registrations/{user_id}", response_model=UserAdminView)
-def get_registration(user_id: str, db: Session = Depends(get_db)) -> UserAdminView:
+@router.get("/registrations/{user_id}", response_model=RegistrationDetailView)
+def get_registration(
+    user_id: str, db: Session = Depends(get_db)
+) -> RegistrationDetailView:
     """
-    Return a single registration with all uploaded documents.
+    Return a single registration awaiting approval, with the documents filed
+    with it — the full applicant profile plus document metadata.
 
-    TODO: load user + documents, build response with presigned URLs for documents
+    404 when there is no such user, 403 once the registration is no longer
+    waiting for a decision.
+
+    The documents are metadata only. The presigned URLs that open the files
+    themselves (SPEC §9.1) are not built yet, so nothing here is a link.
     """
-    # TODO: implement
-    raise NotImplementedError
+    return RegistrationDetailView.model_validate(
+        user_service.get_registration(db, user_id)
+    )
 
 
 @router.post("/registrations/{user_id}/approve", response_model=UserAdminView)

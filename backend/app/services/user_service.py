@@ -7,6 +7,7 @@ TODO list for junior developer:
   [x] implement approve_registration() – first or second admin approves
   [x] implement reject_registration()
   [x] implement get_pending_registrations()
+  [x] implement get_registration() – one registration with its documents
   [x] implement suspend_user()
   [x] implement get_professionals_for_user() – filtered by sector+group
 """
@@ -14,7 +15,7 @@ TODO list for junior developer:
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.constants import AccountStatus, AuditAction, UserRole
 from app.models.user import User
@@ -27,6 +28,15 @@ from app.services.email_service import (
 )
 
 SLA_ESCALATION_DAYS = 7
+
+#: The two states a registration passes through while it waits for its two
+#: admins (SPEC §8.2): nobody has approved yet, or exactly one admin has. They
+#: are what "pending" means everywhere below — the queue, the SLA escalation,
+#: the review screen, and the approve/reject decisions themselves.
+AWAITING_APPROVAL_STATUSES = (
+    AccountStatus.PENDING_APPROVAL,
+    AccountStatus.PARTIALLY_APPROVED,
+)
 
 
 def get_user_by_id(db: Session, user_id: str) -> User | None:
@@ -52,14 +62,40 @@ def get_pending_registrations(db: Session) -> list[User]:
     """
     return (
         db.query(User)
-        .filter(
-            User.account_status.in_(
-                [AccountStatus.PENDING_APPROVAL, AccountStatus.PARTIALLY_APPROVED]
-            )
-        )
+        .filter(User.account_status.in_(AWAITING_APPROVAL_STATUSES))
         .order_by(User.created_at.asc())
         .all()
     )
+
+
+def get_registration(db: Session, user_id: str) -> User:
+    """
+    Load one registration awaiting approval, with its uploaded documents.
+
+    The read side of approve/reject: the admin opens a request from the queue,
+    reads who filed it and what they attached, and only then decides.
+
+    A registration that is no longer waiting answers 403, not 404: the row is
+    there and the admin may well be allowed to see the person elsewhere (the
+    active users list, the audit log) — what is refused is reviewing a
+    decision that has already been made, so the same request cannot be judged
+    twice from a screen that went stale in another admin's browser.
+
+    The documents come along in one extra query (selectinload) instead of one
+    per document as the template renders them.
+    """
+    user = (
+        db.query(User)
+        .options(selectinload(User.documents))
+        .filter(User.id == user_id)
+        .first()
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if user.account_status not in AWAITING_APPROVAL_STATUSES:
+        raise HTTPException(status_code=403, detail="ההרשמה אינה ממתינה לאישור")
+
+    return user
 
 
 def escalate_overdue_registrations(db: Session) -> list[User]:
@@ -76,9 +112,7 @@ def escalate_overdue_registrations(db: Session) -> list[User]:
     stuck_users = (
         db.query(User)
         .filter(
-            User.account_status.in_(
-                [AccountStatus.PENDING_APPROVAL, AccountStatus.PARTIALLY_APPROVED]
-            ),
+            User.account_status.in_(AWAITING_APPROVAL_STATUSES),
             User.updated_at <= threshold,
             User.sla_escalation_sent_at.is_(None),
         )
@@ -174,10 +208,7 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
         raise HTTPException(status_code=404, detail="משתמש לא נמצא")
-    if user.account_status not in (
-        AccountStatus.PENDING_APPROVAL,
-        AccountStatus.PARTIALLY_APPROVED,
-    ):
+    if user.account_status not in AWAITING_APPROVAL_STATUSES:
         raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
     if user.first_approver_id == admin.id:
         raise HTTPException(status_code=400, detail="לא ניתן לאשר את אותה הרשמה פעמיים")
@@ -199,10 +230,7 @@ def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> 
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
         raise HTTPException(status_code=404, detail="משתמש לא נמצא")
-    if user.account_status not in (
-        AccountStatus.PENDING_APPROVAL,
-        AccountStatus.PARTIALLY_APPROVED,
-    ):
+    if user.account_status not in AWAITING_APPROVAL_STATUSES:
         raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
 
     previous_status = user.account_status
