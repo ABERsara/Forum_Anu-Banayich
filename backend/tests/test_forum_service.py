@@ -603,13 +603,38 @@ class TestCreatePost:
         assert result.author_id == author.id
         assert result.status == PostStatus.VISIBLE
 
-    def test_active_author_can_post_to_all_groups_and_sectors(
+    def test_non_admin_author_cannot_broadcast_to_all_groups_and_sectors(
         self, db_session: Session, make_user
     ) -> None:
         author = make_user(
             "widow@example.com",
             UserType.WIDOW,
             Sector.HASIDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            forum_service.create_post(
+                db_session,
+                ForumPostCreate(
+                    title="כותרת",
+                    content="תוכן",
+                    group_visibility=GroupVisibility.ALL,
+                    sector_visibility=SectorVisibility.ALL,
+                ),
+                author,
+            )
+
+        assert exc_info.value.status_code == 403
+
+    def test_admin_author_can_broadcast_to_all_groups_and_sectors(
+        self, db_session: Session, make_user
+    ) -> None:
+        admin = make_user(
+            "admin@example.com",
+            None,
+            None,
+            role=UserRole.ADMIN,
             account_status=AccountStatus.ACTIVE,
         )
 
@@ -621,10 +646,11 @@ class TestCreatePost:
                 group_visibility=GroupVisibility.ALL,
                 sector_visibility=SectorVisibility.ALL,
             ),
-            author,
+            admin,
         )
 
         assert result.group_visibility == GroupVisibility.ALL
+        assert result.sector_visibility == SectorVisibility.ALL
 
     def test_non_active_author_gets_403(self, db_session: Session, make_user) -> None:
         author = make_user(
