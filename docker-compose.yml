@@ -21,6 +21,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+    env_file: ./backend/.env
     environment:
       - DATABASE_URL=postgresql+psycopg2://user:${POSTGRES_PASSWORD:-password}@db:5432/anu_banayich
     depends_on:
