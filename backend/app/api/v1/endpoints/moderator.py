@@ -8,7 +8,7 @@ GET  /moderator/reports/{id}      – single report with full context
 POST /moderator/reports/{id}/decide – decide on a report (valid/invalid)
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.constants import UserRole
@@ -50,15 +50,8 @@ def list_pending_reports(
     Return pending reports in the moderator's assigned cells.
     Sorted by report_count DESC (most-reported content first).
     """
-    reports = report_service.get_pending_reports(db, current_user)
-
-    posts_by_id = {
-        post.id: post
-        for post in db.query(ForumPost)
-        .filter(ForumPost.id.in_([r.target_id for r in reports]))
-        .all()
-    }
-    items = [_to_report_with_content(r, posts_by_id[r.target_id]) for r in reports]
+    pairs = report_service.get_pending_reports(db, current_user)
+    items = [_to_report_with_content(report, post) for report, post in pairs]
 
     return ReportListResponse(items=items, total=len(items), pending_count=len(items))
 
@@ -72,11 +65,7 @@ def get_report(
     """
     Return a single report with the full context of the reported content.
     """
-    report = report_service.get_report_for_moderator(db, report_id, current_user)
-    post = db.query(ForumPost).filter(ForumPost.id == report.target_id).first()
-    if post is None:
-        raise HTTPException(status_code=404, detail="התוכן המדווח לא נמצא.")
-
+    report, post = report_service.get_report_for_moderator(db, report_id, current_user)
     return _to_report_with_content(report, post)
 
 

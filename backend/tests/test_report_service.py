@@ -476,7 +476,7 @@ class TestGetPendingReports:
 
         results = report_service.get_pending_reports(db_session, moderator)
 
-        assert [r.id for r in results] == [in_cell_report.id]
+        assert [r.id for r, _ in results] == [in_cell_report.id]
 
     def test_admin_sees_all_pending_reports_unscoped(self, db_session: Session) -> None:
         """Admin has no moderator_cells but must still see every cell's reports."""
@@ -507,7 +507,7 @@ class TestGetPendingReports:
 
         results = report_service.get_pending_reports(db_session, admin)
 
-        assert {r.id for r in results} == {report_a.id, report_b.id}
+        assert {r.id for r, _ in results} == {report_a.id, report_b.id}
 
     def test_sorted_by_report_count_descending(self, db_session: Session) -> None:
         moderator = _make_user(
@@ -543,8 +543,8 @@ class TestGetPendingReports:
         # Both reports on more_reported_post (report_count=2) sort before the
         # single report on less_reported_post (report_count=1); order between
         # the tied pair is unspecified.
-        assert {r.id for r in results[:2]} == {more_report_a.id, more_report_b.id}
-        assert results[2].id == less_report.id
+        assert {r.id for r, _ in results[:2]} == {more_report_a.id, more_report_b.id}
+        assert results[2][0].id == less_report.id
 
     def test_excludes_already_decided_reports(self, db_session: Session) -> None:
         moderator = _make_user(
@@ -586,11 +586,12 @@ class TestGetReportForModerator:
         post = _make_post(db_session, author)
         report = report_service.file_report(db_session, _report_data(post.id), reporter)
 
-        result = report_service.get_report_for_moderator(
+        result_report, result_post = report_service.get_report_for_moderator(
             db_session, report.id, moderator
         )
 
-        assert result.id == report.id
+        assert result_report.id == report.id
+        assert result_post.id == post.id
 
     def test_moderator_cannot_view_report_outside_their_cell(
         self, db_session: Session
@@ -655,9 +656,12 @@ class TestGetReportForModerator:
         post = _make_post(db_session, author)
         report = report_service.file_report(db_session, _report_data(post.id), reporter)
 
-        result = report_service.get_report_for_moderator(db_session, report.id, admin)
+        result_report, result_post = report_service.get_report_for_moderator(
+            db_session, report.id, admin
+        )
 
-        assert result.id == report.id
+        assert result_report.id == report.id
+        assert result_post.id == post.id
 
     def test_404_for_nonexistent_report(self, db_session: Session) -> None:
         moderator = _make_user(

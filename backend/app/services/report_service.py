@@ -213,18 +213,21 @@ def decide_report(
     raise NotImplementedError("decide_report() is not yet implemented")
 
 
-def get_pending_reports(db: Session, moderator: User) -> list[Report]:
+def get_pending_reports(db: Session, moderator: User) -> list[tuple[Report, ForumPost]]:
     """
-    Return pending reports for the moderator's assigned cells.
+    Return (report, reported post) pairs for the moderator's assigned cells.
     ADMIN sees every pending report, unscoped (spec §3.2 — admin has "הכל"
     for report handling; MODERATOR is scoped to "אחריותו" only).
 
     Only FORUM_POST reports exist today (file_report() rejects other target
     types), so this joins Report -> reported User -> ForumPost and matches
     the reported user's (user_type, sector) against moderator.moderator_cells.
+    The ForumPost is returned alongside each Report (rather than just the
+    Report) so callers — namely the moderator endpoints — never need their
+    own follow-up query to render the reported content.
     """
     query = (
-        db.query(Report)
+        db.query(Report, ForumPost)
         .join(User, Report.reported_user_id == User.id)
         .join(ForumPost, Report.target_id == ForumPost.id)
         .filter(Report.target_type == ReportTargetType.FORUM_POST)
@@ -237,20 +240,28 @@ def get_pending_reports(db: Session, moderator: User) -> list[Report]:
             return []
         query = query.filter(_cell_match_filter(cells))
 
-    return query.order_by(ForumPost.report_count.desc()).all()
+    rows = query.order_by(ForumPost.report_count.desc()).all()
+    return [(report, post) for report, post in rows]
 
 
-def get_report_for_moderator(db: Session, report_id: str, moderator: User) -> Report:
+def get_report_for_moderator(
+    db: Session, report_id: str, moderator: User
+) -> tuple[Report, ForumPost]:
     """
-    Load a single report, enforcing that the moderator is responsible for
-    its cell (ADMIN bypasses this check — see require_role on the router).
+    Load a single report and its reported post, enforcing that the moderator
+    is responsible for its cell (ADMIN bypasses this check — see require_role
+    on the router).
 
-    Raises 404 if the report doesn't exist, 403 if the moderator's cells
-    don't cover it.
+    Raises 404 if the report or its post doesn't exist, 403 if the
+    moderator's cells don't cover it.
     """
     report = db.query(Report).filter(Report.id == report_id).first()
     if report is None:
         raise HTTPException(status_code=404, detail="הדיווח לא נמצא.")
+
+    post = db.query(ForumPost).filter(ForumPost.id == report.target_id).first()
+    if post is None:
+        raise HTTPException(status_code=404, detail="התוכן המדווח לא נמצא.")
 
     if moderator.role == UserRole.MODERATOR:
         cells = moderator.moderator_cells or []
@@ -267,7 +278,7 @@ def get_report_for_moderator(db: Session, report_id: str, moderator: User) -> Re
         if not covered:
             raise HTTPException(status_code=403, detail="אין הרשאה לצפות בדיווח זה.")
 
-    return report
+    return report, post
 
 
 def _check_auto_suspension(db: Session, reported_user: User) -> None:
