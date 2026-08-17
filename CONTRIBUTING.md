@@ -451,12 +451,34 @@ npm test -- --run          # לפני כל PR
 
 | שם | תיאור |
 |---|---|
+| `ENVIRONMENT` | סביבת הרצה — `production` בכל פריסה מתארחת |
 | `DATABASE_URL` | PostgreSQL connection string |
 | `SECRET_KEY` | JWT signing key |
 | `SENDGRID_API_KEY` | שליחת מיילים |
 | `API_URL` | כתובת backend (frontend) |
 
 כל secret חדש → `.env.example` מתעדכן + נוסף ל-GitHub Secrets.
+
+#### פריסה ל-Render — שני משתנים, לא אחד
+
+> **⚠️ ב-Render חובה להגדיר `ENVIRONMENT=production` בנוסף ל-`SECRET_KEY` — לא רק אותו.**
+
+ולידציית ה-`SECRET_KEY` שב-`backend/app/core/config.py` (מפתח חסר / קצר מ-32 תווים /
+זהה לברירת המחדל שבריפו) פועלת רק כאשר `ENVIRONMENT` אינו אחד מ-`development`,
+`dev`, `local`, `test`. ברירת המחדל היא `development` — כלומר פריסה שמגדירה
+`SECRET_KEY` בלבד **עוקפת את הבדיקה בשקט**, והאפליקציה תעלה עם מפתח חלש בלי
+להתריע.
+
+בעת יצירת השירות ב-Render — Dashboard → Service → Environment → Add:
+
+| Key | Value |
+|---|---|
+| `ENVIRONMENT` | `production` |
+| `SECRET_KEY` | פלט של `openssl rand -hex 32` |
+
+אימות לאחר הפריסה: הגדרת `ENVIRONMENT=production` בלי `SECRET_KEY` תקין חייבת
+להפיל את השירות ב-startup עם הודעת `CONFIGURATION ERROR` ב-Render logs. אם השירות
+עלה — `ENVIRONMENT` לא נקלט.
 
 ### CI/CD
 
