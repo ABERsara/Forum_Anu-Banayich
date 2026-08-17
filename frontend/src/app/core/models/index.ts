@@ -248,9 +248,17 @@ export interface ReportWithContent extends Report {
   report_count: number;
 }
 
+/**
+ * A moderator's decision on a report. `decision` is VALID or INVALID —
+ * PENDING is the state a report starts in, and the backend rejects it here.
+ *
+ * The note is required, unlike the nullable moderator_note on Report: rows
+ * decided before this endpoint existed carry none, but no new decision may
+ * be made without one (SPEC §7.3, "הערת מבקר (לתיעוד)").
+ */
 export interface ReportDecideRequest {
   decision: ReportDecision;
-  note?: string;
+  note: string;
 }
 
 export interface ReportList {
@@ -258,6 +266,9 @@ export interface ReportList {
   total: number;
   pending_count: number;
 }
+
+/** Reports already decided in this moderator's cells, newest first. */
+export type ReportHistoryList = PaginatedResponse<ReportWithContent>;
 
 // ---------------------------------------------------------------------------
 // Pagination helper

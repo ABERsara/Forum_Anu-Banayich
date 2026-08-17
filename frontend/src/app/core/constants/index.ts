@@ -122,6 +122,12 @@ export enum PostStatus {
   DELETED = 'deleted',
 }
 
+export const POST_STATUS_LABELS: Record<PostStatus, string> = {
+  [PostStatus.VISIBLE]: 'גלויה',
+  [PostStatus.HIDDEN]: 'מוסתרת',
+  [PostStatus.DELETED]: 'נמחקה',
+};
+
 // ---------------------------------------------------------------------------
 // Professional domains
 // ---------------------------------------------------------------------------
@@ -193,6 +199,12 @@ export enum ReportDecision {
   INVALID = 'invalid',
   VALID = 'valid',
 }
+
+export const REPORT_DECISION_LABELS: Record<ReportDecision, string> = {
+  [ReportDecision.PENDING]: 'ממתין לטיפול',
+  [ReportDecision.INVALID]: 'הדיווח בוטל',
+  [ReportDecision.VALID]: 'הדיווח התקבל',
+};
 
 // ---------------------------------------------------------------------------
 // Documents
