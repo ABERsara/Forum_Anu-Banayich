@@ -88,6 +88,19 @@ def send_urgent_moderator_alert(moderator_email: str, report_id: str) -> None:
     # TODO: send real email
 
 
+def send_content_removed_notification(email: str, report_id: str) -> None:
+    """
+    Notify the author that a report on their content was upheld and the
+    content was removed (SPEC §7.1, "מדווח-עליו מקבל הודעת מערכת").
+
+    The moderator's note is deliberately not passed in — it is internal
+    documentation, and the author is told what happened, not what was
+    written about them.
+    """
+    logger.info(f"[EMAIL] Content removed after report {report_id} → {email}")
+    # TODO: send real email
+
+
 def send_suspension_notification(email: str, hours: int, reason: str) -> None:
     """Notify a user that their account was suspended."""
     logger.info(

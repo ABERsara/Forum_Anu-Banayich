@@ -27,6 +27,7 @@ from app.schemas.professional import (
 from app.schemas.report import (
     ReportCreate,
     ReportDecideRequest,
+    ReportHistoryResponse,
     ReportListResponse,
     ReportResponse,
     ReportWithContent,
@@ -65,5 +66,6 @@ __all__ = [
     "ReportResponse",
     "ReportDecideRequest",
     "ReportListResponse",
+    "ReportHistoryResponse",
     "ReportWithContent",
 ]
