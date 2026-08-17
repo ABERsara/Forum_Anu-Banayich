@@ -250,6 +250,15 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
     if author.account_status != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="רק משתמש פעיל יכול לפרסם הודעה.")
 
+    is_broadcast = (
+        data.group_visibility == GroupVisibility.ALL
+        and data.sector_visibility == SectorVisibility.ALL
+    )
+    if is_broadcast and author.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403, detail="רק מנהל יכול לפרסם הודעה לכלל המשתמשים."
+        )
+
     if data.group_visibility != GroupVisibility.ALL and (
         author.user_type is None
         or data.group_visibility != GroupVisibility(author.user_type.value)
