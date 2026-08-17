@@ -181,9 +181,7 @@ class TestFileReportFirstReportEscalation:
 
         report = report_service.file_report(db_session, _report_data(post.id), reporter)
 
-        assert calls == [
-            ("mod-alerts@example.com", report.id, post.content[:100])
-        ]
+        assert calls == [("mod-alerts@example.com", report.id, post.content[:100])]
 
     def test_post_stays_visible(self, db_session: Session) -> None:
         author = _make_user(db_session, "author@example.com")
@@ -230,7 +228,9 @@ class TestFileReportSecondReportEscalation:
         post = _make_post(db_session, author)
 
         report_service.file_report(db_session, _report_data(post.id), reporter1)
-        report = report_service.file_report(db_session, _report_data(post.id), reporter2)
+        report = report_service.file_report(
+            db_session, _report_data(post.id), reporter2
+        )
 
         assert calls == [("mod-alerts@example.com", report.id)]
 
@@ -253,7 +253,9 @@ class TestFileReportThirdPlusReportEscalation:
         )
         author = _make_user(db_session, "author@example.com")
         post = _make_post(db_session, author)
-        reporters = [_make_user(db_session, f"reporter{i}@example.com") for i in range(4)]
+        reporters = [
+            _make_user(db_session, f"reporter{i}@example.com") for i in range(4)
+        ]
 
         reports = [
             report_service.file_report(db_session, _report_data(post.id), reporter)
@@ -275,10 +277,16 @@ class TestFileReportModeratorBroadcast:
             lambda email, report_id, content_preview: calls.append(email),
         )
         _make_user(
-            db_session, "mod1@example.com", role=UserRole.MODERATOR, alert_email="alert1@example.com"
+            db_session,
+            "mod1@example.com",
+            role=UserRole.MODERATOR,
+            alert_email="alert1@example.com",
         )
         _make_user(
-            db_session, "mod2@example.com", role=UserRole.MODERATOR, alert_email="alert2@example.com"
+            db_session,
+            "mod2@example.com",
+            role=UserRole.MODERATOR,
+            alert_email="alert2@example.com",
         )
         _make_user(db_session, "user@example.com")  # not a moderator
         author = _make_user(db_session, "author@example.com")
@@ -298,7 +306,9 @@ class TestFileReportModeratorBroadcast:
             "send_moderator_alert",
             lambda email, report_id, content_preview: calls.append(email),
         )
-        _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR, alert_email=None)
+        _make_user(
+            db_session, "mod@example.com", role=UserRole.MODERATOR, alert_email=None
+        )
         author = _make_user(db_session, "author@example.com")
         reporter = _make_user(db_session, "reporter@example.com")
         post = _make_post(db_session, author)
