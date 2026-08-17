@@ -498,7 +498,7 @@ def update_moderator(
     return moderator
 
 
-def remove_moderator(db: Session, user_id: str, admin: User) -> User:
+def remove_moderator(db: Session, user_id: str, admin: User) -> None:
     """
     Remove a moderator from the roster.
 
@@ -527,6 +527,3 @@ def remove_moderator(db: Session, user_id: str, admin: User) -> User:
         entity_id=moderator.id,
         details={"revoked_cells": revoked_cells},
     )
-    db.refresh(moderator)
-
-    return moderator

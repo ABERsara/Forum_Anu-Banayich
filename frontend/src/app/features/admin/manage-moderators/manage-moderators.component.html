@@ -141,7 +141,7 @@
             <h2 class="roster__name">{{ fullName(moderator) }}</h2>
             <p class="roster__alert">התראות נשלחות אל: {{ alertAddress(moderator) }}</p>
 
-            <h3 class="roster__cells-title">תאים באחריותו/ה</h3>
+            <h3 class="roster__cells-title">תאים באחריותו</h3>
             @if (moderator.moderator_cells.length === 0) {
               <p class="roster__no-cells">לא הוצאו תאים.</p>
             } @else {
@@ -181,7 +181,7 @@
     <app-confirm-dialog
       title="הסרת ממונה"
       [message]="
-        fullName(moderator) + ' יוסר/תוסר מרשימת הממונים ולא יקבל/תקבל עוד התראות על דיווחים.'
+        fullName(moderator) + ' יוסר מרשימת הממונים ולא יקבל עוד התראות על דיווחים.'
       "
       confirmText="הסרה"
       [isDestructive]="true"

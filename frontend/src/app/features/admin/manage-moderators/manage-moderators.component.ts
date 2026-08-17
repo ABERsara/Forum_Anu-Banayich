@@ -37,7 +37,7 @@ import { ErrorDisplayComponent } from '../../../shared/components/error-display/
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 /** A moderator with no cell ticked oversees nothing — the backend rejects it too. */
-export function atLeastOneCell(control: AbstractControl): ValidationErrors | null {
+function atLeastOneCell(control: AbstractControl): ValidationErrors | null {
   const value: unknown = control.value;
   return Array.isArray(value) && value.length > 0 ? null : { required: true };
 }
@@ -223,7 +223,7 @@ export class ManageModeratorsComponent implements OnInit {
           this.successMessage.set(`ההצאות של ${this.fullName(saved)} עודכנו.`);
         } else {
           this.insertRow(saved);
-          this.successMessage.set(`${this.fullName(saved)} מונה/תה לממונה.`);
+          this.successMessage.set(`${this.fullName(saved)} מונה לממונה.`);
         }
         this.isSaving.set(false);
         this.closeForm();
@@ -258,7 +258,7 @@ export class ManageModeratorsComponent implements OnInit {
     this.adminService.removeModerator(moderator.id).subscribe({
       next: () => {
         this.moderators.update((rows) => rows.filter((row) => row.id !== moderator.id));
-        this.successMessage.set(`${this.fullName(moderator)} הוסר/ה מרשימת הממונים.`);
+        this.successMessage.set(`${this.fullName(moderator)} הוסר מרשימת הממונים.`);
         // The form cannot stay open on a row that is no longer on the roster.
         if (this.editing()?.id === moderator.id) {
           this.closeForm();

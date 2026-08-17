@@ -311,7 +311,7 @@ describe('ManageModeratorsComponent', () => {
       expect(component.moderators()).toEqual([]);
       expect(component.pendingRemoval()).toBeNull();
       expect(component.isRemoving()).toBe(false);
-      expect(component.successMessage()).toContain('הוסר/ה מרשימת הממונים');
+      expect(component.successMessage()).toContain('הוסר מרשימת הממונים');
     });
 
     it('closes the form when the row it was editing is removed', () => {
