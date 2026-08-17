@@ -180,9 +180,7 @@
   @if (pendingRemoval(); as moderator) {
     <app-confirm-dialog
       title="הסרת ממונה"
-      [message]="
-        fullName(moderator) + ' יוסר מרשימת הממונים ולא יקבל עוד התראות על דיווחים.'
-      "
+      [message]="fullName(moderator) + ' יוסר מרשימת הממונים ולא יקבל עוד התראות על דיווחים.'"
       confirmText="הסרה"
       [isDestructive]="true"
       (confirmed)="confirmRemove()"
