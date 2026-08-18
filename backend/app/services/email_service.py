@@ -16,6 +16,7 @@ TODO (when ready for production):
 import logging
 import smtplib
 from email.mime.text import MIMEText
+from email.utils import formataddr
 from html import escape
 
 from app.core.config import settings
@@ -34,7 +35,11 @@ def _build_message(email: str, subject: str, body: str) -> MIMEText:
     # alternative to choose between yet. Add one back if a plain-text fallback is added.
     msg = MIMEText(f'<div dir="rtl">{body}</div>', "html", "utf-8")
     msg["Subject"] = subject
-    msg["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>"
+    # formataddr, not an f-string: it RFC 2047-encodes the Hebrew display name
+    # on its own and leaves the address in the clear. Encoding the two together
+    # hides the address inside an encoded-word, and what a receiving MTA then
+    # parses out of From is "=?utf-8?b?...?=" rather than an address.
+    msg["From"] = formataddr((settings.EMAIL_FROM_NAME, settings.EMAIL_FROM))
     msg["To"] = email
     return msg
 

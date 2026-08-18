@@ -6,8 +6,11 @@ Each covers three paths: dev fallback (SMTP_HOST empty), real SMTP send,
 and SMTP failure (must never raise — registration and answering depend on that).
 """
 
+import email as email_lib
 import logging
 from collections import namedtuple
+from email.header import decode_header, make_header
+from email.utils import parseaddr
 
 import pytest
 
@@ -294,6 +297,19 @@ def _sent_html(smtp):
     return send_call[1], send_call[1].get_payload(decode=True).decode("utf-8")
 
 
+def _from_on_the_wire(msg):
+    """
+    The (display name, address) a receiving MTA parses out of From.
+
+    Serialising and re-parsing is the point: in memory From is whatever Python
+    was handed, and only the bytes show whether the address survived the RFC
+    2047 encoding of the Hebrew display name.
+    """
+    received = email_lib.message_from_bytes(msg.as_bytes())
+    name, address = parseaddr(received["From"])
+    return str(make_header(decode_header(name))), address
+
+
 @pytest.mark.parametrize("sender", ACTIVATED_SENDERS)
 class TestActivatedSendersDevFallback:
     def test_logs_the_same_line_as_before_the_ticket(self, sender, caplog):
@@ -338,7 +354,10 @@ class TestActivatedSendersViaSmtp:
 
         msg, html = _sent_html(_FakeSMTP.instances[0])
         assert msg["To"] == sender.to
-        assert msg["From"] == 'עמותת "אנו בניך" <noreply@anu-banayich.org.il>'
+        assert _from_on_the_wire(msg) == (
+            'עמותת "אנו בניך"',
+            "noreply@anu-banayich.org.il",
+        )
         assert 'dir="rtl">' in html
         assert "שלום" in html
 
@@ -381,7 +400,21 @@ class TestBuildMessage:
         assert html == '<div dir="rtl"><p>גוף</p></div>'
         assert msg["Subject"] == "נושא"
         assert msg["To"] == "a@example.com"
-        assert msg["From"] == 'עמותת "אנו בניך" <noreply@anu-banayich.org.il>'
+
+    def test_sender_address_survives_the_hebrew_display_name(self):
+        """The name is RFC 2047-encoded; the address must stay in the clear, or
+        what an MTA reads out of From is an encoded-word and not an address."""
+        msg = email_service._build_message("a@example.com", "נושא", "<p>גוף</p>")
+
+        name, address = _from_on_the_wire(msg)
+        assert address == "noreply@anu-banayich.org.il"
+        assert name == 'עמותת "אנו בניך"'
+
+    def test_hebrew_subject_reaches_the_reader_decodable(self):
+        msg = email_service._build_message("a@example.com", "נושא בעברית", "<p>גוף</p>")
+
+        received = email_lib.message_from_bytes(msg.as_bytes())
+        assert str(make_header(decode_header(received["Subject"]))) == "נושא בעברית"
 
 
 class TestBuildApprovalMessage:
