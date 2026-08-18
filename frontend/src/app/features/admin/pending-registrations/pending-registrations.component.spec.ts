@@ -94,6 +94,38 @@ describe('PendingRegistrationsComponent', () => {
     expect(adminServiceMock.getRegistration).not.toHaveBeenCalled();
   });
 
+  describe('the actions on a queue row', () => {
+    function actionButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.queue__actions button'));
+    }
+
+    it('names each action after the applicant it decides on', () => {
+      // "אישור" on its own says nothing about whose request it approves, and
+      // in a queue that is every row's button.
+      expect(actionButtons().map((btn) => btn.getAttribute('aria-label'))).toEqual([
+        'בדיקת הבקשה של שרה לוי',
+        'אישור הבקשה של שרה לוי',
+        'דחיית הבקשה של שרה לוי',
+      ]);
+    });
+
+    it('opens the registration for review when its button is pressed', () => {
+      const [review] = actionButtons();
+
+      review.click();
+      fixture.detectChanges();
+
+      expect(adminServiceMock.getRegistration).toHaveBeenCalledWith('u1');
+      expect(review.getAttribute('aria-expanded')).toBe('true');
+      expect(review.getAttribute('aria-controls')).toBe('registration-detail-u1');
+      expect(fixture.nativeElement.querySelector('#registration-detail-u1')).toBeTruthy();
+    });
+
+    it('reports the details as closed while they are', () => {
+      expect(actionButtons()[0].getAttribute('aria-expanded')).toBe('false');
+    });
+  });
+
   describe('reviewing a registration', () => {
     it('loads the clicked registration in full', () => {
       component.toggleDetail('u1');

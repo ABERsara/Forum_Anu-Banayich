@@ -28,6 +28,7 @@ import {
   USER_TYPE_LABELS,
 } from '../../../core/constants';
 import { AdminService } from '../../../core/services/admin.service';
+import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -41,6 +42,7 @@ const NOT_PROVIDED = 'לא צוין';
   imports: [
     RouterLink,
     DatePipe,
+    ButtonComponent,
     ConfirmDialogComponent,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,

@@ -36,34 +36,31 @@
             </div>
 
             <div class="queue__actions">
-              <button
-                type="button"
-                class="btn"
-                [attr.aria-expanded]="isOpen(reg.id)"
-                [attr.aria-controls]="'registration-detail-' + reg.id"
-                [attr.aria-label]="
+              <app-button
+                variant="secondary"
+                [ariaExpanded]="isOpen(reg.id)"
+                [ariaControls]="'registration-detail-' + reg.id"
+                [ariaLabel]="
                   (isOpen(reg.id) ? 'סגירת פרטי הבקשה של ' : 'בדיקת הבקשה של ') + fullName(reg)
                 "
-                (click)="toggleDetail(reg.id)"
+                (clicked)="toggleDetail(reg.id)"
               >
                 {{ isOpen(reg.id) ? 'סגירה' : 'בדיקה' }}
-              </button>
-              <button
-                type="button"
-                class="btn btn--primary"
-                [attr.aria-label]="'אישור הבקשה של ' + fullName(reg)"
-                (click)="approve(reg.id)"
+              </app-button>
+              <app-button
+                variant="primary"
+                [ariaLabel]="'אישור הבקשה של ' + fullName(reg)"
+                (clicked)="approve(reg.id)"
               >
                 אישור
-              </button>
-              <button
-                type="button"
-                class="btn btn--danger"
-                [attr.aria-label]="'דחיית הבקשה של ' + fullName(reg)"
-                (click)="reject(reg.id)"
+              </app-button>
+              <app-button
+                variant="danger"
+                [ariaLabel]="'דחיית הבקשה של ' + fullName(reg)"
+                (clicked)="reject(reg.id)"
               >
                 דחייה
-              </button>
+              </app-button>
             </div>
           </div>
 
