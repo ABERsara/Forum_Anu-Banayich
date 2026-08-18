@@ -481,6 +481,7 @@ Google אחראי על אימות המייל, ולכן שלב OTP מדולג. ש
 - Web Service עם פריסה אוטומטית מ-GitHub
 - תמיכה ב-Python + PostgreSQL מנוהל
 - Environment Variables מוצפנים לשמירת סודות
+- ⚠️ **Free Tier — cold start:** השירות "נרדם" אוטומטית לאחר 15 דקות ללא בקשות; הבקשה הראשונה לאחר מכן עלולה לקחת עד כ-30 שניות עד שהשירות מתעורר ומגיב
 
 **אחסון קבצים ומסמכים:**
 - Cloudflare R2 או Supabase Storage (Free Tier לשלב ראשון)
