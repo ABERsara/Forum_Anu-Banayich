@@ -1,12 +1,13 @@
 """
 Email service.
 
-send_otp_email and send_answer_notification send real mail via SMTP when
-SMTP_HOST is configured. The other notifications below are still stubs.
+Every sender has the same three steps: fall back to a console log when
+SMTP_HOST is empty, build a MIMEText message, hand it to _send_via_smtp.
+The OTP, registration and consultation notifications all send real mail;
+the moderation ones below are still stubs.
 
 TODO (when ready for production):
-  [ ] Send real email for approval/rejection/moderator/suspension/new-question
-      notifications
+  [ ] Send real email for moderator/suspension/SLA notifications
   [ ] Load templates from HTML files
   [ ] Add retry logic for failed sends
   [ ] Add unsubscribe links where required by law
@@ -15,29 +16,38 @@ TODO (when ready for production):
 import logging
 import smtplib
 from email.mime.text import MIMEText
+from html import escape
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
+def _build_message(email: str, subject: str, body: str) -> MIMEText:
+    """
+    Wrap one email body in the envelope every notification shares.
+
+    The RTL wrapper lives here rather than in each body, so no sender can ship
+    Hebrew that renders left-to-right. `body` is HTML that is already escaped.
+    """
+    # single MIMEText, no MIMEMultipart("alternative") — there's no plain-text
+    # alternative to choose between yet. Add one back if a plain-text fallback is added.
+    msg = MIMEText(f'<div dir="rtl">{body}</div>', "html", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>"
+    msg["To"] = email
+    return msg
+
+
 def _build_otp_message(email: str, otp_code: str) -> MIMEText:
-    html = (
-        f'<div dir="rtl">'
+    body = (
         f"<p>שלום,</p>"
         f"<p>ברוך הבא ל-{settings.PROJECT_NAME}. הנה קוד האימות שלך:</p>"
         f"<h1>{otp_code}</h1>"
         f"<p>הקוד תקף ל-{settings.OTP_EXPIRE_MINUTES} דקות.</p>"
         f"<p>לא נרשמת? פשוט התעלם מהמייל הזה.</p>"
-        f"</div>"
     )
-    # single MIMEText, no MIMEMultipart("alternative") — there's no plain-text
-    # alternative to choose between yet. Add one back if a plain-text fallback is added.
-    msg = MIMEText(html, "html", "utf-8")
-    msg["Subject"] = 'קוד אימות – עמותת "אנו בניך"'
-    msg["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>"
-    msg["To"] = email
-    return msg
+    return _build_message(email, 'קוד אימות – עמותת "אנו בניך"', body)
 
 
 def _send_via_smtp(msg: MIMEText, purpose: str) -> bool:
@@ -71,16 +81,54 @@ def send_otp_email(email: str, otp_code: str) -> None:
         logger.info(f"[EMAIL] OTP sent → {email}")
 
 
+def _build_approval_message(email: str, first_name: str) -> MIMEText:
+    body = (
+        f"<p>שלום {escape(first_name)},</p>"
+        f"<p>בקשת ההרשמה שלך ל{settings.PROJECT_NAME} אושרה.</p>"
+        f"<p>מעכשיו אפשר להתחבר לאתר עם כתובת המייל הזו, לקרוא ולכתוב בפורום "
+        f"ולפנות לאנשי המקצוע של העמותה.</p>"
+        f"<p>שמחים שהצטרפת.</p>"
+    )
+    return _build_message(email, 'ההרשמה שלך אושרה – עמותת "אנו בניך"', body)
+
+
 def send_approval_email(email: str, first_name: str) -> None:
     """Notify a user that their registration was approved."""
-    logger.info(f"[EMAIL] Registration approved → {email}")
-    # TODO: send real email
+    if not settings.SMTP_HOST:
+        logger.info(f"[EMAIL] Registration approved → {email}")
+        return
+
+    if _send_via_smtp(_build_approval_message(email, first_name), "approval"):
+        logger.info(f"[EMAIL] Approval email sent → {email}")
+
+
+def _build_rejection_message(email: str, first_name: str, reason: str) -> MIMEText:
+    body = (
+        f"<p>שלום {escape(first_name)},</p>"
+        f"<p>בקשת ההרשמה שלך ל{settings.PROJECT_NAME} נבדקה ולא אושרה.</p>"
+        f"<p>הסיבה שנרשמה: {escape(reason)}</p>"
+        f"<p>לבירור נוסף אפשר לפנות לעמותה.</p>"
+    )
+    return _build_message(
+        email, 'עדכון בנוגע לבקשת ההרשמה שלך – עמותת "אנו בניך"', body
+    )
 
 
 def send_rejection_email(email: str, first_name: str, reason: str) -> None:
-    """Notify a user that their registration was rejected."""
-    logger.info(f"[EMAIL] Registration rejected → {email}, reason: {reason}")
-    # TODO: send real email
+    """
+    Notify a user that their registration was rejected, with the reason.
+
+    The name and the reason are the only user-written text this module puts in
+    a message: escape() is what keeps either of them from becoming markup in a
+    mail signed by the association.
+    """
+    if not settings.SMTP_HOST:
+        logger.info(f"[EMAIL] Registration rejected → {email}, reason: {reason}")
+        return
+
+    msg = _build_rejection_message(email, first_name, reason)
+    if _send_via_smtp(msg, "rejection"):
+        logger.info(f"[EMAIL] Rejection email sent → {email}")
 
 
 def send_moderator_alert(
@@ -107,32 +155,69 @@ def send_suspension_notification(email: str, hours: int, reason: str) -> None:
     # TODO: send real email
 
 
+def _build_question_message(email: str, *, is_general: bool) -> MIMEText:
+    """
+    Build the new-question notification for a professional.
+
+    A direct question and a domain question differ by one sentence, so they
+    share a body — but they keep separate subjects, because a professional who
+    receives both has only the subject line to tell them apart by.
+
+    Neither the question nor the asker is named. The asker chooses per question
+    whether their real name is shown (`show_real_name`), and that choice is
+    honoured on the site, where an email cannot leak past it (SPEC §6.4).
+    """
+    subject, opening = (
+        (
+            'שאלה חדשה בתחום שלך – עמותת "אנו בניך"',
+            "נשאלה שאלה חדשה בתחום המקצועי שלך",
+        )
+        if is_general
+        else (
+            'שאלה חדשה הופנתה אליך – עמותת "אנו בניך"',
+            "הופנתה אליך שאלה חדשה",
+        )
+    )
+    body = (
+        f"<p>שלום,</p>"
+        f"<p>{opening} ב{settings.PROJECT_NAME}.</p>"
+        f'<p>השאלה ממתינה לך במסך "שאלות ממתינות לתשובה" באתר.</p>'
+        f"<p>מטעמי פרטיות תוכן השאלה ופרטי השואל אינם נשלחים במייל.</p>"
+    )
+    return _build_message(email, subject, body)
+
+
 def send_direct_question_notification(professional_email: str, query_id: str) -> None:
     """Notify a professional of a new question addressed to them directly."""
-    logger.info(f"[EMAIL] שאלה ישירה {query_id} → {professional_email}")
-    # TODO: send real email
+    if not settings.SMTP_HOST:
+        logger.info(f"[EMAIL] שאלה ישירה {query_id} → {professional_email}")
+        return
+
+    # query_id names the send in the log; it is deliberately not in the mail.
+    msg = _build_question_message(professional_email, is_general=False)
+    if _send_via_smtp(msg, "direct question notification"):
+        logger.info(f"[EMAIL] Direct question notification sent for query {query_id}")
 
 
 def send_domain_question_notification(professional_email: str, query_id: str) -> None:
     """Notify a professional of a new general question in their domain."""
-    logger.info(f"[EMAIL] שאלה כללית {query_id} → {professional_email}")
-    # TODO: send real email
+    if not settings.SMTP_HOST:
+        logger.info(f"[EMAIL] שאלה כללית {query_id} → {professional_email}")
+        return
+
+    msg = _build_question_message(professional_email, is_general=True)
+    if _send_via_smtp(msg, "domain question notification"):
+        logger.info(f"[EMAIL] Domain question notification sent for query {query_id}")
 
 
 def _build_answer_message(email: str) -> MIMEText:
-    html = (
-        f'<div dir="rtl">'
+    body = (
         f"<p>שלום,</p>"
         f"<p>איש המקצוע השיב לשאלה ששאלת ב{settings.PROJECT_NAME}.</p>"
         f'<p>התשובה ממתינה לך באזור "השאלות שלי" באתר.</p>'
         f"<p>מטעמי פרטיות התשובה עצמה אינה נשלחת במייל.</p>"
-        f"</div>"
     )
-    msg = MIMEText(html, "html", "utf-8")
-    msg["Subject"] = 'התקבלה תשובה לשאלתך – עמותת "אנו בניך"'
-    msg["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>"
-    msg["To"] = email
-    return msg
+    return _build_message(email, 'התקבלה תשובה לשאלתך – עמותת "אנו בניך"', body)
 
 
 def send_answer_notification(asker_email: str, query_id: str) -> None:
