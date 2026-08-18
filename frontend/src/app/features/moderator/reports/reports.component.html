@@ -105,6 +105,13 @@
                 >
                   ביטול הדיווח (שגוי)
                 </button>
+                <a
+                  class="reports__card-link"
+                  [routerLink]="['/moderator/users', report.reported_user_id]"
+                  [attr.aria-label]="'כרטיס המשתמש/ת שכתב/ה את ״' + report.content_title + '״'"
+                >
+                  כרטיס המשתמש/ת
+                </a>
               </div>
             </li>
           }
@@ -151,6 +158,16 @@
                   <dd>{{ report.moderator_note ?? '–' }}</dd>
                 </div>
               </dl>
+
+              <div class="reports__actions">
+                <a
+                  class="reports__card-link"
+                  [routerLink]="['/moderator/users', report.reported_user_id]"
+                  [attr.aria-label]="'כרטיס המשתמש/ת שכתב/ה את ״' + report.content_title + '״'"
+                >
+                  כרטיס המשתמש/ת
+                </a>
+              </div>
             </li>
           }
         </ul>

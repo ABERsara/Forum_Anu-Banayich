@@ -6,6 +6,8 @@ a single report, the decision, and the history of past decisions.
 import pytest
 
 from app.core.constants import (
+    AccountStatus,
+    AuditAction,
     GroupVisibility,
     PostStatus,
     ReportDecision,
@@ -18,6 +20,7 @@ from app.core.constants import (
 )
 from app.core.dependencies import get_current_active_user, get_current_user
 from app.main import app
+from app.models.audit import AuditLog
 from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
@@ -472,3 +475,233 @@ class TestReportHistory:
         response = await client.get(f"{BASE}/reports/history")
 
         assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# GET  /moderator/users/{id}/card     (ABF-100)
+# POST /moderator/users/{id}/suspend  (ABF-100)
+# ---------------------------------------------------------------------------
+
+
+def _make_member(db_session, make_user, email: str = "member@example.com") -> User:
+    """An active user inside WIDOWER_HASIDIC_CELL – the subject of a card."""
+    user = make_user(
+        email,
+        user_type=UserType.WIDOWER,
+        sector=Sector.HASIDIC,
+        account_status=AccountStatus.ACTIVE,
+    )
+    db_session.commit()
+    return user
+
+
+def _suspend_body(hours: int = 48, reason: str = "התנהגות פוגענית חוזרת") -> dict:
+    return {"hours": hours, "reason": reason}
+
+
+class TestGetUserCard:
+    async def test_returns_the_counts_behind_the_moderators_judgement(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        member = _make_member(db_session, make_user)
+        reporter = make_user("reporter@example.com")
+        post = _make_post(db_session, member)
+        report = _file_report(db_session, post, reporter)
+        report.decision = ReportDecision.VALID
+        db_session.commit()
+
+        response = await client.get(f"{BASE}/users/{member.id}/card")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["id"] == member.id
+        assert body["reports_against_total"] == 1
+        assert body["reports_against_valid"] == 1
+        assert body["reports_against_invalid"] == 0
+        assert body["reports_filed_total"] == 0
+        assert body["false_reports_filed"] == 0
+        assert body["is_suspended"] is False
+        assert body["suspended_until"] is None
+
+    async def test_the_card_carries_no_contact_details(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        member = _make_member(db_session, make_user)
+
+        response = await client.get(f"{BASE}/users/{member.id}/card")
+
+        body = response.json()
+        assert not {"email", "phone", "id_number"} & set(body)
+
+    async def test_moderator_forbidden_outside_their_cell(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        elsewhere = make_user(
+            "elsewhere@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        response = await client.get(f"{BASE}/users/{elsewhere.id}/card")
+
+        assert response.status_code == 403
+
+    async def test_404_for_nonexistent_user(
+        self, client, make_user, as_user, db_session
+    ):
+        as_user(_make_moderator(db_session, make_user))
+
+        response = await client.get(f"{BASE}/users/no-such-user/card")
+
+        assert response.status_code == 404
+
+    async def test_regular_user_forbidden(self, client, make_user, as_user, db_session):
+        member = _make_member(db_session, make_user)
+        as_user(make_user("intruder@example.com", role=UserRole.USER))
+
+        response = await client.get(f"{BASE}/users/{member.id}/card")
+
+        assert response.status_code == 403
+
+
+class TestSuspendUserFromTheCard:
+    async def test_suspends_the_user_and_answers_with_the_updated_card(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        member = _make_member(db_session, make_user)
+
+        response = await client.post(
+            f"{BASE}/users/{member.id}/suspend", json=_suspend_body(hours=48)
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["is_suspended"] is True
+        assert body["suspended_until"] is not None
+        assert body["account_status"] == AccountStatus.SUSPENDED.value
+        db_session.refresh(member)
+        assert member.account_status == AccountStatus.SUSPENDED
+
+    async def test_writes_an_audit_entry(self, client, make_user, as_user, db_session):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        member = _make_member(db_session, make_user)
+
+        await client.post(f"{BASE}/users/{member.id}/suspend", json=_suspend_body())
+
+        entries = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == AuditAction.USER_SUSPENDED)
+            .all()
+        )
+        assert len(entries) == 1
+        assert entries[0].actor_id == moderator.id
+        assert entries[0].entity_id == member.id
+
+    async def test_moderator_forbidden_outside_their_cell(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        elsewhere = make_user(
+            "elsewhere@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        response = await client.post(
+            f"{BASE}/users/{elsewhere.id}/suspend", json=_suspend_body()
+        )
+
+        assert response.status_code == 403
+        db_session.refresh(elsewhere)
+        assert elsewhere.account_status == AccountStatus.ACTIVE
+
+    async def test_reason_is_required(self, client, make_user, as_user, db_session):
+        as_user(_make_moderator(db_session, make_user))
+        member = _make_member(db_session, make_user)
+
+        response = await client.post(
+            f"{BASE}/users/{member.id}/suspend", json={"hours": 48}
+        )
+
+        assert response.status_code == 422
+
+    async def test_hours_must_be_positive(self, client, make_user, as_user, db_session):
+        as_user(_make_moderator(db_session, make_user))
+        member = _make_member(db_session, make_user)
+
+        response = await client.post(
+            f"{BASE}/users/{member.id}/suspend", json=_suspend_body(hours=0)
+        )
+
+        assert response.status_code == 422
+
+    async def test_404_for_nonexistent_user(
+        self, client, make_user, as_user, db_session
+    ):
+        as_user(_make_moderator(db_session, make_user))
+
+        response = await client.post(
+            f"{BASE}/users/no-such-user/suspend", json=_suspend_body()
+        )
+
+        assert response.status_code == 404
+
+    async def test_regular_user_forbidden(self, client, make_user, as_user, db_session):
+        member = _make_member(db_session, make_user)
+        as_user(make_user("intruder@example.com", role=UserRole.USER))
+
+        response = await client.post(
+            f"{BASE}/users/{member.id}/suspend", json=_suspend_body()
+        )
+
+        assert response.status_code == 403
+        db_session.refresh(member)
+        assert member.account_status == AccountStatus.ACTIVE
+
+
+class TestTheCardEndToEnd:
+    async def test_three_valid_reports_then_a_48_hour_suspension(
+        self, client, make_user, as_user, db_session
+    ):
+        """
+        The walkthrough this ticket is accepted on: a moderator opens the card
+        of a user with three upheld reports against them, reads the counts,
+        and suspends the account for 48 hours with a reason.
+        """
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        member = _make_member(db_session, make_user)
+        for index in range(3):
+            reporter = make_user(f"reporter-{index}@example.com")
+            report = _file_report(db_session, _make_post(db_session, member), reporter)
+            report.decision = ReportDecision.VALID
+        db_session.commit()
+
+        card = (await client.get(f"{BASE}/users/{member.id}/card")).json()
+
+        assert card["reports_against_total"] == 3
+        assert card["reports_against_valid"] == 3
+        assert card["is_suspended"] is False
+
+        response = await client.post(
+            f"{BASE}/users/{member.id}/suspend",
+            json=_suspend_body(hours=48, reason="שלושה דיווחים מוצדקים"),
+        )
+
+        assert response.status_code == 200
+        db_session.refresh(member)
+        assert member.account_status == AccountStatus.SUSPENDED
+        assert member.suspended_until is not None
+        assert response.json()["reports_against_valid"] == 3

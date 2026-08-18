@@ -129,7 +129,20 @@
   &__actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: $spacing-sm;
+  }
+
+  // The way through to the reported user's moderation history. A link, not
+  // a button: it navigates, and deciding on the report is what the buttons
+  // beside it are for.
+  &__card-link {
+    color: $color-primary-dark;
+    font-size: $font-size-sm;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
   }
 }
 

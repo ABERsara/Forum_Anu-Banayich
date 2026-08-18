@@ -26,7 +26,8 @@ from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.report import ReportCreate, ReportDecideRequest
-from app.services import forum_service, report_service
+from app.schemas.user import SuspendUserRequest
+from app.services import forum_service, report_service, user_service
 
 
 def _make_user(
@@ -1163,3 +1164,410 @@ class TestGetDecidedReports:
         # No row may show up on two pages – hence the id tiebreaker in the
         # ORDER BY, since these decisions can share a timestamp.
         assert {r.id for r in first_page}.isdisjoint({r.id for r in second_page})
+
+
+# ---------------------------------------------------------------------------
+# get_user_card() / suspend_user_for_moderator() – the user card (ABF-100)
+# ---------------------------------------------------------------------------
+
+
+def _card_user(db_session: Session, email: str = "member@example.com") -> User:
+    """An active user inside the moderator's cell – the subject of a card."""
+    return _make_user(
+        db_session,
+        email,
+        user_type=UserType.WIDOWER,
+        sector=Sector.HASIDIC,
+        account_status=AccountStatus.ACTIVE,
+    )
+
+
+def _report_row(
+    db_session: Session,
+    reporter: User,
+    reported_user: User,
+    decision: ReportDecision = ReportDecision.PENDING,
+    target_id: str = "some-post-id",
+) -> Report:
+    """
+    A report row, written straight to the table.
+
+    The card reads the reports table and nothing else, so these rows need no
+    post behind them – and building them here rather than through
+    file_report() + decide_report() keeps a counting test from depending on
+    the deletion and the notifications those two perform.
+    """
+    report = Report(
+        reporter_id=reporter.id,
+        target_type=ReportTargetType.FORUM_POST,
+        target_id=target_id,
+        reported_user_id=reported_user.id,
+        reason=ReportReason.HARASSMENT,
+        decision=decision,
+    )
+    db_session.add(report)
+    db_session.commit()
+    return report
+
+
+SUSPENSION_REASON = "התנהגות פוגענית חוזרת"
+
+
+def _suspend_request(
+    hours: int = 48, reason: str = SUSPENSION_REASON
+) -> SuspendUserRequest:
+    return SuspendUserRequest(hours=hours, reason=reason)
+
+
+class TestGetUserCard:
+    def test_counts_the_reports_against_the_user_by_decision(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+        reporter = _make_user(db_session, "reporter@example.com")
+        _report_row(db_session, reporter, member, ReportDecision.VALID)
+        _report_row(db_session, reporter, member, ReportDecision.VALID)
+        _report_row(db_session, reporter, member, ReportDecision.INVALID)
+        _report_row(db_session, reporter, member, ReportDecision.PENDING)
+
+        card = report_service.get_user_card(db_session, member.id, moderator)
+
+        assert card.reports_against_total == 4
+        assert card.reports_against_valid == 2
+        assert card.reports_against_invalid == 1
+
+    def test_counts_the_false_reports_the_user_filed(self, db_session: Session) -> None:
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+        other = _make_user(db_session, "other@example.com")
+        _report_row(db_session, member, other, ReportDecision.INVALID)
+        _report_row(db_session, member, other, ReportDecision.INVALID)
+        _report_row(db_session, member, other, ReportDecision.VALID)
+
+        card = report_service.get_user_card(db_session, member.id, moderator)
+
+        assert card.reports_filed_total == 3
+        assert card.false_reports_filed == 2
+        # Filing reports says nothing about having been reported.
+        assert card.reports_against_total == 0
+
+    def test_counts_reports_the_user_filed_outside_the_moderators_cells(
+        self, db_session: Session
+    ) -> None:
+        """
+        The counts describe the user, not the cell: a report this user filed
+        about someone in another cell still belongs on their record.
+        """
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+        elsewhere = _make_user(
+            db_session,
+            "elsewhere@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+        )
+        _report_row(db_session, member, elsewhere, ReportDecision.INVALID)
+
+        card = report_service.get_user_card(db_session, member.id, moderator)
+
+        assert card.false_reports_filed == 1
+
+    def test_a_user_with_no_history_counts_zero_across_the_board(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+
+        card = report_service.get_user_card(db_session, member.id, moderator)
+
+        assert card.reports_against_total == 0
+        assert card.reports_against_valid == 0
+        assert card.reports_against_invalid == 0
+        assert card.reports_filed_total == 0
+        assert card.false_reports_filed == 0
+
+    def test_shows_who_the_user_is_and_where_they_belong(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+
+        card = report_service.get_user_card(db_session, member.id, moderator)
+
+        assert card.id == member.id
+        assert card.first_name == member.first_name
+        assert card.user_type == UserType.WIDOWER
+        assert card.sector == Sector.HASIDIC
+        assert card.account_status == AccountStatus.ACTIVE
+
+    def test_carries_no_contact_details(self, db_session: Session) -> None:
+        """
+        A moderator moderates content. The card deliberately stops short of
+        the email, phone and ID number UserAdminView carries for admins.
+        """
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+
+        card = report_service.get_user_card(db_session, member.id, moderator)
+
+        assert not {"email", "phone", "id_number"} & set(card.model_dump())
+
+    def test_shows_the_current_suspension(self, db_session: Session) -> None:
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+        report_service.suspend_user_for_moderator(
+            db_session, member.id, moderator, _suspend_request()
+        )
+
+        card = report_service.get_user_card(db_session, member.id, moderator)
+
+        assert card.is_suspended is True
+        assert card.suspended_until is not None
+        assert card.account_status == AccountStatus.SUSPENDED
+
+    def test_moderator_cannot_open_a_card_outside_their_cells(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        elsewhere = _make_user(
+            db_session,
+            "elsewhere@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            report_service.get_user_card(db_session, elsewhere.id, moderator)
+
+        assert exc.value.status_code == 403
+
+    def test_moderator_with_no_cells_can_open_no_card(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+        member = _card_user(db_session)
+
+        with pytest.raises(HTTPException) as exc:
+            report_service.get_user_card(db_session, member.id, moderator)
+
+        assert exc.value.status_code == 403
+
+    def test_a_user_with_no_cell_belongs_to_no_moderator(
+        self, db_session: Session
+    ) -> None:
+        """A staff account carries no group or sector, so no cell covers it."""
+        moderator = _make_moderator(db_session)
+        professional = _make_user(
+            db_session, "pro@example.com", role=UserRole.PROFESSIONAL
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            report_service.get_user_card(db_session, professional.id, moderator)
+
+        assert exc.value.status_code == 403
+
+    def test_admin_can_open_any_card(self, db_session: Session) -> None:
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        elsewhere = _make_user(
+            db_session,
+            "elsewhere@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        card = report_service.get_user_card(db_session, elsewhere.id, admin)
+
+        assert card.id == elsewhere.id
+
+    def test_nonexistent_user_is_404(self, db_session: Session) -> None:
+        moderator = _make_moderator(db_session)
+
+        with pytest.raises(HTTPException) as exc:
+            report_service.get_user_card(db_session, "no-such-user", moderator)
+
+        assert exc.value.status_code == 404
+
+
+class TestSuspendUserForModerator:
+    def test_suspends_the_user(self, db_session: Session) -> None:
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+
+        card = report_service.suspend_user_for_moderator(
+            db_session, member.id, moderator, _suspend_request(hours=48)
+        )
+
+        db_session.refresh(member)
+        assert member.account_status == AccountStatus.SUSPENDED
+        assert member.is_suspended is True
+        assert card.is_suspended is True
+        assert card.suspended_until is not None
+
+    def test_returns_the_card_as_it_now_stands(self, db_session: Session) -> None:
+        """
+        The reply is the refreshed card, so the page that asked for the
+        suspension does not have to fetch it again to show the result.
+        """
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+        reporter = _make_user(db_session, "reporter@example.com")
+        _report_row(db_session, reporter, member, ReportDecision.VALID)
+
+        card = report_service.suspend_user_for_moderator(
+            db_session, member.id, moderator, _suspend_request()
+        )
+
+        assert card.account_status == AccountStatus.SUSPENDED
+        assert card.reports_against_valid == 1
+
+    def test_writes_one_audit_entry_naming_the_moderator(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+
+        report_service.suspend_user_for_moderator(
+            db_session, member.id, moderator, _suspend_request(hours=48)
+        )
+
+        entries = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == AuditAction.USER_SUSPENDED)
+            .all()
+        )
+        assert len(entries) == 1
+        assert entries[0].actor_id == moderator.id
+        assert entries[0].entity_type == "User"
+        assert entries[0].entity_id == member.id
+        assert entries[0].details == {"hours": 48, "reason": SUSPENSION_REASON}
+
+    def test_notifies_the_user(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sent: list[tuple[str, int, str]] = []
+        monkeypatch.setattr(
+            user_service,
+            "send_suspension_notification",
+            lambda *args: sent.append(args),
+        )
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+
+        report_service.suspend_user_for_moderator(
+            db_session, member.id, moderator, _suspend_request(hours=24)
+        )
+
+        assert sent == [(member.email, 24, SUSPENSION_REASON)]
+
+    def test_moderator_cannot_suspend_outside_their_cells(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        elsewhere = _make_user(
+            db_session,
+            "elsewhere@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            report_service.suspend_user_for_moderator(
+                db_session, elsewhere.id, moderator, _suspend_request()
+            )
+
+        assert exc.value.status_code == 403
+        db_session.refresh(elsewhere)
+        assert elsewhere.account_status == AccountStatus.ACTIVE
+
+    def test_the_cell_check_runs_before_anything_else(
+        self, db_session: Session
+    ) -> None:
+        """
+        A moderator reaching outside their cells is answered 403 and nothing
+        more – not the 400 that would betray the state of that account.
+        """
+        moderator = _make_moderator(db_session)
+        elsewhere = _make_user(
+            db_session,
+            "elsewhere@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+            account_status=AccountStatus.SUSPENDED,
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            report_service.suspend_user_for_moderator(
+                db_session, elsewhere.id, moderator, _suspend_request()
+            )
+
+        assert exc.value.status_code == 403
+
+    def test_an_already_suspended_user_is_rejected(self, db_session: Session) -> None:
+        moderator = _make_moderator(db_session)
+        member = _card_user(db_session)
+        report_service.suspend_user_for_moderator(
+            db_session, member.id, moderator, _suspend_request()
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            report_service.suspend_user_for_moderator(
+                db_session, member.id, moderator, _suspend_request()
+            )
+
+        assert exc.value.status_code == 400
+
+    def test_only_regular_users_can_be_suspended(self, db_session: Session) -> None:
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        professional = _make_user(
+            db_session,
+            "pro@example.com",
+            role=UserRole.PROFESSIONAL,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            report_service.suspend_user_for_moderator(
+                db_session, professional.id, admin, _suspend_request()
+            )
+
+        assert exc.value.status_code == 400
+
+    def test_admin_can_suspend_any_user(self, db_session: Session) -> None:
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        elsewhere = _make_user(
+            db_session,
+            "elsewhere@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+            account_status=AccountStatus.ACTIVE,
+        )
+
+        card = report_service.suspend_user_for_moderator(
+            db_session, elsewhere.id, admin, _suspend_request()
+        )
+
+        assert card.is_suspended is True
+
+    def test_nonexistent_user_is_404(self, db_session: Session) -> None:
+        moderator = _make_moderator(db_session)
+
+        with pytest.raises(HTTPException) as exc:
+            report_service.suspend_user_for_moderator(
+                db_session, "no-such-user", moderator, _suspend_request()
+            )
+
+        assert exc.value.status_code == 404
+
+
+class TestSuspendUserRequestValidation:
+    def test_reason_is_mandatory(self) -> None:
+        with pytest.raises(ValidationError):
+            SuspendUserRequest(hours=48)  # type: ignore[call-arg]
+
+    def test_hours_must_be_positive(self) -> None:
+        with pytest.raises(ValidationError):
+            SuspendUserRequest(hours=0, reason=SUSPENSION_REASON)

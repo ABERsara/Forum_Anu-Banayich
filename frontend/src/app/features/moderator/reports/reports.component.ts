@@ -26,6 +26,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 
 import { ReportWithContent } from '../../../core/models';
 import {
@@ -55,7 +56,13 @@ interface PendingDecision {
 @Component({
   selector: 'app-moderator-reports',
   standalone: true,
-  imports: [DatePipe, ConfirmDialogComponent, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    DatePipe,
+    RouterLink,
+    ConfirmDialogComponent,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './reports.component.html',
   styleUrl: './reports.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

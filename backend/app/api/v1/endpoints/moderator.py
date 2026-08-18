@@ -7,6 +7,8 @@ GET  /moderator/reports             – pending reports in moderator's cells
 GET  /moderator/reports/history     – reports already decided, paginated
 GET  /moderator/reports/{id}        – single report with full context
 POST /moderator/reports/{id}/decide – decide on a report (valid/invalid)
+GET  /moderator/users/{id}/card     – one user's moderation history
+POST /moderator/users/{id}/suspend  – suspend that user by hand
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -24,6 +26,7 @@ from app.schemas.report import (
     ReportResponse,
     ReportWithContent,
 )
+from app.schemas.user import SuspendUserRequest, UserModerationCard
 from app.services import report_service
 
 router = APIRouter(
@@ -137,3 +140,41 @@ def decide_report(
     """
     report = report_service.decide_report(db, report_id, data, current_user)
     return ReportResponse.model_validate(report)
+
+
+# ---------------------------------------------------------------------------
+# The user card (SPEC §7.3)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/users/{user_id}/card", response_model=UserModerationCard)
+def get_user_card(
+    user_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> UserModerationCard:
+    """
+    Return one user's moderation history: how often they were reported, how
+    those reports were decided, how many of the reports they filed turned out
+    to be false, and whether they are currently suspended.
+
+    Scoped to the moderator's own cells – 403 for a user outside them.
+    """
+    return report_service.get_user_card(db, user_id, current_user)
+
+
+@router.post("/users/{user_id}/suspend", response_model=UserModerationCard)
+def suspend_user(
+    user_id: str,
+    data: SuspendUserRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> UserModerationCard:
+    """
+    Suspend a user by hand for `hours` hours, with a reason for the record.
+
+    Answers with the card as it now stands, rather than with UserAdminView as
+    the admin route does: the reply goes back to a moderator, and the card is
+    the moderator's view of a user – counts and cell, no contact details.
+    """
+    return report_service.suspend_user_for_moderator(db, user_id, current_user, data)

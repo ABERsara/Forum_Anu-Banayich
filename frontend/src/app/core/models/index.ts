@@ -73,10 +73,38 @@ export interface ProfessionalProfile {
   professional_description: string | null;
 }
 
-/** Admin suspends an active user for N hours. */
+/** Admin or moderator suspends an active user for N hours. */
 export interface SuspendUserRequest {
   hours: number;
   reason: string;
+}
+
+/**
+ * One user's moderation history, as the moderator responsible for their cell
+ * sees it (SPEC §7.3, "כרטיס משתמש").
+ *
+ * Deliberately without contact details: UserAdminView carries the email,
+ * phone and ID number, and it is an admin view for exactly that reason.
+ */
+export interface UserModerationCard {
+  id: string;
+  first_name: string;
+  last_name: string;
+  user_type: UserType | null;
+  sector: Sector | null;
+  account_status: AccountStatus;
+
+  /** Reports filed against this user; the rest of the total is still pending. */
+  reports_against_total: number;
+  reports_against_valid: number;
+  reports_against_invalid: number;
+
+  /** Reports this user filed about others. */
+  reports_filed_total: number;
+  false_reports_filed: number;
+
+  is_suspended: boolean;
+  suspended_until: string | null; // ISO datetime
 }
 
 // ---------------------------------------------------------------------------

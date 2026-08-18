@@ -18,7 +18,7 @@ import logging
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
-from sqlalchemy import ColumnElement, and_, or_
+from sqlalchemy import ColumnElement, and_, case, func, or_
 from sqlalchemy.orm import Query, Session, joinedload
 
 from app.core.constants import (
@@ -32,6 +32,8 @@ from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.report import ReportCreate, ReportDecideRequest
+from app.schemas.user import SuspendUserRequest, UserModerationCard
+from app.services import user_service
 from app.services.audit_service import log_action
 from app.services.email_service import (
     send_content_removed_notification,
@@ -169,6 +171,27 @@ def _cell_match_filter(cells: list[dict[str, str]]) -> ColumnElement[bool]:
     )
 
 
+def _moderator_covers(moderator: User, user: User) -> bool:
+    """
+    True if `user` sits in one of the cells this moderator oversees.
+
+    The in-Python counterpart to _cell_match_filter(): that one starts from
+    the cells and queries for matching users, this one has both objects in
+    hand already and only has to compare them.
+
+    A user with no group or sector – every non-USER role, plus a registration
+    the admin has not yet placed – belongs to no cell, so no moderator covers
+    them. An empty cell list likewise covers nobody.
+    """
+    if user.user_type is None or user.sector is None:
+        return False
+
+    return any(
+        cell["group"] == user.user_type and cell["sector"] == user.sector
+        for cell in moderator.moderator_cells or []
+    )
+
+
 def _moderator_emails_for(db: Session, post: ForumPost) -> list[str]:
     """
     Return contact addresses for moderators responsible for this post's
@@ -184,15 +207,7 @@ def _moderator_emails_for(db: Session, post: ForumPost) -> list[str]:
         .filter(User.moderator_cells.isnot(None))
         .all()
     )
-    matching = [
-        m
-        for m in moderators
-        if m.moderator_cells
-        and any(
-            cell["group"] == author.user_type and cell["sector"] == author.sector
-            for cell in m.moderator_cells
-        )
-    ]
+    matching = [m for m in moderators if _moderator_covers(m, author)]
     return [m.alert_email or m.email for m in matching]
 
 
@@ -437,6 +452,109 @@ def get_report_for_moderator(
             raise HTTPException(status_code=403, detail="אין הרשאה לצפות בדיווח זה.")
 
     return report
+
+
+# ---------------------------------------------------------------------------
+# The user card – one user's moderation history (SPEC §7.3)
+# ---------------------------------------------------------------------------
+
+
+def _user_in_moderators_cells(db: Session, user_id: str, moderator: User) -> User:
+    """
+    Load a user, enforcing that the moderator oversees the cell they belong
+    to. ADMIN is unscoped, the same way it is for reports (spec §3.2).
+
+    Raises 404 if there is no such user, 403 if they fall outside the
+    moderator's cells.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+
+    if moderator.role == UserRole.MODERATOR and not _moderator_covers(moderator, user):
+        raise HTTPException(status_code=403, detail="המשתמש אינו בתא שבאחריותך.")
+
+    return user
+
+
+def _card_for(db: Session, user: User) -> UserModerationCard:
+    """
+    Build the card for an already-authorized user: their identity, their
+    suspension state, and the five report counts behind the moderator's
+    judgement, counted in one query rather than five.
+
+    The counts span the whole reports table, not just this moderator's
+    cells: they describe the user's own conduct, and a partial count would
+    understate exactly the case the card exists to reveal — someone who was
+    reported repeatedly, in more than one cell.
+    """
+    reported = Report.reported_user_id == user.id
+    filed = Report.reporter_id == user.id
+    valid = Report.decision == ReportDecision.VALID
+    invalid = Report.decision == ReportDecision.INVALID
+
+    # count() ignores NULLs, and a case() without else_ yields NULL when the
+    # condition does not hold – so each count() sees only its own rows.
+    row = (
+        db.query(
+            func.count(case((reported, 1))),
+            func.count(case((and_(reported, valid), 1))),
+            func.count(case((and_(reported, invalid), 1))),
+            func.count(case((filed, 1))),
+            func.count(case((and_(filed, invalid), 1))),
+        )
+        .filter(or_(reported, filed))
+        .one()
+    )
+
+    return UserModerationCard(
+        id=user.id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        user_type=user.user_type,
+        sector=user.sector,
+        account_status=user.account_status,
+        reports_against_total=row[0],
+        reports_against_valid=row[1],
+        reports_against_invalid=row[2],
+        reports_filed_total=row[3],
+        false_reports_filed=row[4],
+        is_suspended=user.is_suspended,
+        suspended_until=user.suspended_until,
+    )
+
+
+def get_user_card(db: Session, user_id: str, moderator: User) -> UserModerationCard:
+    """
+    Return one user's moderation history for the moderator responsible for
+    their cell (SPEC §7.3, "כרטיס משתמש").
+    """
+    return _card_for(db, _user_in_moderators_cells(db, user_id, moderator))
+
+
+def suspend_user_for_moderator(
+    db: Session,
+    user_id: str,
+    moderator: User,
+    data: SuspendUserRequest,
+) -> UserModerationCard:
+    """
+    Suspend a user by hand from their card (SPEC §7.3, "אפשרות השעיה ידנית").
+
+    The cell check runs first, so a moderator reaching outside their cells is
+    told 403 and learns nothing further about the account. Everything past
+    that point – the "only an active regular user may be suspended" rules,
+    the suspension itself, the audit entry and the email to the user – is
+    user_service.suspend_user()'s, unchanged and shared with the admin route.
+
+    Returns the card as it now stands, so the caller that opened it does not
+    have to fetch it again to see the suspension it just applied.
+    """
+    user = _user_in_moderators_cells(db, user_id, moderator)
+    suspended = user_service.suspend_user(
+        db, user.id, moderator, data.hours, data.reason
+    )
+    return _card_for(db, suspended)
 
 
 def _check_auto_suspension(db: Session, reported_user: User) -> None:

@@ -205,6 +205,13 @@ export const routes: Routes = [
             (m) => m.ModeratorReportsComponent,
           ),
       },
+      {
+        path: 'users/:userId',
+        loadComponent: () =>
+          import('./features/moderator/user-card/user-card.component').then(
+            (m) => m.ModeratorUserCardComponent,
+          ),
+      },
     ],
   },
 

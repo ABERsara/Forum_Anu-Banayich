@@ -15,6 +15,8 @@ import {
   ReportDecideRequest,
   ReportHistoryList,
   ReportList,
+  SuspendUserRequest,
+  UserModerationCard,
 } from '../models';
 import { ApiService } from './api.service';
 
@@ -42,6 +44,20 @@ export class ReportService {
 
   decideReport(reportId: string, data: ReportDecideRequest): Observable<Report> {
     return this.api.post<Report>(`/moderator/reports/${reportId}/decide`, data);
+  }
+
+  /** One user's moderation history, scoped to the moderator's own cells. */
+  getUserCard(userId: string): Observable<UserModerationCard> {
+    return this.api.get<UserModerationCard>(`/moderator/users/${userId}/card`);
+  }
+
+  /**
+   * Suspend a user by hand from their card. Answers with the card as it now
+   * stands, so the page does not have to fetch it again.
+   */
+  suspendUser(userId: string, hours: number, reason: string): Observable<UserModerationCard> {
+    const body: SuspendUserRequest = { hours, reason };
+    return this.api.post<UserModerationCard>(`/moderator/users/${userId}/suspend`, body);
   }
 
   // Admin

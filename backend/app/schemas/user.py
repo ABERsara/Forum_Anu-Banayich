@@ -89,6 +89,39 @@ class SuspendUserRequest(BaseModel):
     reason: str = Field(..., min_length=5, max_length=100)
 
 
+class UserModerationCard(BaseModel):
+    """
+    GET /moderator/users/{id}/card – one user's moderation history, as the
+    moderator responsible for their cell sees it (SPEC §7.3, "כרטיס משתמש").
+
+    Deliberately without contact details: a moderator moderates content, and
+    the decision in front of them rests on the counts and the cell, not on
+    the person's email, phone or ID number. UserAdminView carries those, and
+    is an admin view for exactly that reason.
+    """
+
+    id: str
+    first_name: str
+    last_name: str
+    user_type: UserType | None = None
+    sector: Sector | None = None
+    account_status: AccountStatus
+
+    # Reports filed against this user. "valid" and "invalid" are the
+    # moderator decisions already made; the rest are still pending.
+    reports_against_total: int
+    reports_against_valid: int
+    reports_against_invalid: int
+
+    # Reports this user filed about others. A high false_reports_filed is
+    # what SPEC §7.2 calls a "מדווח-שגוי תכוף".
+    reports_filed_total: int
+    false_reports_filed: int
+
+    is_suspended: bool
+    suspended_until: datetime | None = None
+
+
 class ProfessionalProfile(BaseModel):
     """What a regular user sees when browsing professionals."""
 

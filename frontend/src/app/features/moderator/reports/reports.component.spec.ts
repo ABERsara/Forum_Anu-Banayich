@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -72,7 +73,7 @@ describe('ModeratorReportsComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [ModeratorReportsComponent],
-      providers: [{ provide: ReportService, useValue: reportServiceMock }],
+      providers: [{ provide: ReportService, useValue: reportServiceMock }, provideRouter([])],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ModeratorReportsComponent);
@@ -96,6 +97,13 @@ describe('ModeratorReportsComponent', () => {
       expect(text).toContain('הטרדה');
       expect(text).toContain('2 דיווחים');
       expect(text).not.toContain('user-1');
+    });
+
+    it('opens the way through to the card of the reported user', () => {
+      const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.reports__card-link');
+
+      expect(link.getAttribute('href')).toBe('/moderator/users/user-2');
+      expect(link.getAttribute('aria-label')).toContain('כותרת ההודעה');
     });
 
     it('sets hasError when the queue fails to load', () => {
