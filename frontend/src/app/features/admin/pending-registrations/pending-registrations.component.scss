@@ -1,5 +1,156 @@
 @use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
 
-.error-message {
-  color: $color-danger;
+.page {
+  padding: $spacing-md;
+  direction: rtl;
+
+  &__hint {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-md;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The queue – one row per registration waiting for a decision
+// ---------------------------------------------------------------------------
+
+.queue {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  &__item {
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    margin-bottom: $spacing-sm;
+    background: $color-bg;
+  }
+
+  &__row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: $spacing-md;
+  }
+
+  &__summary {
+    flex: 1 1 260px;
+  }
+
+  &__name {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-bold;
+    margin: 0;
+  }
+
+  &__meta {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: $spacing-xs 0;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The opened registration
+// ---------------------------------------------------------------------------
+
+.detail {
+  border-top: 1px solid $color-border;
+  margin-top: $spacing-md;
+  padding-top: $spacing-md;
+
+  &__progress {
+    color: $color-warning;
+    font-size: $font-size-sm;
+    margin: 0 0 $spacing-md;
+  }
+
+  &__title {
+    font-size: $font-size-base;
+    font-weight: $font-weight-bold;
+    margin: $spacing-md 0 $spacing-sm;
+  }
+
+  &__fields {
+    display: grid;
+    gap: $spacing-sm $spacing-md;
+    margin: 0;
+
+    @include responsive(md) {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  &__field {
+    background: $color-bg-subtle;
+    border-radius: $radius-sm;
+    padding: $spacing-sm;
+
+    dt {
+      color: $color-text-muted;
+      font-size: $font-size-xs;
+    }
+
+    dd {
+      margin: $spacing-xs 0 0;
+      // A long email must wrap inside its own cell rather than widen the grid.
+      overflow-wrap: anywhere;
+    }
+  }
+
+  &__note {
+    display: block;
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+    margin: $spacing-xs 0 0;
+  }
+
+  &__empty {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: 0;
+  }
+}
+
+.documents {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  &__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $spacing-sm;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $spacing-sm;
+    margin-bottom: $spacing-xs;
+  }
+
+  &__uploaded,
+  &__expiry {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+}
+
+.badge {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  background: rgba($color-primary, 0.12);
+  color: $color-primary-dark;
 }
