@@ -21,13 +21,9 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-<<<<<<< Updated upstream
-    env_file: ./backend/.env
-=======
     env_file:
       - path: ./backend/.env
         required: false
->>>>>>> Stashed changes
     environment:
       - DATABASE_URL=postgresql+psycopg2://user:${POSTGRES_PASSWORD:-password}@db:5432/anu_banayich
     depends_on:
