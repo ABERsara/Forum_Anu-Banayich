@@ -20,6 +20,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../core/services/auth.service';
+import { GoogleAuthService } from '../../../core/services/google-auth.service';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { LoginRequest } from '../../../core/models';
@@ -75,6 +76,17 @@ import { LoginRequest } from '../../../core/models';
           </button>
         </form>
 
+        <div class="divider"><span>או</span></div>
+
+        <button
+          type="button"
+          class="btn-google"
+          [disabled]="isLoading()"
+          (click)="onGoogleSignIn()"
+        >
+          התחבר עם Google
+        </button>
+
         <p class="register-link">אין לך חשבון? <a routerLink="/register">הירשם/י כאן</a></p>
       </div>
     </div>
@@ -83,6 +95,7 @@ import { LoginRequest } from '../../../core/models';
 export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly googleAuth = inject(GoogleAuthService);
   private readonly router = inject(Router);
 
   form = this.fb.group({
@@ -109,6 +122,30 @@ export class LoginComponent {
       },
       error: (err) => {
         this.errorMessage.set(err.error?.detail ?? 'שגיאה בכניסה. בדוק/י את הפרטים.');
+        this.isLoading.set(false);
+      },
+    });
+  }
+
+  onGoogleSignIn(): void {
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+
+    this.googleAuth.signInWithGoogle().subscribe({
+      next: (idToken) => {
+        this.auth.loginWithGoogle(idToken).subscribe({
+          next: () => {
+            this.isLoading.set(false);
+            this.router.navigate(['/home']);
+          },
+          error: (err) => {
+            this.errorMessage.set(err.error?.detail ?? 'שגיאה בכניסה עם Google.');
+            this.isLoading.set(false);
+          },
+        });
+      },
+      error: () => {
+        this.errorMessage.set('הכניסה עם Google בוטלה או נכשלה.');
         this.isLoading.set(false);
       },
     });
