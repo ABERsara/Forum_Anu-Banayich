@@ -4,8 +4,8 @@ import { TestBed } from '@angular/core/testing';
 
 import { AdminService } from './admin.service';
 import { environment } from '../../../environments/environment';
-import { Sector, UserType } from '../constants';
-import type { ForumPost, ModeratorAdminView, UserAdminView } from '../models';
+import { DocumentType, Sector, UserType } from '../constants';
+import type { ForumPost, ModeratorAdminView, RegistrationDetail, UserAdminView } from '../models';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -20,6 +20,28 @@ describe('AdminService', () => {
   });
 
   afterEach(() => httpMock.verify());
+
+  it('getRegistration GETs one registration with its documents', () => {
+    let result: RegistrationDetail | undefined;
+    service.getRegistration('u1').subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/registrations/u1`);
+    expect(req.request.method).toBe('GET');
+
+    const mockDetail = {
+      id: 'u1',
+      documents: [
+        {
+          id: 'd1',
+          doc_type: DocumentType.DEATH_CERTIFICATE,
+          expires_on: null,
+          uploaded_at: '2026-06-30T04:20:00',
+        },
+      ],
+    } as RegistrationDetail;
+    req.flush(mockDetail);
+    expect(result).toEqual(mockDetail);
+  });
 
   it('approveRegistration POSTs to the approve endpoint with no body', () => {
     let result: UserAdminView | undefined;

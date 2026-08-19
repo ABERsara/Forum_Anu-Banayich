@@ -11,6 +11,7 @@
 
 import {
   AccountStatus,
+  DocumentType,
   GroupVisibility,
   ProfessionalDomain,
   QueryStatus,
@@ -57,6 +58,30 @@ export interface UserAdminView extends UserProfile {
   second_approver_id: string | null;
   approved_at: string | null;
   rejection_reason: string | null;
+}
+
+/**
+ * One document filed with a registration, as the reviewing admin sees it —
+ * metadata only.
+ *
+ * There is no link here on purpose: the files are opened through time-limited
+ * presigned URLs (SPEC §9.1), which are still in the backlog, and the storage
+ * path behind them is never handed to the client.
+ */
+export interface DocumentAdminView {
+  id: string;
+  doc_type: DocumentType;
+  /** ISO date "YYYY-MM-DD". Null for documents that do not expire. */
+  expires_on: string | null;
+  uploaded_at: string; // ISO datetime
+}
+
+/**
+ * One registration as the deciding admin reads it: everything the queue row
+ * carries, plus the documents that came with it, oldest upload first.
+ */
+export interface RegistrationDetail extends UserAdminView {
+  documents: DocumentAdminView[];
 }
 
 /** Admin rejects a pending registration. */

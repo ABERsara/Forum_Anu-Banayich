@@ -6,6 +6,10 @@ UserProfile     → what a user sees about themselves
 UserAdminView   → what an admin sees (includes status, documents)
 RegistrationItem → pending registration in admin queue
 
+Registration review (SPEC §8.2 – the admin deciding on one request):
+DocumentAdminView     → one uploaded document, metadata only
+RegistrationDetailView → the whole request as the deciding admin reads it
+
 Moderator roster (SPEC §7 – the admin side of moderation):
 ModeratorCell           → one group×sector cell a moderator oversees
 ModeratorAdminView      → a moderator as the admin managing the roster sees them
@@ -20,6 +24,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.constants import (
     AccountStatus,
+    DocumentType,
     ProfessionalDomain,
     Sector,
     UserRole,
@@ -75,6 +80,46 @@ class UserAdminView(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DocumentAdminView(BaseModel):
+    """
+    One document uploaded with a registration — metadata only.
+
+    What the file *is*, when it arrived and how long it stays valid is what
+    tells the admin whether the request is complete; the file itself is opened
+    through a time-limited presigned URL (SPEC §9.1), which is not built yet.
+
+    Two columns are deliberately not in this contract:
+      - `storage_url` — the path inside the bucket. It is not a link anyone
+        can open, and handing it out is a private detail of how files are
+        stored, not part of reviewing a registration.
+      - `content_hash` — an integrity check that belongs to downloading the
+        file. On its own it is a fingerprint of the document's contents, and
+        an admin cannot decide anything from it.
+    """
+
+    id: str
+    doc_type: DocumentType
+    #: Some documents carry their own expiry (an ID card, a passport); most do not.
+    expires_on: date | None = None
+    uploaded_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RegistrationDetailView(UserAdminView):
+    """
+    One registration as the deciding admin reads it: the whole applicant
+    profile UserAdminView carries, plus the documents uploaded with it.
+
+    The queue (GET /admin/registrations) stays on UserAdminView. It answers
+    "who is waiting", and it never renders a document, so fetching every
+    applicant's documents there would be a query per row for nothing.
+    """
+
+    #: Oldest upload first — the order the applicant filed them in.
+    documents: list[DocumentAdminView] = Field(default_factory=list)
 
 
 class RegistrationApproveRequest(BaseModel):
