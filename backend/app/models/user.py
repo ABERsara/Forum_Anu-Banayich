@@ -54,6 +54,9 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole), nullable=False, default=UserRole.USER
     )
+    google_uid: Mapped[str | None] = mapped_column(
+        String(128), unique=True, nullable=True
+    )
 
     # ------------------------------------------------------------------
     # Basic identity (all roles)
