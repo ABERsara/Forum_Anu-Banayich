@@ -17,6 +17,7 @@ EXPECTED_TABLES = {
     "audit_logs",
 }
 
+
 def test_migration_creates_all_tables(monkeypatch) -> None:
     with tempfile.TemporaryDirectory() as tmp_dir:
         db_path = os.path.join(tmp_dir, "test_migration.db")

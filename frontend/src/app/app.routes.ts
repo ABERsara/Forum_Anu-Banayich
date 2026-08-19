@@ -194,6 +194,28 @@ export const routes: Routes = [
   },
 
   // ──────────────────────────────────────────────────────────
+  // Professional routes
+  // ──────────────────────────────────────────────────────────
+  {
+    path: 'professional',
+    canActivate: [authGuard, roleGuard(UserRole.PROFESSIONAL)],
+    children: [
+      {
+        path: '',
+        redirectTo: 'questions',
+        pathMatch: 'full',
+      },
+      {
+        path: 'questions',
+        loadComponent: () =>
+          import('./features/advice/pending-questions/pending-questions.component').then(
+            (m) => m.PendingQuestionsComponent,
+          ),
+      },
+    ],
+  },
+
+  // ──────────────────────────────────────────────────────────
   // Moderator routes
   // ──────────────────────────────────────────────────────────
   {
