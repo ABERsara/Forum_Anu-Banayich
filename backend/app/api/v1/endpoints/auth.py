@@ -6,13 +6,17 @@ POST /auth/verify-otp    – verify OTP (email/phone)
 POST /auth/login         – login, returns JWT
 POST /auth/refresh       – refresh access token
 POST /auth/resend-otp    – resend OTP
+POST /auth/google        – login with a verified Firebase/Google ID token
+POST /auth/google/link   – link a Google account to the current session
 """
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db
+from app.core.dependencies import get_current_active_user, get_db
+from app.models.user import User
 from app.schemas.auth import (
+    GoogleAuthRequest,
     LoginRequest,
     OtpVerifyRequest,
     RefreshRequest,
@@ -70,3 +74,27 @@ def resend_otp(data: ResendOtpRequest, db: Session = Depends(get_db)) -> dict[st
     auth_service.resend_otp(db, data.email)
     # PROD: deviates from spec — spec defines "קוד OTP חדש נשלח.", message changed for consistency with other project messages. Reconsider before PROD.
     return {"message": "קוד אימות נשלח מחדש"}
+
+
+@router.post("/google", response_model=TokenResponse)
+def google_login(
+    data: GoogleAuthRequest, db: Session = Depends(get_db)
+) -> TokenResponse:
+    """
+    Login with a verified Firebase/Google ID token.
+
+    Matches an existing ACTIVE account by google_uid, or by verified email on
+    first use (auto-linking it). Returns the same JWT pair shape as /login.
+    """
+    return auth_service.google_login(db, data)
+
+
+@router.post("/google/link")
+def google_link(
+    data: GoogleAuthRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict[str, str]:
+    """Link a verified Google account to the currently logged-in session."""
+    auth_service.google_link(db, current_user, data)
+    return {"message": "חשבון Google קושר בהצלחה."}
