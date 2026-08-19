@@ -111,6 +111,11 @@ export interface TokenResponse {
   token_type: 'bearer';
 }
 
+/** Body for POST /auth/google and POST /auth/google/link. */
+export interface GoogleAuthRequest {
+  id_token: string;
+}
+
 // ---------------------------------------------------------------------------
 // Forum
 // ---------------------------------------------------------------------------

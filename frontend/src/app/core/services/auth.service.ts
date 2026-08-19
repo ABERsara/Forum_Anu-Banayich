@@ -16,6 +16,7 @@ import { Router } from '@angular/router';
 import { Observable, tap, throwError } from 'rxjs';
 
 import {
+  GoogleAuthRequest,
   LoginRequest,
   OtpVerifyRequest,
   RegisterRequest,
@@ -77,6 +78,18 @@ export class AuthService {
       tap((tokens) => {
         this.saveTokens(tokens);
         // if profile load fails after login, clear tokens to avoid a half-authenticated state
+        this.loadCurrentUser().subscribe({
+          error: () => this.clearTokens(),
+        });
+      }),
+    );
+  }
+
+  loginWithGoogle(idToken: string): Observable<TokenResponse> {
+    const body: GoogleAuthRequest = { id_token: idToken };
+    return this.api.post<TokenResponse>('/auth/google', body).pipe(
+      tap((tokens) => {
+        this.saveTokens(tokens);
         this.loadCurrentUser().subscribe({
           error: () => this.clearTokens(),
         });
