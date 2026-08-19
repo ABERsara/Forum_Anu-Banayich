@@ -4,8 +4,8 @@ import { TestBed } from '@angular/core/testing';
 
 import { AdminService } from './admin.service';
 import { environment } from '../../../environments/environment';
-import { DocumentType } from '../constants';
-import type { ForumPost, RegistrationDetail, UserAdminView } from '../models';
+import { DocumentType, Sector, UserType } from '../constants';
+import type { ForumPost, ModeratorAdminView, RegistrationDetail, UserAdminView } from '../models';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -94,6 +94,65 @@ describe('AdminService', () => {
     const mockUsers = [{ id: 'u1' }] as UserAdminView[];
     req.flush(mockUsers);
     expect(result).toEqual(mockUsers);
+  });
+
+  it('getModerators GETs the moderator roster', () => {
+    let result: ModeratorAdminView[] | undefined;
+    service.getModerators().subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/moderators`);
+    expect(req.request.method).toBe('GET');
+
+    const mockRoster = [{ id: 'm1' }] as ModeratorAdminView[];
+    req.flush(mockRoster);
+    expect(result).toEqual(mockRoster);
+  });
+
+  it('addModerator POSTs the new moderator with their cells', () => {
+    const body = {
+      first_name: 'שרה',
+      last_name: 'לוי',
+      email: 'sara.levi@example.com',
+      moderator_cells: [
+        { group: UserType.WIDOW, sector: Sector.SEPHARDIC },
+        { group: UserType.WIDOWER, sector: Sector.SEPHARDIC },
+      ],
+      alert_email: 'alerts.sara@example.com',
+    };
+    let result: ModeratorAdminView | undefined;
+    service.addModerator(body).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/moderators`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(body);
+
+    const created = { id: 'm1' } as ModeratorAdminView;
+    req.flush(created);
+    expect(result).toEqual(created);
+  });
+
+  it('updateModerator PATCHes only the submitted fields', () => {
+    let result: ModeratorAdminView | undefined;
+    service.updateModerator('m1', { alert_email: null }).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/moderators/m1`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ alert_email: null });
+
+    const updated = { id: 'm1' } as ModeratorAdminView;
+    req.flush(updated);
+    expect(result).toEqual(updated);
+  });
+
+  it('removeModerator DELETEs the moderator', () => {
+    let completed = false;
+    service.removeModerator('m1').subscribe(() => (completed = true));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/moderators/m1`);
+    expect(req.request.method).toBe('DELETE');
+
+    req.flush(null);
+    expect(completed).toBe(true);
   });
 
   it('suspendUser POSTs to the suspend endpoint with hours and reason', () => {

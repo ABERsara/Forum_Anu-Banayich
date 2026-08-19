@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
+    AccountStatus,
     GroupVisibility,
     PostStatus,
     ReportDecision,
@@ -27,12 +28,16 @@ def _make_user(
     role: UserRole = UserRole.USER,
     alert_email: str | None = None,
 ) -> User:
+    # ACTIVE by default: everyone in these scenarios is a live account, and
+    # alerts only go to moderators still on the roster (see
+    # report_service._moderator_emails_for).
     user = User(
         email=email,
         password_hash="hashed",
         first_name="Test",
         last_name="User",
         role=role,
+        account_status=AccountStatus.ACTIVE,
         alert_email=alert_email,
     )
     db_session.add(user)

@@ -40,6 +40,8 @@ def upgrade() -> None:
                 "PROFESSIONAL_ADDED",
                 "PROFESSIONAL_UPDATED",
                 "MODERATOR_ASSIGNED",
+                "MODERATOR_UPDATED",
+                "MODERATOR_REMOVED",
                 "DATA_EXPORTED",
                 "USER_LOGIN",
                 "USER_LOGOUT",

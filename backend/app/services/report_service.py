@@ -22,7 +22,7 @@ import logging
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.constants import PostStatus, ReportTargetType, UserRole
+from app.core.constants import AccountStatus, PostStatus, ReportTargetType, UserRole
 from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
@@ -146,6 +146,11 @@ def _moderator_emails_for(db: Session) -> list[str]:
     """
     Return contact addresses for all active moderators.
 
+    Removed moderators keep their row with role=MODERATOR — the appointment is
+    revoked by cancelling the account (see user_service.remove_moderator) — so
+    the status filter is what keeps alerts from following someone off the
+    roster.
+
     TEMPORARY: broadcasts to every moderator, regardless of which group/sector
     they're actually responsible for — moderator_cells matching isn't
     implemented anywhere yet. Sprint 4 will replace only this function's body
@@ -153,7 +158,14 @@ def _moderator_emails_for(db: Session) -> list[str]:
     post.sector_visibility)) once that mechanism exists; callers in
     file_report()/_notify_moderators() won't need to change.
     """
-    moderators = db.query(User).filter(User.role == UserRole.MODERATOR).all()
+    moderators = (
+        db.query(User)
+        .filter(
+            User.role == UserRole.MODERATOR,
+            User.account_status == AccountStatus.ACTIVE,
+        )
+        .all()
+    )
     return [m.alert_email or m.email for m in moderators]
 
 
