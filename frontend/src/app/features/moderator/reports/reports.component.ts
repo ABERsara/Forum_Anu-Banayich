@@ -18,7 +18,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 
 import { ReportWithContent } from '../../../core/models';
-import { ReportDecision, REPORT_REASON_LABELS } from '../../../core/constants';
+import { POST_STATUS_LABELS, ReportDecision, REPORT_REASON_LABELS } from '../../../core/constants';
 import { ReportService } from '../../../core/services/report.service';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -37,7 +37,9 @@ const PREVIEW_LENGTH = 200;
         <app-loading-spinner message="טוען דיווחים..." />
       }
 
-      <app-error-display [message]="hasError() ? 'שגיאה בטעינת הדיווחים.' : ''" />
+      @if (hasError()) {
+        <app-error-display message="שגיאה בטעינת הדיווחים." />
+      }
 
       @if (!isLoading() && !hasError() && pendingReports().length === 0) {
         <p>אין דיווחים ממתינים. כל הכבוד!</p>
@@ -56,6 +58,7 @@ const PREVIEW_LENGTH = 200;
           <p>{{ previewOf(report.content_text) }}</p>
           <p><strong>סיבה:</strong> {{ reasonLabels[report.reason] }}</p>
           <p><strong>תיאור:</strong> {{ report.description ?? '–' }}</p>
+          <p><strong>סטטוס תוכן:</strong> {{ statusLabels[report.content_status] }}</p>
 
           <div style="margin-top: 0.5rem">
             <button (click)="decide(report.id, 'valid')">מחיקת ההודעה (מוצדק)</button>
@@ -75,6 +78,7 @@ export class ModeratorReportsComponent implements OnInit {
   isLoading = signal(false);
   hasError = signal(false);
   readonly reasonLabels = REPORT_REASON_LABELS;
+  readonly statusLabels = POST_STATUS_LABELS;
 
   ngOnInit(): void {
     this.isLoading.set(true);
