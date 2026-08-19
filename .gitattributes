@@ -1,0 +1,5 @@
+# Normalize line endings to LF for all text files, regardless of each
+# developer's local core.autocrlf setting. Prevents npm run format:check
+# (Prettier defaults to endOfLine: "lf") from flagging every file as
+# unformatted on Windows checkouts.
+* text=auto eol=lf
