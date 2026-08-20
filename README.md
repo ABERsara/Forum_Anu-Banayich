@@ -661,4 +661,19 @@ npm run build:prod    # build לייצור
 
 ---
 
+## CI/CD Secrets
+
+`deploy.yml` (פריסה אוטומטית ב-push ל-`main`) דורש 4 GitHub Secrets (Settings → Secrets and variables → Actions):
+
+| Secret | מקור |
+|--------|------|
+| `RENDER_DEPLOY_HOOK_URL` | Render → `anu-banayich-backend` → Settings → Deploy Hook |
+| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
+| `VERCEL_ORG_ID` | נוצר אוטומטית בקובץ `frontend/.vercel/project.json` לאחר `vercel link` |
+| `VERCEL_PROJECT_ID` | נוצר אוטומטית בקובץ `frontend/.vercel/project.json` לאחר `vercel link` |
+
+> ⚠️ הוספת ה-secrets דורשת הרשאת Admin לריפו (בעלים בלבד).
+
+---
+
 > 📌 לפני PR – ראי [CHECKLIST.md](CHECKLIST.md)
