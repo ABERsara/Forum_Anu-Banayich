@@ -7,6 +7,9 @@ import {
   ModeratorAdminView,
   ModeratorCreateRequest,
   ModeratorUpdateRequest,
+  ProfessionalAdminView,
+  ProfessionalCreateRequest,
+  ProfessionalUpdateRequest,
   RegistrationDetail,
   RegistrationRejectRequest,
   SuspendUserRequest,
@@ -70,5 +73,21 @@ export class AdminService {
   /** Takes the moderator off the roster. The endpoint answers 204, no body. */
   removeModerator(userId: string): Observable<void> {
     return this.api.delete<void>(`/admin/moderators/${userId}`);
+  }
+
+  /** The whole catalog, including professionals currently unlisted. */
+  getProfessionals(): Observable<ProfessionalAdminView[]> {
+    return this.api.get<ProfessionalAdminView[]>('/admin/professionals');
+  }
+
+  addProfessional(data: ProfessionalCreateRequest): Observable<ProfessionalAdminView> {
+    return this.api.post<ProfessionalAdminView>('/admin/professionals', data);
+  }
+
+  updateProfessional(
+    userId: string,
+    data: ProfessionalUpdateRequest,
+  ): Observable<ProfessionalAdminView> {
+    return this.api.put<ProfessionalAdminView>(`/admin/professionals/${userId}`, data);
   }
 }
