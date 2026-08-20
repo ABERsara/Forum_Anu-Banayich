@@ -98,10 +98,38 @@ export interface ProfessionalProfile {
   professional_description: string | null;
 }
 
-/** Admin suspends an active user for N hours. */
+/** Admin or moderator suspends an active user for N hours. */
 export interface SuspendUserRequest {
   hours: number;
   reason: string;
+}
+
+/**
+ * One user's moderation history, as the moderator responsible for their cell
+ * sees it (SPEC §7.3, "כרטיס משתמש").
+ *
+ * Deliberately without contact details: UserAdminView carries the email,
+ * phone and ID number, and it is an admin view for exactly that reason.
+ */
+export interface UserModerationCard {
+  id: string;
+  first_name: string;
+  last_name: string;
+  user_type: UserType | null;
+  sector: Sector | null;
+  account_status: AccountStatus;
+
+  /** Reports filed against this user; the rest of the total is still pending. */
+  reports_against_total: number;
+  reports_against_valid: number;
+  reports_against_invalid: number;
+
+  /** Reports this user filed about others. */
+  reports_filed_total: number;
+  false_reports_filed: number;
+
+  is_suspended: boolean;
+  suspended_until: string | null; // ISO datetime
 }
 
 // ---------------------------------------------------------------------------
@@ -326,9 +354,17 @@ export interface ReportWithContent extends Report {
   report_count: number;
 }
 
+/**
+ * A moderator's decision on a report. `decision` is VALID or INVALID —
+ * PENDING is the state a report starts in, and the backend rejects it here.
+ *
+ * The note is required, unlike the nullable moderator_note on Report: rows
+ * decided before this endpoint existed carry none, but no new decision may
+ * be made without one (SPEC §7.3, "הערת מבקר (לתיעוד)").
+ */
 export interface ReportDecideRequest {
   decision: ReportDecision;
-  note?: string;
+  note: string;
 }
 
 export interface ReportList {
@@ -336,6 +372,9 @@ export interface ReportList {
   total: number;
   pending_count: number;
 }
+
+/** Reports already decided in this moderator's cells, newest first. */
+export type ReportHistoryList = PaginatedResponse<ReportWithContent>;
 
 // ---------------------------------------------------------------------------
 // Pagination helper

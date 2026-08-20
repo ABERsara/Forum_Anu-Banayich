@@ -1,0 +1,83 @@
+<div class="page">
+  <a class="page__back" routerLink="/moderator/reports">← חזרה ללוח הבקרה</a>
+  <h1>כרטיס משתמש</h1>
+  <p class="page__hint">
+    ההיסטוריה שלהלן היא הבסיס להחלטה על השעיה. המספרים מתייחסים למשתמש/ת עצמו/ה — גם לדיווחים שהוגשו
+    בתאים אחרים.
+  </p>
+
+  <app-error-display [message]="actionError() ?? ''" />
+
+  @if (isLoading()) {
+    <app-loading-spinner message="טוען כרטיס משתמש..." />
+  } @else if (hasError()) {
+    <app-error-display message="אירעה שגיאה בטעינת כרטיס המשתמש. נסי לרענן את הדף." />
+  } @else if (card(); as card) {
+    <article class="card">
+      <header class="card__head">
+        <h2 class="card__name">{{ fullName() }}</h2>
+        <span class="badge">{{ cellLabel() }}</span>
+        <span class="badge" [class.badge--alert]="card.is_suspended">{{ statusLabel() }}</span>
+      </header>
+
+      <!--
+        role="status" so the change is announced after a suspension: the
+        button that caused it is gone by then, and this line is the only
+        thing on the page that says what happened.
+      -->
+      <p class="card__suspension" role="status">
+        @if (card.is_suspended) {
+          מושעה/ית עד {{ card.suspended_until | date: 'dd/MM/yyyy HH:mm' }}
+        } @else {
+          החשבון אינו מושעה כרגע.
+        }
+      </p>
+
+      <h3 class="card__section">היסטוריית דיווחים</h3>
+      <dl class="stats">
+        <div class="stats__item">
+          <dt>דיווחים נגד המשתמש/ת</dt>
+          <dd>{{ card.reports_against_total }}</dd>
+        </div>
+        <div class="stats__item">
+          <dt>מהם נמצאו מוצדקים</dt>
+          <dd>{{ card.reports_against_valid }}</dd>
+        </div>
+        <div class="stats__item">
+          <dt>מהם נמצאו שגויים</dt>
+          <dd>{{ card.reports_against_invalid }}</dd>
+        </div>
+        <div class="stats__item">
+          <dt>דיווחים שהגיש/ה</dt>
+          <dd>{{ card.reports_filed_total }}</dd>
+        </div>
+        <div class="stats__item stats__item--alert">
+          <dt>מהם נמצאו כוזבים</dt>
+          <dd>{{ card.false_reports_filed }}</dd>
+        </div>
+      </dl>
+
+      @if (canSuspend()) {
+        <h3 class="card__section">פעולות</h3>
+        <div class="card__actions">
+          <app-button variant="danger" [loading]="isSuspending()" (clicked)="openSuspendDialog()">
+            השעיית המשתמש/ת
+          </app-button>
+        </div>
+      }
+    </article>
+  }
+
+  @if (isSuspendDialogOpen()) {
+    <app-suspend-dialog
+      [message]="
+        'השעיית ' +
+        fullName() +
+        ' למשך מספר השעות שייקבע. תישלח הודעה עם הסיבה, והפעולה תירשם ביומן הביקורת.'
+      "
+      confirmText="השעיה"
+      (confirmed)="confirmSuspend($event)"
+      (cancelled)="cancelSuspend()"
+    />
+  }
+</div>
