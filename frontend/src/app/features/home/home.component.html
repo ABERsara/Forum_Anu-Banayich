@@ -34,11 +34,12 @@
         </a>
       }
 
-      <!-- #PROD: no /professional route yet — decide destination (dedicated page vs. /profile) and add routerLink before production -->
       @if (auth.isProfessional()) {
-        <app-card title="ייעוץ מקצועי" subtitle="בקרוב" [elevated]="true">
-          אזור אישי לאנשי מקצוע — בבנייה.
-        </app-card>
+        <a routerLink="/professional" class="home__card-link">
+          <app-card title="ייעוץ מקצועי" subtitle="שאלות הממתינות לתשובתך" [elevated]="true">
+            צפייה בשאלות שהופנו אליך והגשת תשובה לשואל/ת.
+          </app-card>
+        </a>
       }
     </div>
   } @else {

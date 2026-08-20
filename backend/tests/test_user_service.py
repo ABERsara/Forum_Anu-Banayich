@@ -140,10 +140,14 @@ class TestGetPendingRegistrations:
 
 
 class TestGetActiveUsers:
-    def test_returns_only_active_users_with_role_user(self, db_session: Session) -> None:
+    def test_returns_only_active_users_with_role_user(
+        self, db_session: Session
+    ) -> None:
         now = datetime.now(UTC).replace(tzinfo=None)
         _make_user(db_session, "active@example.com", AccountStatus.ACTIVE, now)
-        _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        _make_user(
+            db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now
+        )
         _make_user(db_session, "suspended@example.com", AccountStatus.SUSPENDED, now)
         _make_user(db_session, "rejected@example.com", AccountStatus.REJECTED, now)
         _make_admin(db_session, "admin@example.com")
@@ -156,11 +160,19 @@ class TestGetActiveUsers:
     def test_orders_by_created_at_ascending(self, db_session: Session) -> None:
         base = datetime.now(UTC).replace(tzinfo=None)
         newest = _make_user(
-            db_session, "newest@example.com", AccountStatus.ACTIVE, base + timedelta(minutes=2)
+            db_session,
+            "newest@example.com",
+            AccountStatus.ACTIVE,
+            base + timedelta(minutes=2),
         )
-        oldest = _make_user(db_session, "oldest@example.com", AccountStatus.ACTIVE, base)
+        oldest = _make_user(
+            db_session, "oldest@example.com", AccountStatus.ACTIVE, base
+        )
         middle = _make_user(
-            db_session, "middle@example.com", AccountStatus.ACTIVE, base + timedelta(minutes=1)
+            db_session,
+            "middle@example.com",
+            AccountStatus.ACTIVE,
+            base + timedelta(minutes=1),
         )
 
         result = user_service.get_active_users(db_session)
@@ -580,7 +592,6 @@ class TestRejectRegistration:
         assert details["reason"] == "not enough documents"
 
 
-
 class TestGetProfessionalsForUser:
     def test_matches_exact_group_and_sector(self, db_session: Session) -> None:
         user = _make_regular_user(
@@ -656,7 +667,7 @@ class TestGetProfessionalsForUser:
 
         assert result == []
 
-        
+
 def _create_request(**overrides: object) -> ProfessionalCreateRequest:
     """A valid POST /admin/professionals body, with per-test overrides."""
     payload: dict[str, object] = {
@@ -720,9 +731,7 @@ class TestCreateProfessional:
     def test_creates_an_active_professional_account(self, db_session: Session) -> None:
         admin = _make_admin(db_session, "admin@example.com")
 
-        result = user_service.create_professional(
-            db_session, _create_request(), admin
-        )
+        result = user_service.create_professional(db_session, _create_request(), admin)
 
         assert result.id is not None
         assert result.role == UserRole.PROFESSIONAL
@@ -782,9 +791,7 @@ class TestCreateProfessional:
     def test_creates_audit_log_entry(self, db_session: Session) -> None:
         admin = _make_admin(db_session, "admin@example.com")
 
-        result = user_service.create_professional(
-            db_session, _create_request(), admin
-        )
+        result = user_service.create_professional(db_session, _create_request(), admin)
 
         log = db_session.query(AuditLog).filter(AuditLog.entity_id == result.id).one()
         assert log.action == AuditAction.PROFESSIONAL_ADDED
@@ -942,9 +949,7 @@ class TestUpdateProfessional:
             user_service.update_professional(
                 db_session,
                 member.id,
-                ProfessionalUpdateRequest(
-                    professional_domain=ProfessionalDomain.RABBI
-                ),
+                ProfessionalUpdateRequest(professional_domain=ProfessionalDomain.RABBI),
                 admin,
             )
         assert exc_info.value.status_code == 400
@@ -1042,14 +1047,20 @@ class TestSuspendUser:
         admin = _make_admin(db_session, "admin1@example.com")
 
         before = datetime.now(UTC)
-        result = user_service.suspend_user(db_session, user.id, admin, 48, "spam behaviour")
+        result = user_service.suspend_user(
+            db_session, user.id, admin, 48, "spam behaviour"
+        )
         after = datetime.now(UTC)
 
         assert result.account_status == AccountStatus.SUSPENDED
         assert result.is_suspended is True
         assert result.suspended_until is not None
         suspended_until = result.suspended_until.replace(tzinfo=UTC)
-        assert before + timedelta(hours=48) <= suspended_until <= after + timedelta(hours=48)
+        assert (
+            before + timedelta(hours=48)
+            <= suspended_until
+            <= after + timedelta(hours=48)
+        )
 
     def test_sends_suspension_notification_email(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
@@ -1084,7 +1095,9 @@ class TestSuspendUser:
 
     def test_cannot_suspend_non_active_user(self, db_session: Session) -> None:
         now = datetime.now(UTC).replace(tzinfo=None)
-        user = _make_user(db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now)
+        user = _make_user(
+            db_session, "pending@example.com", AccountStatus.PENDING_APPROVAL, now
+        )
         admin = _make_admin(db_session, "admin1@example.com")
 
         with pytest.raises(HTTPException) as exc_info:
@@ -1096,12 +1109,16 @@ class TestSuspendUser:
         other_admin = _make_admin(db_session, "admin2@example.com")
 
         with pytest.raises(HTTPException) as exc_info:
-            user_service.suspend_user(db_session, other_admin.id, admin, 48, "spam behaviour")
+            user_service.suspend_user(
+                db_session, other_admin.id, admin, 48, "spam behaviour"
+            )
         assert exc_info.value.status_code == 400
 
     def test_suspend_nonexistent_user_raises_404(self, db_session: Session) -> None:
         admin = _make_admin(db_session, "admin1@example.com")
 
         with pytest.raises(HTTPException) as exc_info:
-            user_service.suspend_user(db_session, "does-not-exist", admin, 48, "spam behaviour")
+            user_service.suspend_user(
+                db_session, "does-not-exist", admin, 48, "spam behaviour"
+            )
         assert exc_info.value.status_code == 404

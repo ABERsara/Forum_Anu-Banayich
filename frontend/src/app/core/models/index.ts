@@ -11,6 +11,7 @@
 
 import {
   AccountStatus,
+  DocumentType,
   GroupVisibility,
   ProfessionalDomain,
   QueryStatus,
@@ -57,6 +58,30 @@ export interface UserAdminView extends UserProfile {
   second_approver_id: string | null;
   approved_at: string | null;
   rejection_reason: string | null;
+}
+
+/**
+ * One document filed with a registration, as the reviewing admin sees it —
+ * metadata only.
+ *
+ * There is no link here on purpose: the files are opened through time-limited
+ * presigned URLs (SPEC §9.1), which are still in the backlog, and the storage
+ * path behind them is never handed to the client.
+ */
+export interface DocumentAdminView {
+  id: string;
+  doc_type: DocumentType;
+  /** ISO date "YYYY-MM-DD". Null for documents that do not expire. */
+  expires_on: string | null;
+  uploaded_at: string; // ISO datetime
+}
+
+/**
+ * One registration as the deciding admin reads it: everything the queue row
+ * carries, plus the documents that came with it, oldest upload first.
+ */
+export interface RegistrationDetail extends UserAdminView {
+  documents: DocumentAdminView[];
 }
 
 /** Admin rejects a pending registration. */
@@ -123,6 +148,59 @@ export interface ProfessionalUpdateRequest {
 export interface SuspendUserRequest {
   hours: number;
   reason: string;
+}
+
+// ---------------------------------------------------------------------------
+// Moderator roster (admin side)
+// ---------------------------------------------------------------------------
+
+/**
+ * One cell of the group×sector matrix a moderator oversees, e.g. widows in
+ * the Sephardic sector.
+ *
+ * Both axes are the concrete enums, never the "all" wildcard the content
+ * visibility enums carry: a moderator answers for named cells, so "every
+ * cell" is expressed by ticking them.
+ */
+export interface ModeratorCell {
+  group: UserType;
+  sector: Sector;
+}
+
+/**
+ * A moderator as the admin managing the roster sees them: who they are, the
+ * cells they were assigned, and where their alerts are sent.
+ */
+export interface ModeratorAdminView {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: UserRole;
+  account_status: AccountStatus;
+  moderator_cells: ModeratorCell[];
+  /** Where report alerts go. Null means they go to `email`. */
+  alert_email: string | null;
+  created_at: string;
+}
+
+/** Admin appoints a moderator over the given cells. */
+export interface ModeratorCreateRequest {
+  first_name: string;
+  last_name: string;
+  email: string;
+  moderator_cells: ModeratorCell[];
+  alert_email: string | null;
+}
+
+/**
+ * Admin edits a moderator. Partial by design: an omitted key is left
+ * untouched, so `{ alert_email: 'x@y.z' }` only moves where alerts are sent.
+ * An explicit `null` alert_email clears it; the cell list cannot be emptied.
+ */
+export interface ModeratorUpdateRequest {
+  moderator_cells?: ModeratorCell[];
+  alert_email?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -286,13 +364,21 @@ export interface Report {
   created_at: string;
 }
 
+/** A report enriched with the reported content, returned by moderator views. */
+export interface ReportWithContent extends Report {
+  content_title: string;
+  content_text: string;
+  content_status: PostStatus;
+  report_count: number;
+}
+
 export interface ReportDecideRequest {
   decision: ReportDecision;
   note?: string;
 }
 
 export interface ReportList {
-  items: Report[];
+  items: ReportWithContent[];
   total: number;
   pending_count: number;
 }

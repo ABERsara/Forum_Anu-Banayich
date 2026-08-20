@@ -1,7 +1,9 @@
-import os, tempfile
+import os
+import tempfile
 from pathlib import Path
-from alembic.config import Config
+
 from alembic import command
+from alembic.config import Config
 from sqlalchemy import create_engine, inspect, pool
 
 import app.core.config as _cfg
@@ -16,6 +18,7 @@ EXPECTED_TABLES = {
     "documents",
     "audit_logs",
 }
+
 
 def test_migration_creates_all_tables(monkeypatch) -> None:
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -35,6 +38,6 @@ def test_migration_creates_all_tables(monkeypatch) -> None:
         actual_tables = set(inspect(engine).get_table_names())
         engine.dispose()  # release file lock before tempdir cleanup (Windows)
 
-    assert EXPECTED_TABLES <= actual_tables, (
+    assert actual_tables >= EXPECTED_TABLES, (
         f"Missing tables: {EXPECTED_TABLES - actual_tables}"
     )

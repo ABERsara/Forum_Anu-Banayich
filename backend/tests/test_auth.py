@@ -486,6 +486,14 @@ class TestGetCurrentUser:
         r = await client.get(ME, headers={"Authorization": "Bearer not.a.valid.jwt"})
         assert r.status_code == 401
 
+    async def test_refresh_token_used_as_bearer_returns_401(self, client, db_session):
+        """A refresh token must not be accepted as a bearer access token (I-01)."""
+        await _register_verify_and_activate(client, db_session)
+        login_r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        refresh_tok = login_r.json()["refresh_token"]
+        r = await client.get(ME, headers={"Authorization": f"Bearer {refresh_tok}"})
+        assert r.status_code == 401
+
     async def test_suspended_account_returns_403(self, client, db_session):
         """ensure_account_active must reject a logged-in user once their
         account is suspended, even though their access token is still valid."""
