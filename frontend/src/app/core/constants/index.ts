@@ -122,6 +122,12 @@ export enum PostStatus {
   DELETED = 'deleted',
 }
 
+export const POST_STATUS_LABELS: Record<PostStatus, string> = {
+  [PostStatus.VISIBLE]: 'גלוי',
+  [PostStatus.HIDDEN]: 'מוסתר',
+  [PostStatus.DELETED]: 'מחוק',
+};
+
 // ---------------------------------------------------------------------------
 // Professional domains
 // ---------------------------------------------------------------------------

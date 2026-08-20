@@ -318,13 +318,21 @@ export interface Report {
   created_at: string;
 }
 
+/** A report enriched with the reported content, returned by moderator views. */
+export interface ReportWithContent extends Report {
+  content_title: string;
+  content_text: string;
+  content_status: PostStatus;
+  report_count: number;
+}
+
 export interface ReportDecideRequest {
   decision: ReportDecision;
   note?: string;
 }
 
 export interface ReportList {
-  items: Report[];
+  items: ReportWithContent[];
   total: number;
   pending_count: number;
 }

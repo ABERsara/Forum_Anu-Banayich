@@ -6,7 +6,12 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.core.constants import ReportDecision, ReportReason, ReportTargetType
+from app.core.constants import (
+    PostStatus,
+    ReportDecision,
+    ReportReason,
+    ReportTargetType,
+)
 
 
 class ReportCreate(BaseModel):
@@ -37,6 +42,15 @@ class ReportResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ReportWithContent(ReportResponse):
+    """A report enriched with the reported content, for moderator views."""
+
+    content_title: str
+    content_text: str
+    content_status: PostStatus
+    report_count: int
+
+
 class ReportDecideRequest(BaseModel):
     """POST /moderator/reports/{id}/decide – moderator makes a decision."""
 
@@ -45,6 +59,6 @@ class ReportDecideRequest(BaseModel):
 
 
 class ReportListResponse(BaseModel):
-    items: list[ReportResponse]
+    items: list[ReportWithContent]
     total: int
     pending_count: int

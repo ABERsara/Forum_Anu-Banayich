@@ -13,8 +13,10 @@ from app.core.constants import (
     ReportDecision,
     ReportReason,
     ReportTargetType,
+    Sector,
     SectorVisibility,
     UserRole,
+    UserType,
 )
 from app.models.forum import ForumPost
 from app.models.user import User
@@ -27,6 +29,9 @@ def _make_user(
     email: str,
     role: UserRole = UserRole.USER,
     alert_email: str | None = None,
+    user_type: UserType | None = None,
+    sector: Sector | None = None,
+    moderator_cells: list[dict[str, str]] | None = None,
 ) -> User:
     # ACTIVE by default: everyone in these scenarios is a live account, and
     # alerts only go to moderators still on the roster (see
@@ -39,6 +44,9 @@ def _make_user(
         role=role,
         account_status=AccountStatus.ACTIVE,
         alert_email=alert_email,
+        user_type=user_type,
+        sector=sector,
+        moderator_cells=moderator_cells,
     )
     db_session.add(user)
     db_session.commit()
@@ -67,6 +75,11 @@ def _report_data(
         reason=ReportReason.HARASSMENT,
         description="test description",
     )
+
+
+# Default cell used across tests that need a moderator's moderator_cells to
+# match a post author's (user_type, sector) — spec §4.3.
+WIDOWER_HASIDIC_CELL = {"group": UserType.WIDOWER, "sector": Sector.HASIDIC}
 
 
 class TestFileReportCreatesReport:
@@ -179,8 +192,14 @@ class TestFileReportFirstReportEscalation:
             "mod@example.com",
             role=UserRole.MODERATOR,
             alert_email="mod-alerts@example.com",
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
         )
-        author = _make_user(db_session, "author@example.com")
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
         reporter = _make_user(db_session, "reporter@example.com")
         post = _make_post(db_session, author)
 
@@ -226,8 +245,14 @@ class TestFileReportSecondReportEscalation:
             "mod@example.com",
             role=UserRole.MODERATOR,
             alert_email="mod-alerts@example.com",
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
         )
-        author = _make_user(db_session, "author@example.com")
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
         reporter1 = _make_user(db_session, "reporter1@example.com")
         reporter2 = _make_user(db_session, "reporter2@example.com")
         post = _make_post(db_session, author)
@@ -255,8 +280,14 @@ class TestFileReportThirdPlusReportEscalation:
             "mod@example.com",
             role=UserRole.MODERATOR,
             alert_email="mod-alerts@example.com",
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
         )
-        author = _make_user(db_session, "author@example.com")
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
         post = _make_post(db_session, author)
         reporters = [
             _make_user(db_session, f"reporter{i}@example.com") for i in range(4)
@@ -272,7 +303,7 @@ class TestFileReportThirdPlusReportEscalation:
 
 
 class TestFileReportModeratorBroadcast:
-    def test_broadcasts_to_all_moderators(
+    def test_broadcasts_to_all_moderators_covering_the_authors_cell(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         calls: list[str] = []
@@ -286,21 +317,64 @@ class TestFileReportModeratorBroadcast:
             "mod1@example.com",
             role=UserRole.MODERATOR,
             alert_email="alert1@example.com",
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
         )
         _make_user(
             db_session,
             "mod2@example.com",
             role=UserRole.MODERATOR,
             alert_email="alert2@example.com",
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
         )
         _make_user(db_session, "user@example.com")  # not a moderator
-        author = _make_user(db_session, "author@example.com")
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
         reporter = _make_user(db_session, "reporter@example.com")
         post = _make_post(db_session, author)
 
         report_service.file_report(db_session, _report_data(post.id), reporter)
 
         assert sorted(calls) == ["alert1@example.com", "alert2@example.com"]
+
+    def test_skips_moderators_whose_cells_dont_cover_the_author(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[str] = []
+        monkeypatch.setattr(
+            report_service,
+            "send_moderator_alert",
+            lambda email, report_id, content_preview: calls.append(email),
+        )
+        _make_user(
+            db_session,
+            "mod-widower-hasidic@example.com",
+            role=UserRole.MODERATOR,
+            alert_email="alert1@example.com",
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
+        )
+        _make_user(
+            db_session,
+            "mod-widow-litvish@example.com",
+            role=UserRole.MODERATOR,
+            alert_email="alert2@example.com",
+            moderator_cells=[{"group": UserType.WIDOW, "sector": Sector.LITVISH}],
+        )
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
+
+        report_service.file_report(db_session, _report_data(post.id), reporter)
+
+        assert calls == ["alert1@example.com"]
 
     def test_falls_back_to_email_when_alert_email_missing(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
@@ -312,7 +386,41 @@ class TestFileReportModeratorBroadcast:
             lambda email, report_id, content_preview: calls.append(email),
         )
         _make_user(
-            db_session, "mod@example.com", role=UserRole.MODERATOR, alert_email=None
+            db_session,
+            "mod@example.com",
+            role=UserRole.MODERATOR,
+            alert_email=None,
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
+        )
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
+
+        report_service.file_report(db_session, _report_data(post.id), reporter)
+
+        assert calls == ["mod@example.com"]
+
+    def test_no_alert_when_author_has_no_cell(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An author with no user_type/sector (e.g. incomplete profile) matches no cell."""
+        calls: list[str] = []
+        monkeypatch.setattr(
+            report_service,
+            "send_moderator_alert",
+            lambda email, report_id, content_preview: calls.append(email),
+        )
+        _make_user(
+            db_session,
+            "mod@example.com",
+            role=UserRole.MODERATOR,
+            alert_email="alert@example.com",
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
         )
         author = _make_user(db_session, "author@example.com")
         reporter = _make_user(db_session, "reporter@example.com")
@@ -320,4 +428,257 @@ class TestFileReportModeratorBroadcast:
 
         report_service.file_report(db_session, _report_data(post.id), reporter)
 
-        assert calls == ["mod@example.com"]
+        assert calls == []
+
+
+class TestGetPendingReports:
+    def test_empty_when_moderator_has_no_cells(self, db_session: Session) -> None:
+        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
+        report_service.file_report(db_session, _report_data(post.id), reporter)
+
+        assert report_service.get_pending_reports(db_session, moderator) == []
+
+    def test_returns_only_reports_in_the_moderators_cell(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_user(
+            db_session,
+            "mod@example.com",
+            role=UserRole.MODERATOR,
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
+        )
+        in_cell_author = _make_user(
+            db_session,
+            "in-cell-author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        other_cell_author = _make_user(
+            db_session,
+            "other-cell-author@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+        )
+        reporter1 = _make_user(db_session, "reporter1@example.com")
+        reporter2 = _make_user(db_session, "reporter2@example.com")
+        in_cell_post = _make_post(db_session, in_cell_author)
+        other_cell_post = _make_post(db_session, other_cell_author)
+
+        in_cell_report = report_service.file_report(
+            db_session, _report_data(in_cell_post.id), reporter1
+        )
+        report_service.file_report(
+            db_session, _report_data(other_cell_post.id), reporter2
+        )
+
+        results = report_service.get_pending_reports(db_session, moderator)
+
+        assert [r.id for r, _ in results] == [in_cell_report.id]
+
+    def test_admin_sees_all_pending_reports_unscoped(self, db_session: Session) -> None:
+        """Admin has no moderator_cells but must still see every cell's reports."""
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        author_a = _make_user(
+            db_session,
+            "author-a@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        author_b = _make_user(
+            db_session,
+            "author-b@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+        )
+        reporter1 = _make_user(db_session, "reporter1@example.com")
+        reporter2 = _make_user(db_session, "reporter2@example.com")
+        post_a = _make_post(db_session, author_a)
+        post_b = _make_post(db_session, author_b)
+
+        report_a = report_service.file_report(
+            db_session, _report_data(post_a.id), reporter1
+        )
+        report_b = report_service.file_report(
+            db_session, _report_data(post_b.id), reporter2
+        )
+
+        results = report_service.get_pending_reports(db_session, admin)
+
+        assert {r.id for r, _ in results} == {report_a.id, report_b.id}
+
+    def test_sorted_by_report_count_descending(self, db_session: Session) -> None:
+        moderator = _make_user(
+            db_session,
+            "mod@example.com",
+            role=UserRole.MODERATOR,
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
+        )
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporters = [
+            _make_user(db_session, f"reporter{i}@example.com") for i in range(3)
+        ]
+        less_reported_post = _make_post(db_session, author)
+        more_reported_post = _make_post(db_session, author)
+
+        less_report = report_service.file_report(
+            db_session, _report_data(less_reported_post.id), reporters[0]
+        )
+        more_report_a = report_service.file_report(
+            db_session, _report_data(more_reported_post.id), reporters[1]
+        )
+        more_report_b = report_service.file_report(
+            db_session, _report_data(more_reported_post.id), reporters[2]
+        )
+
+        results = report_service.get_pending_reports(db_session, moderator)
+
+        # Both reports on more_reported_post (report_count=2) sort before the
+        # single report on less_reported_post (report_count=1); order between
+        # the tied pair is unspecified.
+        assert {r.id for r, _ in results[:2]} == {more_report_a.id, more_report_b.id}
+        assert results[2][0].id == less_report.id
+
+    def test_excludes_already_decided_reports(self, db_session: Session) -> None:
+        moderator = _make_user(
+            db_session,
+            "mod@example.com",
+            role=UserRole.MODERATOR,
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
+        )
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
+        report = report_service.file_report(db_session, _report_data(post.id), reporter)
+        report.decision = ReportDecision.VALID
+        db_session.commit()
+
+        assert report_service.get_pending_reports(db_session, moderator) == []
+
+
+class TestGetReportForModerator:
+    def test_moderator_can_view_report_in_their_cell(self, db_session: Session) -> None:
+        moderator = _make_user(
+            db_session,
+            "mod@example.com",
+            role=UserRole.MODERATOR,
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
+        )
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
+        report = report_service.file_report(db_session, _report_data(post.id), reporter)
+
+        result_report, result_post = report_service.get_report_for_moderator(
+            db_session, report.id, moderator
+        )
+
+        assert result_report.id == report.id
+        assert result_post.id == post.id
+
+    def test_moderator_cannot_view_report_outside_their_cell(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_user(
+            db_session,
+            "mod@example.com",
+            role=UserRole.MODERATOR,
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
+        )
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
+        report = report_service.file_report(db_session, _report_data(post.id), reporter)
+
+        with pytest.raises(HTTPException) as exc_info:
+            report_service.get_report_for_moderator(db_session, report.id, moderator)
+
+        assert exc_info.value.status_code == 403
+
+    def test_moderator_with_no_cells_cannot_view_any_report(
+        self, db_session: Session
+    ) -> None:
+        """
+        Regression test: an empty moderator_cells list must deny access to
+        every report, not grant it. or_() with no clauses is a SQL no-op
+        (matches every row) rather than "match none", so this has to be
+        special-cased rather than left to the filter — see _cell_match_filter.
+        """
+        moderator = _make_user(
+            db_session, "mod@example.com", role=UserRole.MODERATOR, moderator_cells=[]
+        )
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
+        report = report_service.file_report(db_session, _report_data(post.id), reporter)
+
+        with pytest.raises(HTTPException) as exc_info:
+            report_service.get_report_for_moderator(db_session, report.id, moderator)
+
+        assert exc_info.value.status_code == 403
+
+    def test_admin_can_view_any_report(self, db_session: Session) -> None:
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+        post = _make_post(db_session, author)
+        report = report_service.file_report(db_session, _report_data(post.id), reporter)
+
+        result_report, result_post = report_service.get_report_for_moderator(
+            db_session, report.id, admin
+        )
+
+        assert result_report.id == report.id
+        assert result_post.id == post.id
+
+    def test_404_for_nonexistent_report(self, db_session: Session) -> None:
+        moderator = _make_user(
+            db_session,
+            "mod@example.com",
+            role=UserRole.MODERATOR,
+            moderator_cells=[WIDOWER_HASIDIC_CELL],
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            report_service.get_report_for_moderator(
+                db_session, "nonexistent-id", moderator
+            )
+
+        assert exc_info.value.status_code == 404
