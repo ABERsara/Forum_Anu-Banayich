@@ -2,7 +2,9 @@
 Email service.
 
 Every sender has the same three steps: fall back to a console log when
-SMTP_HOST is empty, build a MIMEText message, hand it to _send_via_smtp.
+SMTP_HOST is empty, build a MIMEText message, hand it to _send_via_smtp –
+or, when the same notification goes to a whole list, to _send_many_via_smtp,
+which spends one SMTP handshake on the batch instead of one per recipient.
 The OTP, registration and consultation notifications all send real mail;
 the moderation ones below are still stubs.
 
@@ -15,6 +17,8 @@ TODO (when ready for production):
 
 import logging
 import smtplib
+from collections.abc import Iterator
+from contextlib import contextmanager
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from html import escape
@@ -55,25 +59,83 @@ def _build_otp_message(email: str, otp_code: str) -> MIMEText:
     return _build_message(email, 'קוד אימות – עמותת "אנו בניך"', body)
 
 
+@contextmanager
+def _smtp_session() -> Iterator[smtplib.SMTP]:
+    """
+    Open one authenticated SMTP session: connect, EHLO, STARTTLS, login.
+
+    This is the expensive part of sending mail – a TCP connect, a TLS handshake
+    and an auth round trip, all before the first byte of a message. It is a
+    context manager rather than four lines inside _send_via_smtp() so that a
+    fan-out to many recipients can pay for it once and then write every message
+    into the session it already holds open.
+    """
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as session:
+        session.ehlo()
+        session.starttls()
+        session.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        yield session
+
+
 def _send_via_smtp(msg: MIMEText, purpose: str) -> bool:
     """
-    Deliver an already-built message over SMTP.
+    Deliver an already-built message over its own SMTP session.
 
     Returns True on success, False if the send failed – a failed notification
     is logged and swallowed, never raised, because no caller may be rolled back
     by a mail server being down (delivery alerting is tracked in finding I-04).
+
+    For a single message. When the same notification goes to a whole list, use
+    _send_many_via_smtp() instead, which keeps one session open for the batch.
     """
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as s:
-            s.ehlo()
-            s.starttls()
-            s.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            s.send_message(msg)
+        with _smtp_session() as session:
+            session.send_message(msg)
     except Exception as exc:
         logger.error(f"[EMAIL] Failed to send {purpose} email to {msg['To']}: {exc}")
         return False
 
     return True
+
+
+def _send_many_via_smtp(messages: list[MIMEText], purpose: str) -> int:
+    """
+    Deliver a batch of messages over ONE SMTP session, and return how many
+    of them the server accepted.
+
+    Two failures are possible here and they are not the same failure:
+
+    - A single recipient is refused. That is per-message; the session is still
+      good, so it is logged and the rest of the batch still goes out. One
+      professional with a dead mailbox must not silence the notification for
+      everyone else in the domain.
+    - The session itself fails or drops (connect, TLS, auth, disconnect). That
+      is not recoverable per message, so the batch stops there. Whatever was
+      already accepted stays accepted – SMTP has no rollback, and none is
+      wanted.
+
+    Like _send_via_smtp(), nothing is raised: a caller is never rolled back by
+    a mail server being down.
+    """
+    sent = 0
+    try:
+        with _smtp_session() as session:
+            for msg in messages:
+                try:
+                    session.send_message(msg)
+                except smtplib.SMTPRecipientsRefused as exc:
+                    logger.error(
+                        f"[EMAIL] Failed to send {purpose} email to {msg['To']}: {exc}"
+                    )
+                else:
+                    sent += 1
+    except Exception as exc:
+        logger.error(
+            f"[EMAIL] Failed to send {purpose} emails "
+            f"({sent}/{len(messages)} delivered before the session failed): {exc}"
+        )
+
+    return sent
 
 
 def send_otp_email(email: str, otp_code: str) -> None:
@@ -204,15 +266,46 @@ def send_direct_question_notification(professional_email: str, query_id: str) ->
         logger.info(f"[EMAIL] Direct question notification sent for query {query_id}")
 
 
-def send_domain_question_notification(professional_email: str, query_id: str) -> None:
-    """Notify a professional of a new general question in their domain."""
-    if not settings.SMTP_HOST:
-        logger.info(f"[EMAIL] שאלה כללית {query_id} → {professional_email}")
+def send_domain_question_notification(
+    professional_emails: list[str], query_id: str
+) -> None:
+    """
+    Notify every professional in a domain of a new general question.
+
+    Takes the whole list, not one address, and that is the point: a general
+    question fans out to every professional serving the asker's group and
+    sector, and the caller used to loop over a one-address sender. Each of
+    those calls opened its own connection – connect, STARTTLS, login – in line,
+    inside the asker's own POST /advice/questions request, so a domain with ten
+    professionals cost ten sequential handshakes before she got a response.
+    One session covers the whole fan-out: one handshake, then ten writes.
+
+    The dev fallback still logs one line per professional, unchanged, because
+    that line is what a developer without SMTP reads to see who was notified.
+
+    list[str], not Sequence[str]: a plain str is itself a Sequence[str], so the
+    looser annotation would let a single address through as a list of its own
+    characters – one send per character, none of them to anybody. mypy rejects
+    a str at the call site, so the annotation is the guard.
+    """
+    if not professional_emails:
         return
 
-    msg = _build_question_message(professional_email, is_general=True)
-    if _send_via_smtp(msg, "domain question notification"):
-        logger.info(f"[EMAIL] Domain question notification sent for query {query_id}")
+    if not settings.SMTP_HOST:
+        for professional_email in professional_emails:
+            logger.info(f"[EMAIL] שאלה כללית {query_id} → {professional_email}")
+        return
+
+    messages = [
+        _build_question_message(professional_email, is_general=True)
+        for professional_email in professional_emails
+    ]
+    sent = _send_many_via_smtp(messages, "domain question notification")
+    if sent:
+        logger.info(
+            f"[EMAIL] Domain question notification sent for query {query_id} "
+            f"→ {sent}/{len(messages)} professionals"
+        )
 
 
 def _build_answer_message(email: str) -> MIMEText:
