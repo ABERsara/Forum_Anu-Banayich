@@ -23,7 +23,14 @@ from fastapi import HTTPException
 from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session
 
-from app.core.constants import PostStatus, ReportDecision, ReportTargetType, UserRole
+from app.core.constants import (
+    AccountStatus,
+    PostStatus,
+    ReportDecision,
+    ReportTargetType,
+    UserRole,
+)
+
 from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
@@ -164,6 +171,11 @@ def _moderator_emails_for(db: Session, post: ForumPost) -> list[str]:
     """
     Return contact addresses for moderators responsible for this post's
     author's cell (group + sector), per moderator.moderator_cells.
+
+    Removed moderators keep their row with role=MODERATOR — the appointment is
+    revoked by cancelling the account (see user_service.remove_moderator) — so
+    the status filter is what keeps alerts from following someone off the
+    roster.
     """
     author = post.author
     if author.user_type is None or author.sector is None:
@@ -172,6 +184,7 @@ def _moderator_emails_for(db: Session, post: ForumPost) -> list[str]:
     moderators = (
         db.query(User)
         .filter(User.role == UserRole.MODERATOR)
+        .filter(User.account_status == AccountStatus.ACTIVE)
         .filter(User.moderator_cells.isnot(None))
         .all()
     )

@@ -211,6 +211,13 @@ export enum DocumentType {
   PASSPORT = 'passport',
 }
 
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  [DocumentType.DEATH_CERTIFICATE]: 'תעודת פטירה',
+  [DocumentType.SELFIE]: 'תמונת זיהוי',
+  [DocumentType.ID_CARD]: 'תעודת זהות',
+  [DocumentType.PASSPORT]: 'דרכון',
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
