@@ -30,7 +30,6 @@ from app.core.constants import (
     ReportTargetType,
     UserRole,
 )
-
 from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
