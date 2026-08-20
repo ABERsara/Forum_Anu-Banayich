@@ -165,6 +165,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'moderators',
+        loadComponent: () =>
+          import('./features/admin/manage-moderators/manage-moderators.component').then(
+            (m) => m.ManageModeratorsComponent,
+          ),
+      },
+      {
         path: 'audit-log',
         loadComponent: () =>
           import('./features/admin/audit-log/audit-log.component').then((m) => m.AuditLogComponent),
@@ -181,6 +188,28 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/active-users/active-users.component').then(
             (m) => m.ActiveUsersComponent,
+          ),
+      },
+    ],
+  },
+
+  // ──────────────────────────────────────────────────────────
+  // Professional routes
+  // ──────────────────────────────────────────────────────────
+  {
+    path: 'professional',
+    canActivate: [authGuard, roleGuard(UserRole.PROFESSIONAL)],
+    children: [
+      {
+        path: '',
+        redirectTo: 'questions',
+        pathMatch: 'full',
+      },
+      {
+        path: 'questions',
+        loadComponent: () =>
+          import('./features/advice/pending-questions/pending-questions.component').then(
+            (m) => m.PendingQuestionsComponent,
           ),
       },
     ],

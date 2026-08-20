@@ -64,9 +64,10 @@ describe('CopyTextComponent', () => {
 
     const button = fixture.nativeElement.querySelector('.copy-btn') as HTMLButtonElement;
     button.click();
-    await fixture.whenStable();
-    fixture.detectChanges();
 
+    // fixture.whenStable() deadlocks under fake timers with zoneless change
+    // detection, so flush the clipboard microtask and the reset timer via
+    // advanceTimersByTimeAsync instead of whenStable().
     await vi.advanceTimersByTimeAsync(2000);
     fixture.detectChanges();
 

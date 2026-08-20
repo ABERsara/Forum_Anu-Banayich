@@ -1,11 +1,12 @@
 """
 Email service.
 
-send_otp_email sends real mail via SMTP when SMTP_HOST is configured.
-The other notifications below are still stubs.
+send_otp_email and send_answer_notification send real mail via SMTP when
+SMTP_HOST is configured. The other notifications below are still stubs.
 
 TODO (when ready for production):
-  [ ] Send real email for approval/rejection/moderator/suspension/question notifications
+  [ ] Send real email for approval/rejection/moderator/suspension/new-question
+      notifications
   [ ] Load templates from HTML files
   [ ] Add retry logic for failed sends
   [ ] Add unsubscribe links where required by law
@@ -39,14 +40,14 @@ def _build_otp_message(email: str, otp_code: str) -> MIMEText:
     return msg
 
 
-def send_otp_email(email: str, otp_code: str) -> None:
-    """Send OTP verification code to a new registrant."""
-    if not settings.SMTP_HOST:
-        logger.info(f"[DEV EMAIL] OTP {otp_code} -> {email}")
-        return
+def _send_via_smtp(msg: MIMEText, purpose: str) -> bool:
+    """
+    Deliver an already-built message over SMTP.
 
-    msg = _build_otp_message(email, otp_code)
-
+    Returns True on success, False if the send failed – a failed notification
+    is logged and swallowed, never raised, because no caller may be rolled back
+    by a mail server being down (delivery alerting is tracked in finding I-04).
+    """
     try:
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as s:
             s.ehlo()
@@ -54,10 +55,20 @@ def send_otp_email(email: str, otp_code: str) -> None:
             s.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             s.send_message(msg)
     except Exception as exc:
-        logger.error(f"[EMAIL] Failed to send OTP email to {email}: {exc}")
+        logger.error(f"[EMAIL] Failed to send {purpose} email to {msg['To']}: {exc}")
+        return False
+
+    return True
+
+
+def send_otp_email(email: str, otp_code: str) -> None:
+    """Send OTP verification code to a new registrant."""
+    if not settings.SMTP_HOST:
+        logger.info(f"[DEV EMAIL] OTP {otp_code} -> {email}")
         return
 
-    logger.info(f"[EMAIL] OTP sent → {email}")
+    if _send_via_smtp(_build_otp_message(email, otp_code), "OTP"):
+        logger.info(f"[EMAIL] OTP sent → {email}")
 
 
 def send_approval_email(email: str, first_name: str) -> None:
@@ -121,10 +132,36 @@ def send_domain_question_notification(professional_email: str, query_id: str) ->
     # TODO: send real email
 
 
+def _build_answer_message(email: str) -> MIMEText:
+    html = (
+        f'<div dir="rtl">'
+        f"<p>שלום,</p>"
+        f"<p>איש המקצוע השיב לשאלה ששאלת ב{settings.PROJECT_NAME}.</p>"
+        f'<p>התשובה ממתינה לך באזור "השאלות שלי" באתר.</p>'
+        f"<p>מטעמי פרטיות התשובה עצמה אינה נשלחת במייל.</p>"
+        f"</div>"
+    )
+    msg = MIMEText(html, "html", "utf-8")
+    msg["Subject"] = 'התקבלה תשובה לשאלתך – עמותת "אנו בניך"'
+    msg["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>"
+    msg["To"] = email
+    return msg
+
+
 def send_answer_notification(asker_email: str, query_id: str) -> None:
-    """Notify the asker that their question was answered."""
-    logger.info(f"[EMAIL] Answer received for query {query_id} → {asker_email}")
-    # TODO: send real email
+    """
+    Notify the asker that their question was answered.
+
+    The mail says only that an answer is waiting – neither the question nor the
+    answer is quoted, so a private consultation never leaves the platform in an
+    unencrypted inbox (SPEC §6.4).
+    """
+    if not settings.SMTP_HOST:
+        logger.info(f"[DEV EMAIL] Answer received for query {query_id} → {asker_email}")
+        return
+
+    if _send_via_smtp(_build_answer_message(asker_email), "answer notification"):
+        logger.info(f"[EMAIL] Answer notification sent for query {query_id}")
 
 
 def send_sla_escalation_alert(

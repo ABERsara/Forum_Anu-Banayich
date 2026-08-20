@@ -16,12 +16,14 @@ TODO list for junior developer:
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import ColumnElement, and_, case, func, or_
-from sqlalchemy.orm import Query, Session, joinedload
+from sqlalchemy.orm import Query, Session
 
 from app.core.constants import (
+    AccountStatus,
     AuditAction,
     PostStatus,
     ReportDecision,
@@ -196,6 +198,11 @@ def _moderator_emails_for(db: Session, post: ForumPost) -> list[str]:
     """
     Return contact addresses for moderators responsible for this post's
     author's cell (group + sector), per moderator.moderator_cells.
+
+    Removed moderators keep their row with role=MODERATOR — the appointment is
+    revoked by cancelling the account (see user_service.remove_moderator) — so
+    the status filter is what keeps alerts from following someone off the
+    roster.
     """
     author = post.author
     if author.user_type is None or author.sector is None:
@@ -204,6 +211,7 @@ def _moderator_emails_for(db: Session, post: ForumPost) -> list[str]:
     moderators = (
         db.query(User)
         .filter(User.role == UserRole.MODERATOR)
+        .filter(User.account_status == AccountStatus.ACTIVE)
         .filter(User.moderator_cells.isnot(None))
         .all()
     )
@@ -238,25 +246,12 @@ def decide_report(
     """
     # for_update: two moderators sharing a cell can have the same report open.
     # The lock makes the "still PENDING?" check below settle which of them
-    # wins, instead of both writing a decision over each other.
-    report = get_report_for_moderator(db, report_id, moderator, for_update=True)
+    # wins, instead of both writing a decision over each other. It covers the
+    # reported post too — the decision rewrites its status.
+    report, post = get_report_for_moderator(db, report_id, moderator, for_update=True)
 
     if report.decision != ReportDecision.PENDING:
         raise HTTPException(status_code=409, detail="הדיווח כבר טופל.")
-
-    # Only FORUM_POST reports can exist – file_report() rejects the other
-    # target types – so the reported content is always a post.
-    # joinedload(author) avoids a lazy-load for the notification below, after
-    # log_action()'s commit has expired the instance.
-    post = (
-        db.query(ForumPost)
-        .options(joinedload(ForumPost.author))
-        .filter(ForumPost.id == report.target_id)
-        .with_for_update(of=ForumPost)
-        .first()
-    )
-    if post is None:
-        raise HTTPException(status_code=404, detail="התוכן המדווח לא נמצא.")
 
     report.decision = data.decision
     report.moderator_id = moderator.id
@@ -329,11 +324,15 @@ def _apply_content_decision(post: ForumPost, decision: ReportDecision) -> str:
     return "unchanged"
 
 
-def _scoped_report_query(db: Session, moderator: User) -> Query[Report] | None:
+def _scoped_report_query(db: Session, moderator: User) -> Query[Any] | None:
     """
     Base query for the reports a moderator is responsible for: FORUM_POST
     reports joined to the reported user and to the reported post, matched on
     the reported user's (user_type, sector) against moderator.moderator_cells.
+
+    The ForumPost is selected alongside each Report (rather than just the
+    Report) so callers — namely the moderator endpoints — never need their
+    own follow-up query to render the reported content.
 
     ADMIN is unscoped (spec §3.2 — admin has "הכל" for report handling;
     MODERATOR is scoped to "אחריותו" only).
@@ -341,9 +340,15 @@ def _scoped_report_query(db: Session, moderator: User) -> Query[Report] | None:
     Returns None for a MODERATOR with no cells assigned, meaning "responsible
     for nothing". That cannot be expressed as a filter: an empty or_() is a
     SQL no-op that matches every row, i.e. the exact opposite.
+
+    Query[Any] rather than the row type: SQLAlchemy gives a two-entity query
+    its own class, and how that class is parameterised changed between 2.0
+    and 2.1 — pyproject asks only for ">=2.0", so naming it here would make
+    mypy pass on one and fail on the other. The two callers annotate the rows
+    they get back instead, which is where the pairs are actually read.
     """
     query = (
-        db.query(Report)
+        db.query(Report, ForumPost)
         .join(User, Report.reported_user_id == User.id)
         .join(ForumPost, Report.target_id == ForumPost.id)
         .filter(Report.target_type == ReportTargetType.FORUM_POST)
@@ -358,10 +363,11 @@ def _scoped_report_query(db: Session, moderator: User) -> Query[Report] | None:
     return query.filter(_cell_match_filter(cells))
 
 
-def get_pending_reports(db: Session, moderator: User) -> list[Report]:
+def get_pending_reports(db: Session, moderator: User) -> list[tuple[Report, ForumPost]]:
     """
     Return the reports still awaiting a decision in the moderator's cells,
-    most-reported content first (SPEC §7.3).
+    most-reported content first (SPEC §7.3), each paired with the post it is
+    about so the endpoint needs no follow-up query.
 
     This is a work queue meant to be emptied, so it is not paginated —
     get_decided_reports() is, because history only grows.
@@ -370,11 +376,12 @@ def get_pending_reports(db: Session, moderator: User) -> list[Report]:
     if query is None:
         return []
 
-    return (
+    rows: list[tuple[Report, ForumPost]] = (
         query.filter(Report.decision == ReportDecision.PENDING)
         .order_by(ForumPost.report_count.desc())
         .all()
     )
+    return [(report, post) for report, post in rows]
 
 
 def get_decided_reports(
@@ -382,11 +389,11 @@ def get_decided_reports(
     moderator: User,
     page: int = 1,
     page_size: int = 20,
-) -> tuple[list[Report], int]:
+) -> tuple[list[tuple[Report, ForumPost]], int]:
     """
     Return one page of the decisions already made in the moderator's cells,
-    newest first, together with the total across all pages (SPEC §7.3,
-    "היסטוריית דיווחים").
+    newest first, each paired with the post it is about, together with the
+    total across all pages (SPEC §7.3, "היסטוריית דיווחים").
 
     Scoped to the cells, not to who decided: a moderator sharing a cell with
     another needs to see what was already handled there, otherwise the same
@@ -399,7 +406,7 @@ def get_decided_reports(
     query = query.filter(Report.decision != ReportDecision.PENDING)
     total = query.count()
 
-    reports = (
+    rows: list[tuple[Report, ForumPost]] = (
         # Report.id as a tiebreaker: two decisions can share a timestamp, and
         # without a total order a row can repeat across pages or be skipped.
         query.order_by(Report.decided_at.desc(), Report.id)
@@ -407,7 +414,7 @@ def get_decided_reports(
         .limit(page_size)
         .all()
     )
-    return reports, total
+    return [(report, post) for report, post in rows], total
 
 
 def get_report_for_moderator(
@@ -416,17 +423,19 @@ def get_report_for_moderator(
     moderator: User,
     *,
     for_update: bool = False,
-) -> Report:
+) -> tuple[Report, ForumPost]:
     """
-    Load a single report, enforcing that the moderator is responsible for
-    its cell (ADMIN bypasses this check — see require_role on the router).
+    Load a single report and its reported post, enforcing that the moderator
+    is responsible for its cell (ADMIN bypasses this check — see require_role
+    on the router).
 
-    for_update takes a row-level lock, for callers that go on to write to the
-    report. No-op on SQLite (dev), enforced on PostgreSQL (production) — same
-    pattern as forum_service.delete_post().
+    for_update takes a row-level lock on both rows, for callers that go on to
+    write to them — decide_report() rewrites the report and the post's status
+    together. No-op on SQLite (dev), enforced on PostgreSQL (production) —
+    same pattern as forum_service.delete_post().
 
-    Raises 404 if the report doesn't exist, 403 if the moderator's cells
-    don't cover it.
+    Raises 404 if the report or its post doesn't exist, 403 if the
+    moderator's cells don't cover it.
     """
     query = db.query(Report).filter(Report.id == report_id)
     if for_update:
@@ -435,6 +444,14 @@ def get_report_for_moderator(
     report = query.first()
     if report is None:
         raise HTTPException(status_code=404, detail="הדיווח לא נמצא.")
+
+    post_query = db.query(ForumPost).filter(ForumPost.id == report.target_id)
+    if for_update:
+        post_query = post_query.with_for_update()
+
+    post = post_query.first()
+    if post is None:
+        raise HTTPException(status_code=404, detail="התוכן המדווח לא נמצא.")
 
     if moderator.role == UserRole.MODERATOR:
         cells = moderator.moderator_cells or []
@@ -451,7 +468,7 @@ def get_report_for_moderator(
         if not covered:
             raise HTTPException(status_code=403, detail="אין הרשאה לצפות בדיווח זה.")
 
-    return report
+    return report, post
 
 
 # ---------------------------------------------------------------------------

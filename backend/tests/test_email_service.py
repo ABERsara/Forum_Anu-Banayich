@@ -1,8 +1,9 @@
 """
-Unit tests for email_service.send_otp_email.
+Unit tests for the email_service senders that really talk to SMTP:
+send_otp_email and send_answer_notification.
 
-Covers three paths: dev fallback (SMTP_HOST empty), real SMTP send,
-and SMTP failure (must never raise — registration depends on that).
+Each covers three paths: dev fallback (SMTP_HOST empty), real SMTP send,
+and SMTP failure (must never raise — registration and answering depend on that).
 """
 
 import logging
@@ -105,7 +106,9 @@ class TestSendOtpEmailViaSmtp:
         email_service.send_otp_email("test@example.com", "654321")
 
         smtp = _FakeSMTP.instances[0]
-        send_call = next(c for c in smtp.calls if isinstance(c, tuple) and c[0] == "send_message")
+        send_call = next(
+            c for c in smtp.calls if isinstance(c, tuple) and c[0] == "send_message"
+        )
         msg = send_call[1]
         html = msg.get_payload(decode=True).decode("utf-8")
         assert "654321" in html
@@ -137,3 +140,81 @@ class TestSendOtpEmailSmtpFailure:
             email_service.send_otp_email("test@example.com", "111111")
 
         assert "Failed to send OTP email" in caplog.text
+
+
+class TestBuildAnswerMessage:
+    def test_message_structure(self):
+        msg = email_service._build_answer_message("asker@example.com")
+
+        assert msg["To"] == "asker@example.com"
+        assert msg["Subject"] == 'התקבלה תשובה לשאלתך – עמותת "אנו בניך"'
+        html = msg.get_payload(decode=True).decode("utf-8")
+        assert 'dir="rtl"' in html
+
+    def test_does_not_quote_the_consultation(self):
+        """SPEC §6.4 — a private consultation must not leave the platform."""
+        msg = email_service._build_answer_message("asker@example.com")
+
+        html = msg.get_payload(decode=True).decode("utf-8")
+        assert "השאלות שלי" in html  # points the asker back to the site instead
+
+
+class TestSendAnswerNotificationDevFallback:
+    def test_logs_the_query_id(self, caplog):
+        with caplog.at_level(logging.INFO):
+            email_service.send_answer_notification("asker@example.com", "query-42")
+        assert "[DEV EMAIL] Answer received for query query-42" in caplog.text
+
+    def test_does_not_touch_smtp(self, monkeypatch):
+        def _fail(*args, **kwargs):
+            raise AssertionError("SMTP should not be used when SMTP_HOST is empty")
+
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _fail)
+        email_service.send_answer_notification("asker@example.com", "query-42")
+
+
+class TestSendAnswerNotificationViaSmtp:
+    def test_sends_via_smtp_with_starttls(self, monkeypatch):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(settings, "SMTP_USER", "mailtrap-user")
+        monkeypatch.setattr(settings, "SMTP_PASSWORD", "mailtrap-pass")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _FakeSMTP)
+
+        email_service.send_answer_notification("asker@example.com", "query-42")
+
+        assert len(_FakeSMTP.instances) == 1
+        smtp = _FakeSMTP.instances[0]
+        assert smtp.host == "smtp.mailtrap.io"
+        assert "starttls" in smtp.calls
+        assert ("login", "mailtrap-user", "mailtrap-pass") in smtp.calls
+        send_call = next(
+            c for c in smtp.calls if isinstance(c, tuple) and c[0] == "send_message"
+        )
+        assert send_call[1]["To"] == "asker@example.com"
+
+    def test_logs_success_after_send(self, monkeypatch, caplog):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _FakeSMTP)
+
+        with caplog.at_level(logging.INFO):
+            email_service.send_answer_notification("asker@example.com", "query-42")
+
+        assert "[EMAIL] Answer notification sent for query query-42" in caplog.text
+
+
+class TestSendAnswerNotificationSmtpFailure:
+    def test_does_not_raise_on_smtp_failure(self, monkeypatch):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _RaisingSMTP)
+
+        # Must not raise: the answer is already committed by the time we get here.
+        email_service.send_answer_notification("asker@example.com", "query-42")
+
+    def test_logs_error_on_smtp_failure(self, monkeypatch, caplog):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _RaisingSMTP)
+
+        with caplog.at_level(logging.ERROR):
+            email_service.send_answer_notification("asker@example.com", "query-42")
+
+        assert "Failed to send answer notification email" in caplog.text
