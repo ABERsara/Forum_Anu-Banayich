@@ -1,5 +1,6 @@
 @use '../../../../styles/variables' as *;
 @use '../../../../styles/mixins' as *;
+@use 'sass:color';
 
 .page {
   padding: $spacing-md;
@@ -209,13 +210,17 @@
   font-size: $font-size-xs;
   font-weight: $font-weight-medium;
 
+  // The tint is 12% of the same hue, so the undarkened colour sits at 2.89:1
+  // (active) and 4.16:1 (inactive) on it — under the 4.5:1 AA floor at
+  // $font-size-xs (CONTRIBUTING §5). Darkening the text keeps the chip's
+  // colour and clears the floor: 5.65:1 and 6.54:1.
   &--active {
     background: rgba($color-success, 0.12);
-    color: $color-success;
+    color: color.adjust($color-success, $lightness: -12%);
   }
 
   &--inactive {
     background: rgba($color-text-muted, 0.12);
-    color: $color-text-muted;
+    color: color.adjust($color-text-muted, $lightness: -12%);
   }
 }
