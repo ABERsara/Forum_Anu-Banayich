@@ -32,6 +32,7 @@ import {
   ProfessionalUpdateRequest,
 } from '../../../core/models';
 import { AdminService } from '../../../core/services/admin.service';
+import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
@@ -47,7 +48,13 @@ export function atLeastOneSelected(control: AbstractControl): ValidationErrors |
 @Component({
   selector: 'app-manage-professionals',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    ButtonComponent,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './manage-professionals.component.html',
   styleUrl: './manage-professionals.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -220,7 +227,7 @@ export class ManageProfessionalsComponent implements OnInit {
           this.successMessage.set(`הפרטים של ${this.fullName(saved)} עודכנו.`);
         } else {
           this.insertRow(saved);
-          this.successMessage.set(`${this.fullName(saved)} נוסף/ה לקטלוג אנשי המקצוע.`);
+          this.successMessage.set(`${this.fullName(saved)} נוסף לקטלוג אנשי המקצוע.`);
         }
         this.isSaving.set(false);
         this.closeForm();
@@ -249,8 +256,8 @@ export class ManageProfessionalsComponent implements OnInit {
         this.replaceRow(saved);
         this.successMessage.set(
           saved.is_active_professional
-            ? `${this.fullName(saved)} מופיע/ה שוב בקטלוג.`
-            : `${this.fullName(saved)} הושבת/ה ואינו/ה מופיע/ה בקטלוג.`,
+            ? `${this.fullName(saved)} מופיע שוב בקטלוג.`
+            : `${this.fullName(saved)} הושבת ואינו מופיע בקטלוג.`,
         );
         this.togglingId.set(null);
       },

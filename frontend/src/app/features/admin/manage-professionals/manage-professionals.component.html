@@ -4,9 +4,7 @@
   <div class="page__header">
     <h1>ניהול אנשי מקצוע</h1>
     @if (!isFormOpen()) {
-      <button type="button" class="btn btn--primary" (click)="openAddForm()">
-        הוספת איש מקצוע
-      </button>
+      <app-button variant="primary" (clicked)="openAddForm()">הוספת איש מקצוע</app-button>
     }
   </div>
 
@@ -76,7 +74,7 @@
         </div>
 
         <fieldset class="checkbox-group">
-          <legend>קבוצות שהוא/היא משרת/ת</legend>
+          <legend>קבוצות שהוא משרת</legend>
           <div class="checkbox-group__options">
             @for (group of groupOptions; track group) {
               <label class="checkbox-option">
@@ -97,7 +95,7 @@
         </fieldset>
 
         <fieldset class="checkbox-group">
-          <legend>מגזרים שהוא/היא משרת/ת</legend>
+          <legend>מגזרים שהוא משרת</legend>
           <div class="checkbox-group__options">
             @for (sector of sectorOptions; track sector) {
               <label class="checkbox-option">
@@ -133,7 +131,7 @@
 
         <label class="checkbox-option checkbox-option--standalone">
           <input type="checkbox" formControlName="is_active_professional" />
-          מופיע/ה בקטלוג הייעוץ
+          מופיע בקטלוג הייעוץ
         </label>
 
         @if (isSaving()) {
@@ -141,12 +139,12 @@
         }
 
         <div class="panel__actions">
-          <button type="submit" class="btn btn--primary" [disabled]="isSaving()">
+          <app-button type="submit" variant="primary" [disabled]="isSaving()">
             {{ editing() ? 'שמירת שינויים' : 'הוספה לקטלוג' }}
-          </button>
-          <button type="button" class="btn" (click)="closeForm()" [disabled]="isSaving()">
+          </app-button>
+          <app-button variant="secondary" [disabled]="isSaving()" (clicked)="closeForm()">
             ביטול
-          </button>
+          </app-button>
         </div>
       </form>
     </section>
@@ -193,27 +191,25 @@
           </div>
 
           <div class="catalog__actions">
-            <button
-              type="button"
-              class="btn"
-              [attr.aria-label]="'עריכת ' + fullName(professional)"
-              (click)="openEditForm(professional)"
+            <app-button
+              variant="secondary"
+              [ariaLabel]="'עריכת ' + fullName(professional)"
+              (clicked)="openEditForm(professional)"
             >
               עריכה
-            </button>
+            </app-button>
             <!-- Locked while this row is open in the form, so the two cannot
                  write conflicting values for is_active_professional. -->
-            <button
-              type="button"
-              class="btn"
+            <app-button
+              variant="secondary"
               [disabled]="togglingId() === professional.id || editing()?.id === professional.id"
-              [attr.aria-label]="
+              [ariaLabel]="
                 (professional.is_active_professional ? 'השבתת ' : 'הפעלת ') + fullName(professional)
               "
-              (click)="toggleActive(professional)"
+              (clicked)="toggleActive(professional)"
             >
               {{ professional.is_active_professional ? 'השבתה' : 'הפעלה' }}
-            </button>
+            </app-button>
           </div>
         </li>
       }

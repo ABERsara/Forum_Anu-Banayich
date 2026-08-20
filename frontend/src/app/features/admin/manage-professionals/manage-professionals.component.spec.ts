@@ -306,4 +306,25 @@ describe('ManageProfessionalsComponent', () => {
       expect(component.togglingId()).toBeNull();
     });
   });
+
+  describe('the actions on the page', () => {
+    function buttons(): HTMLButtonElement[] {
+      return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
+    }
+
+    it('renders every action through the shared app-button', () => {
+      // A bare <button> here would need its own copy of the .btn rules the
+      // shared component already owns, and would drift the day those change.
+      expect(buttons().length).toBeGreaterThan(0);
+      expect(buttons().every((btn) => btn.closest('app-button') !== null)).toBe(true);
+    });
+
+    it('names each row action after the professional it acts on', () => {
+      const labels = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.catalog__actions button'),
+      ).map((btn) => btn.getAttribute('aria-label'));
+
+      expect(labels).toEqual(['עריכת ישראל כהן', 'השבתת ישראל כהן']);
+    });
+  });
 });
