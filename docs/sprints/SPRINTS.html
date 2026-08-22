@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>מפת דרכים — 5 ספרינטים | אנו בניך</title>
+<title>מפת דרכים — 6 ספרינטים | אנו בניך</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -79,6 +79,7 @@
   .section-number.s3  { background: #d97706; }
   .section-number.s4  { background: #7c3aed; }
   .section-number.s5  { background: #0d9488; }
+  .section-number.s6  { background: #4338ca; }
   .section-number.red    { background: #dc2626; }
   .section-number.green  { background: #16a34a; }
   .section-number.purple { background: #7c3aed; }
@@ -110,6 +111,7 @@
   .badge-s3     { background: #ffedd5; color: #7c2d12; }
   .badge-s4     { background: #ede9fe; color: #4c1d95; }
   .badge-s5     { background: #ccfbf1; color: #134e4a; }
+  .badge-s6     { background: #e0e7ff; color: #312e81; }
   .badge-green  { background: #d4edda; color: #155724; }
   .badge-red    { background: #f8d7da; color: #721c24; }
   .badge-blue   { background: #d1ecf1; color: #0c5460; }
@@ -131,7 +133,7 @@
 
   /* —— TIMELINE STRIP (top visual) —— */
   .roadmap-strip {
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    display: grid; grid-template-columns: repeat(6, 1fr);
     gap: 8px; margin: 20px 0;
   }
   .roadmap-cell {
@@ -150,6 +152,7 @@
   .rc-s3 { background: linear-gradient(135deg, #7c2d12, #ea580c); }
   .rc-s4 { background: linear-gradient(135deg, #4c1d95, #7c3aed); }
   .rc-s5 { background: linear-gradient(135deg, #134e4a, #0d9488); }
+  .rc-s6 { background: linear-gradient(135deg, #312e81, #4338ca); }
 
   /* Arrow between roadmap cells */
   .roadmap-arrows {
@@ -173,6 +176,7 @@
   .sprint-card-header.sh-s3 { background: linear-gradient(90deg, #7c2d12, #ea580c); }
   .sprint-card-header.sh-s4 { background: linear-gradient(90deg, #4c1d95, #7c3aed); }
   .sprint-card-header.sh-s5 { background: linear-gradient(90deg, #134e4a, #0d9488); }
+  .sprint-card-header.sh-s6 { background: linear-gradient(90deg, #312e81, #4338ca); }
   .sprint-card-num {
     font-size: 36px; font-weight: 900; opacity: 0.9;
     background: rgba(255,255,255,0.15); border-radius: 12px;
@@ -251,6 +255,7 @@
   .dep-node.s3 { border-color: #ea580c; color: #7c2d12; background: #ffedd5; }
   .dep-node.s4 { border-color: #7c3aed; color: #4c1d95; background: #ede9fe; }
   .dep-node.s5 { border-color: #0d9488; color: #134e4a; background: #ccfbf1; }
+  .dep-node.s6 { border-color: #4338ca; color: #312e81; background: #e0e7ff; }
   .dep-arrow { font-size: 20px; color: #94a3b8; }
 
   /* —— RBAC TABLE —— */
@@ -260,6 +265,7 @@
   .rbac-s3 { background: #ffedd5; }
   .rbac-s4 { background: #ede9fe; }
   .rbac-s5 { background: #ccfbf1; }
+  .rbac-s6 { background: #e0e7ff; }
 
   /* —— FEATURE ITEM —— */
   .feature-list { list-style: none; padding: 0; margin: 8px 0; }
@@ -287,7 +293,7 @@
     .cover h1 { font-size: 26px; }
     .toc ol { columns: 1; }
     .section { padding: 20px; }
-    .roadmap-strip { grid-template-columns: 1fr 1fr; }
+    .roadmap-strip { grid-template-columns: 1fr 1fr 1fr; }
     .comp-grid { grid-template-columns: 1fr 1fr; }
     .sprint-dep-note { flex-direction: column; }
   }
@@ -304,11 +310,11 @@
 <!-- COVER -->
 <div class="cover">
   <h1>אנו בניך</h1>
-  <div class="sprint-title">מפת דרכים — 5 ספרינטים מלאים</div>
+  <div class="sprint-title">מפת דרכים — 6 ספרינטים מלאים</div>
   <div class="subtitle">פלטפורמת קהילה לאלמנים ויתומים | FastAPI + Angular 22 | פרקטיקום סניף</div>
   <div class="meta">
-    <span><strong>10 שבועות סה"כ</strong></span>
-    <span><strong>5 ספרינטים × 2 שבועות</strong></span>
+    <span><strong>12 שבועות סה"כ</strong></span>
+    <span><strong>6 ספרינטים × 2 שבועות</strong></span>
     <span><strong>End-to-End בכל ספרינט</strong></span>
     <span><strong>MVP חי מ-Sprint 2</strong></span>
   </div>
@@ -317,7 +323,7 @@
 <!-- GOAL BANNER -->
 <div class="goal-banner">
   <strong>המסע המלא</strong>
-  Sprint 1: הרשמה + DB מקומית → Sprint 2: ענן + אישור Admin → Sprint 3: פורום + דיווח → Sprint 4: ייעוץ + מודרציה → Sprint 5: הודעות פרטיות + ליטוש מלא
+  Sprint 1: הרשמה + DB מקומית → Sprint 2: Docker + CI + אישור Admin → Sprint 3: פורום + ענן → Sprint 4: ייעוץ + מודרציה → Sprint 5: DM + AI + i18n + ליטוש → Sprint 6: וידאו קבוצתי
 </div>
 
 <div class="container">
@@ -326,16 +332,17 @@
 <div class="toc">
   <h2>תוכן עניינים</h2>
   <ol>
-    <li><a href="#s-roadmap">ציר הזמן הכולל — 5 ספרינטים</a></li>
+    <li><a href="#s-roadmap">ציר הזמן הכולל — 6 ספרינטים</a></li>
     <li><a href="#s-deps">תלויות בין ספרינטים</a></li>
     <li><a href="#s-shared">מפת קומפוננטות משותפות</a></li>
     <li><a href="#s-status">מכונת סטטוסים — User Lifecycle</a></li>
     <li><a href="#s-rbac">RBAC — מי מקבל גישה מתי</a></li>
     <li><a href="#s-sprint1">Sprint 1 — Auth + DB Foundation</a></li>
-    <li><a href="#s-sprint2">Sprint 2 — Admin Approval + Cloud</a></li>
-    <li><a href="#s-sprint3">Sprint 3 — Forum Module</a></li>
+    <li><a href="#s-sprint2">Sprint 2 — Admin Approval + DevOps</a></li>
+    <li><a href="#s-sprint3">Sprint 3 — Forum Module + Cloud</a></li>
     <li><a href="#s-sprint4">Sprint 4 — Advisory + Moderation</a></li>
-    <li><a href="#s-sprint5">Sprint 5 — Messages + Polish</a></li>
+    <li><a href="#s-sprint5">Sprint 5 — DM + AI + i18n + Polish</a></li>
+    <li><a href="#s-sprint6">Sprint 6 — Video Calls</a></li>
     <li><a href="#s-rules">כללי עבודה</a></li>
     <li><a href="#s-dod">Definition of Done — כולל</a></li>
   </ol>
@@ -347,7 +354,7 @@
 <div class="section" id="s-roadmap">
   <div class="section-header">
     <div class="section-number">1</div>
-    <h2>ציר הזמן הכולל — 5 ספרינטים</h2>
+    <h2>ציר הזמן הכולל — 6 ספרינטים</h2>
   </div>
 
   <div class="roadmap-strip">
@@ -378,7 +385,13 @@
     <div class="roadmap-cell rc-s5">
       <div class="weeks">שבועות 9–10</div>
       <div class="sprint-num">5</div>
-      <div class="sprint-name">Messages +<br>Audit + Polish</div>
+      <div class="sprint-name">DM + AI Agent<br>+ i18n + Polish</div>
+      <div class="sprint-tag">AI + הודעות + עברית/EN</div>
+    </div>
+    <div class="roadmap-cell rc-s6">
+      <div class="weeks">שבועות 11–12</div>
+      <div class="sprint-num">6</div>
+      <div class="sprint-name">Video Calls<br>Zoom / Meet</div>
       <div class="sprint-tag">✅ פרויקט מוגמר</div>
     </div>
   </div>
@@ -416,9 +429,15 @@
     </tr>
     <tr>
       <td><span class="badge badge-s5">Sprint 5</span></td>
-      <td>הודעות פרטיות + Audit Log + ליטוש RTL מלא</td>
-      <td>פרויקט מוגמר ומוכן להגשה</td>
+      <td>הודעות פרטיות + AI Agent (זכויות חד-הורי) + i18n עברית/אנגלית + ליטוש מלא</td>
+      <td>פלטפורמה פונקציונלית מלאה — מוכנה לדמו ראשון</td>
       <td>Sprint 1–4</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s6">Sprint 6</span></td>
+      <td>וידאו קבוצתי — Zoom API / Google Meet API + הזמנות לפי קבוצה/מגזר</td>
+      <td>פרויקט מוגמר ומוכן להגשה</td>
+      <td>Sprint 1–5</td>
     </tr>
   </table>
 </div>
@@ -460,7 +479,12 @@
       <div class="dep-arrow">→</div>
       <div class="dep-node s5">
         <div>Sprint 5</div>
-        <small>Messages + Polish</small>
+        <small>DM + AI + i18n + Polish</small>
+      </div>
+      <div class="dep-arrow">→</div>
+      <div class="dep-node s6">
+        <div>Sprint 6</div>
+        <small>Video Calls</small>
       </div>
     </div>
   </div>
@@ -681,7 +705,8 @@
       <th style="background: #14532d;">Sprint 2</th>
       <th style="background: #7c2d12;">Sprint 3</th>
       <th style="background: #4c1d95;">Sprint 4</th>
-      <th style="background: #134e4a;">Sprint 5</th>
+      <th style="background: #0d9488;">Sprint 5</th>
+      <th style="background: #4338ca;">Sprint 6</th>
     </tr>
     <tr>
       <td><strong>👤 User</strong><br><small>משתמשת רגילה</small></td>
@@ -689,7 +714,8 @@
       <td class="rbac-s2">המתנה לאישור. מייל: אושרת / נדחית / נדרש מידע</td>
       <td class="rbac-s3">קריאת פוסטים מסוננים לקבוצה/מגזר. כתיבה + עריכה + מחיקה שלה. דיווח על פוסטים</td>
       <td class="rbac-s4">שאלה מקצועית (פרטית/ציבורית). צפייה ב-Q&A feed</td>
-      <td class="rbac-s5">שליחת הודעות פרטיות לאנשים מאותה קבוצה/מגזר. מחיקת חשבון</td>
+      <td class="rbac-s5">הודעות פרטיות לאותה קבוצה/מגזר. AI Agent (זכויות חד-הורי). ממשק עברית/אנגלית. מחיקת חשבון</td>
+      <td class="rbac-s6">הצטרפות לשיחת וידאו קבוצתית (פגישות שנפתחו ע"י מקצוען/מנהל)</td>
     </tr>
     <tr>
       <td><strong>🛡️ Admin</strong><br><small>מנהלת</small></td>
@@ -697,7 +723,8 @@
       <td class="rbac-s2">אישור / דחייה / בקשת מידע / השעיה. ניהול מנהלים שניים. SLA tracking</td>
       <td class="rbac-s3">broadcast לכל הקהילה. גישה לכל ההודעות ללא הגבלת קבוצה/מגזר</td>
       <td class="rbac-s4">הוספת / עריכת / הסרת מבקרים ואנשי מקצוע</td>
-      <td class="rbac-s5">Audit Log מלא. ייצוא נתונים CSV</td>
+      <td class="rbac-s5">Audit Log מלא + פילטרים + ייצוא CSV</td>
+      <td class="rbac-s6">פתיחת פגישת וידאו לכל קבוצה/מגזר. הזמנות אוטומטיות למשתתפים</td>
     </tr>
     <tr>
       <td><strong>🔍 Moderator</strong><br><small>מבקרת</small></td>
@@ -706,6 +733,7 @@
       <td class="rbac-s3">קבלת התראות דיווח (שלב 1+2). הסתרת הודעות</td>
       <td class="rbac-s4">טיפול בדיווחים בתאים שלה. כרטיס משתמש. השעיה ידנית. זיהוי חריגות</td>
       <td class="rbac-s5">—</td>
+      <td class="rbac-s6">—</td>
     </tr>
     <tr>
       <td><strong>💼 Professional</strong><br><small>איש מקצוע</small></td>
@@ -714,6 +742,7 @@
       <td class="rbac-s3">—</td>
       <td class="rbac-s4">קבלת שאלות (לפי תחום / ספציפי). מענה + הבהרה. Q&A feed</td>
       <td class="rbac-s5">—</td>
+      <td class="rbac-s6">פתיחת פגישת וידאו קבוצתית לפי קבוצה/מגזר. הזמנת משתתפים דרך המערכת</td>
     </tr>
   </table>
 
@@ -1079,16 +1108,16 @@
 <div class="section" id="s-sprint5">
   <div class="section-header">
     <div class="section-number s5">5</div>
-    <h2>Sprint 5 — Private Messages + Audit Log + Polish</h2>
+    <h2>Sprint 5 — DM + AI Agent + i18n + Polish</h2>
   </div>
 
   <div class="sprint-card">
     <div class="sprint-card-header sh-s5">
       <div class="sprint-card-num">5</div>
       <div class="sprint-card-info">
-        <h3>הגשה מוכנה — הכל עובד, ליטוש מלא</h3>
+        <h3>סגירת פיצ'רים — DM, AI, i18n, ליטוש</h3>
         <div class="sprint-weeks">📅 שבועות 9–10</div>
-        <div class="sprint-goal">🎯 בסוף: הפרויקט מוגמר. אין 501. RTL עקבי. Responsive. כל component עם loading+error.</div>
+        <div class="sprint-goal">🎯 בסוף: פלטפורמה פונקציונלית מלאה — מוכנה לדמו ראשון ללקוח.</div>
       </div>
     </div>
     <div class="sprint-card-body">
@@ -1097,54 +1126,150 @@
         ♻️ <strong>שימוש חוזר:</strong>
         <code>report-button.component</code> מ-Sprint 3 — על הודעות פרטיות.
         <code>confirm-dialog.component</code> מ-Sprint 1 — מחיקת חשבון.
-        <code>loading-spinner</code> + <code>error-display</code> — ווידוא שכל component קיים משתמש בהן.
+        <code>loading-spinner</code> + <code>error-display</code> — ווידוא שכל component משתמש בהן.
       </div>
 
       <div class="sprint-dep-note">
         <div class="dep-from">
-          <strong>💬 Backend — הודעות פרטיות</strong>
+          <strong>💬 הודעות פרטיות (DM) — F1a BLOCKER + F1b + F2</strong>
           <ul class="feature-list">
-            <li>GET /users/search?name= — חיפוש בתוך קבוצה/מגזר בלבד</li>
-            <li>GET /messages — inbox (שיחות פעילות)</li>
-            <li>POST /messages — שליחה (מאמת קבוצה/מגזר זהה)</li>
-            <li>GET /messages/{user_id} — היסטוריית שיחה + pagination</li>
-            <li>מנגנון נגד מטרד: 3 דיווחים מאותו שולח → חסימה אוטומטית</li>
+            <li>F1a: message_service.py + endpoint messages.py (net-new, BLOCKER)</li>
+            <li>GET /messages — inbox + unread count</li>
+            <li>POST /messages — שליחה (חוסמת cross-cell בשכבת service)</li>
+            <li>GET /messages/{user_id} — היסטוריית שיחה</li>
+            <li>F1b: inbox.component + chat.component + message.service.ts</li>
+            <li>F2: GET /users/search?name= — מסונן לאותה קבוצה/מגזר בלבד</li>
           </ul>
         </div>
         <div class="dep-to">
-          <strong>🔐 Backend — Admin + מחיקה</strong>
+          <strong>🤖 AI Agent — זכויות חד-הורי — F7a BLOCKER + F7b</strong>
           <ul class="feature-list">
-            <li>GET /admin/audit-log — paginated + filter סוג/תאריך</li>
-            <li>GET /admin/export — ייצוא CSV</li>
-            <li>DELETE /users/me — מחיקה עצמית: anonymize פוסטים (GDPR)</li>
-            <li>השלמת audit_service — כל פעולות Admin/Moderator</li>
+            <li>F7a: ai_service.py + POST /ai/query (net-new, BLOCKER)</li>
+            <li>RAG-based — קורפוס זכויות חד-הורי סטטי</li>
+            <li>Disclaimer חובה על כל תשובה: "המידע הוא כללי בלבד..."</li>
+            <li>כל שאילתה נרשמת ב-AuditLog (ללא תוכן השאלה — פרטיות)</li>
+            <li>F7b: ai-agent.component + ai.service.ts (net-new)</li>
+            <li>AI API key עם startup guard (כמו SECRET_KEY)</li>
           </ul>
         </div>
       </div>
 
-      <h4>Frontend</h4>
-      <ul class="feature-list">
-        <li>inbox.component — רשימת שיחות + unread count + חיפוש נמענת</li>
-        <li>chat.component — חלון שיחה + שליחה + report-button</li>
-        <li>profile.component — פרופיל אישי + מחיקת חשבון (confirm-dialog)</li>
-        <li>audit-log.component — טבלת לוג עם פילטרים (Admin בלבד)</li>
-        <li>RTL Polish — עיצוב עקבי ימין-לשמאל בכל הקומפוננטות</li>
-        <li>Responsive — תמיכה במובייל בכל הדפים</li>
-        <li>ווידוא כל component: loading-spinner + error-display</li>
-      </ul>
+      <div class="sprint-dep-note">
+        <div class="dep-from">
+          <strong>📊 Admin + GDPR — F3 + F4 + F5</strong>
+          <ul class="feature-list">
+            <li>F3: DELETE /users/me — מחיקה עצמית (GDPR: PII נמחק, פוסטים מאונונימות)</li>
+            <li>profile.component — כפתור "מחיקת חשבון" + confirm-dialog</li>
+            <li>F4: GET /admin/audit-log + פילטרים (סוג/תאריך) + ייצוא CSV</li>
+            <li>audit-log.component — טבלה + פילטרים (Admin בלבד)</li>
+            <li>F5: _check_auto_suspension() + _check_frequent_false_reporter() (backend only)</li>
+            <li>F6a/F6b: GET /queries/feed — Q&A ציבורי לפי קבוצה/מגזר</li>
+          </ul>
+        </div>
+        <div class="dep-to">
+          <strong>🌐 i18n + ליטוש — F8 + F9</strong>
+          <ul class="feature-list">
+            <li>F8: he.json + en.json — כל מפתחות ה-UI</li>
+            <li>i18n.service.ts — טוען קובץ שפה, localStorage</li>
+            <li>language-toggle.component — כפתור בנב-בר</li>
+            <li>F9: כל component של Sprint 5 — loading-spinner + error-display</li>
+            <li>RTL עקבי + Responsive (320px+) בכל הדפים החדשים</li>
+          </ul>
+        </div>
+      </div>
 
-      <h4>✅ Definition of Done — ספרינט 5 + סגירת פרויקט</h4>
+      <h4>✅ Definition of Done</h4>
       <ul class="checklist">
-        <li>הודעות פרטיות זורמות בין משתמשות מאותה קבוצה/מגזר בלבד</li>
-        <li>GET /users/search לא חוצה קבוצות (מחזיר רק מאותה קבוצה/מגזר)</li>
-        <li>מנהלת רואה Audit Log מלא עם filter</li>
-        <li>מנהלת מייצאת נתונים ל-CSV</li>
-        <li>מחיקת חשבון: פרטים נמחקים, פוסטי הפורום מאונונימות</li>
-        <li>כל component מציג loading-spinner + error-display מתאים</li>
-        <li>UI עובד תקין על מובייל</li>
-        <li>אין <code>501 Not Implemented</code> ואין <code>raise NotImplementedError</code> בשום מקום</li>
-        <li><code>ng build</code> עובר ללא שגיאות TypeScript</li>
-        <li><code>ng lint</code> ו-<code>ruff check .</code> עוברים ירוק</li>
+        <li>DM: הודעות זורמות בין משתמשות מאותה קבוצה/מגזר בלבד; cross-cell חסום בשכבת service</li>
+        <li>AI Agent: תשובה על שאלת זכויות חד-הורי + Disclaimer קבוע גלוי תמיד</li>
+        <li>i18n: UI שלם בעברית ובאנגלית; בחירה נשמרת ב-localStorage</li>
+        <li>GDPR: מחיקת חשבון — PII נמחק, פוסטי הפורום מאונונימות, JWT מבוטל</li>
+        <li>Audit Log: פילטר לפי סוג/תאריך + ייצוא CSV</li>
+        <li>Auto-violation: 2 הפרות ב-7 ימים → השעיה אוטומטית 48 שעות</li>
+        <li>Q&A feed: שאלות ציבוריות שנענו — מסוננות לקבוצה/מגזר</li>
+        <li>כל component חדש: loading-spinner + error-display, standalone, <code>@if/@for</code></li>
+        <li>אין <code>501 Not Implemented</code> ואין <code>raise NotImplementedError</code></li>
+        <li><code>ng build</code> + <code>ng lint</code> + <code>ruff check .</code> עוברים ירוק</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- SPRINT 6                                        -->
+<!-- ════════════════════════════════════════════════ -->
+<div class="section" id="s-sprint6">
+  <div class="section-header">
+    <div class="section-number s6">6</div>
+    <h2>Sprint 6 — Video Group Calls (Zoom / Meet)</h2>
+  </div>
+
+  <div class="sprint-card">
+    <div class="sprint-card-header sh-s6">
+      <div class="sprint-card-num">6</div>
+      <div class="sprint-card-info">
+        <h3>שיחות וידאו קבוצתיות — ספרינט אחרון</h3>
+        <div class="sprint-weeks">📅 שבועות 11–12</div>
+        <div class="sprint-goal">🎯 בסוף: מקצוען/מנהל פותח פגישת Zoom/Meet, משתתפים מוזמנים דרך המערכת, קישור חד-פעמי. פרויקט מוגמר.</div>
+      </div>
+    </div>
+    <div class="sprint-card-body">
+
+      <div class="callout callout-blue">
+        💡 <strong>בחירת ספק:</strong> Zoom API או Google Meet API — הצוות בוחר לפי פשטות האינטגרציה. אין העדפת לקוח. (SPEC §11.1)
+      </div>
+
+      <div class="sprint-dep-note">
+        <div class="dep-from">
+          <strong>🔧 Backend</strong>
+          <ul class="feature-list">
+            <li>POST /video/meetings — פתיחת פגישה (מקצוען/מנהל בלבד)</li>
+            <li>חיבור ל-Zoom/Meet REST API — יצירת meeting + קבלת join URL</li>
+            <li>שמירת meeting ID + timestamp + קבוצה/מגזר רלוונטי</li>
+            <li>שליחת הזמנת מייל לכל חברי הקבוצה/מגזר (קישור חד-פעמי)</li>
+            <li>AuditLog על כל פגישה שנפתחת</li>
+            <li>ולידציה: קישור לא ניתן להעברה / לא ניתן לשיתוף חיצוני</li>
+          </ul>
+        </div>
+        <div class="dep-to">
+          <strong>🖥️ Frontend</strong>
+          <ul class="feature-list">
+            <li>open-meeting.component — בורר קבוצה/מגזר + שדה נושא + כפתור "פתח שיחה" (מקצוען/מנהל בלבד)</li>
+            <li>אישור עם הקישור לאחר יצירה</li>
+            <li>join-meeting.component — כפתור "הצטרף לשיחה" מופיע למשתמש כשיש פגישה פעילה לקבוצה שלו</li>
+            <li>video.service.ts — createMeeting(), getActiveMeeting()</li>
+            <li>כפתורי join/open מסוננים לפי תפקיד (guard)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>גבולות סקופ</h4>
+      <table>
+        <tr><th>כלול בספרינט 6</th><th>לא כלול</th></tr>
+        <tr>
+          <td>פתיחת פגישה + הזמנות דרך המערכת לפי קבוצה/מגזר</td>
+          <td>הקלטת פגישות (Zoom Free אינו תומך)</td>
+        </tr>
+        <tr>
+          <td>הצטרפות דרך קישור המערכת (חד-פעמי)</td>
+          <td>לוח שנה / עריכה / ביטול פגישות</td>
+        </tr>
+        <tr>
+          <td>AuditLog על כל פגישה</td>
+          <td>צ'אט בתוך הוידאו (מחוץ לסקופ)</td>
+        </tr>
+      </table>
+
+      <h4>✅ Definition of Done — ספרינט 6 + סגירת פרויקט</h4>
+      <ul class="checklist">
+        <li>מקצוען פותח פגישת Zoom/Meet → חברי הקבוצה/מגזר מקבלים מייל הזמנה</li>
+        <li>קישור ההצטרפות עובר דרך המערכת — לא ניתן להעבירו מחוץ לפלטפורמה</li>
+        <li>כפתור "הצטרף לשיחה" מופיע למשתמש כשיש פגישה פעילה עבור הקבוצה שלו</li>
+        <li>AuditLog מתעד כל פגישה שנפתחה</li>
+        <li>Video API key נקרא ממשתנה סביבה; startup validator חוסם הפעלה ללא key</li>
+        <li><code>ng build</code> + <code>ng lint</code> + <code>ruff check .</code> עוברים ירוק</li>
+        <li>CI ירוק על main — אין <code>501 Not Implemented</code> בשום מקום</li>
+        <li>Demo flow מלא עובד: הרשמה → אישור → פורום → ייעוץ + AI → DM → וידאו</li>
       </ul>
     </div>
   </div>
@@ -1209,8 +1334,10 @@
     <li>משתמשת שואלת שאלה מקצועית → איש מקצוע עונה → שואלת מקבלת מייל</li>
     <li>2 הפרות ב-7 ימים → משתמשת מושעית אוטומטית 48 שעות</li>
     <li>משתמשת שולחת הודעה פרטית → מגיעה רק לאנשים מאותה קבוצה/מגזר</li>
+    <li>AI Agent עונה על שאלה + Disclaimer קבוע מוצג + שאילתה נרשמת ב-AuditLog</li>
     <li>מנהלת מייצאת Audit Log → CSV עם כל הפעולות</li>
     <li>מחיקת חשבון → פרטים נמחקים, פוסטים מאונונימות</li>
+    <li>מקצוען פותח פגישת וידאו → חברי הקבוצה מקבלים מייל הזמנה עם קישור חד-פעמי</li>
   </ul>
 
   <h3>איכות קוד</h3>
@@ -1249,14 +1376,19 @@
     </tr>
     <tr>
       <td><span class="badge badge-s5">Sprint 5</span></td>
-      <td>הודעות + Audit Log + RTL Polish + GDPR</td>
+      <td>DM + AI Agent (זכויות חד-הורי) + i18n + GDPR + Auto-violation + Q&A feed + Audit Log + Polish</td>
+      <td>פלטפורמה פונקציונלית מלאה — מוכנה לדמו ראשון</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-s6">Sprint 6</span></td>
+      <td>שיחות וידאו קבוצתיות — Zoom/Meet + הזמנות + קישור חד-פעמי</td>
       <td>פרויקט מוגמר — מוכן להגשה</td>
     </tr>
   </table>
 </div>
 
 <div style="text-align:center; padding:32px 0; color:#999; font-size:13px;">
-  אנו בניך · מפת דרכים מלאה · 5 ספרינטים · 2026 · גרסה 1.0
+  אנו בניך · מפת דרכים מלאה · 6 ספרינטים · 2026 · גרסה 2.0
 </div>
 
 </div><!-- /container -->

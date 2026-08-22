@@ -165,6 +165,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'moderators',
+        loadComponent: () =>
+          import('./features/admin/manage-moderators/manage-moderators.component').then(
+            (m) => m.ManageModeratorsComponent,
+          ),
+      },
+      {
         path: 'audit-log',
         loadComponent: () =>
           import('./features/admin/audit-log/audit-log.component').then((m) => m.AuditLogComponent),

@@ -122,6 +122,12 @@ export enum PostStatus {
   DELETED = 'deleted',
 }
 
+export const POST_STATUS_LABELS: Record<PostStatus, string> = {
+  [PostStatus.VISIBLE]: 'גלוי',
+  [PostStatus.HIDDEN]: 'מוסתר',
+  [PostStatus.DELETED]: 'מחוק',
+};
+
 // ---------------------------------------------------------------------------
 // Professional domains
 // ---------------------------------------------------------------------------
@@ -204,6 +210,13 @@ export enum DocumentType {
   ID_CARD = 'id_card',
   PASSPORT = 'passport',
 }
+
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  [DocumentType.DEATH_CERTIFICATE]: 'תעודת פטירה',
+  [DocumentType.SELFIE]: 'תמונת זיהוי',
+  [DocumentType.ID_CARD]: 'תעודת זהות',
+  [DocumentType.PASSPORT]: 'דרכון',
+};
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,6 +1,6 @@
 export const environment = {
   production: true,
-  apiUrl: '/api/v1',
+  apiUrl: 'https://anu-banayich-backend.onrender.com/api/v1',
   // Firebase web app config (Project settings → General → Your apps → SDK setup).
   // These are public identifiers, not secrets — safe to commit.
   firebase: {

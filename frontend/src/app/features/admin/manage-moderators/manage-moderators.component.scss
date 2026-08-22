@@ -1,0 +1,278 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+.page {
+  padding: $spacing-md;
+  direction: rtl;
+
+  &__header {
+    @include flex-between;
+
+    flex-wrap: wrap;
+    gap: $spacing-md;
+    margin-top: $spacing-md;
+  }
+
+  &__hint {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-md;
+  }
+}
+
+.success-message {
+  color: $color-success;
+  margin-bottom: $spacing-md;
+}
+
+// ---------------------------------------------------------------------------
+// Add / edit panel
+// ---------------------------------------------------------------------------
+
+.panel {
+  background: $color-bg-subtle;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+
+  &__title {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    margin-bottom: $spacing-md;
+  }
+
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+    margin-top: $spacing-md;
+  }
+}
+
+.form-row {
+  display: grid;
+  gap: $spacing-md;
+
+  @include responsive(md) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin-bottom: $spacing-md;
+
+  label {
+    font-weight: $font-weight-medium;
+  }
+
+  input {
+    padding: $spacing-sm;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    font-size: $font-size-base;
+    font-family: inherit;
+    background: $color-bg;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+}
+
+.field-hint {
+  font-size: $font-size-xs;
+  color: $color-text-muted;
+}
+
+.field-error {
+  font-size: $font-size-xs;
+  color: $color-danger;
+}
+
+// ---------------------------------------------------------------------------
+// Cell matrix – a row per bereavement group, a column per sector
+// ---------------------------------------------------------------------------
+
+.matrix {
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  padding: $spacing-sm $spacing-md $spacing-md;
+  margin-bottom: $spacing-md;
+
+  legend {
+    font-weight: $font-weight-medium;
+    padding-inline: $spacing-xs;
+  }
+
+  // Narrow screens scroll the table instead of squeezing the columns.
+  &__scroll {
+    overflow-x: auto;
+  }
+
+  &__table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  &__caption {
+    caption-side: bottom;
+    text-align: start;
+    padding-top: $spacing-sm;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  th,
+  td {
+    border: 1px solid $color-border;
+    padding: $spacing-sm;
+    text-align: center;
+  }
+
+  th[scope='row'] {
+    text-align: start;
+    font-weight: $font-weight-medium;
+    white-space: nowrap;
+  }
+
+  thead th {
+    background: $color-bg;
+    font-weight: $font-weight-medium;
+  }
+
+  &__checkbox {
+    width: $spacing-md;
+    height: $spacing-md;
+    cursor: pointer;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Roster list
+// ---------------------------------------------------------------------------
+
+.roster {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  &__item {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: $spacing-md;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    margin-bottom: $spacing-sm;
+    background: $color-bg;
+  }
+
+  &__main {
+    flex: 1 1 260px;
+  }
+
+  &__name {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-bold;
+    margin: 0;
+  }
+
+  &__alert {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: $spacing-xs 0;
+  }
+
+  &__cells-title {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+    margin: $spacing-sm 0 $spacing-xs;
+  }
+
+  &__no-cells {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    margin: 0;
+  }
+
+  &__cells {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-xs;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-sm;
+  }
+}
+
+.badge {
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  background: rgba($color-primary, 0.12);
+  color: $color-primary-dark;
+}
+
+// ---------------------------------------------------------------------------
+// Buttons
+// ---------------------------------------------------------------------------
+
+.btn {
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: $color-bg;
+  color: $color-text;
+  font-size: $font-size-base;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover:not(:disabled) {
+    background: $color-bg-subtle;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    background: $color-primary;
+    border-color: $color-primary;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background: $color-primary-dark;
+    }
+  }
+
+  &--danger {
+    border-color: $color-danger;
+    color: $color-danger;
+
+    &:hover:not(:disabled) {
+      background: rgba($color-danger, 0.08);
+    }
+  }
+}

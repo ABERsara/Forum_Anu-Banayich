@@ -100,6 +100,40 @@ def sent_answer_emails(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]
     return sent
 
 
+@pytest.fixture
+def domain_notifications(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[tuple[list[str], str]]:
+    """
+    Capture send_domain_question_notification() calls — one entry per call.
+
+    The list of calls is the assertion, not just the recipients: the fan-out
+    costs one SMTP handshake per call, so "who was notified" and "in how many
+    calls" are two different things worth pinning.
+    """
+    calls: list[tuple[list[str], str]] = []
+    monkeypatch.setattr(
+        email_service,
+        "send_domain_question_notification",
+        lambda emails, query_id: calls.append((list(emails), query_id)),
+    )
+    return calls
+
+
+@pytest.fixture
+def direct_notifications(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
+    """Capture send_direct_question_notification() calls."""
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        email_service,
+        "send_direct_question_notification",
+        lambda professional_email, query_id: calls.append(
+            (professional_email, query_id)
+        ),
+    )
+    return calls
+
+
 class TestCreateQuery:
     def test_requires_professional_id_or_domain(self, db_session: Session) -> None:
         asker = _make_asker(db_session)
@@ -180,6 +214,139 @@ class TestCreateQuery:
         with pytest.raises(HTTPException) as exc_info:
             professional_service.create_query(db_session, data, asker)
         assert exc_info.value.status_code == 404
+
+
+class TestNewQuestionNotifications:
+    """
+    Who gets told about a new question, and at what cost.
+
+    The fan-out runs inside the asker's own create_query() call, so the number
+    of calls into email_service matters as much as the recipients: each call is
+    its own SMTP connect, STARTTLS and login, in sequence, while she waits for
+    her response.
+    """
+
+    def test_domain_question_notifies_every_professional_in_one_call(
+        self,
+        db_session: Session,
+        domain_notifications: list[tuple[list[str], str]],
+    ) -> None:
+        asker = _make_asker(db_session)
+        domain_pros = [
+            _make_professional(
+                db_session, email=f"pro{i}@example.com", domain=ProfessionalDomain.RABBI
+            )
+            for i in range(3)
+        ]
+
+        response = professional_service.create_query(
+            db_session,
+            ProfessionalQueryCreate(
+                content="שאלה כללית לכל רבני העמותה",
+                domain=ProfessionalDomain.RABBI,
+            ),
+            asker,
+        )
+
+        assert len(domain_notifications) == 1, "one send call, not one per professional"
+        recipients, query_id = domain_notifications[0]
+        assert sorted(recipients) == sorted(pro.email for pro in domain_pros)
+        assert query_id == response.id
+
+    def test_domain_question_skips_professionals_who_do_not_serve_the_asker(
+        self,
+        db_session: Session,
+        domain_notifications: list[tuple[list[str], str]],
+    ) -> None:
+        """Batching must not widen the audience: same filter, one call."""
+        asker = _make_asker(
+            db_session, user_type=UserType.WIDOW, sector=Sector.SEPHARDIC
+        )
+        serves = _make_professional(
+            db_session,
+            email="serves@example.com",
+            domain=ProfessionalDomain.RABBI,
+            groups=["widow"],
+            sectors=["sephardic"],
+        )
+        _make_professional(
+            db_session,
+            email="other-group@example.com",
+            domain=ProfessionalDomain.RABBI,
+            groups=["widower"],
+        )
+        _make_professional(
+            db_session,
+            email="other-domain@example.com",
+            domain=ProfessionalDomain.LAWYER,
+        )
+        _make_professional(
+            db_session,
+            email="inactive@example.com",
+            domain=ProfessionalDomain.RABBI,
+            is_active=False,
+        )
+
+        professional_service.create_query(
+            db_session,
+            ProfessionalQueryCreate(
+                content="שאלה כללית שמיועדת רק לחלק מהרבנים",
+                domain=ProfessionalDomain.RABBI,
+            ),
+            asker,
+        )
+
+        assert [recipients for recipients, _ in domain_notifications] == [
+            [serves.email]
+        ]
+
+    def test_domain_with_no_matching_professional_still_sends_nothing(
+        self,
+        db_session: Session,
+        domain_notifications: list[tuple[list[str], str]],
+    ) -> None:
+        """
+        The empty list reaches email_service, which opens no session for it —
+        the question is still created, and nobody is emailed.
+        """
+        asker = _make_asker(db_session)
+
+        professional_service.create_query(
+            db_session,
+            ProfessionalQueryCreate(
+                content="שאלה בתחום שאין בו אף איש מקצוע",
+                domain=ProfessionalDomain.MEDICINE,
+            ),
+            asker,
+        )
+
+        assert [recipients for recipients, _ in domain_notifications] == [[]]
+
+    def test_direct_question_notifies_only_the_chosen_professional(
+        self,
+        db_session: Session,
+        direct_notifications: list[tuple[str, str]],
+        domain_notifications: list[tuple[list[str], str]],
+    ) -> None:
+        asker = _make_asker(db_session)
+        professional = _make_professional(db_session, domain=ProfessionalDomain.RABBI)
+        _make_professional(
+            db_session,
+            email="colleague@example.com",
+            domain=ProfessionalDomain.RABBI,
+        )
+
+        response = professional_service.create_query(
+            db_session,
+            ProfessionalQueryCreate(
+                content="שאלה שמופנית לאיש מקצוע אחד בלבד",
+                professional_id=professional.id,
+            ),
+            asker,
+        )
+
+        assert direct_notifications == [(professional.email, response.id)]
+        assert domain_notifications == []
 
 
 class TestGetMyQuestions:

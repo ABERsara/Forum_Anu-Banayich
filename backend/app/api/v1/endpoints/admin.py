@@ -10,6 +10,10 @@ POST /admin/registrations/{id}/reject  – reject a registration
 GET  /admin/professionals            – all professionals
 POST /admin/professionals            – add a professional
 PUT  /admin/professionals/{id}       – update professional profile
+GET    /admin/moderators             – the moderator roster
+POST   /admin/moderators             – appoint a moderator
+PATCH  /admin/moderators/{id}        – update a moderator's cells / alert email
+DELETE /admin/moderators/{id}        – remove a moderator from the roster
 GET  /admin/audit-log                – full audit log
 POST /admin/users/{id}/suspend       – suspend a user manually
 """
@@ -23,11 +27,16 @@ from app.core.constants import UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.user import (
+    ModeratorAdminView,
+    ModeratorCreateRequest,
+    ModeratorUpdateRequest,
+    ProfessionalAdminView,
+    ProfessionalCreateRequest,
     ProfessionalUpdateRequest,
+    RegistrationDetailView,
     RegistrationRejectRequest,
     SuspendUserRequest,
     UserAdminView,
-    UserProfile,
 )
 from app.services import user_service
 
@@ -51,15 +60,23 @@ def list_pending_registrations(
     ]
 
 
-@router.get("/registrations/{user_id}", response_model=UserAdminView)
-def get_registration(user_id: str, db: Session = Depends(get_db)) -> UserAdminView:
+@router.get("/registrations/{user_id}", response_model=RegistrationDetailView)
+def get_registration(
+    user_id: str, db: Session = Depends(get_db)
+) -> RegistrationDetailView:
     """
-    Return a single registration with all uploaded documents.
+    Return a single registration awaiting approval, with the documents filed
+    with it — the full applicant profile plus document metadata.
 
-    TODO: load user + documents, build response with presigned URLs for documents
+    404 when there is no such user, 403 once the registration is no longer
+    waiting for a decision.
+
+    The documents are metadata only. The presigned URLs that open the files
+    themselves (SPEC §9.1) are not built yet, so nothing here is a link.
     """
-    # TODO: implement
-    raise NotImplementedError
+    return RegistrationDetailView.model_validate(
+        user_service.get_registration(db, user_id)
+    )
 
 
 @router.post("/registrations/{user_id}/approve", response_model=UserAdminView)
@@ -99,23 +116,83 @@ def list_active_users(db: Session = Depends(get_db)) -> list[UserAdminView]:
     ]
 
 
-@router.get("/professionals", response_model=list[UserProfile])
-def list_professionals(db: Session = Depends(get_db)) -> list[UserProfile]:
-    """Return all professional users."""
-    # TODO: query users where role=PROFESSIONAL
-    return []
+@router.get("/professionals", response_model=list[ProfessionalAdminView])
+def list_professionals(db: Session = Depends(get_db)) -> list[ProfessionalAdminView]:
+    """Return the full professional catalog, listed and unlisted alike."""
+    return [
+        ProfessionalAdminView.model_validate(professional)
+        for professional in user_service.get_professionals(db)
+    ]
 
 
-@router.put("/professionals/{user_id}")
+@router.post("/professionals", response_model=ProfessionalAdminView, status_code=201)
+def add_professional(
+    data: ProfessionalCreateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> ProfessionalAdminView:
+    """Add a professional to the catalog."""
+    professional = user_service.create_professional(db, data, current_user)
+    return ProfessionalAdminView.model_validate(professional)
+
+
+@router.put("/professionals/{user_id}", response_model=ProfessionalAdminView)
 def update_professional(
     user_id: str,
     data: ProfessionalUpdateRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> None:
+) -> ProfessionalAdminView:
     """Update a professional's profile (domain, sectors, groups, description)."""
-    # TODO: implement + audit log
-    raise NotImplementedError
+    professional = user_service.update_professional(db, user_id, data, current_user)
+    return ProfessionalAdminView.model_validate(professional)
+
+
+@router.get("/moderators", response_model=list[ModeratorAdminView])
+def list_moderators(db: Session = Depends(get_db)) -> list[ModeratorAdminView]:
+    """Return the moderator roster with the cells assigned to each moderator."""
+    return [
+        ModeratorAdminView.model_validate(moderator)
+        for moderator in user_service.get_moderators(db)
+    ]
+
+
+@router.post("/moderators", response_model=ModeratorAdminView, status_code=201)
+def add_moderator(
+    data: ModeratorCreateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> ModeratorAdminView:
+    """Appoint a moderator over the given cells."""
+    moderator = user_service.create_moderator(db, data, current_user)
+    return ModeratorAdminView.model_validate(moderator)
+
+
+@router.patch("/moderators/{user_id}", response_model=ModeratorAdminView)
+def update_moderator(
+    user_id: str,
+    data: ModeratorUpdateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> ModeratorAdminView:
+    """Update a moderator's assigned cells and/or their alert email."""
+    moderator = user_service.update_moderator(db, user_id, data, current_user)
+    return ModeratorAdminView.model_validate(moderator)
+
+
+@router.delete("/moderators/{user_id}", status_code=204)
+def remove_moderator(
+    user_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """
+    Remove a moderator from the roster.
+
+    204, no body: the roster no longer holds this moderator, so there is
+    nothing about them left for the client to render.
+    """
+    user_service.remove_moderator(db, user_id, current_user)
 
 
 @router.post("/users/{user_id}/suspend", response_model=UserAdminView)

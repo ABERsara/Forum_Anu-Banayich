@@ -139,8 +139,13 @@ class User(Base):
     # ------------------------------------------------------------------
     # Relationships
     # ------------------------------------------------------------------
+    # order_by: the admin reviewing a registration reads the documents in the
+    # order they were filed, and a relationship without one has no defined order.
     documents: Mapped[list["Document"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
-        "Document", back_populates="user", cascade="all, delete-orphan"
+        "Document",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="Document.uploaded_at",
     )
     forum_posts: Mapped[list["ForumPost"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "ForumPost", back_populates="author", foreign_keys="ForumPost.author_id"
