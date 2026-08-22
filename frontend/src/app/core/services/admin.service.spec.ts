@@ -4,8 +4,21 @@ import { TestBed } from '@angular/core/testing';
 
 import { AdminService } from './admin.service';
 import { environment } from '../../../environments/environment';
-import { DocumentType, Sector, UserType } from '../constants';
-import type { ForumPost, ModeratorAdminView, RegistrationDetail, UserAdminView } from '../models';
+import {
+  DocumentType,
+  GroupVisibility,
+  ProfessionalDomain,
+  Sector,
+  SectorVisibility,
+  UserType,
+} from '../constants';
+import type {
+  ForumPost,
+  ModeratorAdminView,
+  ProfessionalAdminView,
+  RegistrationDetail,
+  UserAdminView,
+} from '../models';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -166,5 +179,56 @@ describe('AdminService', () => {
     const mockUser = { id: 'u1' } as UserAdminView;
     req.flush(mockUser);
     expect(result).toEqual(mockUser);
+  });
+
+  it('getProfessionals GETs the professional catalog', () => {
+    let result: ProfessionalAdminView[] | undefined;
+    service.getProfessionals().subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/professionals`);
+    expect(req.request.method).toBe('GET');
+
+    const mockCatalog = [{ id: 'p1' }] as ProfessionalAdminView[];
+    req.flush(mockCatalog);
+    expect(result).toEqual(mockCatalog);
+  });
+
+  it('addProfessional POSTs the new professional', () => {
+    const body = {
+      first_name: 'ישראל',
+      last_name: 'כהן',
+      email: 'cohen.law@example.com',
+      phone: null,
+      professional_domain: ProfessionalDomain.LAWYER,
+      professional_groups: [GroupVisibility.WIDOWS],
+      professional_sectors: [SectorVisibility.HASIDIC],
+      professional_description: null,
+      is_active_professional: true,
+    };
+    let result: ProfessionalAdminView | undefined;
+    service.addProfessional(body).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/professionals`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(body);
+
+    const created = { id: 'p1' } as ProfessionalAdminView;
+    req.flush(created);
+    expect(result).toEqual(created);
+  });
+
+  it('updateProfessional PUTs only the submitted fields', () => {
+    let result: ProfessionalAdminView | undefined;
+    service
+      .updateProfessional('p1', { is_active_professional: false })
+      .subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/professionals/p1`);
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ is_active_professional: false });
+
+    const updated = { id: 'p1' } as ProfessionalAdminView;
+    req.flush(updated);
+    expect(result).toEqual(updated);
   });
 });
