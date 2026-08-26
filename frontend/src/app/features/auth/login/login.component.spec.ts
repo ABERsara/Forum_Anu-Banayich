@@ -11,17 +11,24 @@ describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
   let component: LoginComponent;
   let authLoginMock: ReturnType<typeof vi.fn>;
+  let authLoginWithGoogleMock: ReturnType<typeof vi.fn>;
+  let googleSignInMock: ReturnType<typeof vi.fn>;
   let router: Router;
 
   beforeEach(async () => {
     authLoginMock = vi.fn();
+    authLoginWithGoogleMock = vi.fn();
+    googleSignInMock = vi.fn();
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { login: authLoginMock } },
-        { provide: GoogleAuthService, useValue: { signInWithGoogle: vi.fn() } },
+        {
+          provide: AuthService,
+          useValue: { login: authLoginMock, loginWithGoogle: authLoginWithGoogleMock },
+        },
+        { provide: GoogleAuthService, useValue: { signInWithGoogle: googleSignInMock } },
       ],
     }).compileComponents();
 
@@ -74,5 +81,43 @@ describe('LoginComponent', () => {
 
     const btn = fixture.nativeElement.querySelector('.btn-submit') as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
+  });
+
+  it('should navigate to /home after a successful Google sign-in', () => {
+    googleSignInMock.mockReturnValue(of('id-token'));
+    authLoginWithGoogleMock.mockReturnValue(
+      of({ access_token: 't', refresh_token: 'r', token_type: 'bearer' as const }),
+    );
+    const navigateSpy = vi.spyOn(router, 'navigate');
+
+    component.onGoogleSignIn();
+
+    expect(authLoginWithGoogleMock).toHaveBeenCalledWith('id-token');
+    expect(navigateSpy).toHaveBeenCalledWith(['/home']);
+    expect(component.isLoading()).toBe(false);
+  });
+
+  it('should show a Hebrew error when the Google popup fails', () => {
+    googleSignInMock.mockReturnValue(throwError(() => new Error('popup closed')));
+
+    component.onGoogleSignIn();
+
+    expect(component.errorMessage()).toBe('הכניסה עם Google בוטלה או נכשלה.');
+    expect(component.isLoading()).toBe(false);
+    expect(authLoginWithGoogleMock).not.toHaveBeenCalled();
+  });
+
+  it('should show the backend error when Google login is rejected (403)', () => {
+    googleSignInMock.mockReturnValue(of('id-token'));
+    authLoginWithGoogleMock.mockReturnValue(
+      throwError(() => ({
+        error: { detail: 'אין חשבון מקושר למייל זה. יש להירשם תחילה.' },
+      })),
+    );
+
+    component.onGoogleSignIn();
+
+    expect(component.errorMessage()).toBe('אין חשבון מקושר למייל זה. יש להירשם תחילה.');
+    expect(component.isLoading()).toBe(false);
   });
 });

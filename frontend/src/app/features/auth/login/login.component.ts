@@ -15,7 +15,8 @@
  *   - Warm, supportive color scheme (see _variables.scss)
  */
 
-import { Component, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
@@ -98,6 +99,7 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly googleAuth = inject(GoogleAuthService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
@@ -134,7 +136,10 @@ export class LoginComponent {
 
     this.googleAuth
       .signInWithGoogle()
-      .pipe(switchMap((idToken) => this.auth.loginWithGoogle(idToken)))
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        switchMap((idToken) => this.auth.loginWithGoogle(idToken)),
+      )
       .subscribe({
         next: () => {
           this.isLoading.set(false);
