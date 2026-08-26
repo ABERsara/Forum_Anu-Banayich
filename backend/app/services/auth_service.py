@@ -219,7 +219,7 @@ def google_login(db: Session, data: GoogleAuthRequest) -> TokenResponse:
     )
 
 
-def google_link(db: Session, current_user: User, data: GoogleAuthRequest) -> User:
+def google_link(db: Session, current_user: User, data: GoogleAuthRequest) -> None:
     """
     Explicitly link a verified Google account to the current (logged-in)
     session. Rejects if that Google account is already linked elsewhere.
@@ -239,8 +239,6 @@ def google_link(db: Session, current_user: User, data: GoogleAuthRequest) -> Use
 
     current_user.google_uid = google_uid
     db.commit()
-    db.refresh(current_user)
-    return current_user
 
 
 def refresh_token(db: Session, refresh_tok: str) -> TokenResponse:

@@ -7,7 +7,7 @@
  */
 
 import { Injectable } from '@angular/core';
-import { initializeApp } from 'firebase/app';
+import { getApp, getApps, initializeApp } from 'firebase/app';
 import { GoogleAuthProvider, getAuth, signInWithPopup } from 'firebase/auth';
 import { Observable, from, switchMap } from 'rxjs';
 
@@ -15,7 +15,10 @@ import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class GoogleAuthService {
-  private readonly auth = getAuth(initializeApp(environment.firebase));
+  // Avoid Firebase's "duplicate-app" error if this service is ever
+  // re-instantiated (HMR, tests) while an app instance already exists.
+  private readonly app = getApps().length ? getApp() : initializeApp(environment.firebase);
+  private readonly auth = getAuth(this.app);
 
   /** Opens the Google sign-in popup and resolves with a Firebase ID token. */
   signInWithGoogle(): Observable<string> {

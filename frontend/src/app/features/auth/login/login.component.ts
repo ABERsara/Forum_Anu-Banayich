@@ -18,6 +18,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { switchMap } from 'rxjs';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { GoogleAuthService } from '../../../core/services/google-auth.service';
@@ -131,23 +132,20 @@ export class LoginComponent {
     this.isLoading.set(true);
     this.errorMessage.set('');
 
-    this.googleAuth.signInWithGoogle().subscribe({
-      next: (idToken) => {
-        this.auth.loginWithGoogle(idToken).subscribe({
-          next: () => {
-            this.isLoading.set(false);
-            this.router.navigate(['/home']);
-          },
-          error: (err) => {
-            this.errorMessage.set(err.error?.detail ?? 'שגיאה בכניסה עם Google.');
-            this.isLoading.set(false);
-          },
-        });
-      },
-      error: () => {
-        this.errorMessage.set('הכניסה עם Google בוטלה או נכשלה.');
-        this.isLoading.set(false);
-      },
-    });
+    this.googleAuth
+      .signInWithGoogle()
+      .pipe(switchMap((idToken) => this.auth.loginWithGoogle(idToken)))
+      .subscribe({
+        next: () => {
+          this.isLoading.set(false);
+          this.router.navigate(['/home']);
+        },
+        error: (err) => {
+          // A backend rejection (401/403/409) carries `error.detail`; anything
+          // else (popup closed, network failure) is a Google/Firebase-side error.
+          this.errorMessage.set(err.error?.detail ?? 'הכניסה עם Google בוטלה או נכשלה.');
+          this.isLoading.set(false);
+        },
+      });
   }
 }

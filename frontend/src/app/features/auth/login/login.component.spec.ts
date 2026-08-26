@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 
 import { LoginComponent } from './login.component';
 import { AuthService } from '../../../core/services/auth.service';
+import { GoogleAuthService } from '../../../core/services/google-auth.service';
 
 describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
@@ -17,7 +18,11 @@ describe('LoginComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
-      providers: [provideRouter([]), { provide: AuthService, useValue: { login: authLoginMock } }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { login: authLoginMock } },
+        { provide: GoogleAuthService, useValue: { signInWithGoogle: vi.fn() } },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(LoginComponent);
