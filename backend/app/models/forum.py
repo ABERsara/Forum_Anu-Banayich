@@ -14,7 +14,7 @@ Key rule (enforced in forum_service.py):
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import GroupVisibility, PostStatus, SectorVisibility
@@ -85,6 +85,13 @@ class ForumPost(Base):
 
 class DirectMessage(Base):
     __tablename__ = "direct_messages"
+    __table_args__ = (
+        Index(
+            "ix_direct_messages_conversation_created",
+            "conversation_key",
+            "created_at",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
@@ -96,7 +103,19 @@ class DirectMessage(Base):
         String(36), ForeignKey("users.id"), nullable=False
     )
 
-    # Stored encrypted (server-side encryption)
+    # Deterministic key derived from the two participant ids (sorted, joined) –
+    # see forum_service.build_conversation_key(). No separate "conversation"
+    # entity exists (spec has none); this is what §5.3's "1,000 messages per
+    # conversation" groups by.
+    conversation_key: Mapped[str] = mapped_column(String(80), nullable=False)
+
+    # Which MESSAGE_ENCRYPTION_KEY epoch encrypted `content` – see
+    # app/core/encryption.py. Only version 1 exists today; key rotation is
+    # out of scope for ABF-118.
+    key_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    # Stored encrypted (server-side encryption, AES-256-GCM – see
+    # app/core/encryption.py)
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
     is_read: Mapped[bool] = mapped_column(default=False)
