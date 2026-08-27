@@ -1,4 +1,4 @@
-<header class="header" dir="rtl">
+<header class="header">
   <div class="header__inner">
     <a class="header__logo" routerLink="/home">הפורום</a>
 
@@ -10,6 +10,16 @@
         <a routerLink="/login" routerLinkActive="active">כניסה</a>
         <a routerLink="/register" routerLinkActive="active">הרשמה</a>
       }
+      <button
+        type="button"
+        class="header__lang-toggle"
+        (click)="toggleLang()"
+        [attr.aria-label]="
+          (isHebrew() ? 'header.switch_to_english' : 'header.switch_to_hebrew') | transloco
+        "
+      >
+        {{ (isHebrew() ? 'common.lang_en' : 'common.lang_he') | transloco }}
+      </button>
     </nav>
   </div>
 </header>

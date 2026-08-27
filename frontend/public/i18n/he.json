@@ -1,0 +1,10 @@
+{
+  "common": {
+    "lang_he": "עברית",
+    "lang_en": "English"
+  },
+  "header": {
+    "switch_to_hebrew": "עבור לעברית",
+    "switch_to_english": "עבור לאנגלית"
+  }
+}

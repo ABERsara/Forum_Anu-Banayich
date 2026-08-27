@@ -66,4 +66,28 @@
       border-bottom-color: $color-primary;
     }
   }
+
+  &__lang-toggle {
+    color: $color-text-muted;
+    font-weight: $font-weight-medium;
+    font-family: inherit;
+    font-size: inherit;
+    background: none;
+    border: 1px solid $color-border;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    padding: $spacing-xs $spacing-sm;
+    transition:
+      color $transition-fast,
+      border-color $transition-fast;
+
+    &:hover {
+      color: $color-primary;
+      border-color: $color-primary;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
 }
