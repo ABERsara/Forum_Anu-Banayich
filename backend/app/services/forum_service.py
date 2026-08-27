@@ -11,6 +11,9 @@ TODO list for junior developer:
   [ ] implement search_users_for_dm() – name search within same group/sector
 """
 
+from datetime import datetime
+from typing import TypedDict
+
 from fastapi import HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Query, Session, joinedload
@@ -23,6 +26,7 @@ from app.core.constants import (
     SectorVisibility,
     UserRole,
 )
+from app.core.encryption import decrypt_message, encrypt_message
 from app.models.forum import DirectMessage, ForumPost
 from app.models.user import User
 from app.schemas.forum import (
@@ -34,6 +38,23 @@ from app.schemas.forum import (
     ForumPostUpdate,
 )
 from app.services.audit_service import log_action
+from app.services.user_service import get_user_by_id
+
+#: Generic 403 for anything DM-permission-related — never distinguishes
+#: "wrong role", "wrong cell", or "no such user", per the DoD rule that a
+#: denial must not leak whether a user or conversation exists.
+_DM_FORBIDDEN_MESSAGE = "אין לך הרשאה לשלוח או לצפות בהודעה זו."
+
+
+class DirectMessageData(TypedDict):
+    """A decrypted DirectMessage row, shaped for DirectMessageResponse."""
+
+    id: str
+    sender: User
+    recipient: User
+    content: str
+    is_read: bool
+    created_at: datetime
 
 
 def _content_filter(query: Query[ForumPost], current_user: User) -> Query[ForumPost]:
@@ -354,40 +375,181 @@ def create_broadcast_post(db: Session, data: BroadcastCreate, admin: User) -> Fo
     return post
 
 
+def can_message(sender: User, recipient: User) -> bool:
+    """
+    Single source of truth for "may sender privately message recipient".
+
+    True only if both are USER-role, both ACTIVE, and they're in the same
+    "cell" — spec §4.1's group×sector intersection (both axes, not just
+    group: §3.2's permission table row reads "לקבוצתו" loosely, but §5.3
+    pins the real rule as "בתוך קבוצתו/מגזרו" — within his group AND
+    sector).
+    """
+    return (
+        sender.role == UserRole.USER
+        and recipient.role == UserRole.USER
+        and sender.account_status == AccountStatus.ACTIVE
+        and recipient.account_status == AccountStatus.ACTIVE
+        and sender.user_type is not None
+        and sender.user_type == recipient.user_type
+        and sender.sector is not None
+        and sender.sector == recipient.sector
+    )
+
+
+def build_conversation_key(user_id_a: str, user_id_b: str) -> str:
+    """
+    Deterministic key for the pair, independent of who is sender/recipient.
+
+    No "conversation" entity exists in the spec (§5.3 only talks about a cap
+    of 1,000 messages "per conversation") — this is what groups a pair's
+    messages instead of introducing one. Not a secret: both participants
+    already know each other's id from the cell-members list, so this can
+    (and does, in the frontend) get recomputed client-side identically.
+    """
+    first, second = sorted((user_id_a, user_id_b))
+    return f"{first}:{second}"
+
+
+def _parse_conversation_key(conversation_key: str) -> tuple[str, str] | None:
+    """Split a conversation_key back into its two participant ids."""
+    parts = conversation_key.split(":")
+    if len(parts) != 2:
+        return None
+    return parts[0], parts[1]
+
+
+def _to_response_dict(message: DirectMessage) -> DirectMessageData:
+    """
+    Decrypt one row's content for the API response layer.
+
+    Returns a plain dict rather than mutating message.content in place: this
+    ORM instance may still be session-tracked, and writing the decrypted
+    plaintext into a tracked attribute risks it being flushed back to the DB
+    on some later, unrelated commit — silently replacing the encrypted
+    content. A dict can't have that accident.
+    """
+    return {
+        "id": message.id,
+        "sender": message.sender,
+        "recipient": message.recipient,
+        "content": decrypt_message(message.content, message.key_version),
+        "is_read": message.is_read,
+        "created_at": message.created_at,
+    }
+
+
 def send_direct_message(
     db: Session, data: DirectMessageCreate, sender: User
-) -> DirectMessage:
+) -> DirectMessageData:
     """
-    Send a private message.
+    Send a private message within the sender's own cell.
 
-    Validations:
-      - Recipient must be in the same group as sender
-      - Recipient must be ACTIVE
-      - Sender is not blocked by recipient (check report history)
-
-    TODO:
-      1. Load recipient, validate same group
-      2. Encrypt content (or mark as needing encryption)
-      3. Create DirectMessage, save to DB
+    Never distinguishes "recipient doesn't exist" from "recipient exists but
+    can't be messaged" (wrong cell, wrong role, inactive) — both return the
+    same generic 403, per the DoD rule against leaking user existence.
     """
-    # TODO: implement this function
-    raise NotImplementedError("send_direct_message() is not yet implemented")
+    if sender.role != UserRole.USER:
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+
+    recipient = get_user_by_id(db, data.recipient_id)
+    if recipient is None or not can_message(sender, recipient):
+        log_action(
+            db,
+            actor=sender,
+            action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
+            entity_type="DirectMessage",
+            entity_id=data.recipient_id,
+            details={"reason": "send_blocked"},
+        )
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+
+    encrypted_content, key_version = encrypt_message(data.content)
+    message = DirectMessage(
+        sender_id=sender.id,
+        recipient_id=recipient.id,
+        conversation_key=build_conversation_key(sender.id, recipient.id),
+        content=encrypted_content,
+        key_version=key_version,
+    )
+    db.add(message)
+    db.commit()
+
+    message = (
+        db.query(DirectMessage)
+        .options(joinedload(DirectMessage.sender), joinedload(DirectMessage.recipient))
+        .filter(DirectMessage.id == message.id)
+        .one()
+    )
+    return _to_response_dict(message)
 
 
-def get_conversation(
-    db: Session, current_user: User, other_user_id: str, page: int = 1
-) -> list[DirectMessage]:
+def get_conversation_messages(
+    db: Session, current_user: User, conversation_key: str
+) -> list[DirectMessageData]:
     """
-    Return messages between current_user and other_user, newest first.
+    Return every message for a conversation_key, oldest first.
 
-    TODO:
-      1. Query DirectMessage where (sender=me AND recipient=other) OR (sender=other AND recipient=me)
-      2. Order by created_at DESC
-      3. Apply pagination (max 50 per page)
-      4. Mark retrieved messages as is_read=True
+    No pagination (out of scope — spec §5.3's 1,000/conversation cap isn't
+    enforced here either) and no is_read mutation (marking as read is out of
+    scope for this ticket, despite this function's old TODO comment).
+
+    A well-formed key for a conversation with zero messages yet returns an
+    empty list (200), not 404 — "no messages" is a normal empty state, not
+    an error. The only thing checked is whether current_user is one of the
+    two participants encoded in the key; a malformed key or one that doesn't
+    include current_user gets the same generic 403 as any other denial.
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_conversation() is not yet implemented")
+    if current_user.role != UserRole.USER:
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+
+    parsed = _parse_conversation_key(conversation_key)
+    if parsed is None or current_user.id not in parsed:
+        log_action(
+            db,
+            actor=current_user,
+            action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
+            entity_type="DirectMessage",
+            entity_id=conversation_key,
+            details={"reason": "read_blocked"},
+        )
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+
+    messages = (
+        db.query(DirectMessage)
+        .options(joinedload(DirectMessage.sender), joinedload(DirectMessage.recipient))
+        .filter(DirectMessage.conversation_key == conversation_key)
+        .order_by(DirectMessage.created_at.asc())
+        .all()
+    )
+    return [_to_response_dict(message) for message in messages]
+
+
+def get_cell_members(db: Session, current_user: User) -> list[User]:
+    """
+    List every other ACTIVE user in current_user's own cell (group+sector).
+
+    Name only (UserPublic drops everything else) — same "no PII beyond name"
+    rule as the rest of this file. This is a plain list, not the spec's
+    by-name search (§5.3) — search is explicitly out of scope for this
+    ticket; that's a separate, still-unimplemented feature
+    (search_users_for_dm / GET /users/search).
+    """
+    if current_user.role != UserRole.USER:
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+
+    return (
+        db.query(User)
+        .filter(
+            User.id != current_user.id,
+            User.role == UserRole.USER,
+            User.account_status == AccountStatus.ACTIVE,
+            User.user_type == current_user.user_type,
+            User.sector == current_user.sector,
+        )
+        .order_by(User.first_name, User.last_name)
+        .all()
+    )
 
 
 def search_users_for_dm(db: Session, current_user: User, name: str) -> list[User]:
