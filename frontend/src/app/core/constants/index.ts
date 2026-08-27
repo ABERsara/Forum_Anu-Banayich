@@ -200,6 +200,12 @@ export enum ReportDecision {
   VALID = 'valid',
 }
 
+export const REPORT_DECISION_LABELS: Record<ReportDecision, string> = {
+  [ReportDecision.PENDING]: 'ממתין לטיפול',
+  [ReportDecision.INVALID]: 'הדיווח בוטל',
+  [ReportDecision.VALID]: 'הדיווח התקבל',
+};
+
 // ---------------------------------------------------------------------------
 // Documents
 // ---------------------------------------------------------------------------

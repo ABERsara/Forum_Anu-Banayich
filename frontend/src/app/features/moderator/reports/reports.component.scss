@@ -1,0 +1,201 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+.page {
+  padding: $spacing-md;
+  direction: rtl;
+
+  &__hint {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-md;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tabs – pending queue vs. past decisions
+// ---------------------------------------------------------------------------
+
+.tabs {
+  display: flex;
+  gap: $spacing-xs;
+  border-bottom: 1px solid $color-border;
+  margin-bottom: $spacing-md;
+
+  &__tab {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    padding: $spacing-sm $spacing-md;
+    border: none;
+    // The active tab is marked by a line under it, so every tab reserves the
+    // same space for one – otherwise switching tabs shifts the page.
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: $color-text-muted;
+    font-size: $font-size-base;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color $transition-fast;
+
+    &:hover {
+      color: $color-text;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+
+    &--active {
+      border-bottom-color: $color-primary;
+      color: $color-primary-dark;
+      font-weight: $font-weight-bold;
+    }
+  }
+}
+
+.panel__empty {
+  color: $color-text-muted;
+}
+
+// ---------------------------------------------------------------------------
+// One reported post, in either tab
+// ---------------------------------------------------------------------------
+
+.reports {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  &__item {
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    margin-bottom: $spacing-sm;
+    background: $color-bg;
+  }
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $spacing-sm;
+  }
+
+  &__title {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-bold;
+    margin: 0;
+  }
+
+  &__content {
+    // The reported text is quoted here, so it is set apart from the report's
+    // own metadata rather than reading as the moderator's words.
+    border-inline-start: 3px solid $color-border;
+    padding-inline-start: $spacing-sm;
+    margin: $spacing-sm 0;
+    color: $color-text;
+    // A single unbroken string must not widen the card past the viewport.
+    overflow-wrap: anywhere;
+  }
+
+  &__meta {
+    display: grid;
+    gap: $spacing-sm $spacing-md;
+    margin: 0 0 $spacing-md;
+
+    @include responsive(md) {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    dt {
+      color: $color-text-muted;
+      font-size: $font-size-xs;
+    }
+
+    dd {
+      margin: $spacing-xs 0 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  &__note {
+    @include responsive(md) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+  }
+}
+
+.badge {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  white-space: nowrap;
+  background: rgba($color-primary, 0.12);
+  color: $color-primary-dark;
+
+  &--alert {
+    background: rgba($color-danger, 0.12);
+    color: $color-danger;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// History pagination
+// ---------------------------------------------------------------------------
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+}
+
+// ---------------------------------------------------------------------------
+// Buttons
+// ---------------------------------------------------------------------------
+
+.btn {
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: $color-bg;
+  color: $color-text;
+  font-size: $font-size-base;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover:not(:disabled) {
+    background: $color-bg-subtle;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &--danger {
+    border-color: $color-danger;
+    color: $color-danger;
+
+    &:hover:not(:disabled) {
+      background: rgba($color-danger, 0.08);
+    }
+  }
+}
