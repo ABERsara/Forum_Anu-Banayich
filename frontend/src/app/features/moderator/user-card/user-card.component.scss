@@ -1,0 +1,128 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+.page {
+  padding: $spacing-md;
+  direction: rtl;
+
+  &__back {
+    display: inline-block;
+    margin-bottom: $spacing-sm;
+    color: $color-primary-dark;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__hint {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-md;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The card itself
+// ---------------------------------------------------------------------------
+
+.card {
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  background: $color-bg;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  &__name {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    margin: 0;
+    // A single unbroken name must not widen the card past the viewport.
+    overflow-wrap: anywhere;
+  }
+
+  &__suspension {
+    margin: $spacing-sm 0 0;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  &__section {
+    font-size: $font-size-base;
+    font-weight: $font-weight-bold;
+    margin: $spacing-lg 0 $spacing-sm;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The counts
+// ---------------------------------------------------------------------------
+
+.stats {
+  display: grid;
+  gap: $spacing-sm $spacing-md;
+  margin: 0;
+
+  @include responsive(md) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  &__item {
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $spacing-sm $spacing-md;
+    background: $color-bg-subtle;
+
+    dt {
+      color: $color-text-muted;
+      font-size: $font-size-xs;
+    }
+
+    dd {
+      margin: $spacing-xs 0 0;
+      font-size: $font-size-lg;
+      font-weight: $font-weight-bold;
+    }
+
+    // The count SPEC §7.2 watches for a frequent false reporter.
+    &--alert dd {
+      color: $color-danger;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Cell and account-status chips
+// ---------------------------------------------------------------------------
+
+.badge {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  white-space: nowrap;
+  background: rgba($color-primary, 0.12);
+  color: $color-primary-dark;
+
+  // Solid rather than the usual tint: at $font-size-xs this chip carries the
+  // one word that says the account is suspended, and $color-danger over a 12%
+  // tint of itself lands at 4.0:1 — under the 4.5:1 AA floor. White on solid
+  // $color-danger is 4.83:1.
+  &--alert {
+    background: $color-danger;
+    color: $color-white;
+  }
+}

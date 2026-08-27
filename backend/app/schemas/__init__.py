@@ -27,6 +27,7 @@ from app.schemas.professional import (
 from app.schemas.report import (
     ReportCreate,
     ReportDecideRequest,
+    ReportHistoryResponse,
     ReportListResponse,
     ReportResponse,
     ReportWithContent,
@@ -36,6 +37,7 @@ from app.schemas.user import (
     RegistrationRejectRequest,
     SuspendUserRequest,
     UserAdminView,
+    UserModerationCard,
     UserProfile,
     UserPublic,
 )
@@ -48,6 +50,7 @@ __all__ = [
     "UserPublic",
     "UserProfile",
     "UserAdminView",
+    "UserModerationCard",
     "ProfessionalProfile",
     "RegistrationRejectRequest",
     "SuspendUserRequest",
@@ -65,5 +68,6 @@ __all__ = [
     "ReportResponse",
     "ReportDecideRequest",
     "ReportListResponse",
+    "ReportHistoryResponse",
     "ReportWithContent",
 ]

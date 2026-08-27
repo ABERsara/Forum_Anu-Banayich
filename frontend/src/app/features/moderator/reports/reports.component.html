@@ -1,0 +1,210 @@
+<div class="page">
+  <h1>לוח בקרת מבקר</h1>
+  <p class="page__hint">
+    כל החלטה מחייבת הערה בכתב. ההערה נשמרת עם הדיווח ומהווה את התיעוד היחיד לסיבת ההחלטה לאחר שהתוכן
+    עצמו הוסר.
+  </p>
+
+  <app-error-display [message]="actionError() ?? ''" />
+
+  <!--
+    לשוניות — roving tabindex: only the selected tab is in the page's tab
+    order, and the arrow keys move between them (WAI-ARIA tabs pattern).
+    Without the arrow-key handler the unselected tab would be unreachable
+    by keyboard.
+  -->
+  <div class="tabs" role="tablist" aria-label="דיווחים">
+    <button
+      #pendingTab
+      type="button"
+      role="tab"
+      id="tab-pending"
+      class="tabs__tab"
+      [class.tabs__tab--active]="activeTab() === 'pending'"
+      [attr.aria-selected]="activeTab() === 'pending'"
+      [attr.tabindex]="activeTab() === 'pending' ? 0 : -1"
+      aria-controls="panel-pending"
+      (click)="showTab('pending')"
+      (keydown)="moveToTab($event, 'history', historyTab)"
+    >
+      דיווחים ממתינים
+      @if (pendingReports().length > 0) {
+        <span class="badge">{{ pendingReports().length }}</span>
+      }
+    </button>
+    <button
+      #historyTab
+      type="button"
+      role="tab"
+      id="tab-history"
+      class="tabs__tab"
+      [class.tabs__tab--active]="activeTab() === 'history'"
+      [attr.aria-selected]="activeTab() === 'history'"
+      [attr.tabindex]="activeTab() === 'history' ? 0 : -1"
+      aria-controls="panel-history"
+      (click)="showTab('history')"
+      (keydown)="moveToTab($event, 'pending', pendingTab)"
+    >
+      היסטוריה
+    </button>
+  </div>
+
+  <!-- ───────────────────── דיווחים ממתינים ───────────────────── -->
+  @if (activeTab() === 'pending') {
+    <section id="panel-pending" role="tabpanel" aria-labelledby="tab-pending">
+      @if (isLoading()) {
+        <app-loading-spinner message="טוען דיווחים..." />
+      } @else if (hasError()) {
+        <app-error-display message="אירעה שגיאה בטעינת הדיווחים. נסי לרענן את הדף." />
+      } @else if (pendingReports().length === 0) {
+        <p class="panel__empty">אין דיווחים ממתינים. כל הכבוד!</p>
+      } @else {
+        <ul class="reports">
+          @for (report of pendingReports(); track report.id) {
+            <li class="reports__item">
+              <div class="reports__head">
+                <h2 class="reports__title">{{ report.content_title }}</h2>
+                <span class="badge badge--alert">{{ report.report_count }} דיווחים</span>
+              </div>
+
+              <p class="reports__content">{{ previewOf(report.content_text) }}</p>
+
+              <dl class="reports__meta">
+                <div>
+                  <dt>סיבת הדיווח</dt>
+                  <dd>{{ reasonLabels[report.reason] }}</dd>
+                </div>
+                <div>
+                  <dt>פירוט המדווח/ת</dt>
+                  <dd>{{ report.description ?? '–' }}</dd>
+                </div>
+                <div>
+                  <dt>תאריך הדיווח</dt>
+                  <dd>{{ report.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
+                </div>
+                <div>
+                  <dt>מצב ההודעה</dt>
+                  <dd>{{ postStatusLabels[report.content_status] }}</dd>
+                </div>
+              </dl>
+
+              <div class="reports__actions">
+                <button
+                  type="button"
+                  class="btn btn--danger"
+                  [attr.aria-label]="'מחיקת ההודעה ״' + report.content_title + '״'"
+                  (click)="decide(report, decisions.VALID)"
+                >
+                  מחיקת ההודעה (מוצדק)
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  [attr.aria-label]="'ביטול הדיווח על ״' + report.content_title + '״'"
+                  (click)="decide(report, decisions.INVALID)"
+                >
+                  ביטול הדיווח (שגוי)
+                </button>
+                <a
+                  class="reports__card-link"
+                  [routerLink]="['/moderator/users', report.reported_user_id]"
+                  [attr.aria-label]="'כרטיס המשתמש/ת שכתב/ה את ״' + report.content_title + '״'"
+                >
+                  כרטיס המשתמש/ת
+                </a>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
+  <!-- ────────────────────────── היסטוריה ────────────────────────── -->
+  @if (activeTab() === 'history') {
+    <section id="panel-history" role="tabpanel" aria-labelledby="tab-history">
+      @if (isHistoryLoading()) {
+        <app-loading-spinner message="טוען היסטוריה..." />
+      } @else if (historyError()) {
+        <app-error-display message="אירעה שגיאה בטעינת ההיסטוריה. נסי לרענן את הדף." />
+      } @else if (history().length === 0) {
+        <p class="panel__empty">עדיין לא התקבלו החלטות בתאים שבאחריותך.</p>
+      } @else {
+        <ul class="reports">
+          @for (report of history(); track report.id) {
+            <li class="reports__item">
+              <div class="reports__head">
+                <h2 class="reports__title">{{ report.content_title }}</h2>
+                <span class="badge">{{ decisionLabels[report.decision] }}</span>
+              </div>
+
+              <p class="reports__content">{{ previewOf(report.content_text) }}</p>
+
+              <dl class="reports__meta">
+                <div>
+                  <dt>סיבת הדיווח</dt>
+                  <dd>{{ reasonLabels[report.reason] }}</dd>
+                </div>
+                <div>
+                  <dt>תאריך ההחלטה</dt>
+                  <dd>{{ report.decided_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
+                </div>
+                <div>
+                  <dt>מצב ההודעה</dt>
+                  <dd>{{ postStatusLabels[report.content_status] }}</dd>
+                </div>
+                <div class="reports__note">
+                  <dt>הערת המבקר/ת</dt>
+                  <dd>{{ report.moderator_note ?? '–' }}</dd>
+                </div>
+              </dl>
+
+              <div class="reports__actions">
+                <a
+                  class="reports__card-link"
+                  [routerLink]="['/moderator/users', report.reported_user_id]"
+                  [attr.aria-label]="'כרטיס המשתמש/ת שכתב/ה את ״' + report.content_title + '״'"
+                >
+                  כרטיס המשתמש/ת
+                </a>
+              </div>
+            </li>
+          }
+        </ul>
+
+        @if (historyPageCount() > 1) {
+          <nav class="pager" aria-label="ניווט בין עמודי ההיסטוריה">
+            <button
+              type="button"
+              class="btn"
+              [disabled]="!hasPreviousPage()"
+              (click)="goToPreviousPage()"
+            >
+              הקודם
+            </button>
+            <span aria-live="polite">עמוד {{ historyPage() }} מתוך {{ historyPageCount() }}</span>
+            <button type="button" class="btn" [disabled]="!hasNextPage()" (click)="goToNextPage()">
+              הבא
+            </button>
+          </nav>
+        }
+      }
+    </section>
+  }
+
+  <!-- ───────────── אישור ההחלטה + הערת מבקר (חובה) ───────────── -->
+  @if (pendingDecision(); as pending) {
+    <app-confirm-dialog
+      [title]="confirmTitle(pending.decision)"
+      [message]="confirmMessage(pending.decision)"
+      [confirmText]="confirmTitle(pending.decision)"
+      [isDestructive]="pending.decision === decisions.VALID"
+      [requireInput]="true"
+      inputLabel="הערת המבקר/ת (חובה)"
+      inputPlaceholder="לדוגמה: התוכן כולל התבטאות פוגענית כלפי משתמש אחר"
+      [inputMinLength]="minNoteLength"
+      (confirmed)="confirmDecision($event)"
+      (cancelled)="cancelDecision()"
+    />
+  }
+</div>
