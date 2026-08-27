@@ -517,7 +517,11 @@ def get_conversation_messages(
     including denied attempts).
     """
     parsed = _parse_conversation_key(conversation_key)
-    if current_user.role != UserRole.USER or parsed is None or current_user.id not in parsed:
+    if (
+        current_user.role != UserRole.USER
+        or parsed is None
+        or current_user.id not in parsed
+    ):
         log_action(
             db,
             actor=current_user,
