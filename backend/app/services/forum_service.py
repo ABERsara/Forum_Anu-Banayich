@@ -14,6 +14,7 @@ TODO list for junior developer:
 from datetime import datetime
 from typing import TypedDict
 
+from cryptography.exceptions import InvalidTag
 from fastapi import HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Query, Session, joinedload
@@ -391,8 +392,10 @@ def can_message(sender: User, recipient: User) -> bool:
         and sender.account_status == AccountStatus.ACTIVE
         and recipient.account_status == AccountStatus.ACTIVE
         and sender.user_type is not None
+        and recipient.user_type is not None
         and sender.user_type == recipient.user_type
         and sender.sector is not None
+        and recipient.sector is not None
         and sender.sector == recipient.sector
     )
 
@@ -428,12 +431,22 @@ def _to_response_dict(message: DirectMessage) -> DirectMessageData:
     plaintext into a tracked attribute risks it being flushed back to the DB
     on some later, unrelated commit — silently replacing the encrypted
     content. A dict can't have that accident.
+
+    AES-GCM's InvalidTag means the stored row failed authentication (DB
+    corruption, or content encrypted under a different key) — surfaced as a
+    generic 500 rather than propagating, so the failure detail (and the fact
+    that it's specifically a decryption failure) never reaches the client.
     """
+    try:
+        content = decrypt_message(message.content, message.key_version)
+    except InvalidTag as exc:
+        raise HTTPException(status_code=500, detail="שגיאת שרת פנימית.") from exc
+
     return {
         "id": message.id,
         "sender": message.sender,
         "recipient": message.recipient,
-        "content": decrypt_message(message.content, message.key_version),
+        "content": content,
         "is_read": message.is_read,
         "created_at": message.created_at,
     }
@@ -496,15 +509,15 @@ def get_conversation_messages(
 
     A well-formed key for a conversation with zero messages yet returns an
     empty list (200), not 404 — "no messages" is a normal empty state, not
-    an error. The only thing checked is whether current_user is one of the
-    two participants encoded in the key; a malformed key or one that doesn't
-    include current_user gets the same generic 403 as any other denial.
+    an error. What's checked is the caller's role and whether current_user
+    is one of the two participants encoded in the key; wrong role, a
+    malformed key, or one that doesn't include current_user all get the
+    same generic 403 — and the same audit log entry (§9.3: any attempted
+    access to private content that isn't the caller's own must be logged,
+    including denied attempts).
     """
-    if current_user.role != UserRole.USER:
-        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
-
     parsed = _parse_conversation_key(conversation_key)
-    if parsed is None or current_user.id not in parsed:
+    if current_user.role != UserRole.USER or parsed is None or current_user.id not in parsed:
         log_action(
             db,
             actor=current_user,
