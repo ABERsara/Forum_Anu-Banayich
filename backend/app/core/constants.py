@@ -152,6 +152,8 @@ class AuditAction(enum.StrEnum):
     PROFESSIONAL_ADDED = "professional_added"
     PROFESSIONAL_UPDATED = "professional_updated"
     MODERATOR_ASSIGNED = "moderator_assigned"
+    MODERATOR_UPDATED = "moderator_updated"
+    MODERATOR_REMOVED = "moderator_removed"
     DATA_EXPORTED = "data_exported"
     USER_LOGIN = "user_login"
     USER_LOGOUT = "user_logout"

@@ -11,6 +11,7 @@
 
 import {
   AccountStatus,
+  DocumentType,
   GroupVisibility,
   ProfessionalDomain,
   QueryStatus,
@@ -59,6 +60,30 @@ export interface UserAdminView extends UserProfile {
   rejection_reason: string | null;
 }
 
+/**
+ * One document filed with a registration, as the reviewing admin sees it —
+ * metadata only.
+ *
+ * There is no link here on purpose: the files are opened through time-limited
+ * presigned URLs (SPEC §9.1), which are still in the backlog, and the storage
+ * path behind them is never handed to the client.
+ */
+export interface DocumentAdminView {
+  id: string;
+  doc_type: DocumentType;
+  /** ISO date "YYYY-MM-DD". Null for documents that do not expire. */
+  expires_on: string | null;
+  uploaded_at: string; // ISO datetime
+}
+
+/**
+ * One registration as the deciding admin reads it: everything the queue row
+ * carries, plus the documents that came with it, oldest upload first.
+ */
+export interface RegistrationDetail extends UserAdminView {
+  documents: DocumentAdminView[];
+}
+
 /** Admin rejects a pending registration. */
 export interface RegistrationRejectRequest {
   reason: string;
@@ -73,10 +98,109 @@ export interface ProfessionalProfile {
   professional_description: string | null;
 }
 
+/**
+ * Professional as the admin managing the catalog sees them — unlike
+ * ProfessionalProfile this carries contact details and the routing fields
+ * (which groups and sectors they serve, and whether they are listed at all).
+ */
+export interface ProfessionalAdminView {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  role: UserRole;
+  account_status: AccountStatus;
+  professional_domain: ProfessionalDomain | null;
+  professional_groups: GroupVisibility[];
+  professional_sectors: SectorVisibility[];
+  professional_description: string | null;
+  is_active_professional: boolean;
+  created_at: string;
+}
+
+/** Admin adds a professional to the catalog. */
+export interface ProfessionalCreateRequest {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  professional_domain: ProfessionalDomain;
+  professional_groups: GroupVisibility[];
+  professional_sectors: SectorVisibility[];
+  professional_description: string | null;
+  is_active_professional: boolean;
+}
+
+/**
+ * Admin edits a professional. Partial by design: an omitted key is left
+ * untouched, so `{ is_active_professional: false }` only flips the listing.
+ */
+export interface ProfessionalUpdateRequest {
+  professional_domain?: ProfessionalDomain;
+  professional_groups?: GroupVisibility[];
+  professional_sectors?: SectorVisibility[];
+  professional_description?: string | null;
+  is_active_professional?: boolean;
+}
+
 /** Admin suspends an active user for N hours. */
 export interface SuspendUserRequest {
   hours: number;
   reason: string;
+}
+
+// ---------------------------------------------------------------------------
+// Moderator roster (admin side)
+// ---------------------------------------------------------------------------
+
+/**
+ * One cell of the group×sector matrix a moderator oversees, e.g. widows in
+ * the Sephardic sector.
+ *
+ * Both axes are the concrete enums, never the "all" wildcard the content
+ * visibility enums carry: a moderator answers for named cells, so "every
+ * cell" is expressed by ticking them.
+ */
+export interface ModeratorCell {
+  group: UserType;
+  sector: Sector;
+}
+
+/**
+ * A moderator as the admin managing the roster sees them: who they are, the
+ * cells they were assigned, and where their alerts are sent.
+ */
+export interface ModeratorAdminView {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: UserRole;
+  account_status: AccountStatus;
+  moderator_cells: ModeratorCell[];
+  /** Where report alerts go. Null means they go to `email`. */
+  alert_email: string | null;
+  created_at: string;
+}
+
+/** Admin appoints a moderator over the given cells. */
+export interface ModeratorCreateRequest {
+  first_name: string;
+  last_name: string;
+  email: string;
+  moderator_cells: ModeratorCell[];
+  alert_email: string | null;
+}
+
+/**
+ * Admin edits a moderator. Partial by design: an omitted key is left
+ * untouched, so `{ alert_email: 'x@y.z' }` only moves where alerts are sent.
+ * An explicit `null` alert_email clears it; the cell list cannot be emptied.
+ */
+export interface ModeratorUpdateRequest {
+  moderator_cells?: ModeratorCell[];
+  alert_email?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +233,11 @@ export interface TokenResponse {
   access_token: string;
   refresh_token: string;
   token_type: 'bearer';
+}
+
+/** Body for POST /auth/google and POST /auth/google/link. */
+export interface GoogleAuthRequest {
+  id_token: string;
 }
 
 // ---------------------------------------------------------------------------

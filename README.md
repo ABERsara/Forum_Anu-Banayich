@@ -481,6 +481,7 @@ Google אחראי על אימות המייל, ולכן שלב OTP מדולג. ש
 - Web Service עם פריסה אוטומטית מ-GitHub
 - תמיכה ב-Python + PostgreSQL מנוהל
 - Environment Variables מוצפנים לשמירת סודות
+- ⚠️ **Free Tier — cold start:** השירות "נרדם" אוטומטית לאחר 15 דקות ללא בקשות; הבקשה הראשונה לאחר מכן עלולה לקחת עד כ-30 שניות עד שהשירות מתעורר ומגיב
 
 **אחסון קבצים ומסמכים:**
 - Cloudflare R2 או Supabase Storage (Free Tier לשלב ראשון)
@@ -657,6 +658,21 @@ npm run build:prod    # build לייצור
 | `BACKEND_CORS_ORIGINS` | רשימת origins מורשים |
 | `SMTP_HOST` | שרת מייל (לשליחת OTP והתראות) |
 | `FIREBASE_PROJECT_ID` | מזהה פרויקט Firebase — נדרש לאימות Google ID tokens |
+
+---
+
+## CI/CD Secrets
+
+`deploy.yml` (פריסה אוטומטית ב-push ל-`main`) דורש 4 GitHub Secrets (Settings → Secrets and variables → Actions):
+
+| Secret | מקור |
+|--------|------|
+| `RENDER_DEPLOY_HOOK_URL` | Render → `anu-banayich-backend` → Settings → Deploy Hook |
+| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
+| `VERCEL_ORG_ID` | נוצר אוטומטית בקובץ `frontend/.vercel/project.json` לאחר `vercel link` |
+| `VERCEL_PROJECT_ID` | נוצר אוטומטית בקובץ `frontend/.vercel/project.json` לאחר `vercel link` |
+
+> ⚠️ הוספת ה-secrets דורשת הרשאת Admin לריפו (בעלים בלבד).
 
 ---
 

@@ -123,9 +123,9 @@ export enum PostStatus {
 }
 
 export const POST_STATUS_LABELS: Record<PostStatus, string> = {
-  [PostStatus.VISIBLE]: 'גלויה',
-  [PostStatus.HIDDEN]: 'מוסתרת',
-  [PostStatus.DELETED]: 'נמחקה',
+  [PostStatus.VISIBLE]: 'גלוי',
+  [PostStatus.HIDDEN]: 'מוסתר',
+  [PostStatus.DELETED]: 'מחוק',
 };
 
 // ---------------------------------------------------------------------------
@@ -216,6 +216,13 @@ export enum DocumentType {
   ID_CARD = 'id_card',
   PASSPORT = 'passport',
 }
+
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  [DocumentType.DEATH_CERTIFICATE]: 'תעודת פטירה',
+  [DocumentType.SELFIE]: 'תמונת זיהוי',
+  [DocumentType.ID_CARD]: 'תעודת זהות',
+  [DocumentType.PASSPORT]: 'דרכון',
+};
 
 // ---------------------------------------------------------------------------
 // Helpers

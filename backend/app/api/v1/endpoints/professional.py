@@ -94,8 +94,7 @@ def pending_questions(
     db: Session = Depends(get_db),
 ) -> list[ProfessionalQueryResponse]:
     """Questions waiting for the current professional to answer."""
-    # TODO: call professional_service.get_pending_questions(db, current_user)
-    return []
+    return professional_service.get_pending_questions(db, current_user)
 
 
 @router.put(
@@ -110,5 +109,4 @@ def answer_question(
     db: Session = Depends(get_db),
 ) -> ProfessionalQueryResponse:
     """Professional submits an answer to a question."""
-    # TODO: call professional_service.answer_query(db, query_id, data, current_user)
-    raise NotImplementedError
+    return professional_service.answer_query(db, query_id, data, current_user)

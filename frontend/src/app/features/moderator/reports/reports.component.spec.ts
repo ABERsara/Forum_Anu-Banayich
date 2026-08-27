@@ -233,7 +233,7 @@ describe('ModeratorReportsComponent', () => {
       const text: string = fixture.nativeElement.textContent;
       expect(text).toContain('הדיווח התקבל');
       expect(text).toContain('תוכן פוגעני');
-      expect(text).toContain('נמחקה');
+      expect(text).toContain('מחוק');
       expect(text).toContain('16/07/2026');
     });
 

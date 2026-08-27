@@ -1,23 +1,41 @@
 """
 User management service.
 
-Handles registration approval, suspension, profile retrieval.
+Handles registration approval, suspension, profile retrieval and the two
+admin-side rosters: the professional catalog (SPEC §6.1) and the moderator
+roster (SPEC §7).
 
 TODO list for junior developer:
   [x] implement approve_registration() – first or second admin approves
   [x] implement reject_registration()
   [x] implement get_pending_registrations()
+  [x] implement get_registration() – one registration with its documents
   [x] implement suspend_user()
   [x] implement get_professionals_for_user() – filtered by sector+group
+  [x] implement get_professionals() / create_professional() / update_professional()
+  [x] implement get_moderators() / create_moderator() / update_moderator() /
+      remove_moderator()
 """
 
+import secrets
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.constants import AccountStatus, AuditAction, UserRole
+from app.core.security import get_password_hash
 from app.models.user import User
+from app.schemas.user import (
+    ModeratorCell,
+    ModeratorCreateRequest,
+    ModeratorUpdateRequest,
+    ProfessionalCreateRequest,
+    ProfessionalUpdateRequest,
+)
 from app.services.audit_service import log_action
 from app.services.email_service import (
     send_approval_email,
@@ -27,6 +45,20 @@ from app.services.email_service import (
 )
 
 SLA_ESCALATION_DAYS = 7
+
+#: The two states a registration passes through while it waits for its two
+#: admins (SPEC §8.2): nobody has approved yet, or exactly one admin has. They
+#: are what "pending" means everywhere below — the queue, the SLA escalation,
+#: the review screen, and the approve/reject decisions themselves.
+AWAITING_APPROVAL_STATUSES = (
+    AccountStatus.PENDING_APPROVAL,
+    AccountStatus.PARTIALLY_APPROVED,
+)
+
+#: Bytes of entropy behind the unusable placeholder credential of an account an
+#: admin creates — a professional or a moderator. See create_professional() and
+#: create_moderator() for why there is one at all.
+PLACEHOLDER_PASSWORD_BYTES = 32
 
 
 def get_user_by_id(db: Session, user_id: str) -> User | None:
@@ -52,14 +84,40 @@ def get_pending_registrations(db: Session) -> list[User]:
     """
     return (
         db.query(User)
-        .filter(
-            User.account_status.in_(
-                [AccountStatus.PENDING_APPROVAL, AccountStatus.PARTIALLY_APPROVED]
-            )
-        )
+        .filter(User.account_status.in_(AWAITING_APPROVAL_STATUSES))
         .order_by(User.created_at.asc())
         .all()
     )
+
+
+def get_registration(db: Session, user_id: str) -> User:
+    """
+    Load one registration awaiting approval, with its uploaded documents.
+
+    The read side of approve/reject: the admin opens a request from the queue,
+    reads who filed it and what they attached, and only then decides.
+
+    A registration that is no longer waiting answers 403, not 404: the row is
+    there and the admin may well be allowed to see the person elsewhere (the
+    active users list, the audit log) — what is refused is reviewing a
+    decision that has already been made, so the same request cannot be judged
+    twice from a screen that went stale in another admin's browser.
+
+    The documents come along in one extra query (selectinload) instead of one
+    per document as the template renders them.
+    """
+    user = (
+        db.query(User)
+        .options(selectinload(User.documents))
+        .filter(User.id == user_id)
+        .first()
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if user.account_status not in AWAITING_APPROVAL_STATUSES:
+        raise HTTPException(status_code=403, detail="ההרשמה אינה ממתינה לאישור")
+
+    return user
 
 
 def escalate_overdue_registrations(db: Session) -> list[User]:
@@ -76,9 +134,7 @@ def escalate_overdue_registrations(db: Session) -> list[User]:
     stuck_users = (
         db.query(User)
         .filter(
-            User.account_status.in_(
-                [AccountStatus.PENDING_APPROVAL, AccountStatus.PARTIALLY_APPROVED]
-            ),
+            User.account_status.in_(AWAITING_APPROVAL_STATUSES),
             User.updated_at <= threshold,
             User.sla_escalation_sent_at.is_(None),
         )
@@ -174,10 +230,7 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
         raise HTTPException(status_code=404, detail="משתמש לא נמצא")
-    if user.account_status not in (
-        AccountStatus.PENDING_APPROVAL,
-        AccountStatus.PARTIALLY_APPROVED,
-    ):
+    if user.account_status not in AWAITING_APPROVAL_STATUSES:
         raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
     if user.first_approver_id == admin.id:
         raise HTTPException(status_code=400, detail="לא ניתן לאשר את אותה הרשמה פעמיים")
@@ -199,10 +252,7 @@ def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> 
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
         raise HTTPException(status_code=404, detail="משתמש לא נמצא")
-    if user.account_status not in (
-        AccountStatus.PENDING_APPROVAL,
-        AccountStatus.PARTIALLY_APPROVED,
-    ):
+    if user.account_status not in AWAITING_APPROVAL_STATUSES:
         raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
 
     previous_status = user.account_status
@@ -283,3 +333,376 @@ def get_professionals_for_user(db: Session, current_user: User) -> list[User]:
         .all()
     )
     return [pro for pro in professionals if _visible_to_user(pro, current_user)]
+
+
+# ---------------------------------------------------------------------------
+# Professional catalog – admin side (SPEC §6.1)
+#
+# get_professionals_for_user() above is the member's view: active professionals
+# whose group/sector routing matches them. The admin's view below is the whole
+# catalog, including the ones no member can currently see.
+# ---------------------------------------------------------------------------
+
+#: Fields whose values reach the DB as JSON lists of plain strings.
+_PROFESSIONAL_LIST_FIELDS = ("professional_groups", "professional_sectors")
+
+
+def _as_values(items: Sequence[StrEnum]) -> list[str]:
+    """
+    Unwrap the enums the API validated into the plain strings the JSON columns
+    hold — the same shape _visible_to_user() matches against.
+    """
+    return [item.value for item in items]
+
+
+def get_professionals(db: Session) -> list[User]:
+    """
+    Return the full professional catalog for the admin, listed and unlisted
+    alike, so an admin can find a deactivated professional and re-activate them.
+    """
+    return (
+        db.query(User)
+        .filter(User.role == UserRole.PROFESSIONAL)
+        .order_by(User.last_name.asc(), User.first_name.asc())
+        .all()
+    )
+
+
+def create_professional(
+    db: Session, data: ProfessionalCreateRequest, admin: User
+) -> User:
+    """
+    Add a professional to the catalog.
+
+    The account is ACTIVE on creation: the OTP and the two-admin approval flow
+    exist to vet bereaved members registering themselves, and an admin adding a
+    vetted professional already is that check.
+
+    It is created with a random placeholder password nobody holds — the column
+    is NOT NULL and an empty hash would accept an empty password. The
+    professional receives real credentials through the invitation flow (Sprint
+    5); until then the account exists in the catalog but cannot be signed into.
+    """
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
+
+    professional = User(
+        email=data.email,
+        password_hash=get_password_hash(
+            secrets.token_urlsafe(PLACEHOLDER_PASSWORD_BYTES)
+        ),
+        first_name=data.first_name,
+        last_name=data.last_name,
+        phone=data.phone,
+        role=UserRole.PROFESSIONAL,
+        account_status=AccountStatus.ACTIVE,
+        professional_domain=data.professional_domain,
+        professional_groups=_as_values(data.professional_groups),
+        professional_sectors=_as_values(data.professional_sectors),
+        professional_description=data.professional_description,
+        is_active_professional=data.is_active_professional,
+    )
+    db.add(professional)
+    db.flush()  # assigns the id the audit entry has to reference
+
+    # log_action() commits, so the professional and their audit trail land in
+    # the same transaction — the catalog can never gain an unlogged entry.
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.PROFESSIONAL_ADDED,
+        entity_type="User",
+        entity_id=professional.id,
+        details={
+            "professional_domain": professional.professional_domain,
+            "is_active_professional": professional.is_active_professional,
+        },
+    )
+    db.refresh(professional)
+
+    return professional
+
+
+def _apply_professional_updates(
+    professional: User, updates: dict[str, Any]
+) -> list[str]:
+    """
+    Write the submitted fields onto the row and return the ones that really
+    changed, so a re-save of identical values is not logged as an edit.
+    """
+    changed: list[str] = []
+    for field, value in updates.items():
+        new_value = _as_values(value) if field in _PROFESSIONAL_LIST_FIELDS else value
+        if getattr(professional, field) != new_value:
+            setattr(professional, field, new_value)
+            changed.append(field)
+    return changed
+
+
+def update_professional(
+    db: Session, user_id: str, data: ProfessionalUpdateRequest, admin: User
+) -> User:
+    """
+    Update a professional's catalog entry (domain, groups, sectors, description,
+    active flag).
+
+    Only the fields present in the request are touched — see
+    ProfessionalUpdateRequest. The audit entry records which fields changed and
+    the resulting listing state; it deliberately carries no field *contents*,
+    because the description is free text and audit logs hold no PII
+    (CONTRIBUTING §4).
+    """
+    professional = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if not professional:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if professional.role != UserRole.PROFESSIONAL:
+        raise HTTPException(status_code=400, detail="ניתן לערוך אנשי מקצוע בלבד")
+
+    changed = _apply_professional_updates(
+        professional, data.model_dump(exclude_unset=True)
+    )
+    if not changed:
+        return professional
+
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.PROFESSIONAL_UPDATED,
+        entity_type="User",
+        entity_id=professional.id,
+        details={
+            "updated_fields": sorted(changed),
+            "is_active_professional": professional.is_active_professional,
+        },
+    )
+    db.refresh(professional)
+
+    return professional
+
+
+# ---------------------------------------------------------------------------
+# Moderator roster – admin side (SPEC §7)
+#
+# A moderator oversees a set of cells of the group×sector matrix. The roster
+# below is what the admin manages: who is appointed, over which cells, and
+# where their report alerts are sent.
+# ---------------------------------------------------------------------------
+
+
+def _cells_as_json(cells: Sequence[ModeratorCell]) -> list[dict[str, str]]:
+    """
+    Unwrap the cells the API validated into the plain dicts the JSON column
+    holds: [{"group": "widow", "sector": "sephardic"}, ...].
+    """
+    return [{"group": cell.group.value, "sector": cell.sector.value} for cell in cells]
+
+
+def get_moderators(db: Session) -> list[User]:
+    """
+    Return the moderator roster: every appointed moderator with their cells.
+
+    A removed moderator keeps their row (see remove_moderator) but is off the
+    roster, so they are filtered out here instead of lingering as an entry the
+    admin can no longer act on.
+    """
+    return (
+        db.query(User)
+        .filter(
+            User.role == UserRole.MODERATOR,
+            User.account_status != AccountStatus.CANCELLED,
+        )
+        .order_by(User.last_name.asc(), User.first_name.asc())
+        .all()
+    )
+
+
+def _load_moderator(db: Session, user_id: str) -> User:
+    """
+    Load a moderator for editing — locked for update — or raise why not.
+    """
+    user = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    if user.role != UserRole.MODERATOR:
+        raise HTTPException(status_code=400, detail="ניתן לערוך ממונים בלבד")
+    if user.account_status == AccountStatus.CANCELLED:
+        raise HTTPException(status_code=400, detail="הממונה כבר הוסר מהמערכת")
+    return user
+
+
+def _log_appointment(
+    db: Session, moderator: User, admin: User, *, reinstated: bool
+) -> None:
+    """
+    Record an appointment.
+
+    The cells are the *scope* a moderator answers for, not anyone's personal
+    data, so they belong in the entry. The alert address is contact detail, so
+    only whether one was given is recorded (CONTRIBUTING §4).
+    """
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.MODERATOR_ASSIGNED,
+        entity_type="User",
+        entity_id=moderator.id,
+        details={
+            "cells": moderator.moderator_cells,
+            "alert_email_set": moderator.alert_email is not None,
+            "reinstated": reinstated,
+        },
+    )
+
+
+def _reinstate_moderator(
+    db: Session, existing: User, data: ModeratorCreateRequest, admin: User
+) -> User:
+    """
+    Re-appoint someone who had been removed from the roster.
+
+    Removal keeps the row, so appointing the same person again would otherwise
+    collide with their own record forever. Any *other* account holding the
+    address is a genuine conflict and is rejected.
+    """
+    if not (
+        existing.role == UserRole.MODERATOR
+        and existing.account_status == AccountStatus.CANCELLED
+    ):
+        raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
+
+    existing.first_name = data.first_name
+    existing.last_name = data.last_name
+    existing.account_status = AccountStatus.ACTIVE
+    existing.moderator_cells = _cells_as_json(data.moderator_cells)
+    existing.alert_email = data.alert_email
+
+    _log_appointment(db, existing, admin, reinstated=True)
+    db.refresh(existing)
+
+    return existing
+
+
+def create_moderator(db: Session, data: ModeratorCreateRequest, admin: User) -> User:
+    """
+    Appoint a moderator over the given cells.
+
+    The account is ACTIVE on creation: the OTP and the two-admin approval flow
+    exist to vet bereaved members registering themselves, and an admin
+    appointing someone they chose already is that check.
+
+    It is created with a random placeholder password nobody holds — the column
+    is NOT NULL and an empty hash would accept an empty password. The moderator
+    receives real credentials through the invitation flow (out of scope for this
+    ticket); until then the appointment stands but the account cannot be signed
+    into.
+    """
+    existing = db.query(User).filter(User.email == data.email).first()
+    if existing is not None:
+        return _reinstate_moderator(db, existing, data, admin)
+
+    moderator = User(
+        email=data.email,
+        password_hash=get_password_hash(
+            secrets.token_urlsafe(PLACEHOLDER_PASSWORD_BYTES)
+        ),
+        first_name=data.first_name,
+        last_name=data.last_name,
+        role=UserRole.MODERATOR,
+        account_status=AccountStatus.ACTIVE,
+        moderator_cells=_cells_as_json(data.moderator_cells),
+        alert_email=data.alert_email,
+    )
+    db.add(moderator)
+    db.flush()  # assigns the id the audit entry has to reference
+
+    # log_action() commits, so the moderator and their audit trail land in the
+    # same transaction — the roster can never gain an unlogged appointment.
+    _log_appointment(db, moderator, admin, reinstated=False)
+    db.refresh(moderator)
+
+    return moderator
+
+
+def _apply_moderator_updates(moderator: User, updates: dict[str, Any]) -> list[str]:
+    """
+    Write the submitted fields onto the row and return the ones that really
+    changed, so a re-save of identical values is not logged as an edit.
+
+    `updates` comes from model_dump(mode="json"), which is already the shape
+    the columns hold: cells as plain dicts of strings, alert_email as a str.
+    Cells arrive in one canonical order (see schemas.user), so re-ticking the
+    same cells in another order compares equal.
+    """
+    changed: list[str] = []
+    for field, value in updates.items():
+        if getattr(moderator, field) != value:
+            setattr(moderator, field, value)
+            changed.append(field)
+    return changed
+
+
+def update_moderator(
+    db: Session, user_id: str, data: ModeratorUpdateRequest, admin: User
+) -> User:
+    """
+    Update a moderator's cells and/or alert address.
+
+    Only the fields present in the request are touched — see
+    ModeratorUpdateRequest. The audit entry records which fields changed and
+    the cells the moderator now holds; the alert address itself never reaches
+    the log (CONTRIBUTING §4).
+    """
+    moderator = _load_moderator(db, user_id)
+
+    changed = _apply_moderator_updates(
+        moderator, data.model_dump(exclude_unset=True, mode="json")
+    )
+    if not changed:
+        return moderator
+
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.MODERATOR_UPDATED,
+        entity_type="User",
+        entity_id=moderator.id,
+        details={
+            "updated_fields": sorted(changed),
+            "cells": moderator.moderator_cells,
+            "alert_email_set": moderator.alert_email is not None,
+        },
+    )
+    db.refresh(moderator)
+
+    return moderator
+
+
+def remove_moderator(db: Session, user_id: str, admin: User) -> None:
+    """
+    Remove a moderator from the roster.
+
+    The row is not deleted: audit entries, decided reports and any content the
+    account touched all reference its id, and a hard delete would either fail
+    on those references or orphan them. The appointment is revoked instead —
+    the account is cancelled, so it can no longer sign in (see
+    ensure_account_active), and the cells and alert address are cleared so
+    nothing keeps routing to someone who no longer moderates.
+
+    The same person can be appointed again later; create_moderator() reinstates
+    this row rather than colliding with it.
+    """
+    moderator = _load_moderator(db, user_id)
+    revoked_cells = moderator.moderator_cells or []
+
+    moderator.account_status = AccountStatus.CANCELLED
+    moderator.moderator_cells = []
+    moderator.alert_email = None
+
+    log_action(
+        db,
+        actor=admin,
+        action=AuditAction.MODERATOR_REMOVED,
+        entity_type="User",
+        entity_id=moderator.id,
+        details={"revoked_cells": revoked_cells},
+    )

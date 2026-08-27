@@ -5,7 +5,37 @@ Copy .env.example to .env and fill in real values before running.
 Never commit .env to git!
 """
 
+import sys
+from typing import Self
+
+from pydantic import ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# ----------------------------------------------------------------------
+# SECRET_KEY guard rails (ABF-96)
+#
+# SECRET_KEY signs and verifies every JWT the API issues. A key that is
+# public knowledge means anyone can forge an admin token, so outside
+# development the application refuses to start rather than boot insecure.
+# ----------------------------------------------------------------------
+
+# The convenience default assigned to Settings.SECRET_KEY below.
+DEFAULT_SECRET_KEY = "dev-secret-change-in-production"
+
+# The placeholder shipped in backend/.env.example — copying that file to
+# .env and deploying it is the likeliest way to reach production with a
+# key that is readable in this repository.
+ENV_EXAMPLE_SECRET_KEY = "change-me-in-production-use-openssl-rand-hex-32"
+
+# Every key value that is public because it lives in this repository.
+KNOWN_INSECURE_SECRET_KEYS = frozenset({DEFAULT_SECRET_KEY, ENV_EXAMPLE_SECRET_KEY})
+
+# 32 characters is the shortest key still worth signing HS256 tokens with.
+MIN_SECRET_KEY_LENGTH = 32
+
+# Environments allowed to keep the default key. Everything else is treated
+# as production — deployments must set ENVIRONMENT explicitly.
+DEVELOPMENT_ENVIRONMENTS = frozenset({"development", "dev", "local", "test"})
 
 
 class Settings(BaseSettings):
@@ -16,6 +46,11 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     PROJECT_NAME: str = 'מערכת "אנו בניך"'
     API_V1_STR: str = "/api/v1"
+
+    # Deployment environment. Any value outside DEVELOPMENT_ENVIRONMENTS
+    # enforces the SECRET_KEY rules below, so hosted deployments must set
+    # ENVIRONMENT=production.
+    ENVIRONMENT: str = "development"
 
     # ------------------------------------------------------------------
     # Security
@@ -86,5 +121,71 @@ class Settings(BaseSettings):
     FALSE_REPORT_DAYS_WINDOW: int = 30
     DM_BLOCK_AFTER_REPORTS: int = 3  # DM reports before auto-block
 
+    # ------------------------------------------------------------------
+    # Validation
+    # ------------------------------------------------------------------
+    @model_validator(mode="after")
+    def _validate_secret_key(self) -> Self:
+        """Reject a forgeable JWT signing key outside development.
 
-settings = Settings()
+        Never include the key itself in an error message — these messages
+        land in deployment logs. Report its length instead.
+        """
+        if self.ENVIRONMENT.strip().lower() in DEVELOPMENT_ENVIRONMENTS:
+            return self
+
+        env = self.ENVIRONMENT
+        key = self.SECRET_KEY.strip()
+
+        if not key:
+            raise ValueError(
+                f"SECRET_KEY is missing or empty while ENVIRONMENT={env!r}. "
+                "The API cannot sign JWTs without it."
+            )
+
+        if key in KNOWN_INSECURE_SECRET_KEYS:
+            raise ValueError(
+                f"SECRET_KEY is still a placeholder committed to this repository, "
+                f"while ENVIRONMENT={env!r}. Its value is public, so anyone could "
+                "forge an admin token."
+            )
+
+        if len(key) < MIN_SECRET_KEY_LENGTH:
+            raise ValueError(
+                f"SECRET_KEY is too short: {len(key)} characters, but at least "
+                f"{MIN_SECRET_KEY_LENGTH} are required while ENVIRONMENT={env!r}."
+            )
+
+        return self
+
+
+def _format_startup_error(exc: ValidationError) -> str:
+    """Render a ValidationError as an actionable message, not a traceback."""
+    problems = "\n".join(
+        f"  - {error['msg'].removeprefix('Value error, ')}" for error in exc.errors()
+    )
+    return (
+        "\n"
+        "============================================================\n"
+        "  CONFIGURATION ERROR - the application cannot start\n"
+        "============================================================\n"
+        f"{problems}\n"
+        "\n"
+        "  How to fix:\n"
+        "    1. Generate a strong key:  openssl rand -hex 32\n"
+        "    2. Set it as the SECRET_KEY environment variable on the host\n"
+        "       (Render: Dashboard > Service > Environment > Add).\n"
+        "    3. Redeploy. Previously issued JWTs stop validating, so users\n"
+        "       will have to log in again.\n"
+        "\n"
+        "  Local development is unaffected: ENVIRONMENT defaults to\n"
+        "  'development', where this check is skipped.\n"
+        "============================================================\n"
+    )
+
+
+try:
+    settings = Settings()
+except ValidationError as exc:
+    print(_format_startup_error(exc), file=sys.stderr)
+    sys.exit(1)

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
@@ -56,8 +56,13 @@ export class NewPostComponent {
   form = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(256)]],
     content: ['', [Validators.required, Validators.maxLength(5000)]],
-    group_visibility: [GroupVisibility.ALL, Validators.required],
-    sector_visibility: [SectorVisibility.ALL, Validators.required],
+    // Start unset rather than snapshotting groupOptions()/sectorOptions() here:
+    // currentUser() is still null on first render (populated asynchronously
+    // after the /users/me call), so a snapshot would always resolve to the
+    // "all" fallback. The effect below fills in the user's own scope once
+    // the profile loads.
+    group_visibility: this.fb.control<GroupVisibility | null>(null, Validators.required),
+    sector_visibility: this.fb.control<SectorVisibility | null>(null, Validators.required),
     // Optional, part of the form group per design, but never sent to the
     // backend: ForumPostCreate has no attachment field, and there's no
     // upload endpoint yet (out of scope – S3 is backlog, see ABF-48 notes).
@@ -68,6 +73,21 @@ export class NewPostComponent {
   isLoading = signal(false);
   errorMessage = signal('');
   fileError = signal('');
+
+  constructor() {
+    // Runs once, the first time currentUser() resolves to a non-null profile.
+    // Guarded on the control still being unset so it never clobbers a
+    // selection the user already made.
+    effect(() => {
+      const user = this.auth.currentUser();
+      if (!user || this.form.controls.group_visibility.value !== null) return;
+
+      this.form.patchValue({
+        group_visibility: this.groupOptions()[0],
+        sector_visibility: this.sectorOptions()[0],
+      });
+    });
+  }
 
   get contentLength(): number {
     return this.form.get('content')?.value?.length ?? 0;

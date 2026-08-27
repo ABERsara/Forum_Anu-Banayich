@@ -5,20 +5,28 @@ Handles professional queries (questions and answers).
 
 TODO list for junior developer:
   [x] implement create_query()
-  [ ] implement answer_query()
+  [x] implement answer_query()
   [ ] implement get_public_qa()
   [x] implement get_my_questions() (for the asker)
-  [ ] implement get_pending_questions() (for the professional)
+  [x] implement get_pending_questions() (for the professional)
 """
 
+import enum
+from datetime import UTC, datetime
+from typing import TypeVar
+
 from fastapi import HTTPException
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import Query, Session, contains_eager, joinedload
 
 from app.core.constants import (
     SECTOR_LABELS,
     USER_TYPE_LABELS,
     ProfessionalDomain,
+    QueryStatus,
+    Sector,
     UserRole,
+    UserType,
 )
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
@@ -60,6 +68,69 @@ def _professional_matches_asker(professional: User, asker: User) -> bool:
     return group_ok and sector_ok
 
 
+_EnumT = TypeVar("_EnumT", bound=enum.Enum)
+
+
+def _assigned_members(
+    assigned: list[str] | None, enum_cls: type[_EnumT]
+) -> list[_EnumT] | None:
+    """
+    Translate one of the professional_groups/professional_sectors JSON lists
+    into enum members that can be bound into a SQL query.
+
+    Returns None for ["all"] – meaning "no restriction, skip the filter".
+    Unknown strings are dropped, so a professional assigned to nothing (or to
+    values that no longer exist) matches no asker at all, exactly like
+    _professional_matches_asker() decides for a single row.
+    """
+    values = assigned or []
+    if "all" in values:
+        return None
+    return [member for member in enum_cls if member.value in values]
+
+
+def _restrict_to_assigned_askers(
+    query: Query[ProfessionalQuery], professional: User
+) -> Query[ProfessionalQuery]:
+    """
+    Keep only queries whose asker belongs to a group AND sector this
+    professional was assigned to serve.
+
+    SQL-side twin of _professional_matches_asker(): same rule, evaluated by the
+    database instead of over rows already fetched – private questions must never
+    leave the DB for a professional who may not read them (see the content
+    filter rule in CONTRIBUTING.md). Keep the two in sync.
+
+    The caller must already have joined ProfessionalQuery.asker, so that `User`
+    here refers to the asker and not to the professional the query points at.
+    """
+    groups = _assigned_members(professional.professional_groups, UserType)
+    sectors = _assigned_members(professional.professional_sectors, Sector)
+
+    if groups is not None:
+        query = query.filter(User.user_type.in_(groups))
+    if sectors is not None:
+        query = query.filter(User.sector.in_(sectors))
+    return query
+
+
+def _professional_may_answer(query: ProfessionalQuery, professional: User) -> bool:
+    """
+    True if `professional` is allowed to answer `query` – the same targeting
+    rule get_pending_questions() lists by:
+      - a question addressed to them personally, or
+      - a general question in their domain, from an asker they serve.
+    """
+    if query.professional_id is not None:
+        return query.professional_id == professional.id
+
+    return (
+        professional.professional_domain is not None
+        and query.domain == professional.professional_domain
+        and _professional_matches_asker(professional, query.asker)
+    )
+
+
 def _to_response(query: ProfessionalQuery) -> ProfessionalQueryResponse:
     """
     Build the client-facing response for a query, enforcing the privacy rule:
@@ -94,6 +165,12 @@ def _notify_professionals(
     Send the new-question email notification(s):
       - specific professional  → direct email
       - general domain question → email to all matching professionals
+
+    The domain fan-out selects its recipients here and hands the whole list to
+    email_service in one call, rather than calling a one-address sender inside
+    the loop. The loop is the asker's own POST /advice/questions request, and a
+    send per professional means an SMTP connect, STARTTLS and login per
+    professional, in sequence, while she waits. One call is one session.
     """
     if professional is not None:
         email_service.send_direct_question_notification(professional.email, query_id)
@@ -111,9 +188,12 @@ def _notify_professionals(
         )
         .all()
     )
-    for candidate in matching_professionals:
-        if _professional_matches_asker(candidate, asker):
-            email_service.send_domain_question_notification(candidate.email, query_id)
+    recipients = [
+        candidate.email
+        for candidate in matching_professionals
+        if _professional_matches_asker(candidate, asker)
+    ]
+    email_service.send_domain_question_notification(recipients, query_id)
 
 
 def create_query(
@@ -175,19 +255,60 @@ def answer_query(
     query_id: str,
     data: ProfessionalAnswerRequest,
     professional: User,
-) -> ProfessionalQuery:
+) -> ProfessionalQueryResponse:
     """
-    Professional submits an answer.
+    Professional submits an answer: stores it, closes the question and emails
+    the asker.
 
-    TODO:
-      1. Load query, verify professional_id matches or domain matches
-      2. Set answer, answered_at, status = ANSWERED
-      3. Save to DB
-      4. Notify the asker (push notification / email)
-      5. Return the updated query
+    Permission: see _professional_may_answer().
+
+    Answering is a one-way transition. A general question reaches every
+    professional in its domain, so two of them can hit this at the same time –
+    the row lock plus the OPEN check make the first answer win, and the second
+    gets 409 instead of silently overwriting it. Editing an existing answer is
+    a separate feature (sprint 5).
     """
-    # TODO: implement this function
-    raise NotImplementedError("answer_query() is not yet implemented")
+    query = (
+        db.query(ProfessionalQuery)
+        .options(
+            joinedload(ProfessionalQuery.asker),
+            joinedload(ProfessionalQuery.professional),
+        )
+        # Row-level lock against the concurrent-answer race described above.
+        # Scoped with of= so the JOINed users rows are not locked too.
+        # No-op on SQLite (dev), enforced on PostgreSQL (production).
+        .with_for_update(of=ProfessionalQuery)
+        .filter(ProfessionalQuery.id == query_id)
+        .first()
+    )
+    if query is None:
+        raise HTTPException(status_code=404, detail="השאלה לא נמצאה.")
+
+    if not _professional_may_answer(query, professional):
+        raise HTTPException(status_code=403, detail="אין לך הרשאה לענות על שאלה זו.")
+
+    if query.status != QueryStatus.OPEN:
+        raise HTTPException(status_code=409, detail="השאלה כבר נענתה.")
+
+    query.answer = data.answer
+    query.status = QueryStatus.ANSWERED
+    # answered_at is a naive DateTime column, like created_at – store UTC
+    # without the tzinfo so the two stay comparable (as in user_service).
+    query.answered_at = datetime.now(UTC).replace(tzinfo=None)
+
+    # Read both while the instance is still loaded: commit() expires it, and
+    # touching asker/professional afterwards would re-SELECT them one lazy
+    # load at a time (the same concern create_query() notes).
+    response = _to_response(query)
+    asker_email = query.asker.email
+
+    db.commit()
+
+    # Only after the answer is safely stored: a failed notification must never
+    # roll back an answer the professional already submitted.
+    email_service.send_answer_notification(asker_email, query_id)
+
+    return response
 
 
 def get_public_qa(
@@ -230,15 +351,47 @@ def get_my_questions(db: Session, asker: User) -> list[ProfessionalQueryResponse
     return [_to_response(query) for query in queries]
 
 
-def get_pending_questions(db: Session, professional: User) -> list[ProfessionalQuery]:
+def get_pending_questions(
+    db: Session, professional: User
+) -> list[ProfessionalQueryResponse]:
     """
-    Return questions waiting for this professional's answer.
+    Return the questions still waiting for this professional's answer.
 
-    TODO:
-      1. Find questions where (professional_id == professional.id)
-         OR (domain == professional.professional_domain AND professional_id IS NULL)
-      2. Filter status == OPEN
-      3. Verify the asker's group/sector is in the professional's assigned groups/sectors
+    A question is pending for them when it is still OPEN, it targets them
+    (personally, or through their domain when no professional was chosen), and
+    the asker belongs to a group+sector they were assigned to serve.
+
+    Oldest first: this is a work queue, so whoever has been waiting longest
+    comes first – unlike get_my_questions(), which is a personal history and
+    shows the newest question on top.
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_pending_questions() is not yet implemented")
+    targets = [ProfessionalQuery.professional_id == professional.id]
+    if professional.professional_domain is not None:
+        # A general question fans out to one domain only; a professional
+        # without a domain can never be its target.
+        targets.append(
+            and_(
+                ProfessionalQuery.professional_id.is_(None),
+                ProfessionalQuery.domain == professional.professional_domain,
+            )
+        )
+
+    query = (
+        db.query(ProfessionalQuery)
+        # join + contains_eager: a single SELECT that both filters on the
+        # asker's group/sector and loads the asker _to_response() needs for
+        # the alias – rather than a filtering join plus a second fetch.
+        .join(ProfessionalQuery.asker)
+        .options(
+            contains_eager(ProfessionalQuery.asker),
+            joinedload(ProfessionalQuery.professional),
+        )
+        .filter(ProfessionalQuery.status == QueryStatus.OPEN, or_(*targets))
+    )
+
+    queries = (
+        _restrict_to_assigned_askers(query, professional)
+        .order_by(ProfessionalQuery.created_at.asc())
+        .all()
+    )
+    return [_to_response(query) for query in queries]

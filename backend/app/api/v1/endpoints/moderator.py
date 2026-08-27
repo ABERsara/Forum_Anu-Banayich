@@ -9,7 +9,7 @@ GET  /moderator/reports/{id}        – single report with full context
 POST /moderator/reports/{id}/decide – decide on a report (valid/invalid)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.constants import UserRole
@@ -43,28 +43,6 @@ def _to_report_with_content(report: Report, post: ForumPost) -> ReportWithConten
     )
 
 
-def _with_content(db: Session, reports: list[Report]) -> list[ReportWithContent]:
-    """
-    Attach the reported post to each report, in one query rather than one
-    per row. A report whose post has vanished is dropped instead of raising:
-    a moderator's queue is not the place to surface an orphaned row.
-    """
-    if not reports:
-        return []
-
-    posts_by_id = {
-        post.id: post
-        for post in db.query(ForumPost)
-        .filter(ForumPost.id.in_([r.target_id for r in reports]))
-        .all()
-    }
-    return [
-        _to_report_with_content(report, posts_by_id[report.target_id])
-        for report in reports
-        if report.target_id in posts_by_id
-    ]
-
-
 @router.get("/reports", response_model=ReportListResponse)
 def list_pending_reports(
     current_user: User = Depends(get_current_active_user),
@@ -74,8 +52,8 @@ def list_pending_reports(
     Return pending reports in the moderator's assigned cells.
     Sorted by report_count DESC (most-reported content first).
     """
-    reports = report_service.get_pending_reports(db, current_user)
-    items = _with_content(db, reports)
+    pairs = report_service.get_pending_reports(db, current_user)
+    items = [_to_report_with_content(report, post) for report, post in pairs]
 
     return ReportListResponse(items=items, total=len(items), pending_count=len(items))
 
@@ -93,12 +71,10 @@ def list_decided_reports(
     Return decisions already made in the moderator's assigned cells,
     newest first (SPEC §7.3, "היסטוריית דיווחים").
     """
-    reports, total = report_service.get_decided_reports(
-        db, current_user, page, page_size
-    )
+    pairs, total = report_service.get_decided_reports(db, current_user, page, page_size)
 
     return ReportHistoryResponse(
-        items=_with_content(db, reports),
+        items=[_to_report_with_content(report, post) for report, post in pairs],
         total=total,
         page=page,
         page_size=page_size,
@@ -114,11 +90,7 @@ def get_report(
     """
     Return a single report with the full context of the reported content.
     """
-    report = report_service.get_report_for_moderator(db, report_id, current_user)
-    post = db.query(ForumPost).filter(ForumPost.id == report.target_id).first()
-    if post is None:
-        raise HTTPException(status_code=404, detail="התוכן המדווח לא נמצא.")
-
+    report, post = report_service.get_report_for_moderator(db, report_id, current_user)
     return _to_report_with_content(report, post)
 
 
