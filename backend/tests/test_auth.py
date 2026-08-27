@@ -15,6 +15,7 @@ from app.core.constants import AccountStatus, UserRole
 from app.core.dependencies import require_role
 from app.core.security import ALGORITHM
 from app.models.user import User
+from app.services import auth_service
 
 BASE = "/api/v1/auth"
 
@@ -461,6 +462,164 @@ class TestRefresh:
         access_tok = login_r.json()["access_token"]
         r = await client.post(f"{BASE}/refresh", json={"refresh_token": access_tok})
         assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# google login / link
+#
+# The real Firebase ID token verification (signature against Google's public
+# certs) can't run in a unit test, so `_verify_firebase_token`'s lower-level
+# call is monkeypatched to return canned claims — everything downstream of
+# that (matching, auto-linking, active-status checks, JWT issuance) is real.
+# ---------------------------------------------------------------------------
+
+GOOGLE_SUB = "google-uid-123"
+
+
+def _mock_verify(monkeypatch, claims=None, *, raises=False):
+    def _fake(id_token, request, audience=None):
+        if raises:
+            raise ValueError("invalid token")
+        return claims
+
+    monkeypatch.setattr(auth_service.google_id_token, "verify_firebase_token", _fake)
+
+
+def _valid_claims(sub=GOOGLE_SUB, email=VALID_PAYLOAD["email"], email_verified=True):
+    return {"sub": sub, "email": email, "email_verified": email_verified}
+
+
+class TestGoogleLogin:
+    async def test_invalid_token_returns_401(self, client, monkeypatch):
+        _mock_verify(monkeypatch, raises=True)
+        r = await client.post(f"{BASE}/google", json={"id_token": "bad"})
+        assert r.status_code == 401
+
+    async def test_unverified_email_returns_401(self, client, monkeypatch):
+        _mock_verify(monkeypatch, claims=_valid_claims(email_verified=False))
+        r = await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        assert r.status_code == 401
+
+    async def test_missing_email_claim_returns_401(self, client, monkeypatch):
+        _mock_verify(monkeypatch, claims={"sub": GOOGLE_SUB, "email_verified": True})
+        r = await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        assert r.status_code == 401
+
+    async def test_unknown_email_returns_403(self, client, monkeypatch):
+        _mock_verify(monkeypatch, claims=_valid_claims(email="nobody@example.com"))
+        r = await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        assert r.status_code == 403
+
+    async def test_active_user_first_time_returns_200(
+        self, client, db_session, monkeypatch
+    ):
+        await _register_verify_and_activate(client, db_session)
+        _mock_verify(monkeypatch, claims=_valid_claims())
+        r = await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        assert r.status_code == 200
+        assert "access_token" in r.json()
+
+    async def test_active_user_first_time_auto_links_google_uid(
+        self, client, db_session, monkeypatch
+    ):
+        await _register_verify_and_activate(client, db_session)
+        _mock_verify(monkeypatch, claims=_valid_claims())
+        await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        assert _get_user(db_session).google_uid == GOOGLE_SUB
+
+    async def test_second_login_matches_directly_by_google_uid(
+        self, client, db_session, monkeypatch
+    ):
+        await _register_verify_and_activate(client, db_session)
+        _mock_verify(monkeypatch, claims=_valid_claims())
+        await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        r = await client.post(f"{BASE}/google", json={"id_token": "tok2"})
+        assert r.status_code == 200
+
+    async def test_pending_approval_user_returns_403(
+        self, client, db_session, monkeypatch
+    ):
+        await _register_and_verify(client, db_session)
+        _mock_verify(monkeypatch, claims=_valid_claims())
+        r = await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        assert r.status_code == 403
+
+    async def test_suspended_user_returns_403(self, client, db_session, monkeypatch):
+        user = await _register_verify_and_activate(client, db_session)
+        user.is_suspended = True
+        user.account_status = AccountStatus.SUSPENDED
+        user.suspended_until = datetime.now(UTC) + timedelta(hours=1)
+        db_session.commit()
+        _mock_verify(monkeypatch, claims=_valid_claims())
+        r = await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        assert r.status_code == 403
+
+    async def test_suspended_user_after_window_can_login_and_reactivates(
+        self, client, db_session, monkeypatch
+    ):
+        user = await _register_verify_and_activate(client, db_session)
+        user.is_suspended = True
+        user.account_status = AccountStatus.SUSPENDED
+        user.suspended_until = datetime.now(UTC) - timedelta(minutes=1)
+        db_session.commit()
+        _mock_verify(monkeypatch, claims=_valid_claims())
+        r = await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        assert r.status_code == 200
+        restored = _get_user(db_session)
+        assert restored.account_status == AccountStatus.ACTIVE
+        assert restored.is_suspended is False
+
+    async def test_email_matches_account_linked_to_different_google_uid_returns_409(
+        self, client, db_session, monkeypatch
+    ):
+        user = await _register_verify_and_activate(client, db_session)
+        user.google_uid = "other-uid"
+        db_session.commit()
+        _mock_verify(monkeypatch, claims=_valid_claims(sub="different-uid"))
+        r = await client.post(f"{BASE}/google", json={"id_token": "tok"})
+        assert r.status_code == 409
+
+
+class TestGoogleLink:
+    async def test_requires_auth_returns_401(self, client, monkeypatch):
+        _mock_verify(monkeypatch, claims=_valid_claims())
+        r = await client.post(f"{BASE}/google/link", json={"id_token": "tok"})
+        assert r.status_code == 401
+
+    async def test_success_links_google_uid(self, client, db_session, monkeypatch):
+        await _register_verify_and_activate(client, db_session)
+        login_r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        access_tok = login_r.json()["access_token"]
+
+        _mock_verify(monkeypatch, claims=_valid_claims())
+        r = await client.post(
+            f"{BASE}/google/link",
+            json={"id_token": "tok"},
+            headers={"Authorization": f"Bearer {access_tok}"},
+        )
+        assert r.status_code == 200
+        assert _get_user(db_session).google_uid == GOOGLE_SUB
+
+    async def test_conflict_when_google_uid_belongs_to_another_user_returns_409(
+        self, client, db_session, monkeypatch
+    ):
+        other = await _register_verify_and_activate(
+            client, db_session, "other@example.com"
+        )
+        other.google_uid = GOOGLE_SUB
+        db_session.commit()
+
+        await _register_verify_and_activate(client, db_session)
+        login_r = await client.post(f"{BASE}/login", json=LOGIN_PAYLOAD)
+        access_tok = login_r.json()["access_token"]
+
+        _mock_verify(monkeypatch, claims=_valid_claims())
+        r = await client.post(
+            f"{BASE}/google/link",
+            json={"id_token": "tok"},
+            headers={"Authorization": f"Bearer {access_tok}"},
+        )
+        assert r.status_code == 409
 
 
 # ---------------------------------------------------------------------------

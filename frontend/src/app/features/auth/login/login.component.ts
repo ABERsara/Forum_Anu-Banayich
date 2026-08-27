@@ -15,11 +15,14 @@
  *   - Warm, supportive color scheme (see _variables.scss)
  */
 
-import { Component, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { switchMap } from 'rxjs';
 
 import { AuthService } from '../../../core/services/auth.service';
+import { GoogleAuthService } from '../../../core/services/google-auth.service';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { LoginRequest } from '../../../core/models';
@@ -75,6 +78,17 @@ import { LoginRequest } from '../../../core/models';
           </button>
         </form>
 
+        <div class="divider"><span>או</span></div>
+
+        <button
+          type="button"
+          class="btn-google"
+          [disabled]="isLoading()"
+          (click)="onGoogleSignIn()"
+        >
+          התחבר עם Google
+        </button>
+
         <p class="register-link">אין לך חשבון? <a routerLink="/register">הירשם/י כאן</a></p>
       </div>
     </div>
@@ -83,7 +97,9 @@ import { LoginRequest } from '../../../core/models';
 export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly googleAuth = inject(GoogleAuthService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
@@ -112,5 +128,29 @@ export class LoginComponent {
         this.isLoading.set(false);
       },
     });
+  }
+
+  onGoogleSignIn(): void {
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+
+    this.googleAuth
+      .signInWithGoogle()
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        switchMap((idToken) => this.auth.loginWithGoogle(idToken)),
+      )
+      .subscribe({
+        next: () => {
+          this.isLoading.set(false);
+          this.router.navigate(['/home']);
+        },
+        error: (err) => {
+          // A backend rejection (401/403/409) carries `error.detail`; anything
+          // else (popup closed, network failure) is a Google/Firebase-side error.
+          this.errorMessage.set(err.error?.detail ?? 'הכניסה עם Google בוטלה או נכשלה.');
+          this.isLoading.set(false);
+        },
+      });
   }
 }

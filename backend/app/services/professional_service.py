@@ -165,6 +165,12 @@ def _notify_professionals(
     Send the new-question email notification(s):
       - specific professional  → direct email
       - general domain question → email to all matching professionals
+
+    The domain fan-out selects its recipients here and hands the whole list to
+    email_service in one call, rather than calling a one-address sender inside
+    the loop. The loop is the asker's own POST /advice/questions request, and a
+    send per professional means an SMTP connect, STARTTLS and login per
+    professional, in sequence, while she waits. One call is one session.
     """
     if professional is not None:
         email_service.send_direct_question_notification(professional.email, query_id)
@@ -182,9 +188,12 @@ def _notify_professionals(
         )
         .all()
     )
-    for candidate in matching_professionals:
-        if _professional_matches_asker(candidate, asker):
-            email_service.send_domain_question_notification(candidate.email, query_id)
+    recipients = [
+        candidate.email
+        for candidate in matching_professionals
+        if _professional_matches_asker(candidate, asker)
+    ]
+    email_service.send_domain_question_notification(recipients, query_id)
 
 
 def create_query(

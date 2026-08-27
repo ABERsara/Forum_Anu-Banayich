@@ -66,6 +66,12 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class GoogleAuthRequest(BaseModel):
+    """Body for POST /auth/google and POST /auth/google/link."""
+
+    id_token: str
+
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 

@@ -98,6 +98,52 @@ export interface ProfessionalProfile {
   professional_description: string | null;
 }
 
+/**
+ * Professional as the admin managing the catalog sees them — unlike
+ * ProfessionalProfile this carries contact details and the routing fields
+ * (which groups and sectors they serve, and whether they are listed at all).
+ */
+export interface ProfessionalAdminView {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  role: UserRole;
+  account_status: AccountStatus;
+  professional_domain: ProfessionalDomain | null;
+  professional_groups: GroupVisibility[];
+  professional_sectors: SectorVisibility[];
+  professional_description: string | null;
+  is_active_professional: boolean;
+  created_at: string;
+}
+
+/** Admin adds a professional to the catalog. */
+export interface ProfessionalCreateRequest {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  professional_domain: ProfessionalDomain;
+  professional_groups: GroupVisibility[];
+  professional_sectors: SectorVisibility[];
+  professional_description: string | null;
+  is_active_professional: boolean;
+}
+
+/**
+ * Admin edits a professional. Partial by design: an omitted key is left
+ * untouched, so `{ is_active_professional: false }` only flips the listing.
+ */
+export interface ProfessionalUpdateRequest {
+  professional_domain?: ProfessionalDomain;
+  professional_groups?: GroupVisibility[];
+  professional_sectors?: SectorVisibility[];
+  professional_description?: string | null;
+  is_active_professional?: boolean;
+}
+
 /** Admin or moderator suspends an active user for N hours. */
 export interface SuspendUserRequest {
   hours: number;
@@ -215,6 +261,11 @@ export interface TokenResponse {
   access_token: string;
   refresh_token: string;
   token_type: 'bearer';
+}
+
+/** Body for POST /auth/google and POST /auth/google/link. */
+export interface GoogleAuthRequest {
+  id_token: string;
 }
 
 // ---------------------------------------------------------------------------
