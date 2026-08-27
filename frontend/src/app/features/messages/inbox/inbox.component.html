@@ -1,0 +1,23 @@
+<div class="cell-members" dir="rtl">
+  <h1>חברי התא שלי</h1>
+
+  <div aria-live="polite" [attr.aria-busy]="isLoading()">
+    @if (isLoading()) {
+      <app-loading-spinner size="md" message="טוען חברי תא..." />
+    } @else if (hasError()) {
+      <app-error-display message="אירעה שגיאה בטעינת רשימת החברים. נסה לרענן את הדף." />
+    } @else if (members().length === 0) {
+      <p>אין חברים נוספים בתא שלך כרגע.</p>
+    } @else {
+      <ul class="cell-members__list">
+        @for (member of members(); track member.id) {
+          <li>
+            <a [routerLink]="['/messages', member.id]" class="cell-members__item">
+              {{ member.first_name }} {{ member.last_name }}
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+</div>

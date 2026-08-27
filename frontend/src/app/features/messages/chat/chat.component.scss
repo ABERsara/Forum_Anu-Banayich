@@ -1,0 +1,132 @@
+@use '../../../../styles/variables' as *;
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  // app-root renders <app-header> (64px, see header.component.scss's
+  // .header__inner) above <router-outlet> in normal document flow, not as
+  // an overlay — so 100dvh here would overflow the viewport by 64px and
+  // push the composer below the fold. 100dvh over 100vh: correct on mobile
+  // when the browser chrome shows/hides.
+  height: calc(100dvh - 64px);
+  padding: $spacing-md;
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    padding-bottom: $spacing-sm;
+    border-bottom: 1px solid $color-border;
+
+    h1 {
+      margin: 0;
+      font-size: $font-size-lg;
+    }
+  }
+
+  &__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: $spacing-md 0;
+  }
+
+  &__messages {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+  }
+
+  &__message {
+    display: flex;
+
+    // In this dir="rtl" container, flex-start is the right edge and
+    // flex-end is the left edge — own messages go on the left, matching
+    // this app's established chat convention.
+    &--mine {
+      justify-content: flex-end;
+
+      .chat__bubble {
+        background: $color-primary;
+        color: $color-white;
+      }
+    }
+
+    &--theirs {
+      justify-content: flex-start;
+
+      .chat__bubble {
+        background: $color-bg-subtle;
+        color: $color-text;
+      }
+    }
+  }
+
+  &__bubble {
+    max-width: 75%;
+    padding: $spacing-sm $spacing-md;
+    border-radius: $radius-lg;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  &__composer-row {
+    display: flex;
+    gap: $spacing-sm;
+    padding-top: $spacing-sm;
+    border-top: 1px solid $color-border;
+
+    input {
+      flex: 1;
+      padding: $spacing-sm;
+      border: 1px solid $color-border;
+      border-radius: $radius-md;
+
+      &:focus-visible {
+        outline: 2px solid $color-primary;
+        outline-offset: 2px;
+      }
+    }
+
+    button {
+      padding: $spacing-sm $spacing-md;
+      border-radius: $radius-md;
+      border: none;
+      background: $color-primary;
+      color: $color-white;
+
+      &:disabled {
+        background: $color-border;
+        color: $color-text-muted;
+      }
+
+      &:focus-visible {
+        outline: 2px solid $color-primary-dark;
+        outline-offset: 2px;
+      }
+    }
+  }
+
+  // Visible to screen readers only — the placeholder already communicates
+  // the field's purpose visually, but a placeholder alone is not an
+  // accessible name.
+  &__composer-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (max-width: $bp-sm) {
+    &__bubble {
+      max-width: 90%;
+    }
+  }
+}
