@@ -1,13 +1,13 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { TranslocoModule } from '@jsverse/transloco';
 
 import { AuthService } from '../../core/services/auth.service';
 import { LocaleService } from '../../core/services/locale.service';
+import { LanguageToggleComponent } from '../../shared/components/language-toggle/language-toggle.component';
 
 @Component({
   selector: 'app-header',
-  imports: [RouterLink, RouterLinkActive, TranslocoModule],
+  imports: [RouterLink, RouterLinkActive, LanguageToggleComponent],
   templateUrl: './header.component.html',
   styleUrl: './header.component.scss',
 })

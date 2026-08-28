@@ -10,16 +10,7 @@
         <a routerLink="/login" routerLinkActive="active">כניסה</a>
         <a routerLink="/register" routerLinkActive="active">הרשמה</a>
       }
-      <button
-        type="button"
-        class="header__lang-toggle"
-        (click)="toggleLang()"
-        [attr.aria-label]="
-          (isHebrew() ? 'header.switch_to_english' : 'header.switch_to_hebrew') | transloco
-        "
-      >
-        {{ (isHebrew() ? 'common.lang_en' : 'common.lang_he') | transloco }}
-      </button>
+      <app-language-toggle [isHebrew]="isHebrew()" (toggled)="toggleLang()" />
     </nav>
   </div>
 </header>
