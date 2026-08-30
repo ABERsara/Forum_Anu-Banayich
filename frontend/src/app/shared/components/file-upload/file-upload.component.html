@@ -14,20 +14,28 @@
     [attr.aria-label]="ariaLabel() || null"
     (click)="fileInput.click()"
   >
-    {{ label() }}
+    {{ label() || ('shared.file_upload.choose_file' | transloco) }}
   </button>
 
   @if (previewUrl) {
     <div class="file-upload__preview">
-      <img [src]="previewUrl" alt="תצוגה מקדימה" class="file-upload__image" />
-      <button type="button" class="file-upload__clear" (click)="clear(fileInput)">נקה</button>
+      <img
+        [src]="previewUrl"
+        [alt]="'shared.file_upload.preview_alt' | transloco"
+        class="file-upload__image"
+      />
+      <button type="button" class="file-upload__clear" (click)="clear(fileInput)">
+        {{ 'shared.file_upload.clear' | transloco }}
+      </button>
     </div>
   }
 
   @if (selectedFileName) {
     <div class="file-upload__preview">
       <span class="file-upload__filename">{{ selectedFileName }}</span>
-      <button type="button" class="file-upload__clear" (click)="clear(fileInput)">נקה</button>
+      <button type="button" class="file-upload__clear" (click)="clear(fileInput)">
+        {{ 'shared.file_upload.clear' | transloco }}
+      </button>
     </div>
   }
 </div>
