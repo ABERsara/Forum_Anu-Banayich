@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 import { LoginComponent } from './login.component';
 import { AuthService } from '../../../core/services/auth.service';
 import { GoogleAuthService } from '../../../core/services/google-auth.service';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
@@ -21,7 +22,7 @@ describe('LoginComponent', () => {
     googleSignInMock = vi.fn();
 
     await TestBed.configureTestingModule({
-      imports: [LoginComponent],
+      imports: [LoginComponent, translocoTesting()],
       providers: [
         provideRouter([]),
         {

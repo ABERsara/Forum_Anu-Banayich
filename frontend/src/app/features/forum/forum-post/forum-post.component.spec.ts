@@ -16,6 +16,7 @@ import {
 import type { ForumPost, UserProfile } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
   return {
@@ -77,7 +78,7 @@ describe('ForumPostComponent', () => {
     navigateSpy = vi.fn();
 
     TestBed.configureTestingModule({
-      imports: [ForumPostComponent],
+      imports: [ForumPostComponent, translocoTesting()],
       providers: [
         { provide: ForumService, useValue: forumServiceMock },
         { provide: AuthService, useValue: authServiceMock },
