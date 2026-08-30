@@ -3,13 +3,14 @@
  *
  * TODO:
  *   1. Display current user info (from AuthService.currentUser())
- *   2. Show user_type and sector with Hebrew labels
- *   3. Show account_status with Hebrew label + explanation
+ *   2. Show user_type and sector with translated labels
+ *   3. Show account_status with translated label + explanation
  *   4. Allow updating: first_name, last_name (add PUT /users/me endpoint if not done)
  *   5. Add "מחיקת חשבון" section at the bottom (dangerous – requires OTP confirmation)
  */
 
 import { Component, inject } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ACCOUNT_STATUS_LABELS, SECTOR_LABELS, USER_TYPE_LABELS } from '../../core/constants';
 import { AuthService } from '../../core/services/auth.service';
@@ -17,6 +18,7 @@ import { AuthService } from '../../core/services/auth.service';
 @Component({
   selector: 'app-profile',
   standalone: true,
+  imports: [TranslocoPipe],
   template: `
     <div style="padding: 1rem; direction: rtl">
       <h1>הפרופיל שלי</h1>
@@ -24,9 +26,14 @@ import { AuthService } from '../../core/services/auth.service';
       @if (auth.currentUser(); as user) {
         <p><strong>שם:</strong> {{ user.first_name }} {{ user.last_name }}</p>
         <p><strong>מייל:</strong> {{ user.email }}</p>
-        <p><strong>קבוצה:</strong> {{ user.user_type ? userTypeLabels[user.user_type] : '' }}</p>
-        <p><strong>מגזר:</strong> {{ user.sector ? sectorLabels[user.sector] : '' }}</p>
-        <p><strong>סטטוס:</strong> {{ statusLabels[user.account_status] }}</p>
+        <p>
+          <strong>קבוצה:</strong>
+          {{ user.user_type ? (userTypeLabels[user.user_type] | transloco) : '' }}
+        </p>
+        <p>
+          <strong>מגזר:</strong> {{ user.sector ? (sectorLabels[user.sector] | transloco) : '' }}
+        </p>
+        <p><strong>סטטוס:</strong> {{ statusLabels[user.account_status] | transloco }}</p>
         <!-- TODO: edit form, change password, delete account -->
       }
     </div>

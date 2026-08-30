@@ -22,6 +22,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import {
   DocumentType,
@@ -42,6 +43,7 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
   imports: [
     ReactiveFormsModule,
     RouterLink,
+    TranslocoPipe,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,
     FileUploadComponent,

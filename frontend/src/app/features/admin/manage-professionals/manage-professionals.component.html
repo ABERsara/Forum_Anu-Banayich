@@ -68,7 +68,7 @@
           <label for="professional_domain">תחום</label>
           <select id="professional_domain" formControlName="professional_domain">
             @for (domain of domains; track domain) {
-              <option [value]="domain">{{ domainLabels[domain] }}</option>
+              <option [value]="domain">{{ domainLabels[domain] | transloco }}</option>
             }
           </select>
         </div>
@@ -83,7 +83,7 @@
                   [checked]="isChecked(form.controls.professional_groups, group)"
                   (change)="toggleAudience(form.controls.professional_groups, group, allGroups)"
                 />
-                {{ groupLabels[group] }}
+                {{ groupLabels[group] | transloco }}
               </label>
             }
           </div>
@@ -104,7 +104,7 @@
                   [checked]="isChecked(form.controls.professional_sectors, sector)"
                   (change)="toggleAudience(form.controls.professional_sectors, sector, allSectors)"
                 />
-                {{ sectorLabels[sector] }}
+                {{ sectorLabels[sector] | transloco }}
               </label>
             }
           </div>

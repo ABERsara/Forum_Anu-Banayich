@@ -7,6 +7,7 @@ import { AdviceListComponent } from './advice-list.component';
 import { ProfessionalService } from '../../../core/services/professional.service';
 import { ProfessionalDomain } from '../../../core/constants';
 import type { ProfessionalProfile } from '../../../core/models';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeProfessional(overrides: Partial<ProfessionalProfile> = {}): ProfessionalProfile {
   return {
@@ -36,7 +37,7 @@ describe('AdviceListComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [AdviceListComponent],
+      imports: [AdviceListComponent, translocoTesting()],
       providers: [
         provideRouter([]),
         { provide: ProfessionalService, useValue: professionalServiceMock },

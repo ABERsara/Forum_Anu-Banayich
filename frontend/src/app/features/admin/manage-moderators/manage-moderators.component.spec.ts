@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -7,6 +8,7 @@ import { ManageModeratorsComponent } from './manage-moderators.component';
 import { AdminService } from '../../../core/services/admin.service';
 import { AccountStatus, Sector, UserRole, UserType } from '../../../core/constants';
 import type { ModeratorAdminView } from '../../../core/models';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 const WIDOWS_SEPHARDIC = { group: UserType.WIDOW, sector: Sector.SEPHARDIC };
 const WIDOWERS_SEPHARDIC = { group: UserType.WIDOWER, sector: Sector.SEPHARDIC };
@@ -45,7 +47,7 @@ describe('ManageModeratorsComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ManageModeratorsComponent],
+      imports: [ManageModeratorsComponent, translocoTesting()],
       providers: [provideRouter([]), { provide: AdminService, useValue: adminServiceMock }],
     }).compileComponents();
 
@@ -82,6 +84,24 @@ describe('ManageModeratorsComponent', () => {
       expect(text).toContain('שרה לוי');
       expect(text).toContain('אלמנים – ספרדי');
       expect(text).toContain('אלמנות – ספרדי');
+    });
+
+    it('re-reads those labels in English when the language changes', () => {
+      adminServiceMock.getModerators.mockReturnValue(
+        of([makeModerator({ moderator_cells: [WIDOWERS_SEPHARDIC, WIDOWS_SEPHARDIC] })]),
+      );
+      component.ngOnInit();
+      fixture.detectChanges();
+
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+
+      // Read the badges themselves: the caption above them quotes a cell as an
+      // example, and that sentence is this module's own copy, not a label.
+      const badges = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.badge'),
+      ).map((badge) => badge.textContent?.trim());
+      expect(badges).toEqual(['Widowers – Sephardic', 'Widows – Sephardic']);
     });
 
     it('shows where alerts are sent, falling back to the login address', () => {

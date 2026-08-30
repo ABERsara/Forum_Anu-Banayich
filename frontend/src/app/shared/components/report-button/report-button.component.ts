@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, input, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { REPORT_REASON_LABELS, ReportReason, ReportTargetType } from '../../../core/constants';
 import { ReportService } from '../../../core/services/report.service';
@@ -8,7 +9,7 @@ import { ErrorDisplayComponent } from '../error-display/error-display.component'
 @Component({
   selector: 'app-report-button',
   standalone: true,
-  imports: [ErrorDisplayComponent],
+  imports: [TranslocoPipe, ErrorDisplayComponent],
   templateUrl: './report-button.component.html',
   styleUrl: './report-button.component.scss',
 })

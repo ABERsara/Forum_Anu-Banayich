@@ -18,6 +18,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { DocumentAdminView, RegistrationDetail, UserAdminView } from '../../../core/models';
 import {
@@ -27,6 +28,7 @@ import {
   SECTOR_LABELS,
   USER_TYPE_LABELS,
 } from '../../../core/constants';
+import { LabelService } from '../../../core/i18n/label.service';
 import { AdminService } from '../../../core/services/admin.service';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -42,6 +44,7 @@ const NOT_PROVIDED = 'לא צוין';
   imports: [
     RouterLink,
     DatePipe,
+    TranslocoPipe,
     ButtonComponent,
     ConfirmDialogComponent,
     ErrorDisplayComponent,
@@ -53,6 +56,7 @@ const NOT_PROVIDED = 'לא צוין';
 })
 export class PendingRegistrationsComponent implements OnInit {
   private readonly adminService = inject(AdminService);
+  private readonly labels = inject(LabelService);
 
   registrations = signal<UserAdminView[]>([]);
   isLoading = signal(false);
@@ -163,11 +167,15 @@ export class PendingRegistrationsComponent implements OnInit {
    * while reviewing (SPEC §8.1), so a request can reach this screen without one.
    */
   userTypeLabel(registration: UserAdminView): string {
-    return registration.user_type ? this.userTypeLabels[registration.user_type] : NOT_PROVIDED;
+    return registration.user_type
+      ? this.labels.label(this.userTypeLabels[registration.user_type])
+      : NOT_PROVIDED;
   }
 
   sectorLabel(registration: UserAdminView): string {
-    return registration.sector ? this.sectorLabels[registration.sector] : NOT_PROVIDED;
+    return registration.sector
+      ? this.labels.label(this.sectorLabels[registration.sector])
+      : NOT_PROVIDED;
   }
 
   /** Where this request stands in the two-admin approval (SPEC §8.2). */
@@ -178,7 +186,7 @@ export class PendingRegistrationsComponent implements OnInit {
   }
 
   documentLabel(document: DocumentAdminView): string {
-    return this.documentTypeLabels[document.doc_type];
+    return this.labels.label(this.documentTypeLabels[document.doc_type]);
   }
 
   // ---------------------------------------------------------------------------

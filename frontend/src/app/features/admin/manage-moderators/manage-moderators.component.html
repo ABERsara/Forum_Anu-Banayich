@@ -80,21 +80,25 @@
                 <tr>
                   <td></td>
                   @for (sector of sectors; track sector) {
-                    <th scope="col">{{ sectorLabels[sector] }}</th>
+                    <th scope="col">{{ sectorLabels[sector] | transloco }}</th>
                   }
                 </tr>
               </thead>
               <tbody>
                 @for (group of groups; track group) {
                   <tr>
-                    <th scope="row">{{ groupLabels[group] }}</th>
+                    <th scope="row">{{ groupLabels[group] | transloco }}</th>
                     @for (sector of sectors; track sector) {
                       <td>
                         <input
                           type="checkbox"
                           class="matrix__checkbox"
                           [checked]="isCellSelected(group, sector)"
-                          [attr.aria-label]="groupLabels[group] + ' – ' + sectorLabels[sector]"
+                          [attr.aria-label]="
+                            (groupLabels[group] | transloco) +
+                            ' – ' +
+                            (sectorLabels[sector] | transloco)
+                          "
                           (change)="toggleCell(group, sector)"
                         />
                       </td>

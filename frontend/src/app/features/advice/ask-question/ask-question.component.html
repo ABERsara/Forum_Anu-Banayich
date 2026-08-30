@@ -16,7 +16,7 @@
           <select id="domain" formControlName="domain">
             <option [ngValue]="null">בחר/י תחום</option>
             @for (domain of domainOptions; track domain) {
-              <option [ngValue]="domain">{{ domainLabels[domain] }}</option>
+              <option [ngValue]="domain">{{ domainLabels[domain] | transloco }}</option>
             }
           </select>
           @if (form.controls.domain.invalid && form.controls.domain.touched) {

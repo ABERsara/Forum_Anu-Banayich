@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { UserAdminView } from '../../../core/models';
 import { SECTOR_LABELS, USER_TYPE_LABELS } from '../../../core/constants';
@@ -15,7 +16,13 @@ import {
 @Component({
   selector: 'app-active-users',
   standalone: true,
-  imports: [RouterLink, LoadingSpinnerComponent, ErrorDisplayComponent, SuspendDialogComponent],
+  imports: [
+    RouterLink,
+    TranslocoPipe,
+    LoadingSpinnerComponent,
+    ErrorDisplayComponent,
+    SuspendDialogComponent,
+  ],
   templateUrl: './active-users.component.html',
   styleUrl: './active-users.component.scss',
 })

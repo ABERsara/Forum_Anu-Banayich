@@ -33,7 +33,7 @@
           <select formControlName="user_type">
             <option value="" disabled>בחר/י</option>
             @for (t of userTypes; track t) {
-              <option [value]="t">{{ userTypeLabels[t] }}</option>
+              <option [value]="t">{{ userTypeLabels[t] | transloco }}</option>
             }
           </select>
         </label>
@@ -45,7 +45,7 @@
           <select formControlName="sector">
             <option value="" disabled>בחר/י</option>
             @for (s of sectors; track s) {
-              <option [value]="s">{{ sectorLabels[s] }}</option>
+              <option [value]="s">{{ sectorLabels[s] | transloco }}</option>
             }
           </select>
         </label>

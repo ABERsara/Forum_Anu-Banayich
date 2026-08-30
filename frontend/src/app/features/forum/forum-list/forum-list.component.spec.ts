@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -7,6 +8,7 @@ import { ForumListComponent } from './forum-list.component';
 import { GroupVisibility, PostStatus, SectorVisibility } from '../../../core/constants';
 import type { ForumPost, ForumPostList } from '../../../core/models';
 import { ForumService } from '../../../core/services/forum.service';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
   return {
@@ -46,7 +48,7 @@ describe('ForumListComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ForumListComponent],
+      imports: [ForumListComponent, translocoTesting()],
       providers: [provideRouter([]), { provide: ForumService, useValue: forumServiceMock }],
     }).compileComponents();
 
@@ -133,5 +135,17 @@ describe('ForumListComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('אלמנות');
     expect(text).toContain('חסידי');
+  });
+
+  it('shows those badges in English under an English locale', () => {
+    fixture.detectChanges();
+
+    TestBed.inject(TranslocoService).setActiveLang('en');
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Widows');
+    expect(text).toContain('Hasidic');
+    expect(text).not.toContain('אלמנות');
   });
 });

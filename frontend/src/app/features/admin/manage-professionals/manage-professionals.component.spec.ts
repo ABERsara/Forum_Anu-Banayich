@@ -13,6 +13,7 @@ import {
   UserRole,
 } from '../../../core/constants';
 import type { ProfessionalAdminView } from '../../../core/models';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeProfessional(overrides: Partial<ProfessionalAdminView> = {}): ProfessionalAdminView {
   return {
@@ -50,7 +51,7 @@ describe('ManageProfessionalsComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ManageProfessionalsComponent],
+      imports: [ManageProfessionalsComponent, translocoTesting()],
       providers: [provideRouter([]), { provide: AdminService, useValue: adminServiceMock }],
     }).compileComponents();
 

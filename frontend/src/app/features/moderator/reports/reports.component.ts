@@ -16,6 +16,7 @@
  */
 
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ReportWithContent } from '../../../core/models';
 import { POST_STATUS_LABELS, ReportDecision, REPORT_REASON_LABELS } from '../../../core/constants';
@@ -28,7 +29,7 @@ const PREVIEW_LENGTH = 200;
 @Component({
   selector: 'app-moderator-reports',
   standalone: true,
-  imports: [LoadingSpinnerComponent, ErrorDisplayComponent],
+  imports: [TranslocoPipe, LoadingSpinnerComponent, ErrorDisplayComponent],
   template: `
     <div style="padding: 1rem; direction: rtl">
       <h1>לוח בקרת מבקר – דיווחים ממתינים</h1>
@@ -56,9 +57,9 @@ const PREVIEW_LENGTH = 200;
             </span>
           </div>
           <p>{{ previewOf(report.content_text) }}</p>
-          <p><strong>סיבה:</strong> {{ reasonLabels[report.reason] }}</p>
+          <p><strong>סיבה:</strong> {{ reasonLabels[report.reason] | transloco }}</p>
           <p><strong>תיאור:</strong> {{ report.description ?? '–' }}</p>
-          <p><strong>סטטוס תוכן:</strong> {{ statusLabels[report.content_status] }}</p>
+          <p><strong>סטטוס תוכן:</strong> {{ statusLabels[report.content_status] | transloco }}</p>
 
           <div style="margin-top: 0.5rem">
             <button (click)="decide(report.id, 'valid')">מחיקת ההודעה (מוצדק)</button>
