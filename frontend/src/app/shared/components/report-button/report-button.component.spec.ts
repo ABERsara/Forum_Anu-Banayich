@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import { ReportButtonComponent } from './report-button.component';
 import { ReportReason, ReportTargetType } from '../../../core/constants';
 import { ReportService } from '../../../core/services/report.service';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 describe('ReportButtonComponent', () => {
   let fixture: ComponentFixture<ReportButtonComponent>;
@@ -17,7 +18,7 @@ describe('ReportButtonComponent', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [ReportButtonComponent],
+      imports: [ReportButtonComponent, translocoTesting()],
       providers: [{ provide: ReportService, useValue: reportServiceMock }],
     }).compileComponents();
 

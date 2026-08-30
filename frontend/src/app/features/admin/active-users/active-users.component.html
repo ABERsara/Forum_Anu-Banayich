@@ -17,7 +17,10 @@
       <div class="user-card">
         <strong>{{ user.first_name }} {{ user.last_name }}</strong>
         <span> | {{ user.email }}</span>
-        <span> | {{ userTypeLabels[user.user_type!] }} | {{ sectorLabels[user.sector!] }}</span>
+        <span>
+          | {{ userTypeLabels[user.user_type!] | transloco }} |
+          {{ sectorLabels[user.sector!] | transloco }}</span
+        >
         <div class="user-card__actions">
           <button (click)="suspend(user.id)">השעה</button>
         </div>

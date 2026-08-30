@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import {
   GROUP_VISIBILITY_LABELS,
@@ -20,6 +21,7 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
   imports: [
     ReactiveFormsModule,
     RouterLink,
+    TranslocoPipe,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,
     FileUploadComponent,

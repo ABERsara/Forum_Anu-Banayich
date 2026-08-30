@@ -7,6 +7,7 @@ import { PendingQuestionsComponent } from './pending-questions.component';
 import { ProfessionalDomain, QueryStatus } from '../../../core/constants';
 import type { ProfessionalQuery } from '../../../core/models';
 import { ProfessionalService } from '../../../core/services/professional.service';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeQuestion(overrides: Partial<ProfessionalQuery> = {}): ProfessionalQuery {
   return {
@@ -36,7 +37,7 @@ describe('PendingQuestionsComponent', () => {
 
   async function setup(): Promise<void> {
     await TestBed.configureTestingModule({
-      imports: [PendingQuestionsComponent],
+      imports: [PendingQuestionsComponent, translocoTesting()],
       providers: [
         provideRouter([]),
         { provide: ProfessionalService, useValue: professionalServiceMock },

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { Subject, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -7,6 +8,7 @@ import { PendingRegistrationsComponent } from './pending-registrations.component
 import { AdminService } from '../../../core/services/admin.service';
 import { AccountStatus, DocumentType, Sector, UserRole, UserType } from '../../../core/constants';
 import type { RegistrationDetail, UserAdminView } from '../../../core/models';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeUser(overrides: Partial<UserAdminView> = {}): UserAdminView {
   return {
@@ -66,7 +68,7 @@ describe('PendingRegistrationsComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [PendingRegistrationsComponent],
+      imports: [PendingRegistrationsComponent, translocoTesting()],
       providers: [provideRouter([]), { provide: AdminService, useValue: adminServiceMock }],
     }).compileComponents();
 
@@ -147,6 +149,20 @@ describe('PendingRegistrationsComponent', () => {
       expect(text).toContain('123456789');
       expect(text).toContain('0501234567');
       expect(text).toContain('30/06/2026');
+    });
+
+    it('shows those details in English under an English locale', () => {
+      component.toggleDetail('u1');
+      fixture.detectChanges();
+
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+
+      const text: string = fixture.nativeElement.textContent;
+      expect(text).toContain('Widow');
+      expect(text).toContain('Sephardic');
+      expect(text).toContain('Death certificate');
+      expect(text).not.toContain('אלמנה');
     });
 
     it('lists the uploaded documents as metadata, with no link to open them', () => {

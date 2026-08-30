@@ -4,6 +4,7 @@
 
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ProfessionalProfile } from '../../../core/models';
 import { PROFESSIONAL_DOMAIN_LABELS, ProfessionalDomain } from '../../../core/constants';
@@ -12,7 +13,7 @@ import { ProfessionalService } from '../../../core/services/professional.service
 @Component({
   selector: 'app-advice-list',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   styleUrl: './advice-list.component.scss',
   template: `
     <div class="page">
@@ -30,7 +31,7 @@ import { ProfessionalService } from '../../../core/services/professional.service
             <select (change)="onDomainChange($event)">
               <option value="">הכל</option>
               @for (domain of domains; track domain) {
-                <option [value]="domain">{{ domainLabels[domain] }}</option>
+                <option [value]="domain">{{ domainLabels[domain] | transloco }}</option>
               }
             </select>
           </label>
@@ -47,7 +48,7 @@ import { ProfessionalService } from '../../../core/services/professional.service
         @for (pro of filteredProfessionals(); track pro.id) {
           <div class="professional-card">
             <strong>{{ pro.first_name }} {{ pro.last_name }}</strong>
-            <p>{{ domainLabels[pro.professional_domain] }}</p>
+            <p>{{ domainLabels[pro.professional_domain] | transloco }}</p>
             <p>{{ pro.professional_description }}</p>
             <a [routerLink]="['/advice/ask']" [queryParams]="{ professionalId: pro.id }">
               שאל/י שאלה

@@ -17,10 +17,12 @@ import {
   Validators,
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import {
   GROUP_VISIBILITY_LABELS,
   GroupVisibility,
+  LabelKey,
   SECTOR_LABELS,
   Sector,
   UserType,
@@ -31,6 +33,7 @@ import {
   ModeratorCreateRequest,
   ModeratorUpdateRequest,
 } from '../../../core/models';
+import { LabelService } from '../../../core/i18n/label.service';
 import { AdminService } from '../../../core/services/admin.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
@@ -48,6 +51,7 @@ function atLeastOneCell(control: AbstractControl): ValidationErrors | null {
   imports: [
     ReactiveFormsModule,
     RouterLink,
+    TranslocoPipe,
     ConfirmDialogComponent,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,
@@ -58,6 +62,7 @@ function atLeastOneCell(control: AbstractControl): ValidationErrors | null {
 })
 export class ManageModeratorsComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
+  private readonly labels = inject(LabelService);
   private readonly adminService = inject(AdminService);
 
   readonly moderators = signal<ModeratorAdminView[]>([]);
@@ -88,7 +93,7 @@ export class ManageModeratorsComponent implements OnInit {
    * UserType value is also a GroupVisibility value, which is what lets the
    * labels be derived here instead of spelled out a third time.
    */
-  readonly groupLabels: Record<UserType, string> = {
+  readonly groupLabels: Record<UserType, LabelKey> = {
     [UserType.WIDOWER]: GROUP_VISIBILITY_LABELS[GroupVisibility.WIDOWERS],
     [UserType.WIDOW]: GROUP_VISIBILITY_LABELS[GroupVisibility.WIDOWS],
     [UserType.ORPHAN_MALE]: GROUP_VISIBILITY_LABELS[GroupVisibility.ORPHANS_MALE],
@@ -137,9 +142,15 @@ export class ManageModeratorsComponent implements OnInit {
     return `${moderator.first_name} ${moderator.last_name}`;
   }
 
-  /** "אלמנות – ספרדי", the cell as it reads in the roster. */
+  /**
+   * "אלמנות – ספרדי", the cell as it reads in the roster. Two labels joined
+   * into one string, which is why it translates here rather than in the
+   * template: there is no single key for the pair.
+   */
   cellLabel(cell: ModeratorCell): string {
-    return `${this.groupLabels[cell.group]} – ${this.sectorLabels[cell.sector]}`;
+    const group = this.labels.label(this.groupLabels[cell.group]);
+    const sector = this.labels.label(this.sectorLabels[cell.sector]);
+    return `${group} – ${sector}`;
   }
 
   /** Where this moderator's report alerts land. */

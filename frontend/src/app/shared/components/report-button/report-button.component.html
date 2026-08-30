@@ -20,7 +20,7 @@
           (change)="onReasonChange($any($event.target).value)"
         >
           @for (option of reasonOptions; track option) {
-            <option [value]="option">{{ reasonLabels[option] }}</option>
+            <option [value]="option">{{ reasonLabels[option] | transloco }}</option>
           }
         </select>
       </div>
