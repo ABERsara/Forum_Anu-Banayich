@@ -19,7 +19,9 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: $spacing-lg;
-    text-align: right;
+    // Logical, not physical: the grid reads from the start edge, which
+    // follows <html dir> — right in Hebrew, left in English.
+    text-align: start;
   }
 
   &__card-link {
