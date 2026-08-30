@@ -18,6 +18,7 @@ from app.schemas.forum import (
     ForumPostListResponse,
     ForumPostResponse,
 )
+from app.schemas.like import LikeResponse
 from app.schemas.professional import (
     ProfessionalAnswerRequest,
     ProfessionalQueryCreate,
@@ -61,6 +62,7 @@ __all__ = [
     "ProfessionalQueryResponse",
     "ProfessionalAnswerRequest",
     "PublicQAResponse",
+    "LikeResponse",
     "ReportCreate",
     "ReportResponse",
     "ReportDecideRequest",
