@@ -2,7 +2,11 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { PROFESSIONAL_DOMAIN_LABELS, QUERY_STATUS_LABELS } from '../../../core/constants';
+import {
+  PROFESSIONAL_DOMAIN_LABELS,
+  QUERY_STATUS_LABELS,
+  QueryStatus,
+} from '../../../core/constants';
 import { ProfessionalQuery } from '../../../core/models';
 import { ProfessionalService } from '../../../core/services/professional.service';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
@@ -24,6 +28,7 @@ export class MyQuestionsComponent implements OnInit {
 
   readonly domainLabels = PROFESSIONAL_DOMAIN_LABELS;
   readonly statusLabels = QUERY_STATUS_LABELS;
+  readonly queryStatus = QueryStatus;
 
   ngOnInit(): void {
     this.isLoading.set(true);

@@ -19,6 +19,9 @@
             {{ statusLabels[question.status] }}
           </span>
         </div>
+        @if (question.status === queryStatus.ANSWERED && question.answer) {
+          <p class="question-answer">{{ question.answer }}</p>
+        }
       </div>
     }
   }
