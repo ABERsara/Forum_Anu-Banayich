@@ -326,7 +326,7 @@ data: { roles: ['admin'] },
 
 ## 5. נגישות
 
-**תקן חובה: ת"י 5568 / WCAG 2.1 AA** — זו חובה חוקית (SPEC §9.5), לא nice-to-have.
+**תקן חובה: ת"י 5568 / WCAG 2.1 AA.** רמת הנגישות המדויקת הנדרשת עדיין שאלה פתוחה מול הלקוח (SPEC §14, סעיף 6) — הטבלה הבאה היא ה-baseline המחייב בינתיים; SPEC §9.5 עוסק בפרטיות/GDPR ולא בנגישות, אין לצטט אותו כמקור לדרישות נגישות.
 
 | דרישה | כיצד |
 |---|---|
@@ -334,7 +334,7 @@ data: { roles: ['admin'] },
 | תיוג | `aria-label` / `aria-labelledby` על כל element שהטקסט לא מסביר אותו |
 | Focus | `:focus-visible` עם `@include focus-ring` מ-`_mixins.scss` |
 | ניגודיות | 4.5:1 לטקסט רגיל — `$color-text` על `$color-bg` עומד בתקן |
-| כיוון | `<html lang="he" dir="rtl">` קיים; אין לשנות |
+| כיוון | `<html lang>`/`<html dir>` נקבעים דינמית ע"י `LocaleService` (ABF-126) לפי השפה הפעילה — לא hardcoded |
 | תמונות | `alt` תיאורי — לא "תמונה", לא ריק אלא אם דקורטיבי (`alt=""`) |
 | היררכיית כותרות | h1→h2→h3 בסדר, לא מדלגים |
 
@@ -344,18 +344,22 @@ data: { roles: ['admin'] },
 
 > ספרינט 5 יוסיף תמיכה מלאה. אנחנו מכינים את התשתית **עכשיו** כדי למנוע שכתוב מאוחר.
 
-**לא לכתוב טקסט hardcoded בתוך templates.** הכל דרך מפתח תרגום:
+**לא לכתוב טקסט hardcoded בתוך templates.** הכל דרך מפתח תרגום, עם ה-pipe של Transloco (`@jsverse/transloco`):
 
 ```html
 <!-- ✅ -->
-<span>{{ 'common.copy' | translate }}</span>
-<button>{{ 'forum.report.button' | translate }}</button>
+<span>{{ 'common.copy' | transloco }}</span>
+<button>{{ 'forum.report.button' | transloco }}</button>
 
 <!-- ❌ -->
 <span>העתק</span>
 ```
 
-קבצי תרגום: `frontend/src/assets/i18n/he.json`, `en.json`.
+קבצי תרגום: `frontend/public/i18n/he.json`, `en.json` (לא `src/assets/` — בפרויקט הזה `public/` הוא תיקיית ה-static assets, נטענים ב-runtime מ-`/i18n/{lang}.json`).
+
+**מוסכמת שמות מפתחות**: dot notation, `<module>.<element>` (למשל `common.copy`, `forum.report.button`). דוגמאות אמיתיות מ-ABF-126:
+`common.lang_he`, `common.lang_en`, `header.switch_to_hebrew`, `header.switch_to_english`.
+
 מפתח חסר ב-EN — OK בינתיים. העיקר שה-hook קיים.
 
 ---
