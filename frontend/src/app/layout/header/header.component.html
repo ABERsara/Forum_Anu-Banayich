@@ -1,4 +1,4 @@
-<header class="header" dir="rtl">
+<header class="header">
   <div class="header__inner">
     <a class="header__logo" routerLink="/home">הפורום</a>
 
@@ -32,6 +32,7 @@
         <a routerLink="/login" routerLinkActive="active">כניסה</a>
         <a routerLink="/register" routerLinkActive="active">הרשמה</a>
       }
+      <app-language-toggle [isHebrew]="isHebrew()" (toggled)="toggleLang()" />
     </nav>
   </div>
 </header>
