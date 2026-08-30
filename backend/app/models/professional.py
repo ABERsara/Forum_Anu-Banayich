@@ -79,6 +79,12 @@ class ProfessionalQuery(Base):
     professional: Mapped["User | None"] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "User", foreign_keys=[professional_id]
     )
+    likes: Mapped[list["Like"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
+        "Like",
+        primaryjoin="and_(Like.target_id == ProfessionalQuery.id, Like.target_type == 'professional_query')",
+        foreign_keys="Like.target_id",
+        viewonly=True,
+    )
 
     def __repr__(self) -> str:
         return f"<ProfessionalQuery id={self.id} status={self.status}>"
