@@ -1,16 +1,16 @@
-<div class="chat" dir="rtl">
+<div class="chat">
   <header class="chat__header">
-    <a routerLink="/messages">→ חזרה לחברי התא</a>
-    <h1>{{ otherUserName() || 'שיחה' }}</h1>
+    <a routerLink="/messages">{{ 'messages.chat.back_to_members' | transloco }}</a>
+    <h1>{{ otherUserName() || ('messages.chat.title_fallback' | transloco) }}</h1>
   </header>
 
   <div class="chat__body" aria-live="polite" [attr.aria-busy]="isLoading()">
     @if (isLoading()) {
-      <app-loading-spinner size="md" message="טוען הודעות..." />
+      <app-loading-spinner size="md" [message]="'messages.chat.loading' | transloco" />
     } @else if (hasError()) {
-      <app-error-display message="אירעה שגיאה בטעינת ההודעות. נסה לרענן את הדף." />
+      <app-error-display [message]="loadErrorKey() | transloco" />
     } @else if (messages().length === 0) {
-      <p>עדיין אין הודעות. כתבו הודעה כדי להתחיל.</p>
+      <p>{{ 'messages.chat.empty' | transloco }}</p>
     } @else {
       <ul class="chat__messages">
         @for (msg of messages(); track msg.id) {
@@ -29,20 +29,24 @@
 
   <form class="chat__composer" (submit)="$event.preventDefault(); sendMessage()">
     @if (sendError()) {
-      <app-error-display message="שליחת ההודעה נכשלה. נסו שוב." />
+      <app-error-display [message]="sendErrorKey() | transloco" />
     }
     <div class="chat__composer-row">
-      <label class="chat__composer-label" for="chat-new-message">הודעה חדשה</label>
+      <label class="chat__composer-label" for="chat-new-message">{{
+        'messages.chat.new_message_label' | transloco
+      }}</label>
       <input
         id="chat-new-message"
         name="newMessage"
         type="text"
         [(ngModel)]="newMessage"
-        placeholder="כתבו הודעה..."
+        [placeholder]="'messages.chat.placeholder' | transloco"
         maxlength="2000"
         [disabled]="isSending()"
       />
-      <button type="submit" [disabled]="!newMessage.trim() || isSending()">שלח</button>
+      <button type="submit" [disabled]="!newMessage.trim() || isSending()">
+        {{ 'messages.chat.send' | transloco }}
+      </button>
     </div>
   </form>
 </div>

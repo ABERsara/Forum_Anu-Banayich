@@ -42,9 +42,9 @@
   &__message {
     display: flex;
 
-    // In this dir="rtl" container, flex-start is the right edge and
-    // flex-end is the left edge — own messages go on the left, matching
-    // this app's established chat convention.
+    // flex-start/flex-end are direction-relative, so this flips correctly
+    // with <html dir> (LocaleService) in both RTL and LTR — own messages
+    // always land on the trailing edge, matching this app's chat convention.
     &--mine {
       justify-content: flex-end;
 

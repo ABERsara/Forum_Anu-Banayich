@@ -6,5 +6,26 @@
   "header": {
     "switch_to_hebrew": "עבור לעברית",
     "switch_to_english": "עבור לאנגלית"
+  },
+  "errors": {
+    "dm_forbidden": "אין לך הרשאה לשלוח או לצפות בהודעה זו.",
+    "internal_server_error": "שגיאת שרת פנימית. נסו שוב מאוחר יותר.",
+    "generic": "אירעה שגיאה. נסו שוב."
+  },
+  "messages": {
+    "inbox": {
+      "title": "חברי התא שלי",
+      "loading": "טוען חברי תא...",
+      "empty": "אין חברים נוספים בתא שלך כרגע."
+    },
+    "chat": {
+      "back_to_members": "→ חזרה לחברי התא",
+      "title_fallback": "שיחה",
+      "loading": "טוען הודעות...",
+      "empty": "עדיין אין הודעות. כתבו הודעה כדי להתחיל.",
+      "new_message_label": "הודעה חדשה",
+      "placeholder": "כתבו הודעה...",
+      "send": "שלח"
+    }
   }
 }

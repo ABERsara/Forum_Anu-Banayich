@@ -44,7 +44,10 @@ from app.services.user_service import get_user_by_id
 #: Generic 403 for anything DM-permission-related — never distinguishes
 #: "wrong role", "wrong cell", or "no such user", per the DoD rule that a
 #: denial must not leak whether a user or conversation exists.
-_DM_FORBIDDEN_MESSAGE = "אין לך הרשאה לשלוח או לצפות בהודעה זו."
+#: A translation key, not display text — i18n DoD requires server errors to
+#: come back as a key the client resolves via Transloco (he/en), not
+#: hardcoded Hebrew.
+_DM_FORBIDDEN_MESSAGE = "errors.dm_forbidden"
 
 
 class DirectMessageData(TypedDict):
@@ -440,7 +443,9 @@ def _to_response_dict(message: DirectMessage) -> DirectMessageData:
     try:
         content = decrypt_message(message.content, message.key_version)
     except InvalidTag as exc:
-        raise HTTPException(status_code=500, detail="שגיאת שרת פנימית.") from exc
+        raise HTTPException(
+            status_code=500, detail="errors.internal_server_error"
+        ) from exc
 
     return {
         "id": message.id,

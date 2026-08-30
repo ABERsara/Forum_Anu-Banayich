@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -18,7 +19,24 @@ describe('InboxComponent', () => {
 
   function setup(): void {
     TestBed.configureTestingModule({
-      imports: [InboxComponent],
+      imports: [
+        InboxComponent,
+        TranslocoTestingModule.forRoot({
+          langs: {
+            he: {
+              messages: {
+                inbox: {
+                  title: 'חברי התא שלי',
+                  loading: 'טוען חברי תא...',
+                  empty: 'אין חברים נוספים בתא שלך כרגע.',
+                },
+              },
+            },
+          },
+          translocoConfig: { availableLangs: ['he'], defaultLang: 'he' },
+          preloadLangs: true,
+        }),
+      ],
       providers: [provideRouter([]), { provide: ForumService, useValue: forumServiceMock }],
     }).compileComponents();
 

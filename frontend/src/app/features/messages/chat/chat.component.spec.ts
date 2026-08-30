@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -47,7 +48,28 @@ describe('ChatComponent', () => {
 
   function setup(): void {
     TestBed.configureTestingModule({
-      imports: [ChatComponent],
+      imports: [
+        ChatComponent,
+        TranslocoTestingModule.forRoot({
+          langs: {
+            he: {
+              messages: {
+                chat: {
+                  back_to_members: '→ חזרה לחברי התא',
+                  title_fallback: 'שיחה',
+                  loading: 'טוען הודעות...',
+                  empty: 'עדיין אין הודעות. כתבו הודעה כדי להתחיל.',
+                  new_message_label: 'הודעה חדשה',
+                  placeholder: 'כתבו הודעה...',
+                  send: 'שלח',
+                },
+              },
+            },
+          },
+          translocoConfig: { availableLangs: ['he'], defaultLang: 'he' },
+          preloadLangs: true,
+        }),
+      ],
       providers: [
         { provide: ForumService, useValue: forumServiceMock },
         { provide: AuthService, useValue: { currentUser: () => ME } },
