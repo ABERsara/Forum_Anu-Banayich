@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { FileUploadComponent } from './file-upload.component';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 const MB = 1024 * 1024;
 
@@ -25,7 +28,7 @@ describe('FileUploadComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [FileUploadComponent],
+      imports: [FileUploadComponent, translocoTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(FileUploadComponent);
@@ -49,7 +52,16 @@ describe('FileUploadComponent', () => {
 
       // first call: '' (clear previous error), second call: actual error message
       expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy.mock.calls[1][0]).toContain('5');
+      expect(spy.mock.calls[1][0]).toBe('הקובץ גדול מדי. הגודל המקסימלי הוא 5 MB');
+    });
+
+    it('emits the size complaint in the active language, with the limit filled in', () => {
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      const spy = vi.spyOn(component.validationError, 'emit');
+
+      triggerChange(fixture, makeFile('big.jpg', 'image/jpeg', 6));
+
+      expect(spy.mock.calls[1][0]).toBe('The file is too large. The maximum size is 5 MB');
     });
 
     it('should not emit fileSelected when file exceeds maxSizeMb', () => {
@@ -236,6 +248,44 @@ describe('FileUploadComponent', () => {
       fixture.destroy();
 
       expect(revokeSpy).toHaveBeenCalledWith('blob:fake-url');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // text
+  // ---------------------------------------------------------------------------
+
+  describe('text', () => {
+    function buttonText(): string {
+      return fixture.nativeElement.querySelector('.file-upload__btn').textContent.trim();
+    }
+
+    it('falls back to a generic Hebrew button label', () => {
+      expect(buttonText()).toBe('בחר קובץ');
+    });
+
+    /** Un-migrated call sites still pass a Hebrew literal; it must survive. */
+    it('renders a caller-supplied label verbatim, translated or not', () => {
+      fixture.componentRef.setInput('label', 'בחר/י תעודת פטירה');
+      fixture.detectChanges();
+
+      expect(buttonText()).toBe('בחר/י תעודת פטירה');
+    });
+
+    it('renders its own text in English under an English locale', () => {
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      triggerChange(fixture, makeFile('photo.jpg', 'image/jpeg', 2));
+
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+
+      expect(buttonText()).toBe('Choose file');
+      expect(fixture.nativeElement.querySelector('.file-upload__clear').textContent.trim()).toBe(
+        'Clear',
+      );
+      expect(fixture.nativeElement.querySelector('img').getAttribute('alt')).toBe('Preview');
+      expect((fixture.nativeElement as HTMLElement).textContent ?? '').not.toMatch(HEBREW);
     });
   });
 });

@@ -360,8 +360,12 @@ data: { roles: ['admin'] },
 **מוסכמת שמות מפתחות**: dot notation, `<module>.<element>` (למשל `common.copy`, `forum.report.button`). דוגמאות אמיתיות מ-ABF-126:
 `common.lang_he`, `common.lang_en`, `header.switch_to_hebrew`, `header.switch_to_english`.
 
-מפתח חסר ב-EN — OK בינתיים. העיקר שה-hook קיים. **חריג: מרחב `constants.*`** — שם שתי
-השפות חייבות להיות מלאות, ו-`core/constants/index.spec.ts` מפיל את הבילד אם מפתח חסר באחת מהן.
+**שתי השפות חייבות להיות מלאות.** `core/i18n/translations.spec.ts` מפיל את הבילד אם מפתח קיים
+בקובץ אחד ולא בשני, אם ערך כלשהו ריק, או אם אותו מפתח מַפנה לפרמטרים שונים בשתי השפות
+(`{{name}}` שנעלם בצד אחד = משפט שבולע את השם). זה החליף את ההקלה של ABF-126 ("מפתח חסר
+ב-EN — OK בינתיים"): כל שבעת טיקטי המיגרציה מחויבים ממילא לשתי השפות בקריטריוני הקבלה,
+והשומר רק אוכף את מה שהם כבר דורשים. `core/constants/index.spec.ts` ממשיך לשמור בנוסף
+על מרחב `constants.*` — שם גם *עודף* תרגום (מפתח שאף מיפוי לא מצביע עליו) הוא כשל.
 
 ### תוויות משותפות — אל תתרגמו אותן שוב (ABF-127)
 
@@ -394,6 +398,65 @@ this.labels.label(SECTOR_LABELS[user.sector]);
 
 ```ts
 TestBed.configureTestingModule({ imports: [MyComponent, translocoTesting()] });
+```
+
+### קומפוננטות משותפות — מי מתרגם את הטקסט (ABF-128)
+
+`shared/components/` ו-`layout/header/` כבר migrated. **הכלל: קלט טקסט של קומפוננטה משותפת
+מקבל טקסט מתורגם, לא מפתח.** הקומפוננטה המשותפת היא dumb — היא מרנדרת את המחרוזת שקיבלה
+כמו שהיא, וה-pipe רץ אצל *הקורא*:
+
+```html
+<!-- ✅ הקורא מתרגם -->
+<app-confirm-dialog
+  [title]="'forum.delete_post.title' | transloco"
+  [confirmText]="'forum.delete_post.confirm' | transloco"
+/>
+<app-card [title]="'home.forum.title' | transloco" />
+<app-loading-spinner [message]="'common.loading' | transloco" />
+<app-error-display [message]="'forum.load_failed' | transloco" />
+```
+
+```html
+<!-- ❌ מפתח גולמי כערך — הקומפוננטה לא מתרגמת, והמפתח יגיע למסך -->
+<app-confirm-dialog title="forum.delete_post.title" />
+```
+
+למה כך: המפתח `forum.*` שייך למודול שקורא, לא לקומפוננטה המשותפת — כך אף מודול לא נוגע
+ב-`shared/` בטיקט שלו, ובדיוק כפי שקומפוננטה משותפת לא יודעת מאיזה מודול הגיעה המחרוזת,
+היא גם לא צריכה לדעת באיזה מרחב מפתחות הוא משתמש.
+
+**ברירות המחדל** של הדיאלוגים (`shared.confirm_dialog.*`, `shared.suspend_dialog.*`,
+`shared.file_upload.choose_file`, `shared.copy_text.*`) הן הטקסט היחיד שהקומפוננטות האלה
+מחזיקות בעצמן, והן נכנסות רק כשהקורא לא העביר כלום. קורא שעדיין מעביר מחרוזת עברית קשיחה
+(מודול שטרם עבר מיגרציה) ממשיך לעבוד בדיוק כמו קודם.
+
+`common.cancel` ו-`common.loading` הם מפתחות חוצי-מודולים — אל תוסיפו `forum.cancel` משלכם.
+
+**דיווח שגיאה שנשמר ב-signal** — שמרו את ה*מפתח* והריצו pipe בתבנית, לא טקסט מתורגם:
+
+```ts
+// ✅ מתחלף עם השפה גם כשההודעה כבר על המסך — ראו report-button.component.ts
+errorKey.set(err.status === 409 ? 'shared.report.error_duplicate' : 'shared.report.error_generic');
+```
+
+```html
+@if (errorKey(); as key) {
+  <app-error-display [message]="key | transloco" />
+}
+```
+
+**כיוון טקסט:** אל תכתבו `dir="rtl"` בתבנית ואל תכתבו `text-align: right`. `LocaleService`
+מגדיר `<html dir>` לפי השפה, והכול יורש ממנו; ל-CSS השתמשו במאפיינים לוגיים
+(`text-align: start`, `margin-inline-start`).
+
+**בבדיקות** — `HEBREW` מ-`src/testing/transloco-testing.ts`. אחרי מעבר ל-EN,
+`expect(text).not.toMatch(HEBREW)` נופל על *כל* מחרוזת שנשכחה, לא רק על זו שנזכרתם לבדוק:
+
+```ts
+TestBed.inject(TranslocoService).setActiveLang('en');
+fixture.detectChanges();
+expect(fixture.nativeElement.textContent).not.toMatch(HEBREW);
 ```
 
 ---

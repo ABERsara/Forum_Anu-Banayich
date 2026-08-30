@@ -1,11 +1,80 @@
 {
   "common": {
     "lang_he": "עברית",
-    "lang_en": "English"
+    "lang_en": "English",
+    "cancel": "Cancel",
+    "loading": "Loading..."
   },
   "header": {
     "switch_to_hebrew": "Switch to Hebrew",
-    "switch_to_english": "Switch to English"
+    "switch_to_english": "Switch to English",
+    "brand": "The Forum",
+    "home": "Home",
+    "logout": "Log out",
+    "login": "Log in",
+    "register": "Sign up"
+  },
+  "home": {
+    "title": "Welcome",
+    "greeting": "Hello, {{name}}",
+    "forum": {
+      "title": "Forum",
+      "subtitle": "Questions and answers from the community",
+      "body": "Sharing, support and answers from community members."
+    },
+    "advice": {
+      "title": "Advice",
+      "subtitle": "Reach out to a professional",
+      "body": "Personal, professional advice on whatever is on your mind."
+    },
+    "admin": {
+      "title": "Administration",
+      "subtitle": "Admin dashboard",
+      "body": "Manage users, registration approvals and content."
+    },
+    "moderator": {
+      "title": "Moderator",
+      "subtitle": "Reports and complaints",
+      "body": "Review the reports users have filed."
+    },
+    "professional": {
+      "title": "Professional advice",
+      "subtitle": "Questions awaiting your answer",
+      "body": "View the questions sent to you and answer the asker."
+    }
+  },
+  "shared": {
+    "confirm_dialog": {
+      "title": "Are you sure?",
+      "confirm": "Confirm"
+    },
+    "suspend_dialog": {
+      "title": "Suspend user",
+      "confirm": "Suspend",
+      "hours_label": "Number of hours",
+      "reason_label": "Reason for the suspension",
+      "reason_placeholder": "For example: breach of the forum rules"
+    },
+    "report": {
+      "button": "Report",
+      "submitted": "Your report was sent, thank you.",
+      "dialog_title": "Report content",
+      "reason_label": "Reason for the report",
+      "description_label": "Details (optional)",
+      "submit": "Send report",
+      "error_duplicate": "You have already reported this content.",
+      "error_generic": "Something went wrong sending the report. Please try again."
+    },
+    "file_upload": {
+      "choose_file": "Choose file",
+      "clear": "Clear",
+      "preview_alt": "Preview",
+      "file_too_large": "The file is too large. The maximum size is {{max}} MB"
+    },
+    "copy_text": {
+      "copy": "Copy",
+      "copied": "Copied!"
+    }
   },
   "constants": {
     "user_type": {

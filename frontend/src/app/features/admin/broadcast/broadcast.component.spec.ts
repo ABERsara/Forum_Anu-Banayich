@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 import { BroadcastComponent } from './broadcast.component';
 import { AdminService } from '../../../core/services/admin.service';
 import { ForumPost } from '../../../core/models';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 describe('BroadcastComponent', () => {
   let fixture: ComponentFixture<BroadcastComponent>;
@@ -16,7 +17,7 @@ describe('BroadcastComponent', () => {
     sendBroadcastMock = vi.fn();
 
     await TestBed.configureTestingModule({
-      imports: [BroadcastComponent],
+      imports: [BroadcastComponent, translocoTesting()],
       providers: [
         provideRouter([]),
         { provide: AdminService, useValue: { sendBroadcast: sendBroadcastMock } },

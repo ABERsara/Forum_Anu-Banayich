@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { AuthService } from '../../core/services/auth.service';
 import { LocaleService } from '../../core/services/locale.service';
@@ -7,7 +8,7 @@ import { LanguageToggleComponent } from '../../shared/components/language-toggle
 
 @Component({
   selector: 'app-header',
-  imports: [RouterLink, RouterLinkActive, LanguageToggleComponent],
+  imports: [RouterLink, RouterLinkActive, LanguageToggleComponent, TranslocoPipe],
   templateUrl: './header.component.html',
   styleUrl: './header.component.scss',
 })

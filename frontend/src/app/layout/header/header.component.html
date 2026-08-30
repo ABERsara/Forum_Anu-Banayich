@@ -1,14 +1,16 @@
 <header class="header">
   <div class="header__inner">
-    <a class="header__logo" routerLink="/home">הפורום</a>
+    <a class="header__logo" routerLink="/home">{{ 'header.brand' | transloco }}</a>
 
     <nav class="header__nav">
       @if (auth.isLoggedIn()) {
-        <a routerLink="/home" routerLinkActive="active">בית</a>
-        <button type="button" class="header__logout" (click)="logout()">התנתקות</button>
+        <a routerLink="/home" routerLinkActive="active">{{ 'header.home' | transloco }}</a>
+        <button type="button" class="header__logout" (click)="logout()">
+          {{ 'header.logout' | transloco }}
+        </button>
       } @else {
-        <a routerLink="/login" routerLinkActive="active">כניסה</a>
-        <a routerLink="/register" routerLinkActive="active">הרשמה</a>
+        <a routerLink="/login" routerLinkActive="active">{{ 'header.login' | transloco }}</a>
+        <a routerLink="/register" routerLinkActive="active">{{ 'header.register' | transloco }}</a>
       }
       <app-language-toggle [isHebrew]="isHebrew()" (toggled)="toggleLang()" />
     </nav>

@@ -1,18 +1,20 @@
-<div class="report-button" dir="rtl">
+<div class="report-button">
   @if (isSubmitted()) {
-    <p class="report-button__submitted">הדיווח נשלח, תודה.</p>
+    <p class="report-button__submitted">{{ 'shared.report.submitted' | transloco }}</p>
   } @else {
-    <button type="button" (click)="onOpenClick()">דיווח</button>
+    <button type="button" (click)="onOpenClick()">{{ 'shared.report.button' | transloco }}</button>
   }
 </div>
 
 @if (showDialog()) {
   <div class="overlay">
-    <div class="dialog" dir="rtl">
-      <h2 class="dialog__title">דיווח על תוכן</h2>
+    <div class="dialog">
+      <h2 class="dialog__title">{{ 'shared.report.dialog_title' | transloco }}</h2>
 
       <div class="dialog__field">
-        <label class="dialog__label" for="report-reason">סיבת הדיווח</label>
+        <label class="dialog__label" for="report-reason">
+          {{ 'shared.report.reason_label' | transloco }}
+        </label>
         <select
           id="report-reason"
           class="dialog__select"
@@ -26,7 +28,9 @@
       </div>
 
       <div class="dialog__field">
-        <label class="dialog__label" for="report-description">פירוט (לא חובה)</label>
+        <label class="dialog__label" for="report-description">
+          {{ 'shared.report.description_label' | transloco }}
+        </label>
         <textarea
           id="report-description"
           class="dialog__textarea"
@@ -36,19 +40,21 @@
         ></textarea>
       </div>
 
-      @if (errorMessage(); as err) {
-        <app-error-display [message]="err" />
+      @if (errorKey(); as key) {
+        <app-error-display [message]="key | transloco" />
       }
 
       <div class="dialog__actions">
-        <button class="btn btn--cancel" type="button" (click)="onCancel()">ביטול</button>
+        <button class="btn btn--cancel" type="button" (click)="onCancel()">
+          {{ 'common.cancel' | transloco }}
+        </button>
         <button
           class="btn btn--primary"
           type="button"
           [disabled]="isSubmitting()"
           (click)="onSubmit()"
         >
-          שליחת דיווח
+          {{ 'shared.report.submit' | transloco }}
         </button>
       </div>
     </div>

@@ -6,13 +6,14 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
  * Copies a text string to the clipboard and shows brief visual confirmation.
  *
  * Usage:
  *   <app-copy-text [text]="someValue" />
- *   <app-copy-text [text]="someValue" label="Copy ID" successLabel="Copied!" />
+ *   <app-copy-text [text]="someValue" [label]="'admin.copy_id' | transloco" />
  *
  * Architecture notes (reference for all shared components):
  * - Standalone, no NgModule
@@ -23,6 +24,7 @@ import {
  */
 @Component({
   selector: 'app-copy-text',
+  imports: [TranslocoPipe],
   templateUrl: './copy-text.component.html',
   styleUrl: './copy-text.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,11 +33,14 @@ export class CopyTextComponent implements OnDestroy {
   /** The string that will be written to the clipboard. */
   text = input.required<string>();
 
-  /** Button label before the user copies. */
-  label = input('העתק');
+  /**
+   * Button label before the user copies — already translated by the caller.
+   * Falls back to a generic "copy". See `confirm-dialog.component.ts`.
+   */
+  label = input('');
 
-  /** Button label shown briefly after a successful copy. */
-  successLabel = input('הועתק!');
+  /** Label shown briefly after a successful copy. Falls back to "copied!". */
+  successLabel = input('');
 
   /** Emits once per successful clipboard write. */
   copied = output<void>();

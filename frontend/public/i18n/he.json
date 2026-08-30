@@ -1,11 +1,80 @@
 {
   "common": {
     "lang_he": "עברית",
-    "lang_en": "English"
+    "lang_en": "English",
+    "cancel": "ביטול",
+    "loading": "טוען..."
   },
   "header": {
     "switch_to_hebrew": "עבור לעברית",
-    "switch_to_english": "עבור לאנגלית"
+    "switch_to_english": "עבור לאנגלית",
+    "brand": "הפורום",
+    "home": "בית",
+    "logout": "התנתקות",
+    "login": "כניסה",
+    "register": "הרשמה"
+  },
+  "home": {
+    "title": "ברוכים הבאים",
+    "greeting": "שלום, {{name}}",
+    "forum": {
+      "title": "פורום",
+      "subtitle": "שאלות ותשובות מהקהילה",
+      "body": "שיתוף, תמיכה ותשובות מחברי הקהילה."
+    },
+    "advice": {
+      "title": "ייעוץ",
+      "subtitle": "פנייה לאיש מקצוע",
+      "body": "קבלת ייעוץ אישי ומקצועי בנושאים שמעסיקים אתכם."
+    },
+    "admin": {
+      "title": "ניהול",
+      "subtitle": "לוח בקרה למנהלים",
+      "body": "ניהול משתמשים, אישורי הרשמה ותוכן."
+    },
+    "moderator": {
+      "title": "מבקר",
+      "subtitle": "דוחות ותלונות",
+      "body": "סקירת דוחות שהוגשו על ידי משתמשים."
+    },
+    "professional": {
+      "title": "ייעוץ מקצועי",
+      "subtitle": "שאלות הממתינות לתשובתך",
+      "body": "צפייה בשאלות שהופנו אליך והגשת תשובה לשואל/ת."
+    }
+  },
+  "shared": {
+    "confirm_dialog": {
+      "title": "האם לאשר?",
+      "confirm": "אישור"
+    },
+    "suspend_dialog": {
+      "title": "השעיית משתמש",
+      "confirm": "השעה",
+      "hours_label": "מספר שעות",
+      "reason_label": "סיבת ההשעייה",
+      "reason_placeholder": "לדוגמה: הפרת כללי הפורום"
+    },
+    "report": {
+      "button": "דיווח",
+      "submitted": "הדיווח נשלח, תודה.",
+      "dialog_title": "דיווח על תוכן",
+      "reason_label": "סיבת הדיווח",
+      "description_label": "פירוט (לא חובה)",
+      "submit": "שליחת דיווח",
+      "error_duplicate": "כבר דיווחת על תוכן זה.",
+      "error_generic": "אירעה שגיאה בשליחת הדיווח. נסה שוב."
+    },
+    "file_upload": {
+      "choose_file": "בחר קובץ",
+      "clear": "נקה",
+      "preview_alt": "תצוגה מקדימה",
+      "file_too_large": "הקובץ גדול מדי. הגודל המקסימלי הוא {{max}} MB"
+    },
+    "copy_text": {
+      "copy": "העתק",
+      "copied": "הועתק!"
+    }
   },
   "constants": {
     "user_type": {

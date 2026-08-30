@@ -1,6 +1,6 @@
 <div class="overlay">
-  <div class="dialog" dir="rtl">
-    <h2 class="dialog__title">{{ title() }}</h2>
+  <div class="dialog">
+    <h2 class="dialog__title">{{ title() || ('shared.confirm_dialog.title' | transloco) }}</h2>
     @if (message()) {
       <p class="dialog__message">{{ message() }}</p>
     }
@@ -21,7 +21,7 @@
     }
     <div class="dialog__actions">
       <button class="btn btn--cancel" type="button" (click)="cancelled.emit()">
-        {{ cancelText() }}
+        {{ cancelText() || ('common.cancel' | transloco) }}
       </button>
       <button
         class="btn"
@@ -31,7 +31,7 @@
         [disabled]="isConfirmDisabled"
         (click)="onConfirm()"
       >
-        {{ confirmText() }}
+        {{ confirmText() || ('shared.confirm_dialog.confirm' | transloco) }}
       </button>
     </div>
   </div>
