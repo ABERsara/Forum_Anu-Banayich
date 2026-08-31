@@ -127,4 +127,16 @@ describe('MyQuestionsComponent', () => {
     const answerEl = fixture.nativeElement.querySelector('.question-answer');
     expect(answerEl).toBeNull();
   });
+
+  it('does not show an answer block when answered but the answer text is missing', async () => {
+    professionalServiceMock = {
+      getMyQuestions: vi
+        .fn()
+        .mockReturnValue(of([makeQuestion({ status: QueryStatus.ANSWERED, answer: null })])),
+    };
+    await setup();
+
+    const answerEl = fixture.nativeElement.querySelector('.question-answer');
+    expect(answerEl).toBeNull();
+  });
 });
