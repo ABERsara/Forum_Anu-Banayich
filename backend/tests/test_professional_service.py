@@ -1,32 +1,36 @@
 """
 Unit tests for professional_service.create_query(), get_my_questions(),
-get_pending_questions() and answer_query().
+get_pending_questions(), answer_query() and like_service.toggle_like().
 """
 
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy import event, insert
+from sqlalchemy.engine import Connection
+from sqlalchemy.orm import Mapper, Session
 
 from app.core.constants import (
+    LikeTargetType,
     ProfessionalDomain,
     QueryStatus,
     Sector,
     UserRole,
     UserType,
 )
+from app.models.like import Like
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import ProfessionalAnswerRequest, ProfessionalQueryCreate
-from app.services import email_service, professional_service
+from app.services import email_service, like_service, professional_service
 
 
 def _make_asker(
     db_session: Session,
     email: str = "asker@example.com",
-    user_type: UserType = UserType.WIDOW,
-    sector: Sector = Sector.SEPHARDIC,
+    user_type: UserType | None = UserType.WIDOW,
+    sector: Sector | None = Sector.SEPHARDIC,
 ) -> User:
     asker = User(
         email=email,
@@ -74,6 +78,7 @@ def _make_query(
     status: QueryStatus = QueryStatus.OPEN,
     content: str = "שאלה שממתינה לתשובה מאיש המקצוע",
     show_real_name: bool = False,
+    is_public: bool = False,
 ) -> ProfessionalQuery:
     query = ProfessionalQuery(
         asker_id=asker.id,
@@ -82,6 +87,7 @@ def _make_query(
         content=content,
         status=status,
         show_real_name=show_real_name,
+        is_public=is_public,
     )
     db_session.add(query)
     db_session.commit()
@@ -682,3 +688,260 @@ class TestAnswerQuery:
         assert stored is not None
         assert stored.answer == "התשובה הראשונה שהוגשה לשאלה"
         assert len(sent_answer_emails) == 1
+
+
+class TestToggleLike:
+    def test_first_like_then_toggle_removes_it(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        liker = _make_asker(db_session, email="liker@example.com")
+        query = _make_query(
+            db_session, asker, status=QueryStatus.ANSWERED, is_public=True
+        )
+
+        liked = like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, liker
+        )
+        assert liked.liked is True
+        assert liked.like_count == 1
+        assert db_session.query(Like).count() == 1
+
+        unliked = like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, liker
+        )
+        assert unliked.liked is False
+        assert unliked.like_count == 0
+        assert db_session.query(Like).count() == 0
+
+    def test_two_different_users_both_count(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        first_liker = _make_asker(db_session, email="liker1@example.com")
+        second_liker = _make_asker(db_session, email="liker2@example.com")
+        query = _make_query(
+            db_session, asker, status=QueryStatus.ANSWERED, is_public=True
+        )
+
+        like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, first_liker
+        )
+        result = like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, second_liker
+        )
+
+        assert result.like_count == 2
+
+    def test_asker_may_like_their_own_question(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        query = _make_query(db_session, asker, status=QueryStatus.ANSWERED)
+
+        result = like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, asker
+        )
+
+        assert result.liked is True
+
+    def test_admin_may_like_any_question_regardless_of_cell(
+        self, db_session: Session
+    ) -> None:
+        asker = _make_asker(
+            db_session, user_type=UserType.WIDOW, sector=Sector.SEPHARDIC
+        )
+        admin = _make_asker(
+            db_session,
+            email="admin@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        admin.role = UserRole.ADMIN
+        db_session.commit()
+        query = _make_query(
+            db_session, asker, status=QueryStatus.ANSWERED, is_public=False
+        )
+
+        result = like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, admin
+        )
+
+        assert result.liked is True
+
+    def test_outsider_rejected_on_private_question(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        outsider = _make_asker(db_session, email="outsider@example.com")
+        query = _make_query(
+            db_session, asker, status=QueryStatus.ANSWERED, is_public=False
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, outsider
+            )
+        assert exc_info.value.status_code == 403
+
+    def test_outsider_rejected_on_public_question_outside_the_askers_cell(
+        self, db_session: Session
+    ) -> None:
+        asker = _make_asker(
+            db_session, user_type=UserType.WIDOW, sector=Sector.SEPHARDIC
+        )
+        outsider = _make_asker(
+            db_session,
+            email="outsider@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        query = _make_query(
+            db_session, asker, status=QueryStatus.ANSWERED, is_public=True
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, outsider
+            )
+        assert exc_info.value.status_code == 403
+
+    def test_user_in_askers_cell_may_like_public_question(
+        self, db_session: Session
+    ) -> None:
+        asker = _make_asker(
+            db_session, user_type=UserType.WIDOW, sector=Sector.SEPHARDIC
+        )
+        same_cell_user = _make_asker(
+            db_session,
+            email="same-cell@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+        )
+        query = _make_query(
+            db_session, asker, status=QueryStatus.ANSWERED, is_public=True
+        )
+
+        result = like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, same_cell_user
+        )
+
+        assert result.liked is True
+
+    def test_rejects_open_question(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        query = _make_query(db_session, asker, status=QueryStatus.OPEN)
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, asker
+            )
+        assert exc_info.value.status_code == 409
+
+    def test_rejects_closed_question(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        query = _make_query(db_session, asker, status=QueryStatus.CLOSED)
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, asker
+            )
+        assert exc_info.value.status_code == 409
+
+    def test_unliking_still_works_after_question_is_closed(
+        self, db_session: Session
+    ) -> None:
+        """
+        The ANSWERED requirement must only block creating a new like — once a
+        like exists, its owner must always be able to remove it, even if the
+        question's status later moves on to CLOSED. Otherwise a like becomes
+        permanently stuck with no way to undo it.
+        """
+        asker = _make_asker(db_session)
+        query = _make_query(db_session, asker, status=QueryStatus.ANSWERED)
+
+        liked = like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, asker
+        )
+        assert liked.liked is True
+
+        query.status = QueryStatus.CLOSED
+        db_session.commit()
+
+        unliked = like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, asker
+        )
+        assert unliked.liked is False
+        assert db_session.query(Like).count() == 0
+
+    def test_denies_when_asker_or_viewer_has_no_cell_set(
+        self, db_session: Session
+    ) -> None:
+        """
+        A None user_type/sector must never accidentally match another None
+        via `None == None` — a stranger with no profile cell must not be
+        granted access to a public question just because both sides are
+        unset (User.user_type/sector are nullable columns).
+        """
+        asker = _make_asker(db_session, user_type=None, sector=None)
+        stranger = _make_asker(
+            db_session, email="stranger@example.com", user_type=None, sector=None
+        )
+        query = _make_query(
+            db_session, asker, status=QueryStatus.ANSWERED, is_public=True
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, stranger
+            )
+        assert exc_info.value.status_code == 403
+
+    def test_rejects_unknown_query_id(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session,
+                LikeTargetType.PROFESSIONAL_QUERY,
+                "00000000-0000-0000-0000-000000000000",
+                asker,
+            )
+        assert exc_info.value.status_code == 404
+
+    def test_concurrent_double_click_does_not_raise_500(
+        self, db_session: Session
+    ) -> None:
+        """
+        Simulates two requests racing to like the same target: toggle_like()'s
+        own SELECT finds no existing row, but by the time its INSERT reaches
+        the DB a competing row for the same (user, target_type, target_id) is
+        already there — the composite primary key rejects it, and toggle_like()
+        must catch that and answer normally instead of a 500.
+
+        The test's single shared SQLite connection (see conftest.db_engine)
+        means the injected competing row lives in the same transaction as our
+        own failed INSERT, so it is undone by the same rollback — this only
+        asserts the IntegrityError is caught rather than propagated, not the
+        resulting count (a real second session's row would survive that
+        rollback, since it was already committed independently).
+        """
+        asker = _make_asker(db_session)
+        liker = _make_asker(db_session, email="liker@example.com")
+        query = _make_query(
+            db_session, asker, status=QueryStatus.ANSWERED, is_public=True
+        )
+
+        def sneak_in_competing_row(
+            mapper: Mapper[Like], connection: Connection, target: Like
+        ) -> None:
+            connection.execute(
+                insert(Like).values(
+                    user_id=liker.id,
+                    target_type=LikeTargetType.PROFESSIONAL_QUERY,
+                    target_id=query.id,
+                )
+            )
+
+        event.listen(Like, "before_insert", sneak_in_competing_row)
+        try:
+            result = like_service.toggle_like(
+                db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, liker
+            )
+        finally:
+            event.remove(Like, "before_insert", sneak_in_competing_row)
+
+        assert result.liked is True
+        assert isinstance(result.like_count, int)
