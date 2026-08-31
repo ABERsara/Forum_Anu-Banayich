@@ -83,6 +83,55 @@
       "back_to_login": "חזרה למסך הכניסה"
     }
   },
+  "forum": {
+    "back_to_list": "חזרה לפורום",
+    "list": {
+      "title": "פורום הקהילה",
+      "empty": "אין הודעות עדיין. היה הראשון לפרסם!",
+      "previous": "הקודם",
+      "next": "הבא",
+      "page": "עמוד {{current}} מתוך {{total}}"
+    },
+    "post": {
+      "attachment": "קובץ מצורף",
+      "edit": "עריכה",
+      "delete": "מחיקה"
+    },
+    "delete_post": {
+      "title": "מחיקת הודעה",
+      "message": "פעולה זו תמחק את ההודעה. לא ניתן לשחזר.",
+      "confirm": "מחיקה"
+    },
+    "post_form": {
+      "title_label": "כותרת",
+      "title_error": "נא להזין כותרת (2 עד 256 תווים)",
+      "content_label": "תוכן",
+      "content_error": "נא להזין תוכן (עד 5000 תווים)"
+    },
+    "new_post": {
+      "title": "פרסום הודעה חדשה",
+      "group_label": "קהל יעד – קבוצה",
+      "sector_label": "קהל יעד – מגזר",
+      "attachment_label": "צירוף קובץ (אופציונלי)",
+      "publishing": "מפרסם...",
+      "submit": "פרסם"
+    },
+    "edit_post": {
+      "title": "עריכת הודעה",
+      "saving": "שומר...",
+      "submit": "שמירה"
+    },
+    "errors": {
+      "load_posts_failed": "אירעה שגיאה בטעינת הפוסטים. נסה לרענן את הדף.",
+      "load_post_failed": "אירעה שגיאה בטעינת ההודעה. נסה לרענן את הדף.",
+      "not_found": "ההודעה לא נמצאה.",
+      "view_forbidden": "אין לך הרשאה לצפות בהודעה זו.",
+      "edit_forbidden": "אין לך הרשאה לערוך הודעה זו.",
+      "create_failed": "אירעה שגיאה בפרסום ההודעה.",
+      "save_failed": "אירעה שגיאה. נסה שוב.",
+      "delete_failed": "אירעה שגיאה במחיקת ההודעה. נסה שוב."
+    }
+  },
   "home": {
     "title": "ברוכים הבאים",
     "greeting": "שלום, {{name}}",

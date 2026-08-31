@@ -83,6 +83,55 @@
       "back_to_login": "Back to the login screen"
     }
   },
+  "forum": {
+    "back_to_list": "Back to the forum",
+    "list": {
+      "title": "Community forum",
+      "empty": "No posts yet. Be the first to post!",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{current}} of {{total}}"
+    },
+    "post": {
+      "attachment": "Attachment",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "delete_post": {
+      "title": "Delete post",
+      "message": "This will delete the post. It cannot be undone.",
+      "confirm": "Delete"
+    },
+    "post_form": {
+      "title_label": "Title",
+      "title_error": "Please enter a title (2 to 256 characters)",
+      "content_label": "Content",
+      "content_error": "Please enter content (up to 5000 characters)"
+    },
+    "new_post": {
+      "title": "New post",
+      "group_label": "Audience – group",
+      "sector_label": "Audience – sector",
+      "attachment_label": "Attach a file (optional)",
+      "publishing": "Publishing...",
+      "submit": "Publish"
+    },
+    "edit_post": {
+      "title": "Edit post",
+      "saving": "Saving...",
+      "submit": "Save"
+    },
+    "errors": {
+      "load_posts_failed": "Something went wrong loading the posts. Please refresh the page.",
+      "load_post_failed": "Something went wrong loading the post. Please refresh the page.",
+      "not_found": "The post was not found.",
+      "view_forbidden": "You do not have permission to view this post.",
+      "edit_forbidden": "You do not have permission to edit this post.",
+      "create_failed": "Something went wrong publishing the post.",
+      "save_failed": "Something went wrong. Please try again.",
+      "delete_failed": "Something went wrong deleting the post. Please try again."
+    }
+  },
   "home": {
     "title": "Welcome",
     "greeting": "Hello, {{name}}",
