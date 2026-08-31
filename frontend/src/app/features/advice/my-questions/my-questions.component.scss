@@ -38,6 +38,13 @@ h1 {
   flex-wrap: wrap;
 }
 
+.question-answer {
+  color: $color-text;
+  margin-top: $spacing-sm;
+  padding-top: $spacing-sm;
+  border-top: 1px solid $color-border;
+}
+
 .question-status {
   font-weight: $font-weight-medium;
 

@@ -33,6 +33,33 @@ KNOWN_INSECURE_SECRET_KEYS = frozenset({DEFAULT_SECRET_KEY, ENV_EXAMPLE_SECRET_K
 # 32 characters is the shortest key still worth signing HS256 tokens with.
 MIN_SECRET_KEY_LENGTH = 32
 
+# ----------------------------------------------------------------------
+# MESSAGE_ENCRYPTION_KEY guard rails (ABF-118, same template as ABF-96)
+#
+# MESSAGE_ENCRYPTION_KEY encrypts every private message at rest. A key that
+# is public knowledge means anyone with DB access can read private messages,
+# so outside development the application refuses to start rather than boot
+# insecure — identical reasoning to SECRET_KEY above.
+# ----------------------------------------------------------------------
+
+# The convenience default assigned to Settings.MESSAGE_ENCRYPTION_KEY below.
+DEFAULT_MESSAGE_ENCRYPTION_KEY = "dev-message-key-change-in-production-0000"
+
+# The placeholder shipped in backend/.env.example.
+ENV_EXAMPLE_MESSAGE_ENCRYPTION_KEY = "change-me-in-production-use-openssl-rand-hex-32"
+
+# Every key value that is public because it lives in this repository.
+KNOWN_INSECURE_MESSAGE_ENCRYPTION_KEYS = frozenset(
+    {DEFAULT_MESSAGE_ENCRYPTION_KEY, ENV_EXAMPLE_MESSAGE_ENCRYPTION_KEY}
+)
+
+# Same threshold as SECRET_KEY: 32 characters is the shortest secret still
+# worth deriving an AES-256 key from. app/core/encryption.py hashes this
+# string (SHA-256) to get the actual 32 raw key bytes, so this does not need
+# to be hex — "openssl rand -hex 32" is just a convenient way to generate a
+# long random string, same as the SECRET_KEY guidance above.
+MIN_MESSAGE_ENCRYPTION_KEY_LENGTH = 32
+
 # Environments allowed to keep the default key. Everything else is treated
 # as production — deployments must set ENVIRONMENT explicitly.
 DEVELOPMENT_ENVIRONMENTS = frozenset({"development", "dev", "local", "test"})
@@ -57,6 +84,10 @@ class Settings(BaseSettings):
     # Run: openssl rand -hex 32
     # ------------------------------------------------------------------
     SECRET_KEY: str = "dev-secret-change-in-production"
+
+    # Private-message encryption (AES-256-GCM) — SHA-256-hashed into the
+    # actual 32-byte key by app/core/encryption.py. Run: openssl rand -hex 32
+    MESSAGE_ENCRYPTION_KEY: str = "dev-message-key-change-in-production-0000"
 
     # JWT access token: 15 minutes (spec section 9.2)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
@@ -154,6 +185,42 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"SECRET_KEY is too short: {len(key)} characters, but at least "
                 f"{MIN_SECRET_KEY_LENGTH} are required while ENVIRONMENT={env!r}."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def _validate_message_encryption_key(self) -> Self:
+        """Reject a forgeable private-message encryption key outside development.
+
+        Never include the key itself in an error message — these messages
+        land in deployment logs. Report its length instead.
+        """
+        if self.ENVIRONMENT.strip().lower() in DEVELOPMENT_ENVIRONMENTS:
+            return self
+
+        env = self.ENVIRONMENT
+        key = self.MESSAGE_ENCRYPTION_KEY.strip()
+
+        if not key:
+            raise ValueError(
+                f"MESSAGE_ENCRYPTION_KEY is missing or empty while "
+                f"ENVIRONMENT={env!r}. The API cannot encrypt private messages "
+                "without it."
+            )
+
+        if key in KNOWN_INSECURE_MESSAGE_ENCRYPTION_KEYS:
+            raise ValueError(
+                f"MESSAGE_ENCRYPTION_KEY is still a placeholder committed to "
+                f"this repository, while ENVIRONMENT={env!r}. Its value is "
+                "public, so anyone with DB access could read private messages."
+            )
+
+        if len(key) < MIN_MESSAGE_ENCRYPTION_KEY_LENGTH:
+            raise ValueError(
+                f"MESSAGE_ENCRYPTION_KEY is too short: {len(key)} characters, "
+                f"but at least {MIN_MESSAGE_ENCRYPTION_KEY_LENGTH} are required "
+                f"while ENVIRONMENT={env!r}."
             )
 
         return self

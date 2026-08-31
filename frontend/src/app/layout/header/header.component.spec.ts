@@ -19,7 +19,7 @@ describe('HeaderComponent', () => {
    * spec provided: the header now renders text of its own, so the spec has to
    * assert against the real he/en files rather than an empty dictionary.
    */
-  function setup(isLoggedIn: boolean): void {
+  function setup(isLoggedIn: boolean, isUser = false): void {
     langSignal = signal<AppLang>('he');
     toggleLangSpy = vi.fn();
 
@@ -27,7 +27,7 @@ describe('HeaderComponent', () => {
       imports: [HeaderComponent, translocoTesting()],
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { isLoggedIn: () => isLoggedIn } },
+        { provide: AuthService, useValue: { isLoggedIn: () => isLoggedIn, isUser: () => isUser } },
         { provide: LocaleService, useValue: { lang: langSignal, toggleLang: toggleLangSpy } },
       ],
     });
@@ -119,6 +119,30 @@ describe('HeaderComponent', () => {
       expect(headerText()).toContain('Home');
       expect(logoutText()).toBe('Log out');
       expect(headerText()).not.toMatch(HEBREW);
+    });
+
+    /**
+     * The messages link arrived from ABF-118 while this branch was rewriting
+     * the nav around it, so it is the one label the merge had to move onto a
+     * key by hand. These two pin both halves of that resolution: the link is
+     * still role-gated as ABF-118 built it, and it is translated like the rest
+     * of the nav rather than left as the Hebrew literal it came in as.
+     */
+    it('shows the messages link to a regular user, in both languages', () => {
+      setup(true, true);
+
+      expect(headerText()).toContain('הודעות');
+
+      switchToEnglish();
+
+      expect(headerText()).toContain('Messages');
+      expect(headerText()).not.toMatch(HEBREW);
+    });
+
+    it('hides the messages link from a role that is not a plain user', () => {
+      setup(true, false);
+
+      expect(fixture.nativeElement.querySelector('.header__messages')).toBeNull();
     });
   });
 });

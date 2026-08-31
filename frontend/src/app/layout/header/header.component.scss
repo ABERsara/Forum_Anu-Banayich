@@ -47,6 +47,16 @@
     }
   }
 
+  &__messages {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+  }
+
+  &__messages-icon {
+    display: inline-flex;
+  }
+
   &__logout {
     color: $color-text-muted;
     font-weight: $font-weight-medium;

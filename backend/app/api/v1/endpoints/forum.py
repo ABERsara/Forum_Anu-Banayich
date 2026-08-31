@@ -9,9 +9,10 @@ DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
 POST   /forum/broadcast       – admin-only post visible to all users
 
-GET    /messages              – inbox (list of conversations)
-POST   /messages              – send a direct message
-GET    /messages/{user_id}    – conversation with a specific user
+GET    /messages                          – inbox (list of conversations) – OUT OF SCOPE (ABF-118)
+POST   /messages                          – send a direct message (own cell only)
+GET    /conversations/{key}/messages      – full history of one conversation
+GET    /cells/me/members                  – other ACTIVE users in your own cell
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,6 +32,7 @@ from app.schemas.forum import (
     ForumPostUpdate,
 )
 from app.schemas.report import ReportCreate, ReportResponse
+from app.schemas.user import UserPublic
 from app.services import forum_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
@@ -176,25 +178,40 @@ def send_message(
     db: Session = Depends(get_db),
 ) -> DirectMessageResponse:
     """
-    Send a private message.
-
-    TODO: call forum_service.send_direct_message(db, data, current_user)
+    Send a private message to another member of your own cell.
     """
-    # TODO: implement
-    raise NotImplementedError
+    result = forum_service.send_direct_message(db, data, current_user)
+    return DirectMessageResponse.model_validate(result)
 
 
-@router.get("/messages/{user_id}", response_model=list[DirectMessageResponse])
-def get_conversation(
-    user_id: str,
-    page: int = Query(1, ge=1),
+@router.get(
+    "/conversations/{conversation_key}/messages",
+    response_model=list[DirectMessageResponse],
+)
+def get_conversation_messages(
+    conversation_key: str,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[DirectMessageResponse]:
     """
-    Return the conversation with a specific user.
+    Return the full history of one conversation, oldest first.
 
-    TODO: call forum_service.get_conversation(db, current_user, user_id, page)
+    No pagination (out of scope for ABF-118 — see the ticket's "לא נכנס" list).
     """
-    # TODO: implement
-    return []
+    results = forum_service.get_conversation_messages(
+        db, current_user, conversation_key
+    )
+    return [DirectMessageResponse.model_validate(r) for r in results]
+
+
+@router.get("/cells/me/members", response_model=list[UserPublic])
+def get_my_cell_members(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> list[UserPublic]:
+    """
+    List other ACTIVE users in the current user's own cell (group+sector) —
+    the entry point for starting a private conversation.
+    """
+    members = forum_service.get_cell_members(db, current_user)
+    return [UserPublic.model_validate(member) for member in members]
