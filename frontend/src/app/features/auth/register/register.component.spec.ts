@@ -7,7 +7,7 @@ import { vi } from 'vitest';
 import { RegisterComponent } from './register.component';
 import { AuthService } from '../../../core/services/auth.service';
 import { DocumentType } from '../../../core/constants';
-import { translocoTesting } from '../../../../testing/transloco-testing';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 describe('RegisterComponent', () => {
   let fixture: ComponentFixture<RegisterComponent>;
@@ -130,17 +130,17 @@ describe('RegisterComponent', () => {
       });
       expect(component.currentStep()).toBe(3);
       expect(component.isLoading()).toBe(false);
-      expect(component.errorMessage()).toBe('');
+      expect(component.error()).toEqual({ key: '', text: '' });
     });
 
-    it('sets errorMessage and stops loading when register fails', () => {
+    it('shows the backend detail and stops loading when register fails', () => {
       authService.register.mockReturnValue(
         throwError(() => ({ error: { detail: 'אימייל כבר קיים' } })),
       );
 
       component.submitStep2();
 
-      expect(component.errorMessage()).toBe('אימייל כבר קיים');
+      expect(component.error()).toEqual({ key: '', text: 'אימייל כבר קיים' });
       expect(component.isLoading()).toBe(false);
       expect(component.currentStep()).toBe(2);
     });
@@ -164,12 +164,12 @@ describe('RegisterComponent', () => {
       expect(component.currentStep()).toBe(4);
     });
 
-    it('sets errorMessage when the code is wrong', () => {
+    it('shows the backend detail when the code is wrong', () => {
       authService.verifyOtp.mockReturnValue(throwError(() => ({ error: { detail: 'קוד שגוי' } })));
 
       component.submitOtp();
 
-      expect(component.errorMessage()).toBe('קוד שגוי');
+      expect(component.error()).toEqual({ key: '', text: 'קוד שגוי' });
       expect(component.currentStep()).toBe(3);
     });
   });
@@ -248,6 +248,179 @@ describe('RegisterComponent', () => {
       component.submitStep4();
 
       expect(navigateSpy).toHaveBeenCalledWith(['/auth/pending']);
+    });
+  });
+
+  describe('the copy on screen', () => {
+    function text(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    /** Every step's fields live in one form, so a step is shown by switching to it. */
+    function showStep(step: 1 | 2 | 3 | 4): void {
+      component.currentStep.set(step);
+      component.form.markAllAsTouched();
+      fixture.detectChanges();
+    }
+
+    function switchToEnglish(): void {
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+    }
+
+    describe('in Hebrew, the default', () => {
+      it('reads on step 1 exactly as it did before the keys went in', () => {
+        showStep(1);
+
+        expect(fixture.nativeElement.querySelector('h1').textContent.trim()).toBe('הרשמה למערכת');
+        expect(text()).toContain('שלב 1 מתוך 4');
+        expect(text()).toContain('שם פרטי');
+        expect(text()).toContain('שם משפחה');
+        expect(text()).toContain('תעודת זהות');
+        expect(text()).toContain('תאריך לידה');
+        expect(text()).toContain('סוג משתמש');
+        expect(text()).toContain('שיוך עדתי');
+        expect(text()).toContain('בחר/י');
+        expect(text()).toContain('המשך');
+        expect(text()).toContain('יש לך חשבון? כנס/י כאן');
+      });
+
+      it('shows the step 1 validation messages', () => {
+        showStep(1);
+
+        expect(text()).toContain('נא להזין שם פרטי (לפחות 2 תווים)');
+        expect(text()).toContain('נא להזין שם משפחה (לפחות 2 תווים)');
+        expect(text()).toContain('נא להזין תעודת זהות תקינה (לפחות 7 ספרות)');
+        expect(text()).toContain('נא לבחור תאריך לידה');
+        expect(text()).toContain('נא לבחור סוג משתמש');
+        expect(text()).toContain('נא לבחור שיוך עדתי');
+      });
+
+      it('shows step 2 and its validation messages', () => {
+        showStep(2);
+
+        expect(text()).toContain('אימייל');
+        expect(text()).toContain('טלפון');
+        expect(text()).toContain('סיסמה');
+        expect(text()).toContain('שלח קוד OTP');
+        expect(text()).toContain('נא להזין כתובת אימייל תקינה');
+        expect(text()).toContain('נא להזין מספר טלפון תקין (9-15 ספרות בלבד)');
+        expect(text()).toContain('הסיסמה חייבת להכיל לפחות 8 תווים');
+      });
+
+      it('shows step 3 with the address the code went to', () => {
+        component.form.patchValue({ email: 'sara@example.com' });
+        showStep(3);
+
+        expect(text()).toContain('קוד אימות נשלח לאימייל: sara@example.com');
+        expect(text()).toContain('נא להזין קוד אימות (לפחות 4 ספרות)');
+        expect(text()).toContain('אמת/י קוד');
+        expect(text()).toContain('שלח/י קוד מחדש');
+      });
+
+      it('shows step 4, with the shared document labels unchanged', () => {
+        showStep(4);
+
+        expect(text()).toContain('תעודת פטירה');
+        expect(text()).toContain('תמונת סלפי');
+        expect(text()).toContain('מסמך מזהה');
+        expect(text()).toContain('תעודת זהות');
+        expect(text()).toContain('דרכון');
+        expect(text()).toContain('בחר/י תעודת פטירה');
+        expect(text()).toContain('אני מצהיר/ה כי כל הפרטים והמסמכים שמסרתי נכונים ומדויקים');
+        expect(text()).toContain('קראתי ואני מסכים/ה לתנאי השימוש ומדיניות הפרטיות');
+        expect(text()).toContain(
+          'אני מצהיר/ה כי אני זכאי/ת להירשם למערכת בהתאם לסוג המשתמש שבחרתי',
+        );
+        expect(text()).toContain('סיום');
+      });
+    });
+
+    describe('in English', () => {
+      it.each([1, 2, 3, 4] as const)('leaves no Hebrew anywhere on step %i', (step) => {
+        showStep(step);
+
+        switchToEnglish();
+
+        expect(text()).not.toMatch(HEBREW);
+      });
+
+      it('translates step 1, its options and its validation messages', () => {
+        showStep(1);
+
+        switchToEnglish();
+
+        expect(fixture.nativeElement.querySelector('h1').textContent.trim()).toBe('Sign up');
+        expect(text()).toContain('Step 1 of 4');
+        expect(text()).toContain('First name');
+        expect(text()).toContain('Sector');
+        expect(text()).toContain('Choose');
+        expect(text()).toContain('Please enter a first name (at least 2 characters)');
+        expect(text()).toContain('Please choose a sector');
+        expect(text()).toContain('Continue');
+        expect(text()).toContain('Already have an account? Log in here');
+      });
+
+      it('translates the step 2 validation messages', () => {
+        showStep(2);
+
+        switchToEnglish();
+
+        expect(text()).toContain('Please enter a valid email address');
+        expect(text()).toContain('Please enter a valid phone number (9-15 digits only)');
+        expect(text()).toContain('The password must be at least 8 characters');
+      });
+
+      it('keeps the address in the step 3 hint while the sentence around it changes', () => {
+        component.form.patchValue({ email: 'sara@example.com' });
+        showStep(3);
+
+        switchToEnglish();
+
+        expect(text()).toContain('A verification code was sent to: sara@example.com');
+        expect(text()).toContain('Please enter the verification code (at least 4 digits)');
+      });
+
+      it('translates step 4, documents and declarations alike', () => {
+        showStep(4);
+
+        switchToEnglish();
+
+        expect(text()).toContain('Death certificate');
+        expect(text()).toContain('Selfie photo');
+        expect(text()).toContain('Identity document');
+        expect(text()).toContain('ID card');
+        expect(text()).toContain('Passport');
+        expect(text()).toContain('Choose a death certificate');
+        expect(text()).toContain(
+          'I have read and agree to the terms of use and the privacy policy',
+        );
+        expect(text()).toContain('Finish');
+      });
+
+      /**
+       * The failure is held as a key rather than as resolved text, so a message
+       * already on screen follows the switch instead of staying in the language
+       * it was raised in.
+       */
+      it('re-renders a failure that is already on screen', () => {
+        authService.resendOtp.mockReturnValue(throwError(() => new Error('network down')));
+        showStep(3);
+        component.resendOtp();
+        fixture.detectChanges();
+        expect(text()).toContain('שליחת הקוד נכשלה.');
+
+        switchToEnglish();
+
+        expect(text()).toContain('Sending the code failed.');
+        expect(text()).not.toMatch(HEBREW);
+      });
+    });
+
+    it('does not pin its own text direction — it follows <html dir>', () => {
+      expect(fixture.nativeElement.querySelector('.register-container').hasAttribute('dir')).toBe(
+        false,
+      );
     });
   });
 });
