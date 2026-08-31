@@ -145,6 +145,13 @@ class DocumentType(enum.StrEnum):
     PASSPORT = "passport"  # דרכון
 
 
+class AgentMessageRole(enum.StrEnum):
+    """Who authored a message in an agent conversation."""
+
+    USER = "user"  # המשתמש ששוחח עם הסוכן
+    AGENT = "agent"  # תשובת סוכן ה-AI
+
+
 class AuditAction(enum.StrEnum):
     """Sensitive admin/moderator actions that must be logged."""
 
