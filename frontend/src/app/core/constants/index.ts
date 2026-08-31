@@ -3,7 +3,35 @@
  *
  * ⚠️  These MUST stay in sync with backend/app/core/constants.py
  *     If you add a value here, add it there too (and vice versa).
+ *
+ * ⚠️  Every `*_LABELS` map here holds i18n *keys*, never display text.
+ *     See {@link LabelKey} for how to render one.
  */
+
+/**
+ * An i18n key into `public/i18n/{he,en}.json` — not text to show the user.
+ *
+ * The `*_LABELS` maps below are the platform's shared vocabulary: one map per
+ * enum, imported by a dozen feature modules. Holding keys rather than Hebrew
+ * strings is what lets those modules be translated one at a time without any
+ * of them editing this file, and what keeps one label from being translated
+ * twice, differently, in two of them.
+ *
+ * Resolve a key before it reaches the screen — in a template with the pipe,
+ * which also re-renders it on a language switch:
+ *
+ * ```html
+ * {{ sectorLabels[user.sector] | transloco }}
+ * ```
+ *
+ * or, only where TypeScript has to assemble the string itself, with
+ * `LabelService` (`core/i18n/label.service.ts`):
+ *
+ * ```ts
+ * this.labels.label(SECTOR_LABELS[user.sector]);
+ * ```
+ */
+export type LabelKey = string;
 
 // ---------------------------------------------------------------------------
 // Roles
@@ -27,11 +55,12 @@ export enum UserType {
   ORPHAN_FEMALE = 'orphan_female', // יתומה
 }
 
-export const USER_TYPE_LABELS: Record<UserType, string> = {
-  [UserType.WIDOWER]: 'אלמן',
-  [UserType.WIDOW]: 'אלמנה',
-  [UserType.ORPHAN_MALE]: 'יתום',
-  [UserType.ORPHAN_FEMALE]: 'יתומה',
+/** The person, in the singular. Contrast GROUP_VISIBILITY_LABELS. */
+export const USER_TYPE_LABELS: Record<UserType, LabelKey> = {
+  [UserType.WIDOWER]: 'constants.user_type.widower',
+  [UserType.WIDOW]: 'constants.user_type.widow',
+  [UserType.ORPHAN_MALE]: 'constants.user_type.orphan_male',
+  [UserType.ORPHAN_FEMALE]: 'constants.user_type.orphan_female',
 };
 
 // ---------------------------------------------------------------------------
@@ -45,11 +74,11 @@ export enum Sector {
   GENERAL = 'general', // כללי
 }
 
-export const SECTOR_LABELS: Record<Sector, string> = {
-  [Sector.HASIDIC]: 'חסידי',
-  [Sector.LITVISH]: 'ליטאי',
-  [Sector.SEPHARDIC]: 'ספרדי',
-  [Sector.GENERAL]: 'כללי',
+export const SECTOR_LABELS: Record<Sector, LabelKey> = {
+  [Sector.HASIDIC]: 'constants.sector.hasidic',
+  [Sector.LITVISH]: 'constants.sector.litvish',
+  [Sector.SEPHARDIC]: 'constants.sector.sephardic',
+  [Sector.GENERAL]: 'constants.sector.general',
 };
 
 // ---------------------------------------------------------------------------
@@ -66,14 +95,14 @@ export enum AccountStatus {
   CANCELLED = 'cancelled',
 }
 
-export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
-  [AccountStatus.PENDING_OTP]: 'ממתין לאימות',
-  [AccountStatus.PENDING_APPROVAL]: 'ממתין לאישור מנהלים',
-  [AccountStatus.PARTIALLY_APPROVED]: 'אושר חלקית',
-  [AccountStatus.ACTIVE]: 'פעיל',
-  [AccountStatus.REJECTED]: 'נדחה',
-  [AccountStatus.SUSPENDED]: 'מושעה',
-  [AccountStatus.CANCELLED]: 'בוטל',
+export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, LabelKey> = {
+  [AccountStatus.PENDING_OTP]: 'constants.account_status.pending_otp',
+  [AccountStatus.PENDING_APPROVAL]: 'constants.account_status.pending_approval',
+  [AccountStatus.PARTIALLY_APPROVED]: 'constants.account_status.partially_approved',
+  [AccountStatus.ACTIVE]: 'constants.account_status.active',
+  [AccountStatus.REJECTED]: 'constants.account_status.rejected',
+  [AccountStatus.SUSPENDED]: 'constants.account_status.suspended',
+  [AccountStatus.CANCELLED]: 'constants.account_status.cancelled',
 };
 
 // ---------------------------------------------------------------------------
@@ -96,20 +125,31 @@ export enum SectorVisibility {
   ALL = 'all',
 }
 
-export const GROUP_VISIBILITY_LABELS: Record<GroupVisibility, string> = {
-  [GroupVisibility.WIDOWERS]: 'אלמנים',
-  [GroupVisibility.WIDOWS]: 'אלמנות',
-  [GroupVisibility.ORPHANS_MALE]: 'יתומים',
-  [GroupVisibility.ORPHANS_FEMALE]: 'יתומות',
-  [GroupVisibility.ALL]: 'כולם',
+/**
+ * The audience, in the plural. A post is addressed to a population, not to a
+ * person, so these read differently from USER_TYPE_LABELS even though every
+ * GroupVisibility value except ALL is also a UserType value.
+ */
+export const GROUP_VISIBILITY_LABELS: Record<GroupVisibility, LabelKey> = {
+  [GroupVisibility.WIDOWERS]: 'constants.group_visibility.widower',
+  [GroupVisibility.WIDOWS]: 'constants.group_visibility.widow',
+  [GroupVisibility.ORPHANS_MALE]: 'constants.group_visibility.orphan_male',
+  [GroupVisibility.ORPHANS_FEMALE]: 'constants.group_visibility.orphan_female',
+  [GroupVisibility.ALL]: 'constants.group_visibility.all',
 };
 
-export const SECTOR_VISIBILITY_LABELS: Record<SectorVisibility, string> = {
-  [SectorVisibility.HASIDIC]: 'חסידי',
-  [SectorVisibility.LITVISH]: 'ליטאי',
-  [SectorVisibility.SEPHARDIC]: 'ספרדי',
-  [SectorVisibility.GENERAL]: 'כללי',
-  [SectorVisibility.ALL]: 'כל המגזרים',
+/**
+ * A sector reads the same whether it names a person's sector or a post's
+ * audience, so the four shared values deliberately point at the very keys
+ * SECTOR_LABELS uses: one sector, one translation, no drift between the two
+ * maps. Only ALL, which has no counterpart in Sector, needs a key of its own.
+ */
+export const SECTOR_VISIBILITY_LABELS: Record<SectorVisibility, LabelKey> = {
+  [SectorVisibility.HASIDIC]: SECTOR_LABELS[Sector.HASIDIC],
+  [SectorVisibility.LITVISH]: SECTOR_LABELS[Sector.LITVISH],
+  [SectorVisibility.SEPHARDIC]: SECTOR_LABELS[Sector.SEPHARDIC],
+  [SectorVisibility.GENERAL]: SECTOR_LABELS[Sector.GENERAL],
+  [SectorVisibility.ALL]: 'constants.sector_visibility.all',
 };
 
 // ---------------------------------------------------------------------------
@@ -122,10 +162,10 @@ export enum PostStatus {
   DELETED = 'deleted',
 }
 
-export const POST_STATUS_LABELS: Record<PostStatus, string> = {
-  [PostStatus.VISIBLE]: 'גלוי',
-  [PostStatus.HIDDEN]: 'מוסתר',
-  [PostStatus.DELETED]: 'מחוק',
+export const POST_STATUS_LABELS: Record<PostStatus, LabelKey> = {
+  [PostStatus.VISIBLE]: 'constants.post_status.visible',
+  [PostStatus.HIDDEN]: 'constants.post_status.hidden',
+  [PostStatus.DELETED]: 'constants.post_status.deleted',
 };
 
 // ---------------------------------------------------------------------------
@@ -143,15 +183,15 @@ export enum ProfessionalDomain {
   OTHER = 'other',
 }
 
-export const PROFESSIONAL_DOMAIN_LABELS: Record<ProfessionalDomain, string> = {
-  [ProfessionalDomain.LAWYER]: 'עו"ד',
-  [ProfessionalDomain.ACCOUNTANT]: 'רואה חשבון',
-  [ProfessionalDomain.PSYCHOLOGIST]: 'פסיכולוג',
-  [ProfessionalDomain.FINANCIAL_ADVISOR]: 'יועץ כלכלי',
-  [ProfessionalDomain.RABBI]: 'רב/דיין',
-  [ProfessionalDomain.MEDICINE]: 'רפואה',
-  [ProfessionalDomain.SOCIAL_WORKER]: 'סוציאל וורקר',
-  [ProfessionalDomain.OTHER]: 'אחר',
+export const PROFESSIONAL_DOMAIN_LABELS: Record<ProfessionalDomain, LabelKey> = {
+  [ProfessionalDomain.LAWYER]: 'constants.professional_domain.lawyer',
+  [ProfessionalDomain.ACCOUNTANT]: 'constants.professional_domain.accountant',
+  [ProfessionalDomain.PSYCHOLOGIST]: 'constants.professional_domain.psychologist',
+  [ProfessionalDomain.FINANCIAL_ADVISOR]: 'constants.professional_domain.financial_advisor',
+  [ProfessionalDomain.RABBI]: 'constants.professional_domain.rabbi',
+  [ProfessionalDomain.MEDICINE]: 'constants.professional_domain.medicine',
+  [ProfessionalDomain.SOCIAL_WORKER]: 'constants.professional_domain.social_worker',
+  [ProfessionalDomain.OTHER]: 'constants.professional_domain.other',
 };
 
 // ---------------------------------------------------------------------------
@@ -164,10 +204,10 @@ export enum QueryStatus {
   CLOSED = 'closed',
 }
 
-export const QUERY_STATUS_LABELS: Record<QueryStatus, string> = {
-  [QueryStatus.OPEN]: 'פתוח',
-  [QueryStatus.ANSWERED]: 'נענה',
-  [QueryStatus.CLOSED]: 'סגור',
+export const QUERY_STATUS_LABELS: Record<QueryStatus, LabelKey> = {
+  [QueryStatus.OPEN]: 'constants.query_status.open',
+  [QueryStatus.ANSWERED]: 'constants.query_status.answered',
+  [QueryStatus.CLOSED]: 'constants.query_status.closed',
 };
 
 // ---------------------------------------------------------------------------
@@ -181,11 +221,11 @@ export enum ReportReason {
   OTHER = 'other',
 }
 
-export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
-  [ReportReason.HARASSMENT]: 'הטרדה',
-  [ReportReason.OFFENSIVE]: 'תוכן פוגעני',
-  [ReportReason.SPAM]: 'ספאם',
-  [ReportReason.OTHER]: 'אחר',
+export const REPORT_REASON_LABELS: Record<ReportReason, LabelKey> = {
+  [ReportReason.HARASSMENT]: 'constants.report_reason.harassment',
+  [ReportReason.OFFENSIVE]: 'constants.report_reason.offensive',
+  [ReportReason.SPAM]: 'constants.report_reason.spam',
+  [ReportReason.OTHER]: 'constants.report_reason.other',
 };
 
 export enum ReportTargetType {
@@ -201,6 +241,15 @@ export enum ReportDecision {
 }
 
 // ---------------------------------------------------------------------------
+// Likes
+// ---------------------------------------------------------------------------
+
+export enum LikeTargetType {
+  FORUM_POST = 'forum_post',
+  PROFESSIONAL_QUERY = 'professional_query',
+}
+
+// ---------------------------------------------------------------------------
 // Documents
 // ---------------------------------------------------------------------------
 
@@ -211,11 +260,11 @@ export enum DocumentType {
   PASSPORT = 'passport',
 }
 
-export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
-  [DocumentType.DEATH_CERTIFICATE]: 'תעודת פטירה',
-  [DocumentType.SELFIE]: 'תמונת זיהוי',
-  [DocumentType.ID_CARD]: 'תעודת זהות',
-  [DocumentType.PASSPORT]: 'דרכון',
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, LabelKey> = {
+  [DocumentType.DEATH_CERTIFICATE]: 'constants.document_type.death_certificate',
+  [DocumentType.SELFIE]: 'constants.document_type.selfie',
+  [DocumentType.ID_CARD]: 'constants.document_type.id_card',
+  [DocumentType.PASSPORT]: 'constants.document_type.passport',
 };
 
 // ---------------------------------------------------------------------------

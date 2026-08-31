@@ -27,5 +27,70 @@
       "placeholder": "כתבו הודעה...",
       "send": "שלח"
     }
+  },
+  "constants": {
+    "user_type": {
+      "widower": "אלמן",
+      "widow": "אלמנה",
+      "orphan_male": "יתום",
+      "orphan_female": "יתומה"
+    },
+    "sector": {
+      "hasidic": "חסידי",
+      "litvish": "ליטאי",
+      "sephardic": "ספרדי",
+      "general": "כללי"
+    },
+    "account_status": {
+      "pending_otp": "ממתין לאימות",
+      "pending_approval": "ממתין לאישור מנהלים",
+      "partially_approved": "אושר חלקית",
+      "active": "פעיל",
+      "rejected": "נדחה",
+      "suspended": "מושעה",
+      "cancelled": "בוטל"
+    },
+    "group_visibility": {
+      "widower": "אלמנים",
+      "widow": "אלמנות",
+      "orphan_male": "יתומים",
+      "orphan_female": "יתומות",
+      "all": "כולם"
+    },
+    "sector_visibility": {
+      "all": "כל המגזרים"
+    },
+    "post_status": {
+      "visible": "גלוי",
+      "hidden": "מוסתר",
+      "deleted": "מחוק"
+    },
+    "professional_domain": {
+      "lawyer": "עו\"ד",
+      "accountant": "רואה חשבון",
+      "psychologist": "פסיכולוג",
+      "financial_advisor": "יועץ כלכלי",
+      "rabbi": "רב/דיין",
+      "medicine": "רפואה",
+      "social_worker": "סוציאל וורקר",
+      "other": "אחר"
+    },
+    "query_status": {
+      "open": "פתוח",
+      "answered": "נענה",
+      "closed": "סגור"
+    },
+    "report_reason": {
+      "harassment": "הטרדה",
+      "offensive": "תוכן פוגעני",
+      "spam": "ספאם",
+      "other": "אחר"
+    },
+    "document_type": {
+      "death_certificate": "תעודת פטירה",
+      "selfie": "תמונת זיהוי",
+      "id_card": "תעודת זהות",
+      "passport": "דרכון"
+    }
   }
 }

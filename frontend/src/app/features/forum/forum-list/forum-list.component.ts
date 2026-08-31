@@ -7,6 +7,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { GROUP_VISIBILITY_LABELS, SECTOR_VISIBILITY_LABELS } from '../../../core/constants';
 import { ForumPost } from '../../../core/models';
@@ -17,7 +18,7 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 @Component({
   selector: 'app-forum-list',
   standalone: true,
-  imports: [RouterLink, DatePipe, LoadingSpinnerComponent, ErrorDisplayComponent],
+  imports: [RouterLink, DatePipe, TranslocoPipe, LoadingSpinnerComponent, ErrorDisplayComponent],
   templateUrl: './forum-list.component.html',
   styleUrl: './forum-list.component.scss',
 })

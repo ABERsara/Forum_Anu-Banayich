@@ -7,6 +7,7 @@ import { ActiveUsersComponent } from './active-users.component';
 import { AdminService } from '../../../core/services/admin.service';
 import { AccountStatus, Sector, UserRole, UserType } from '../../../core/constants';
 import type { UserAdminView } from '../../../core/models';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeUser(overrides: Partial<UserAdminView> = {}): UserAdminView {
   return {
@@ -45,7 +46,7 @@ describe('ActiveUsersComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ActiveUsersComponent],
+      imports: [ActiveUsersComponent, translocoTesting()],
       providers: [provideRouter([]), { provide: AdminService, useValue: adminServiceMock }],
     }).compileComponents();
 

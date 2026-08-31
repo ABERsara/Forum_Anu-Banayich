@@ -16,6 +16,7 @@ import {
 import type { ForumPost, UserProfile } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeUser(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
@@ -57,7 +58,7 @@ describe('NewPostComponent', () => {
     forumServiceMock = { createPost: vi.fn().mockReturnValue(of(CREATED_POST)) };
 
     await TestBed.configureTestingModule({
-      imports: [NewPostComponent],
+      imports: [NewPostComponent, translocoTesting()],
       providers: [
         provideRouter([]),
         { provide: ForumService, useValue: forumServiceMock },

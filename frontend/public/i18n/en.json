@@ -27,5 +27,70 @@
       "placeholder": "Write a message...",
       "send": "Send"
     }
+  },
+  "constants": {
+    "user_type": {
+      "widower": "Widower",
+      "widow": "Widow",
+      "orphan_male": "Orphan (male)",
+      "orphan_female": "Orphan (female)"
+    },
+    "sector": {
+      "hasidic": "Hasidic",
+      "litvish": "Litvish",
+      "sephardic": "Sephardic",
+      "general": "General"
+    },
+    "account_status": {
+      "pending_otp": "Pending verification",
+      "pending_approval": "Pending admin approval",
+      "partially_approved": "Partially approved",
+      "active": "Active",
+      "rejected": "Rejected",
+      "suspended": "Suspended",
+      "cancelled": "Cancelled"
+    },
+    "group_visibility": {
+      "widower": "Widowers",
+      "widow": "Widows",
+      "orphan_male": "Orphans (male)",
+      "orphan_female": "Orphans (female)",
+      "all": "Everyone"
+    },
+    "sector_visibility": {
+      "all": "All sectors"
+    },
+    "post_status": {
+      "visible": "Visible",
+      "hidden": "Hidden",
+      "deleted": "Deleted"
+    },
+    "professional_domain": {
+      "lawyer": "Lawyer",
+      "accountant": "Accountant",
+      "psychologist": "Psychologist",
+      "financial_advisor": "Financial advisor",
+      "rabbi": "Rabbi / Dayan",
+      "medicine": "Medicine",
+      "social_worker": "Social worker",
+      "other": "Other"
+    },
+    "query_status": {
+      "open": "Open",
+      "answered": "Answered",
+      "closed": "Closed"
+    },
+    "report_reason": {
+      "harassment": "Harassment",
+      "offensive": "Offensive content",
+      "spam": "Spam",
+      "other": "Other"
+    },
+    "document_type": {
+      "death_certificate": "Death certificate",
+      "selfie": "Identity photo",
+      "id_card": "ID card",
+      "passport": "Passport"
+    }
   }
 }
