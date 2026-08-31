@@ -5,6 +5,28 @@
     <nav class="header__nav">
       @if (auth.isLoggedIn()) {
         <a routerLink="/home" routerLinkActive="active">בית</a>
+        @if (auth.isUser()) {
+          <a routerLink="/messages" routerLinkActive="active" class="header__messages">
+            <span class="header__messages-icon" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 18 18"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M2 4.5A1.5 1.5 0 0 1 3.5 3h11A1.5 1.5 0 0 1 16 4.5v7A1.5 1.5 0 0 1 14.5 13H6l-3.5 2.5V13H3.5A1.5 1.5 0 0 1 2 11.5v-7Z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </span>
+            הודעות
+            <!-- Unread badge lands here once the inbox task (Sprint 5, task 4) exposes unread counts -->
+          </a>
+        }
         <button type="button" class="header__logout" (click)="logout()">התנתקות</button>
       } @else {
         <a routerLink="/login" routerLinkActive="active">כניסה</a>
