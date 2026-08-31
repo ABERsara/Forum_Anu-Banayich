@@ -1,0 +1,30 @@
+@use '../../../../styles/variables' as *;
+
+.cell-members {
+  padding: $spacing-md;
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__item {
+    display: block;
+    padding: $spacing-md;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    margin-bottom: $spacing-sm;
+    color: $color-text;
+    text-decoration: none;
+
+    &:hover {
+      background: $color-bg-subtle;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $color-primary;
+      outline-offset: 2px;
+    }
+  }
+}

@@ -121,6 +121,13 @@ class ReportTargetType(enum.StrEnum):
     PROFESSIONAL_QUERY = "professional_query"  # שאלה מקצועית
 
 
+class LikeTargetType(enum.StrEnum):
+    """What type of content a like applies to."""
+
+    FORUM_POST = "forum_post"  # הודעת פורום
+    PROFESSIONAL_QUERY = "professional_query"  # שאלה מקצועית
+
+
 class ReportDecision(enum.StrEnum):
     """Moderator's decision on a report."""
 
@@ -157,6 +164,7 @@ class AuditAction(enum.StrEnum):
     DATA_EXPORTED = "data_exported"
     USER_LOGIN = "user_login"
     USER_LOGOUT = "user_logout"
+    DIRECT_MESSAGE_ACCESS_DENIED = "direct_message_access_denied"
 
 
 # ---------------------------------------------------------------------------
