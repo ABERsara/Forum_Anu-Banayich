@@ -17,10 +17,12 @@ import {
   Validators,
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import {
   GROUP_VISIBILITY_LABELS,
   GroupVisibility,
+  LabelKey,
   PROFESSIONAL_DOMAIN_LABELS,
   ProfessionalDomain,
   SECTOR_VISIBILITY_LABELS,
@@ -31,6 +33,7 @@ import {
   ProfessionalCreateRequest,
   ProfessionalUpdateRequest,
 } from '../../../core/models';
+import { LabelService } from '../../../core/i18n/label.service';
 import { AdminService } from '../../../core/services/admin.service';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
@@ -51,6 +54,7 @@ export function atLeastOneSelected(control: AbstractControl): ValidationErrors |
   imports: [
     ReactiveFormsModule,
     RouterLink,
+    TranslocoPipe,
     ButtonComponent,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,
@@ -62,6 +66,7 @@ export function atLeastOneSelected(control: AbstractControl): ValidationErrors |
 export class ManageProfessionalsComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly adminService = inject(AdminService);
+  private readonly labels = inject(LabelService);
 
   readonly professionals = signal<ProfessionalAdminView[]>([]);
   readonly isLoading = signal(false);
@@ -140,13 +145,19 @@ export class ManageProfessionalsComponent implements OnInit {
 
   domainLabel(professional: ProfessionalAdminView): string {
     return professional.professional_domain
-      ? this.domainLabels[professional.professional_domain]
+      ? this.labels.label(this.domainLabels[professional.professional_domain])
       : 'ללא תחום';
   }
 
-  /** "אלמנות, יתומות" – who this professional is offered to. */
-  audienceLabel(values: string[], labels: Record<string, string>): string {
-    return values.map((value) => labels[value] ?? value).join(', ');
+  /**
+   * "אלמנות, יתומות" – who this professional is offered to. A joined list has
+   * no key of its own, so the parts are translated here. A value the map does
+   * not know is shown raw rather than sent to Transloco as a bogus key.
+   */
+  audienceLabel(values: string[], labelKeys: Record<string, LabelKey>): string {
+    return values
+      .map((value) => (labelKeys[value] ? this.labels.label(labelKeys[value]) : value))
+      .join(', ');
   }
 
   // -------------------------------------------------------------------------

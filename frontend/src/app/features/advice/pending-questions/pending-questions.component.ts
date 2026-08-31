@@ -8,8 +8,9 @@ import {
   Validators,
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
-import { PROFESSIONAL_DOMAIN_LABELS } from '../../../core/constants';
+import { LabelKey, PROFESSIONAL_DOMAIN_LABELS } from '../../../core/constants';
 import { ProfessionalQuery } from '../../../core/models';
 import { ProfessionalService } from '../../../core/services/professional.service';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
@@ -33,6 +34,7 @@ const ANSWER_MAX_LENGTH = 5000;
     ReactiveFormsModule,
     RouterLink,
     DatePipe,
+    TranslocoPipe,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,
   ],
@@ -87,8 +89,12 @@ export class PendingQuestionsComponent implements OnInit {
       : question.asker_alias;
   }
 
-  /** The domain a general question arrived under; empty when asked directly. */
-  topic(question: ProfessionalQuery): string {
+  /**
+   * The label key for the domain a general question arrived under; empty when
+   * it was asked of this professional directly. The template pipes it, so an
+   * empty topic stays empty — Transloco passes a falsy key straight through.
+   */
+  topic(question: ProfessionalQuery): LabelKey {
     return question.domain ? this.domainLabels[question.domain] : '';
   }
 

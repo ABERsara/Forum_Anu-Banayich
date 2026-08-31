@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -7,6 +8,7 @@ import { AskQuestionComponent } from './ask-question.component';
 import { ProfessionalService } from '../../../core/services/professional.service';
 import { ProfessionalDomain, QueryStatus } from '../../../core/constants';
 import type { ProfessionalQuery } from '../../../core/models';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeActivatedRoute(professionalId: string | null): ActivatedRoute {
   return {
@@ -39,7 +41,7 @@ describe('AskQuestionComponent', () => {
     professionalServiceMock = { askQuestion: vi.fn().mockReturnValue(of(RESPONSE)) };
 
     await TestBed.configureTestingModule({
-      imports: [AskQuestionComponent],
+      imports: [AskQuestionComponent, translocoTesting()],
       providers: [
         provideRouter([]),
         { provide: ProfessionalService, useValue: professionalServiceMock },
@@ -54,6 +56,23 @@ describe('AskQuestionComponent', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
   }
+
+  it('lists the domain options in the active language', async () => {
+    await setup();
+    const domainOptions = () =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLOptionElement>(
+          'select[formControlName="domain"] option',
+        ),
+      ).map((option) => option.textContent?.trim());
+
+    expect(domainOptions()).toContain('רב/דיין');
+
+    TestBed.inject(TranslocoService).setActiveLang('en');
+    fixture.detectChanges();
+
+    expect(domainOptions()).toContain('Rabbi / Dayan');
+  });
 
   it('reads professionalId from the query params', async () => {
     await setup('pro-1');

@@ -1,11 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { RegisterComponent } from './register.component';
 import { AuthService } from '../../../core/services/auth.service';
 import { DocumentType } from '../../../core/constants';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 describe('RegisterComponent', () => {
   let fixture: ComponentFixture<RegisterComponent>;
@@ -39,7 +41,7 @@ describe('RegisterComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [RegisterComponent],
+      imports: [RegisterComponent, translocoTesting()],
       providers: [provideRouter([]), { provide: AuthService, useValue: authService }],
     }).compileComponents();
 
@@ -50,6 +52,25 @@ describe('RegisterComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('translates the user-type options without touching the value they submit', () => {
+    const optionsOf = (field: string) =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLOptionElement>(
+          `select[formControlName="${field}"] option:not([disabled])`,
+        ),
+      ).map((option) => [option.value, option.textContent?.trim()]);
+
+    expect(optionsOf('user_type')).toContainEqual(['widow', 'אלמנה']);
+    expect(optionsOf('sector')).toContainEqual(['sephardic', 'ספרדי']);
+
+    TestBed.inject(TranslocoService).setActiveLang('en');
+    fixture.detectChanges();
+
+    // Same values, new labels — a filter or a POST built from these is unchanged.
+    expect(optionsOf('user_type')).toContainEqual(['widow', 'Widow']);
+    expect(optionsOf('sector')).toContainEqual(['sephardic', 'Sephardic']);
   });
 
   describe('isStep1Invalid', () => {

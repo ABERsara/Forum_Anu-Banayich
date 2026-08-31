@@ -360,7 +360,41 @@ data: { roles: ['admin'] },
 **מוסכמת שמות מפתחות**: dot notation, `<module>.<element>` (למשל `common.copy`, `forum.report.button`). דוגמאות אמיתיות מ-ABF-126:
 `common.lang_he`, `common.lang_en`, `header.switch_to_hebrew`, `header.switch_to_english`.
 
-מפתח חסר ב-EN — OK בינתיים. העיקר שה-hook קיים.
+מפתח חסר ב-EN — OK בינתיים. העיקר שה-hook קיים. **חריג: מרחב `constants.*`** — שם שתי
+השפות חייבות להיות מלאות, ו-`core/constants/index.spec.ts` מפיל את הבילד אם מפתח חסר באחת מהן.
+
+### תוויות משותפות — אל תתרגמו אותן שוב (ABF-127)
+
+עשרת מיפויי התוויות ב-`core/constants/index.ts` (`SECTOR_LABELS`, `USER_TYPE_LABELS`,
+`GROUP_VISIBILITY_LABELS`, `ACCOUNT_STATUS_LABELS`, `PROFESSIONAL_DOMAIN_LABELS`,
+`QUERY_STATUS_LABELS`, `POST_STATUS_LABELS`, `REPORT_REASON_LABELS`, `DOCUMENT_TYPE_LABELS`,
+`SECTOR_VISIBILITY_LABELS`) כבר מחזיקים **מפתחות תרגום**, במרחב `constants.<enum>.<value>` —
+למשל `constants.sector.hasidic`. הם משותפים לכל המודולים, ולכן טיקט מיגרציה של מודול **לא**
+מוסיף להם מפתחות ולא נוגע ב-`core/constants/index.ts`: מייבאים את המפה כמו קודם ומרנדרים דרך
+ה-pipe.
+
+```html
+<!-- ✅ בתבנית — מתעדכן לבד בהחלפת שפה. להוסיף TranslocoPipe ל-imports של הקומפוננטה -->
+{{ sectorLabels[user.sector] | transloco }}
+```
+
+```ts
+// ✅ רק כשה-TypeScript מרכיב את המחרוזת בעצמו — צירוף כמה תוויות, או מתודה שמחזירה
+//    שם של אדם בענף אחד ותווית בענף אחר. ראו core/i18n/label.service.ts
+this.labels.label(SECTOR_LABELS[user.sector]);
+```
+
+```ts
+// ❌ אל תוסיפו למודול שלכם מפתח משלכם לאותה תווית — זו בדיוק הכפילות ש-ABF-127 מנע
+'forum.sector.hasidic': 'חסידי'
+```
+
+**בבדיקות**: `translocoTesting()` מ-`src/testing/transloco-testing.ts` טוען את קבצי ה-he/en
+האמיתיים, כך שאפשר להמשיך לבדוק מול הטקסט העברי עצמו:
+
+```ts
+TestBed.configureTestingModule({ imports: [MyComponent, translocoTesting()] });
+```
 
 ---
 
