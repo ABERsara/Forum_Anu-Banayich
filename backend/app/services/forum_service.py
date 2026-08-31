@@ -465,12 +465,14 @@ def send_direct_message(
 
     Never distinguishes "recipient doesn't exist" from "recipient exists but
     can't be messaged" (wrong cell, wrong role, inactive) — both return the
-    same generic 403, per the DoD rule against leaking user existence.
+    same generic 403, per the DoD rule against leaking user existence. Also
+    covers the sender's own role: a non-USER sender is denied and audited
+    the same way as any other blocked send (§9.3 — a moderator's attempt to
+    send a private message is itself an access to private content).
     """
-    if sender.role != UserRole.USER:
-        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
-
-    recipient = get_user_by_id(db, data.recipient_id)
+    recipient = (
+        None if sender.role != UserRole.USER else get_user_by_id(db, data.recipient_id)
+    )
     if recipient is None or not can_message(sender, recipient):
         log_action(
             db,
@@ -558,6 +560,14 @@ def get_cell_members(db: Session, current_user: User) -> list[User]:
     (search_users_for_dm / GET /users/search).
     """
     if current_user.role != UserRole.USER:
+        log_action(
+            db,
+            actor=current_user,
+            action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
+            entity_type="DirectMessage",
+            entity_id=current_user.id,
+            details={"reason": "cell_members_role_blocked"},
+        )
         raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
 
     return (

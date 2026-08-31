@@ -12,20 +12,9 @@ import { TranslocoModule } from '@jsverse/transloco';
 
 import { UserPublic } from '../../../core/models';
 import { ForumService } from '../../../core/services/forum.service';
+import { errorKeyFrom } from '../../../core/utils/error-key.util';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
-
-//: Same known-error-key set as chat.component.ts — get_cell_members() only
-//: ever denies with _DM_FORBIDDEN_MESSAGE, but any other/unrecognized
-//: detail still falls back to a generic message instead of the raw value.
-const KNOWN_ERROR_KEYS = ['errors.dm_forbidden', 'errors.internal_server_error'];
-
-function errorKeyFrom(err: unknown): string {
-  const detail = (err as { error?: { detail?: unknown } })?.error?.detail;
-  return typeof detail === 'string' && KNOWN_ERROR_KEYS.includes(detail)
-    ? detail
-    : 'errors.generic';
-}
 
 @Component({
   selector: 'app-inbox',

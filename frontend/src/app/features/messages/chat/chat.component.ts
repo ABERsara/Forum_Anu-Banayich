@@ -15,21 +15,9 @@ import { TranslocoModule } from '@jsverse/transloco';
 import { DirectMessage, UserPublic } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
+import { errorKeyFrom } from '../../../core/utils/error-key.util';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
-
-//: Server errors come back as one of these translation keys (see
-//: forum_service.py's _DM_FORBIDDEN_MESSAGE / InvalidTag handling) — any
-//: other detail (network failure, an unrecognized key) falls back to a
-//: generic message rather than showing the raw backend value to the user.
-const KNOWN_ERROR_KEYS = ['errors.dm_forbidden', 'errors.internal_server_error'];
-
-function errorKeyFrom(err: unknown): string {
-  const detail = (err as { error?: { detail?: unknown } })?.error?.detail;
-  return typeof detail === 'string' && KNOWN_ERROR_KEYS.includes(detail)
-    ? detail
-    : 'errors.generic';
-}
 
 @Component({
   selector: 'app-chat',

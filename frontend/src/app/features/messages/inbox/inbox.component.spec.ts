@@ -1,12 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { InboxComponent } from './inbox.component';
 import type { UserPublic } from '../../../core/models';
 import { ForumService } from '../../../core/services/forum.service';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeMember(overrides: Partial<UserPublic> = {}): UserPublic {
   return { id: 'member-1', first_name: 'שרה', last_name: 'לוי', ...overrides };
@@ -19,24 +19,7 @@ describe('InboxComponent', () => {
 
   function setup(): void {
     TestBed.configureTestingModule({
-      imports: [
-        InboxComponent,
-        TranslocoTestingModule.forRoot({
-          langs: {
-            he: {
-              messages: {
-                inbox: {
-                  title: 'חברי התא שלי',
-                  loading: 'טוען חברי תא...',
-                  empty: 'אין חברים נוספים בתא שלך כרגע.',
-                },
-              },
-            },
-          },
-          translocoConfig: { availableLangs: ['he'], defaultLang: 'he' },
-          preloadLangs: true,
-        }),
-      ],
+      imports: [InboxComponent, translocoTesting()],
       providers: [provideRouter([]), { provide: ForumService, useValue: forumServiceMock }],
     }).compileComponents();
 
