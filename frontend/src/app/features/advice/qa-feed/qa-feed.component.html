@@ -1,0 +1,60 @@
+<div class="qa-feed-page">
+  <a routerLink="/advice">{{ 'advice.qa_feed.back_link' | transloco }}</a>
+  <h1>{{ 'advice.qa_feed.title' | transloco }}</h1>
+
+  <div class="filter-bar">
+    <label>
+      {{ 'advice.qa_feed.domain_filter_label' | transloco }}
+      <select (change)="onDomainChange($event)">
+        <option value="">{{ 'advice.qa_feed.domain_filter_all' | transloco }}</option>
+        @for (domain of domains; track domain) {
+          <option [value]="domain">{{ domainLabels[domain] | transloco }}</option>
+        }
+      </select>
+    </label>
+  </div>
+
+  <div aria-live="polite" [attr.aria-busy]="isLoading()">
+    @if (isLoading()) {
+      <app-loading-spinner [message]="'advice.qa_feed.loading' | transloco" />
+    } @else if (hasError()) {
+      <app-error-display [message]="errorKey() | transloco" />
+    } @else if (items().length === 0) {
+      <p class="empty-state">{{ 'advice.qa_feed.empty' | transloco }}</p>
+    } @else {
+      @for (item of items(); track item.id) {
+        <div class="qa-card">
+          <p class="qa-question">{{ item.content }}</p>
+          <p class="qa-answer">{{ item.answer }}</p>
+          <div class="qa-meta">
+            @if (item.domain) {
+              <span>{{ domainLabels[item.domain] | transloco }}</span>
+            }
+            <span>{{ item.answered_at | date: 'dd/MM/yyyy' }}</span>
+            <button
+              type="button"
+              class="like-button"
+              [class.liked]="item.liked_by_me"
+              (click)="toggleLike(item)"
+            >
+              <span aria-hidden="true">👍</span>
+              <span>{{ item.like_count }}</span>
+            </button>
+          </div>
+          @if (likeErrorId() === item.id) {
+            <app-error-display [message]="'advice.qa_feed.like_error' | transloco" />
+          }
+        </div>
+      }
+
+      @if (hasMore()) {
+        <button type="button" class="load-more" [disabled]="isLoadingMore()" (click)="loadMore()">
+          {{
+            (isLoadingMore() ? 'advice.qa_feed.loading_more' : 'advice.qa_feed.load_more')
+              | transloco
+          }}
+        </button>
+      }
+    }
+  </div>
+</div>
