@@ -26,6 +26,12 @@
             {{ 'home.advice.body' | transloco }}
           </app-card>
         </a>
+
+        <a routerLink="/messages" class="home__card-link">
+          <app-card title="הודעות" subtitle="שיחה פרטית עם חברי התא שלך" [elevated]="true">
+            תקשורת פרטית ומוצפנת עם חברי התא שלך.
+          </app-card>
+        </a>
       }
 
       @if (auth.isAdmin()) {

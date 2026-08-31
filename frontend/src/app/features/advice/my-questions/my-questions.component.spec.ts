@@ -100,4 +100,43 @@ describe('MyQuestionsComponent', () => {
 
     expect(component.target(component.questions[0])).toBe('רב/דיין');
   });
+
+  it('shows the answer text when the question was answered', async () => {
+    professionalServiceMock = {
+      getMyQuestions: vi.fn().mockReturnValue(
+        of([
+          makeQuestion({
+            status: QueryStatus.ANSWERED,
+            answer: 'זו תשובת המקצוען לשאלה שלך.',
+          }),
+        ]),
+      ),
+    };
+    await setup();
+
+    const answerEl = fixture.nativeElement.querySelector('.question-answer');
+    expect(answerEl?.textContent).toContain('זו תשובת המקצוען לשאלה שלך.');
+  });
+
+  it('does not show an answer block for an open question', async () => {
+    professionalServiceMock = {
+      getMyQuestions: vi.fn().mockReturnValue(of([makeQuestion({ status: QueryStatus.OPEN })])),
+    };
+    await setup();
+
+    const answerEl = fixture.nativeElement.querySelector('.question-answer');
+    expect(answerEl).toBeNull();
+  });
+
+  it('does not show an answer block when answered but the answer text is missing', async () => {
+    professionalServiceMock = {
+      getMyQuestions: vi
+        .fn()
+        .mockReturnValue(of([makeQuestion({ status: QueryStatus.ANSWERED, answer: null })])),
+    };
+    await setup();
+
+    const answerEl = fixture.nativeElement.querySelector('.question-answer');
+    expect(answerEl).toBeNull();
+  });
 });
