@@ -9,7 +9,7 @@ DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
 POST   /forum/broadcast       – admin-only post visible to all users
 
-GET    /messages                          – inbox (list of conversations) – OUT OF SCOPE (ABF-118)
+GET    /messages                          – inbox (list of conversations, paginated)
 POST   /messages                          – send a direct message (own cell only)
 GET    /conversations/{key}/messages      – full history of one conversation
 GET    /cells/me/members                  – other ACTIVE users in your own cell
@@ -23,7 +23,7 @@ from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
-    ConversationSummary,
+    ConversationListResponse,
     DirectMessageCreate,
     DirectMessageResponse,
     ForumPostCreate,
@@ -157,18 +157,17 @@ def report_post(
 # ──────────────────────────────────────────────────────────
 
 
-@router.get("/messages", response_model=list[ConversationSummary])
+@router.get("/messages", response_model=ConversationListResponse)
 def get_inbox(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> list[ConversationSummary]:
+) -> ConversationListResponse:
     """
-    Return a list of conversations (inbox view).
-
-    TODO: implement – group messages by conversation partner, show latest message
+    Return the current user's conversations (inbox view), most recent first.
     """
-    # TODO: implement
-    return []
+    return forum_service.get_inbox(db, current_user, page, page_size)
 
 
 @router.post("/messages", response_model=DirectMessageResponse, status_code=201)

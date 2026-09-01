@@ -16,7 +16,7 @@ from typing import TypedDict
 
 from cryptography.exceptions import InvalidTag
 from fastapi import HTTPException
-from sqlalchemy import or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Query, Session, joinedload
 
 from app.core.constants import (
@@ -32,12 +32,15 @@ from app.models.forum import DirectMessage, ForumPost
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
+    ConversationListResponse,
+    ConversationSummary,
     DirectMessageCreate,
     ForumPostCreate,
     ForumPostListResponse,
     ForumPostResponse,
     ForumPostUpdate,
 )
+from app.schemas.user import UserPublic
 from app.services.audit_service import log_action
 from app.services.user_service import get_user_by_id
 
@@ -511,8 +514,13 @@ def get_conversation_messages(
     Return every message for a conversation_key, oldest first.
 
     No pagination (out of scope — spec §5.3's 1,000/conversation cap isn't
-    enforced here either) and no is_read mutation (marking as read is out of
-    scope for this ticket, despite this function's old TODO comment).
+    enforced here either).
+
+    Marks every message *sent to* current_user in this conversation as read
+    (ABF-119): opening a conversation is what "reading" it means for the
+    inbox's unread_count to stay accurate — this only clears the viewer's
+    own counter, it is not a "seen by" indicator shown back to the sender
+    (no read-receipts UI exists, and this adds none).
 
     A well-formed key for a conversation with zero messages yet returns an
     empty list (200), not 404 — "no messages" is a normal empty state, not
@@ -539,6 +547,13 @@ def get_conversation_messages(
         )
         raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
 
+    db.query(DirectMessage).filter(
+        DirectMessage.conversation_key == conversation_key,
+        DirectMessage.recipient_id == current_user.id,
+        DirectMessage.is_read.is_(False),
+    ).update({"is_read": True})
+    db.commit()
+
     messages = (
         db.query(DirectMessage)
         .options(joinedload(DirectMessage.sender), joinedload(DirectMessage.recipient))
@@ -547,6 +562,103 @@ def get_conversation_messages(
         .all()
     )
     return [_to_response_dict(message) for message in messages]
+
+
+def get_inbox(
+    db: Session, current_user: User, page: int = 1, page_size: int = 20
+) -> ConversationListResponse:
+    """
+    Return the current user's conversations, most recent message first.
+
+    One query does the heavy lifting: a ROW_NUMBER() window picks each
+    conversation_key's newest row, and a SUM() window computes that
+    conversation's unread count in the same pass — no per-conversation
+    query, so the query count doesn't grow with how many conversations a
+    user has (§ABF-119 AC). `total` costs one more small query
+    (COUNT DISTINCT conversation_key); still a fixed two queries overall.
+
+    Only the page's own rows get decrypted — bounded by page_size, never the
+    full history. Unlike get_conversation_messages(), this never mutates
+    is_read — merely listing conversations isn't "reading" one, only opening
+    it is. No audit entry on success either, same asymmetry as
+    get_conversation_messages() (only denied access is logged).
+    """
+    if current_user.role != UserRole.USER:
+        log_action(
+            db,
+            actor=current_user,
+            action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
+            entity_type="DirectMessage",
+            entity_id=current_user.id,
+            details={"reason": "inbox_role_blocked"},
+        )
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+
+    me = current_user.id
+    own_messages = or_(DirectMessage.sender_id == me, DirectMessage.recipient_id == me)
+
+    partner_id = case(
+        (DirectMessage.sender_id == me, DirectMessage.recipient_id),
+        else_=DirectMessage.sender_id,
+    ).label("partner_id")
+    unread_flag = case(
+        (and_(DirectMessage.recipient_id == me, DirectMessage.is_read.is_(False)), 1),
+        else_=0,
+    )
+
+    ranked = (
+        db.query(
+            DirectMessage.content,
+            DirectMessage.key_version,
+            DirectMessage.created_at,
+            partner_id,
+            func.row_number()
+            .over(
+                partition_by=DirectMessage.conversation_key,
+                order_by=DirectMessage.created_at.desc(),
+            )
+            .label("rn"),
+            func.sum(unread_flag)
+            .over(partition_by=DirectMessage.conversation_key)
+            .label("unread_count"),
+        )
+        .filter(own_messages)
+        .subquery()
+    )
+
+    rows = (
+        db.query(
+            ranked.c.content,
+            ranked.c.key_version,
+            ranked.c.created_at,
+            ranked.c.unread_count,
+            User,
+        )
+        .join(User, User.id == ranked.c.partner_id)
+        .filter(ranked.c.rn == 1)
+        .order_by(ranked.c.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    total = (
+        db.query(DirectMessage.conversation_key).filter(own_messages).distinct().count()
+    )
+
+    items = [
+        ConversationSummary(
+            other_user=UserPublic.model_validate(partner),
+            last_message_preview=decrypt_message(content, key_version),
+            last_message_at=created_at,
+            unread_count=int(unread_count),
+        )
+        for content, key_version, created_at, unread_count, partner in rows
+    ]
+
+    return ConversationListResponse(
+        items=items, total=total, page=page, page_size=page_size
+    )
 
 
 def get_cell_members(db: Session, current_user: User) -> list[User]:
