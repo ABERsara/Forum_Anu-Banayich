@@ -1,14 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { AskQuestionComponent } from './ask-question.component';
 import { ProfessionalService } from '../../../core/services/professional.service';
 import { ProfessionalDomain, QueryStatus } from '../../../core/constants';
 import type { ProfessionalQuery } from '../../../core/models';
-import { translocoTesting } from '../../../../testing/transloco-testing';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeActivatedRoute(professionalId: string | null): ActivatedRoute {
   return {
@@ -54,6 +54,18 @@ describe('AskQuestionComponent', () => {
 
     fixture = TestBed.createComponent(AskQuestionComponent);
     component = fixture.componentInstance;
+    fixture.detectChanges();
+  }
+
+  /** Fills the form with something the validators accept and submits it. */
+  function submitValidQuestion(): void {
+    component.form.setValue({
+      content: 'זוהי שאלה תקינה עם תוכן מספיק',
+      is_public: false,
+      show_real_name: false,
+      domain: ProfessionalDomain.RABBI,
+    });
+    component.onSubmit();
     fixture.detectChanges();
   }
 
@@ -123,16 +135,158 @@ describe('AskQuestionComponent', () => {
     professionalServiceMock.askQuestion.mockReturnValue(
       throwError(() => ({ error: { detail: 'שגיאה מהשרת' } })),
     );
-    component.form.setValue({
-      content: 'זוהי שאלה תקינה עם תוכן מספיק',
-      is_public: false,
-      show_real_name: false,
-      domain: ProfessionalDomain.RABBI,
+    submitValidQuestion();
+
+    expect(component.error()).toEqual({ key: '', text: 'שגיאה מהשרת' });
+    expect(component.isLoading()).toBe(false);
+  });
+
+  /** No `detail` — a network failure, say — so our own key carries the message. */
+  it('falls back to our own key when the API sent no detail', async () => {
+    await setup(null);
+    professionalServiceMock.askQuestion.mockReturnValue(throwError(() => ({})));
+    submitValidQuestion();
+
+    expect(component.error()).toEqual({ key: 'advice.errors.ask_failed', text: '' });
+    expect(component.isLoading()).toBe(false);
+  });
+  describe('i18n', () => {
+    function text(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function heading(): string {
+      return fixture.nativeElement.querySelector('h1').textContent.trim();
+    }
+
+    function placeholders(): (string | null)[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[placeholder]'),
+      ).map((element) => element.getAttribute('placeholder'));
+    }
+
+    function switchToEnglish(): void {
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+    }
+
+    /** Touches every control so the validation messages render. */
+    function showValidationErrors(): void {
+      component.form.markAllAsTouched();
+      fixture.detectChanges();
+    }
+
+    it('reads in Hebrew exactly as it did before the keys went in', async () => {
+      await setup(null);
+
+      expect(text()).toContain('חזרה לרשימת אנשי מקצוע');
+      expect(heading()).toBe('שאלה מקצועית');
+      expect(text()).toContain('בחר/י תחום — השאלה תישלח לכל אנשי המקצוע בתחום זה.');
+      expect(text()).toContain('תחום');
+      expect(text()).toContain('השאלה שלך');
+      expect(text()).toContain('האם לפרסם את השאלה והתשובה לחברי הקהילה?');
+      expect(text()).toContain('הצג/י את שמי האמיתי לאיש המקצוע');
+      expect(text()).toContain('שלח שאלה');
+      expect(placeholders()).toContain('פרט/י את שאלתך (10 עד 2000 תווים)');
     });
 
-    component.onSubmit();
+    it('leaves no Hebrew on the page in English', async () => {
+      await setup(null);
 
-    expect(component.errorMessage()).toBe('שגיאה מהשרת');
-    expect(component.isLoading()).toBe(false);
+      switchToEnglish();
+
+      expect(text()).toContain('Back to the professionals list');
+      expect(heading()).toBe('Professional question');
+      expect(text()).toContain(
+        'Choose a field — your question will be sent to every professional in it.',
+      );
+      expect(text()).toContain('Field');
+      expect(text()).toContain('Your question');
+      expect(placeholders()).toContain('Describe your question (10 to 2000 characters)');
+      expect(text()).toContain('Send question');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** The ticket calls out both checkbox labels by name. */
+    it('translates both checkbox labels', async () => {
+      await setup(null);
+      expect(text()).toContain('האם לפרסם את השאלה והתשובה לחברי הקהילה?');
+      expect(text()).toContain('הצג/י את שמי האמיתי לאיש המקצוע');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Publish this question and its answer to the community?');
+      expect(text()).toContain('Show my real name to the professional');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the validation messages', async () => {
+      await setup(null);
+      showValidationErrors();
+      expect(text()).toContain('נא לבחור תחום');
+      expect(text()).toContain('נא להזין שאלה (10 עד 2000 תווים)');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Please choose a field');
+      expect(text()).toContain('Please enter a question (10 to 2000 characters)');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the hint shown when a professional was chosen', async () => {
+      await setup('pro-1');
+      expect(text()).toContain('השאלה תישלח לאיש המקצוע הנבחר.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Your question will be sent to the professional you chose.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the sending copy while the request is in flight', async () => {
+      await setup(null);
+      professionalServiceMock.askQuestion.mockReturnValue(NEVER);
+      submitValidQuestion();
+      expect(text()).toContain('שולח שאלה...');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Sending question...');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** Our own copy is a key, so a failure already on screen follows the switch. */
+    it('re-renders our own failure copy in the new language', async () => {
+      await setup(null);
+      professionalServiceMock.askQuestion.mockReturnValue(throwError(() => ({})));
+      submitValidQuestion();
+      expect(text()).toContain('שגיאה בשליחת השאלה.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Something went wrong sending the question.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** The sentence the API wrote is not ours to translate — it stays put. */
+    it('leaves the sentence the API sent exactly as it came', async () => {
+      await setup(null);
+      professionalServiceMock.askQuestion.mockReturnValue(
+        throwError(() => ({ error: { detail: 'לא ניתן לשאול את איש המקצוע הזה.' } })),
+      );
+      submitValidQuestion();
+
+      switchToEnglish();
+
+      expect(text()).toContain('לא ניתן לשאול את איש המקצוע הזה.');
+    });
+
+    it('does not pin its own text direction — it follows <html dir>', async () => {
+      await setup(null);
+
+      expect(fixture.nativeElement.querySelector('.ask-question-page').hasAttribute('dir')).toBe(
+        false,
+      );
+    });
   });
 });
