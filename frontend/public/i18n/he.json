@@ -39,6 +39,21 @@
       "send": "שלח"
     }
   },
+  "advice": {
+    "qa_feed": {
+      "back_link": "→ חזרה לייעוץ מקצועי",
+      "title": "שאלות ותשובות קהילתיות",
+      "domain_filter_label": "סינון לפי תחום:",
+      "domain_filter_all": "הכל",
+      "loading": "טוען שאלות ותשובות...",
+      "empty": "אין עדיין שאלות ותשובות ציבוריות בתא שלך.",
+      "load_more": "טען עוד",
+      "loading_more": "טוען...",
+      "like_error": "הלייק לא נשמר. נסה שוב.",
+      "like_aria": "לייק — {{count}}",
+      "unlike_aria": "ביטול לייק — {{count}}"
+    }
+  },
   "constants": {
     "user_type": {
       "widower": "אלמן",

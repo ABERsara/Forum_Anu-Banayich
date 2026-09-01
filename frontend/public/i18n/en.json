@@ -39,6 +39,21 @@
       "send": "Send"
     }
   },
+  "advice": {
+    "qa_feed": {
+      "back_link": "← Back to professional advice",
+      "title": "Community Q&A",
+      "domain_filter_label": "Filter by domain:",
+      "domain_filter_all": "All",
+      "loading": "Loading questions and answers...",
+      "empty": "There are no public questions and answers in your cell yet.",
+      "load_more": "Load more",
+      "loading_more": "Loading...",
+      "like_error": "Couldn't save the like. Please try again.",
+      "like_aria": "Like — {{count}}",
+      "unlike_aria": "Unlike — {{count}}"
+    }
+  },
   "constants": {
     "user_type": {
       "widower": "Widower",

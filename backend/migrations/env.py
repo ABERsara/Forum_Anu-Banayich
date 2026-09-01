@@ -18,8 +18,14 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
+#
+# disable_existing_loggers=False: fileConfig()'s default (True) silently
+# disables every logger already created in this process — harmless for a
+# real `alembic upgrade` CLI run (a fresh process), but when alembic runs
+# in-process (test_migration.py does exactly this), it permanently disables
+# app.* loggers for every test that runs afterward in the same suite.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
