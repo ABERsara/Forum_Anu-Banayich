@@ -448,7 +448,8 @@ errorKey.set(err.status === 409 ? 'shared.report.error_duplicate' : 'shared.repo
 
 **כיוון טקסט:** אל תכתבו `dir="rtl"` בתבנית ואל תכתבו `text-align: right`. `LocaleService`
 מגדיר `<html dir>` לפי השפה, והכול יורש ממנו; ל-CSS השתמשו במאפיינים לוגיים
-(`text-align: start`, `margin-inline-start`).
+(`text-align: start`, `margin-inline-start`). `dir="ltr"` על שדה שהתוכן שלו תמיד LTR (אימייל,
+למשל) הוא כיוון של *הערך* ולא של העמוד — הוא נשאר.
 
 **בבדיקות** — `HEBREW` מ-`src/testing/transloco-testing.ts`. אחרי מעבר ל-EN,
 `expect(text).not.toMatch(HEBREW)` נופל על *כל* מחרוזת שנשכחה, לא רק על זו שנזכרתם לבדוק:
@@ -458,6 +459,38 @@ TestBed.inject(TranslocoService).setActiveLang('en');
 fixture.detectChanges();
 expect(fixture.nativeElement.textContent).not.toMatch(HEBREW);
 ```
+
+### שגיאה מהשרת מול קופי שלנו (ABF-129)
+
+מסכי ה-auth מציגים שגיאה משני מקורות, ואי אפשר לטפל בשניהם אותו דבר:
+
+- **הקופי שלנו** — "קוד שגוי", "שגיאה בכניסה" — נשמר כ**מפתח** ורץ ב-pipe בתבנית, כדי שהודעה
+  שכבר על המסך תתחלף עם השפה במקום לקפוא בשפה שבה נוצרה.
+- **`error.detail` שהשרת החזיר** — "אימייל כבר קיים" — הוא כבר משפט גמור, ומוצג כמו שהוא.
+  לבלוע אותו יעלה לקורא/ת בדיוק את מה שההודעה הגנרית שלנו לא יודעת לתת: *למה* הבקשה נכשלה.
+
+`features/auth/auth-error.ts` מחזיק את שני השדות ב-`AuthError` אחד, כך שלא ייתכן ששניהם
+מלאים, ו-`authErrorFrom` שומר בדיוק על סדר העדיפויות של ה-`err.error?.detail ?? '...'`
+שהיה שם קודם:
+
+```ts
+// ✅ detail מהשרת אם הגיע, אחרת המפתח שלנו
+this.error.set(authErrorFrom(err, 'auth.login.error_generic'));
+```
+
+```html
+@if (error().text; as text) {
+  <app-error-display [message]="text" />
+} @else if (error().key) {
+  <app-error-display [message]="error().key | transloco" />
+}
+```
+
+אותו כלל חל על טקסט שקומפוננטה משותפת כבר תרגמה בעצמה — למשל ה-`validationError` של
+`app-file-upload`: הוא מגיע כטקסט, ולכן נכנס ל-`text` ולא ל-`key`.
+
+השרת עדיין כותב את המשפטים האלה בעברית בכל שפת ממשק; מפתחות תרגום הוא מדבר רק בהודעות
+הישירות (ABF-118). להעביר גם את `/auth/*` למפתחות זה שינוי backend, לא טיקט מיגרציה.
 
 ---
 
