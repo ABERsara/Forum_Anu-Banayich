@@ -15,6 +15,36 @@ import { ErrorDisplayComponent } from '../../../shared/components/error-display/
 import { FileUploadComponent } from '../../../shared/components/file-upload/file-upload.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
+/**
+ * A failed submit, split by who wrote the sentence (CONTRIBUTING §6).
+ *
+ *   - `key` is copy of ours. The template pipes it, so a message already on
+ *     screen follows a language switch instead of freezing in the language it
+ *     was raised in.
+ *   - `text` is the API's own `detail` — a finished sentence, shown as-is.
+ *     Replacing it with our generic line would cost the reader the one thing
+ *     that line cannot tell them: *why* the request failed.
+ *
+ * Exactly one is ever set; `submitErrorFrom` is the only writer. This is the
+ * same shape as `features/auth/auth-error.ts`, deliberately not imported from
+ * there — a forum ticket has no business reaching into the auth module. Worth
+ * promoting the pair to `core/i18n/` once a third feature needs it.
+ */
+interface SubmitError {
+  key: string;
+  text: string;
+}
+
+const NO_ERROR: SubmitError = { key: '', text: '' };
+
+/** The API's own explanation when it sent one, our generic key when it did not. */
+function submitErrorFrom(err: unknown, fallbackKey: string): SubmitError {
+  const detail = (err as { error?: { detail?: unknown } })?.error?.detail;
+  return typeof detail === 'string' && detail.trim() !== ''
+    ? { key: '', text: detail }
+    : { key: fallbackKey, text: '' };
+}
+
 @Component({
   selector: 'app-new-post',
   standalone: true,
@@ -73,7 +103,12 @@ export class NewPostComponent {
   });
 
   isLoading = signal(false);
-  errorMessage = signal('');
+  /** What went wrong on submit, as a key of ours or a sentence the API sent. */
+  error = signal<SubmitError>(NO_ERROR);
+  /**
+   * The size complaint from `app-file-upload`. It arrives already resolved, so
+   * unlike `error` it is text and is rendered without the pipe.
+   */
   fileError = signal('');
 
   constructor() {
@@ -111,7 +146,7 @@ export class NewPostComponent {
     }
 
     this.isLoading.set(true);
-    this.errorMessage.set('');
+    this.error.set(NO_ERROR);
 
     const { title, content, group_visibility, sector_visibility } = this.form.getRawValue();
     this.forumService
@@ -127,7 +162,7 @@ export class NewPostComponent {
           this.router.navigate(['/forum', post.id]);
         },
         error: (err) => {
-          this.errorMessage.set(err.error?.detail ?? 'אירעה שגיאה בפרסום ההודעה.');
+          this.error.set(submitErrorFrom(err, 'forum.errors.create_failed'));
           this.isLoading.set(false);
         },
       });

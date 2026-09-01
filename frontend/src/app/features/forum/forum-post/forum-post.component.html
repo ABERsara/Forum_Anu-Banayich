@@ -1,10 +1,12 @@
-<div class="forum-post" dir="rtl">
-  <a routerLink="/forum">← חזרה לפורום</a>
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="forum-post">
+  <a routerLink="/forum">← {{ 'forum.back_to_list' | transloco }}</a>
 
   @if (isLoading()) {
     <app-loading-spinner size="md" />
-  } @else if (errorMessage(); as errorMsg) {
-    <app-error-display [message]="errorMsg" />
+  } @else if (errorKey(); as key) {
+    <app-error-display [message]="key | transloco" />
   } @else if (post(); as post) {
     <h1>{{ post.title }}</h1>
     <p class="forum-post__meta">
@@ -13,7 +15,9 @@
     <p class="forum-post__content">{{ post.content }}</p>
 
     @if (post.attachment_url) {
-      <a [href]="post.attachment_url" target="_blank" rel="noopener">קובץ מצורף</a>
+      <a [href]="post.attachment_url" target="_blank" rel="noopener">
+        {{ 'forum.post.attachment' | transloco }}
+      </a>
     }
 
     <app-report-button [contentType]="reportTargetType" [contentId]="post.id" />
@@ -25,7 +29,7 @@
             class="forum-post__btn forum-post__btn--edit"
             [routerLink]="['/forum', post.id, 'edit']"
           >
-            עריכה
+            {{ 'forum.post.edit' | transloco }}
           </a>
         }
         @if (canDelete()) {
@@ -34,21 +38,23 @@
             class="forum-post__btn forum-post__btn--delete"
             (click)="onDeleteClick()"
           >
-            מחיקה
+            {{ 'forum.post.delete' | transloco }}
           </button>
         }
       </div>
     }
 
-    @if (deleteError(); as deleteErr) {
-      <app-error-display [message]="deleteErr" />
+    @if (deleteErrorKey(); as key) {
+      <app-error-display [message]="key | transloco" />
     }
 
     @if (showDeleteConfirm()) {
+      <!-- The dialog is dumb: it renders the text it is handed, so the pipe
+           runs here rather than inside shared/ (CONTRIBUTING §6). -->
       <app-confirm-dialog
-        title="מחיקת הודעה"
-        message="פעולה זו תמחק את ההודעה. לא ניתן לשחזר."
-        confirmText="מחיקה"
+        [title]="'forum.delete_post.title' | transloco"
+        [message]="'forum.delete_post.message' | transloco"
+        [confirmText]="'forum.delete_post.confirm' | transloco"
         [isDestructive]="true"
         (confirmed)="onDeleteConfirmed()"
         (cancelled)="onDeleteCancelled()"
