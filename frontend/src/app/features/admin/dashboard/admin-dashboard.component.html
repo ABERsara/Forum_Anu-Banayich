@@ -11,7 +11,9 @@
         @if (!hasError()) {
           <span class="stats-card__value">{{ pendingCount() }}</span>
         }
-        <span class="stats-card__label">{{ 'admin.pending_registrations.title' | transloco }}</span>
+        <span class="stats-card__label">{{
+          'admin.dashboard.pending_card_label' | transloco
+        }}</span>
       }
     </div>
     <!-- A chevron, not copy: U+2039 is Bidi_Mirrored, so the browser turns it
@@ -22,16 +24,19 @@
     <app-error-display [message]="'admin.errors.load_pending_count_failed' | transloco" />
   }
 
-  <!-- Every link here names the page it opens, so the ones whose text is that
+  <!-- Every link here names the page it opens. The ones whose text is that
        page's own heading share its title key rather than holding a second copy
-       of the same words. Registrations, the audit log and reports read
-       differently from the heading they lead to, and keep a key of their own:
-       sharing would have changed the Hebrew on one screen or the other. -->
+       of the same words — but only where this ticket migrates the page itself,
+       which is active-users and broadcast. Registrations, the audit log and
+       reports read differently from the heading they lead to, and the two
+       management links point at screens ABF-133 migrates: both kinds keep a key
+       of their own here, so that no ticket owns copy for a screen it does not
+       touch, and no rename over there silently rewrites this menu. -->
   <nav>
     <a routerLink="/admin/registrations">{{ 'admin.dashboard.nav_registrations' | transloco }}</a> |
     <a routerLink="/admin/active-users">{{ 'admin.active_users.title' | transloco }}</a> |
-    <a routerLink="/admin/professionals">{{ 'admin.manage_professionals.title' | transloco }}</a> |
-    <a routerLink="/admin/moderators">{{ 'admin.manage_moderators.title' | transloco }}</a> |
+    <a routerLink="/admin/professionals">{{ 'admin.dashboard.nav_professionals' | transloco }}</a> |
+    <a routerLink="/admin/moderators">{{ 'admin.dashboard.nav_moderators' | transloco }}</a> |
     <a routerLink="/admin/audit-log">{{ 'admin.dashboard.nav_audit_log' | transloco }}</a> |
     <a routerLink="/admin/broadcast">{{ 'admin.broadcast.title' | transloco }}</a> |
     <a routerLink="/moderator/reports">{{ 'admin.dashboard.nav_reports' | transloco }}</a>

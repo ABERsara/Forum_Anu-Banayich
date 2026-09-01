@@ -19,24 +19,18 @@
     "back_to_dashboard": "חזרה ללוח הבקרה",
     "dashboard": {
       "title": "לוח בקרה – מנהל",
+      "pending_card_label": "הרשמות ממתינות לאישור",
       "nav_registrations": "הרשמות ממתינות",
+      "nav_professionals": "ניהול אנשי מקצוע",
+      "nav_moderators": "ניהול ממונים",
       "nav_audit_log": "יומן פעולות",
       "nav_reports": "דיווחים"
-    },
-    "pending_registrations": {
-      "title": "הרשמות ממתינות לאישור"
     },
     "active_users": {
       "title": "משתמשים פעילים",
       "empty": "אין משתמשים פעילים כרגע.",
       "suspend": "השעה",
       "suspend_message": "פעולה זו תשעה את המשתמש למספר השעות שנקבעו, ותשלח לו הודעה עם הסיבה."
-    },
-    "manage_professionals": {
-      "title": "ניהול אנשי מקצוע"
-    },
-    "manage_moderators": {
-      "title": "ניהול ממונים"
     },
     "broadcast": {
       "title": "שידור לכלל המשתמשים",

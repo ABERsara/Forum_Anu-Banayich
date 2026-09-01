@@ -19,24 +19,18 @@
     "back_to_dashboard": "Back to the dashboard",
     "dashboard": {
       "title": "Admin dashboard",
+      "pending_card_label": "Registrations awaiting approval",
       "nav_registrations": "Pending registrations",
+      "nav_professionals": "Manage professionals",
+      "nav_moderators": "Manage moderators",
       "nav_audit_log": "Audit log",
       "nav_reports": "Reports"
-    },
-    "pending_registrations": {
-      "title": "Registrations awaiting approval"
     },
     "active_users": {
       "title": "Active users",
       "empty": "There are no active users right now.",
       "suspend": "Suspend",
       "suspend_message": "This will suspend the user for the number of hours you set, and send them a message with the reason."
-    },
-    "manage_professionals": {
-      "title": "Manage professionals"
-    },
-    "manage_moderators": {
-      "title": "Manage moderators"
     },
     "broadcast": {
       "title": "Broadcast to all users",
