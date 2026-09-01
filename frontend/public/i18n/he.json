@@ -14,12 +14,23 @@
   },
   "messages": {
     "inbox": {
+      "title": "התיבה שלי",
+      "loading": "טוען שיחות...",
+      "empty": "עדיין אין לך שיחות. התחילו שיחה חדשה כדי להתחיל.",
+      "new_message": "+ שיחה חדשה",
+      "item_aria": "שיחה עם {{name}}",
+      "item_aria_unread": "שיחה עם {{name}}, {{count}} הודעות שלא נקראו",
+      "previous_page": "הקודם",
+      "next_page": "הבא",
+      "page_of": "עמוד {{page}} מתוך {{total}}"
+    },
+    "newMessage": {
       "title": "חברי התא שלי",
       "loading": "טוען חברי תא...",
       "empty": "אין חברים נוספים בתא שלך כרגע."
     },
     "chat": {
-      "back_to_members": "→ חזרה לחברי התא",
+      "back_to_inbox": "→ חזרה לתיבה",
       "title_fallback": "שיחה",
       "loading": "טוען הודעות...",
       "empty": "עדיין אין הודעות. כתבו הודעה כדי להתחיל.",
