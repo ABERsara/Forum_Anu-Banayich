@@ -1,0 +1,83 @@
+@use '../../../../styles/variables' as *;
+
+:host {
+  display: block;
+  padding: $spacing-lg;
+}
+
+h1 {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $color-text;
+  margin: $spacing-lg 0;
+}
+
+.filter-bar {
+  margin: $spacing-md 0;
+}
+
+.empty-state {
+  color: $color-text-muted;
+}
+
+.qa-card {
+  background: $color-bg;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-md;
+}
+
+.qa-question {
+  color: $color-text;
+  font-weight: $font-weight-medium;
+  margin-bottom: $spacing-sm;
+}
+
+.qa-answer {
+  color: $color-text;
+  margin: 0 0 $spacing-sm;
+  padding-top: $spacing-sm;
+  border-top: 1px solid $color-border;
+}
+
+.qa-meta {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  font-size: $font-size-sm;
+  color: $color-text-muted;
+  flex-wrap: wrap;
+}
+
+.like-button {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: transparent;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  color: $color-text-muted;
+
+  &.liked {
+    color: $color-primary;
+    border-color: $color-primary;
+  }
+}
+
+.load-more {
+  display: block;
+  margin: $spacing-md auto 0;
+  padding: 0.5rem 1.5rem;
+  border-radius: $radius-md;
+  border: 1px solid $color-border;
+  background: $color-bg;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}

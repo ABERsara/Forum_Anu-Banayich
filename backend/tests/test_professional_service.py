@@ -4,11 +4,12 @@ get_pending_questions(), answer_query() and like_service.toggle_like().
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import event, insert
-from sqlalchemy.engine import Connection
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Mapper, Session
 
 from app.core.constants import (
@@ -24,6 +25,11 @@ from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import ProfessionalAnswerRequest, ProfessionalQueryCreate
 from app.services import email_service, like_service, professional_service
+
+#: Sentinel distinguishing "caller didn't pass asker_user_type/asker_sector"
+#: (default to the asker's own cell) from "caller explicitly passed None"
+#: (simulate a historical row with no frozen cell).
+_UNSET = object()
 
 
 def _make_asker(
@@ -79,7 +85,13 @@ def _make_query(
     content: str = "שאלה שממתינה לתשובה מאיש המקצוע",
     show_real_name: bool = False,
     is_public: bool = False,
+    answer: str | None = None,
+    asker_user_type: UserType | None | object = _UNSET,
+    asker_sector: Sector | None | object = _UNSET,
 ) -> ProfessionalQuery:
+    # Default to the asker's own cell, mirroring what create_query() does —
+    # callers only need to override this to simulate a stale/mismatched
+    # snapshot (e.g. a profile change after the question was created).
     query = ProfessionalQuery(
         asker_id=asker.id,
         professional_id=professional.id if professional is not None else None,
@@ -88,6 +100,11 @@ def _make_query(
         status=status,
         show_real_name=show_real_name,
         is_public=is_public,
+        answer=answer,
+        asker_user_type=(
+            asker.user_type if asker_user_type is _UNSET else asker_user_type
+        ),
+        asker_sector=asker.sector if asker_sector is _UNSET else asker_sector,
     )
     db_session.add(query)
     db_session.commit()
@@ -165,6 +182,11 @@ class TestCreateQuery:
         assert response.status == QueryStatus.OPEN
         assert response.asker_alias == "אלמנה – ספרדי"
         assert response.asker is None  # show_real_name defaults to False
+
+        stored = db_session.get(ProfessionalQuery, response.id)
+        assert stored is not None
+        assert stored.asker_user_type == UserType.WIDOW
+        assert stored.asker_sector == Sector.SEPHARDIC
 
     def test_asks_general_domain_question(self, db_session: Session) -> None:
         asker = _make_asker(db_session)
@@ -551,6 +573,305 @@ class TestGetPendingQuestions:
 
         assert results[0].asker is not None
         assert results[0].asker.id == asker.id
+
+
+class TestGetPublicQA:
+    def test_excludes_private_and_unanswered_questions(
+        self, db_session: Session
+    ) -> None:
+        asker = _make_asker(db_session)
+        _make_query(db_session, asker, is_public=False, status=QueryStatus.ANSWERED)
+        _make_query(db_session, asker, is_public=True, status=QueryStatus.OPEN)
+        _make_query(db_session, asker, is_public=True, status=QueryStatus.CLOSED)
+        visible = _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה לשאלה הציבורית היחידה שנענתה",
+        )
+
+        results = professional_service.get_public_qa(db_session, asker)
+
+        assert [r.id for r in results] == [visible.id]
+
+    def test_same_cell_user_sees_it_different_cell_does_not(
+        self, db_session: Session
+    ) -> None:
+        asker = _make_asker(
+            db_session, user_type=UserType.WIDOW, sector=Sector.SEPHARDIC
+        )
+        _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה גלויה לבני התא של השואלת",
+        )
+        same_cell = _make_asker(
+            db_session,
+            email="same-cell@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+        )
+        other_cell = _make_asker(
+            db_session,
+            email="other-cell@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+
+        assert len(professional_service.get_public_qa(db_session, same_cell)) == 1
+        assert professional_service.get_public_qa(db_session, other_cell) == []
+
+    def test_admin_sees_every_cell(self, db_session: Session) -> None:
+        first_cell_asker = _make_asker(
+            db_session, user_type=UserType.WIDOW, sector=Sector.SEPHARDIC
+        )
+        second_cell_asker = _make_asker(
+            db_session,
+            email="other-cell-asker@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        _make_query(
+            db_session,
+            first_cell_asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה בתא הראשון",
+        )
+        _make_query(
+            db_session,
+            second_cell_asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה בתא השני",
+        )
+        admin = _make_asker(
+            db_session, email="admin@example.com", user_type=None, sector=None
+        )
+        admin.role = UserRole.ADMIN
+        db_session.commit()
+
+        assert len(professional_service.get_public_qa(db_session, admin)) == 2
+
+    def test_domain_filter_applied_when_given_ignored_when_not(
+        self, db_session: Session
+    ) -> None:
+        asker = _make_asker(db_session)
+        _make_query(
+            db_session,
+            asker,
+            domain=ProfessionalDomain.RABBI,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה של רב לשאלה",
+            content="שאלה בתחום הרבנות שנשאלה",
+        )
+        _make_query(
+            db_session,
+            asker,
+            domain=ProfessionalDomain.LAWYER,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה של עורך דין לשאלה",
+            content="שאלה בתחום המשפטי שנשאלה",
+        )
+
+        assert len(professional_service.get_public_qa(db_session, asker)) == 2
+        filtered = professional_service.get_public_qa(
+            db_session, asker, domain=ProfessionalDomain.RABBI
+        )
+        assert len(filtered) == 1
+        assert filtered[0].domain == ProfessionalDomain.RABBI
+
+    def test_pagination(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        queries = [
+            _make_query(
+                db_session,
+                asker,
+                is_public=True,
+                status=QueryStatus.ANSWERED,
+                answer=f"תשובה מספר {i}",
+                content=f"שאלה ציבורית מספר {i} ברשימה",
+            )
+            for i in range(5)
+        ]
+        # created_at ties under SQLite's default resolution — space them out
+        # so page ordering (newest first) is deterministic, as elsewhere.
+        now = datetime.now(UTC)
+        for offset, query in enumerate(queries):
+            db_session.query(ProfessionalQuery).filter(
+                ProfessionalQuery.id == query.id
+            ).update({"created_at": now - timedelta(minutes=len(queries) - offset)})
+        db_session.commit()
+
+        first_page = professional_service.get_public_qa(
+            db_session, asker, page=1, page_size=2
+        )
+        second_page = professional_service.get_public_qa(
+            db_session, asker, page=2, page_size=2
+        )
+
+        assert [r.id for r in first_page] == [queries[4].id, queries[3].id]
+        assert [r.id for r in second_page] == [queries[2].id, queries[1].id]
+
+    def test_like_count_and_liked_by_me(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        liker = _make_asker(db_session, email="liker@example.com")
+        non_liker = _make_asker(db_session, email="non-liker@example.com")
+        query = _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה שתקבל לייק אחד",
+        )
+        like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, liker
+        )
+
+        as_liker = professional_service.get_public_qa(db_session, liker)
+        as_non_liker = professional_service.get_public_qa(db_session, non_liker)
+
+        assert as_liker[0].like_count == 1
+        assert as_liker[0].liked_by_me is True
+        assert as_non_liker[0].like_count == 1
+        assert as_non_liker[0].liked_by_me is False
+
+    def test_like_count_and_liked_by_me_avoid_n_plus_one(
+        self, db_session: Session, db_engine: Engine
+    ) -> None:
+        """
+        like_count/liked_by_me must come from one SELECT for the whole page,
+        not one extra query per row — the same concern the "one send call,
+        not one per professional" tests above pin for email notifications.
+        """
+        asker = _make_asker(db_session)
+        viewer = _make_asker(db_session, email="viewer@example.com")
+        queries = [
+            _make_query(
+                db_session,
+                asker,
+                is_public=True,
+                status=QueryStatus.ANSWERED,
+                answer=f"תשובה מספר {i}",
+                content=f"שאלה ציבורית מספר {i} לבדיקת ביצועים",
+            )
+            for i in range(5)
+        ]
+        for query in queries[:3]:
+            like_service.toggle_like(
+                db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, viewer
+            )
+
+        # Force any pending lazy-refresh of `viewer` (its attributes were
+        # expired by the commits above) to happen now, outside the counted
+        # window below — get_public_qa() reads viewer.role/user_type/sector,
+        # and that first touch would otherwise cost its own SELECT unrelated
+        # to the per-row concern this test is actually pinning.
+        _ = (viewer.role, viewer.user_type, viewer.sector)
+
+        statements: list[str] = []
+
+        def _record(
+            conn: Connection,
+            cursor: Any,
+            statement: str,
+            parameters: Any,
+            context: Any,
+            executemany: bool,
+        ) -> None:
+            statements.append(statement)
+
+        event.listen(db_engine, "before_cursor_execute", _record)
+        try:
+            results = professional_service.get_public_qa(db_session, viewer)
+        finally:
+            event.remove(db_engine, "before_cursor_execute", _record)
+
+        assert len(results) == 5
+        select_statements = [
+            s for s in statements if s.strip().upper().startswith("SELECT")
+        ]
+        assert len(select_statements) == 1, (
+            "expected a single SELECT for the whole page, not one per row"
+        )
+
+    def test_asker_profile_change_after_creation_does_not_move_the_question(
+        self, db_session: Session
+    ) -> None:
+        """
+        The visible cell is the one frozen onto the question when it was
+        created, not the asker's current profile — changing the asker's
+        user_type/sector afterwards must not move an existing question to a
+        different cell's feed.
+        """
+        asker = _make_asker(
+            db_session, user_type=UserType.WIDOW, sector=Sector.SEPHARDIC
+        )
+        query = _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה לשאלה שנשאלה בתא המקורי",
+            content="שאלה שנשאלה בתא המקורי של השואלת",
+        )
+
+        asker.user_type = UserType.WIDOWER
+        asker.sector = Sector.HASIDIC
+        db_session.commit()
+
+        original_cell_viewer = _make_asker(
+            db_session,
+            email="original-cell@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+        )
+        new_cell_viewer = _make_asker(
+            db_session,
+            email="new-cell@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+
+        assert [
+            r.id
+            for r in professional_service.get_public_qa(
+                db_session, original_cell_viewer
+            )
+        ] == [query.id]
+        assert professional_service.get_public_qa(db_session, new_cell_viewer) == []
+
+    def test_skips_a_malformed_answered_row_instead_of_raising(
+        self, db_session: Session, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """
+        status=ANSWERED should always come with an answer (answer_query()
+        sets both together) — but if that invariant is ever violated, e.g. by
+        a manual DB edit, one malformed row must not 500 the whole feed for
+        everyone. It's skipped and logged instead.
+        """
+        asker = _make_asker(db_session)
+        _make_query(
+            db_session, asker, is_public=True, status=QueryStatus.ANSWERED, answer=None
+        )
+        good = _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה תקינה לשאלה השנייה",
+        )
+
+        with caplog.at_level("ERROR"):
+            results = professional_service.get_public_qa(db_session, asker)
+
+        assert [r.id for r in results] == [good.id]
+        assert "skipping" in caplog.text
 
 
 class TestAnswerQuery:
