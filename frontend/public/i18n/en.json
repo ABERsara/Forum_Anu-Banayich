@@ -7,6 +7,27 @@
     "switch_to_hebrew": "Switch to Hebrew",
     "switch_to_english": "Switch to English"
   },
+  "errors": {
+    "dm_forbidden": "You don't have permission to send or view this message.",
+    "internal_server_error": "Internal server error. Please try again later.",
+    "generic": "Something went wrong. Please try again."
+  },
+  "messages": {
+    "inbox": {
+      "title": "My cell members",
+      "loading": "Loading cell members...",
+      "empty": "There are no other members in your cell yet."
+    },
+    "chat": {
+      "back_to_members": "← Back to cell members",
+      "title_fallback": "Conversation",
+      "loading": "Loading messages...",
+      "empty": "No messages yet. Write a message to get started.",
+      "new_message_label": "New message",
+      "placeholder": "Write a message...",
+      "send": "Send"
+    }
+  },
   "constants": {
     "user_type": {
       "widower": "Widower",

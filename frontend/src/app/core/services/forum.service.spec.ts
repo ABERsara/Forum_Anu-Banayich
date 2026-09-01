@@ -2,10 +2,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
-import { ForumService } from './forum.service';
+import { ForumService, buildConversationKey } from './forum.service';
 import { environment } from '../../../environments/environment';
 import { GroupVisibility, PostStatus, SectorVisibility } from '../constants';
-import type { ForumPost, ForumPostList } from '../models';
+import type { DirectMessage, ForumPost, ForumPostList, UserPublic } from '../models';
 
 const MOCK_POST: ForumPost = {
   id: 'post-1',
@@ -106,5 +106,59 @@ describe('ForumService', () => {
     const updatedPost: ForumPost = { ...MOCK_POST, title: 'כותרת מעודכנת' };
     req.flush(updatedPost);
     expect(result).toEqual(updatedPost);
+  });
+
+  describe('buildConversationKey', () => {
+    it('is order-independent', () => {
+      expect(buildConversationKey('id-a', 'id-b')).toBe(buildConversationKey('id-b', 'id-a'));
+    });
+
+    it('joins the sorted ids with a colon', () => {
+      expect(buildConversationKey('id-b', 'id-a')).toBe('id-a:id-b');
+    });
+  });
+
+  describe('direct messages', () => {
+    const MOCK_MESSAGE: DirectMessage = {
+      id: 'msg-1',
+      sender: { id: 'me-1', first_name: 'שרה', last_name: 'לוי' },
+      recipient: { id: 'other-1', first_name: 'רבקה', last_name: 'כהן' },
+      content: 'שלום',
+      is_read: false,
+      created_at: '2026-08-01T10:00:00',
+    };
+
+    it('sendMessage POSTs to /messages with the given data', () => {
+      let result: DirectMessage | undefined;
+      const data = { recipient_id: 'other-1', content: 'שלום' };
+      service.sendMessage(data).subscribe((res) => (result = res));
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/messages`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(data);
+      req.flush(MOCK_MESSAGE);
+      expect(result).toEqual(MOCK_MESSAGE);
+    });
+
+    it('getConversation GETs /conversations/{key}/messages using the sorted key', () => {
+      let result: DirectMessage[] | undefined;
+      service.getConversation('me-1', 'other-1').subscribe((res) => (result = res));
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/conversations/me-1:other-1/messages`);
+      expect(req.request.method).toBe('GET');
+      req.flush([MOCK_MESSAGE]);
+      expect(result).toEqual([MOCK_MESSAGE]);
+    });
+
+    it('getCellMembers GETs /cells/me/members', () => {
+      let result: UserPublic[] | undefined;
+      service.getCellMembers().subscribe((res) => (result = res));
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/cells/me/members`);
+      expect(req.request.method).toBe('GET');
+      const members: UserPublic[] = [{ id: 'other-1', first_name: 'רבקה', last_name: 'כהן' }];
+      req.flush(members);
+      expect(result).toEqual(members);
+    });
   });
 });

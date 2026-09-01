@@ -1,0 +1,52 @@
+<div class="chat">
+  <header class="chat__header">
+    <a routerLink="/messages">{{ 'messages.chat.back_to_members' | transloco }}</a>
+    <h1>{{ otherUserName() || ('messages.chat.title_fallback' | transloco) }}</h1>
+  </header>
+
+  <div class="chat__body" aria-live="polite" [attr.aria-busy]="isLoading()">
+    @if (isLoading()) {
+      <app-loading-spinner size="md" [message]="'messages.chat.loading' | transloco" />
+    } @else if (hasError()) {
+      <app-error-display [message]="loadErrorKey() | transloco" />
+    } @else if (messages().length === 0) {
+      <p>{{ 'messages.chat.empty' | transloco }}</p>
+    } @else {
+      <ul class="chat__messages">
+        @for (msg of messages(); track msg.id) {
+          <li
+            class="chat__message"
+            [class.chat__message--mine]="isMyMessage(msg)"
+            [class.chat__message--theirs]="!isMyMessage(msg)"
+          >
+            <span class="chat__bubble">{{ msg.content }}</span>
+          </li>
+        }
+      </ul>
+      <div #messagesEnd></div>
+    }
+  </div>
+
+  <form class="chat__composer" (submit)="$event.preventDefault(); sendMessage()">
+    @if (sendError()) {
+      <app-error-display [message]="sendErrorKey() | transloco" />
+    }
+    <div class="chat__composer-row">
+      <label class="chat__composer-label" for="chat-new-message">{{
+        'messages.chat.new_message_label' | transloco
+      }}</label>
+      <input
+        id="chat-new-message"
+        name="newMessage"
+        type="text"
+        [(ngModel)]="newMessage"
+        [placeholder]="'messages.chat.placeholder' | transloco"
+        maxlength="2000"
+        [disabled]="isSending()"
+      />
+      <button type="submit" [disabled]="!newMessage.trim() || isSending()">
+        {{ 'messages.chat.send' | transloco }}
+      </button>
+    </div>
+  </form>
+</div>

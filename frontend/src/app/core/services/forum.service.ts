@@ -4,8 +4,6 @@
  * TODO list for junior developer:
  *   [ ] implement reportPost() – POST /forum/posts/:id/report
  *   [ ] implement getInbox() – GET /messages
- *   [ ] implement sendMessage() – POST /messages
- *   [ ] implement getConversation() – GET /messages/:userId
  *   [ ] implement searchUsers() – GET /users/search?name=...
  */
 
@@ -24,6 +22,17 @@ import {
   UserPublic,
 } from '../models';
 import { ApiService } from './api.service';
+
+/**
+ * Deterministic conversation key for a pair of user ids — must produce the
+ * exact same string as the backend's forum_service.build_conversation_key()
+ * (Python's sorted() and this both sort ASCII UUID strings lexicographically,
+ * so they agree). Not a secret: both participants already know each other's
+ * id from the cell-members list.
+ */
+export function buildConversationKey(userIdA: string, userIdB: string): string {
+  return [userIdA, userIdB].sort().join(':');
+}
 
 @Injectable({ providedIn: 'root' })
 export class ForumService {
@@ -74,22 +83,22 @@ export class ForumService {
   }
 
   sendMessage(data: DirectMessageCreate): Observable<DirectMessage> {
-    void data;
-    /**
-     * TODO:
-     *   return this.api.post<DirectMessage>('/messages', data);
-     */
-    throw new Error('sendMessage() not yet implemented');
+    return this.api.post<DirectMessage>('/messages', data);
   }
 
-  getConversation(userId: string, page = 1): Observable<DirectMessage[]> {
-    void userId;
-    void page;
-    /**
-     * TODO:
-     *   return this.api.get<DirectMessage[]>(`/messages/${userId}?page=${page}`);
-     */
-    throw new Error('getConversation() not yet implemented');
+  /**
+   * Full history of the conversation with `otherUserId` (no pagination —
+   * out of scope for ABF-118). `conversation_key` is a deterministic,
+   * non-secret pairing of the two user ids — see buildConversationKey().
+   */
+  getConversation(myUserId: string, otherUserId: string): Observable<DirectMessage[]> {
+    const key = buildConversationKey(myUserId, otherUserId);
+    return this.api.get<DirectMessage[]>(`/conversations/${key}/messages`);
+  }
+
+  /** Other ACTIVE members of the current user's own cell (group+sector). */
+  getCellMembers(): Observable<UserPublic[]> {
+    return this.api.get<UserPublic[]>('/cells/me/members');
   }
 
   searchUsers(name: string): Observable<UserPublic[]> {

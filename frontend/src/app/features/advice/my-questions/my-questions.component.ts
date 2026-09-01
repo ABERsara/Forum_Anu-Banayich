@@ -3,7 +3,11 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { PROFESSIONAL_DOMAIN_LABELS, QUERY_STATUS_LABELS } from '../../../core/constants';
+import {
+  PROFESSIONAL_DOMAIN_LABELS,
+  QUERY_STATUS_LABELS,
+  QueryStatus,
+} from '../../../core/constants';
 import { ProfessionalQuery } from '../../../core/models';
 import { LabelService } from '../../../core/i18n/label.service';
 import { ProfessionalService } from '../../../core/services/professional.service';
@@ -27,6 +31,7 @@ export class MyQuestionsComponent implements OnInit {
 
   readonly domainLabels = PROFESSIONAL_DOMAIN_LABELS;
   readonly statusLabels = QUERY_STATUS_LABELS;
+  readonly queryStatus = QueryStatus;
 
   ngOnInit(): void {
     this.isLoading.set(true);

@@ -44,6 +44,7 @@ def upgrade() -> None:
                 "DATA_EXPORTED",
                 "USER_LOGIN",
                 "USER_LOGOUT",
+                "DIRECT_MESSAGE_ACCESS_DENIED",
                 name="auditaction",
             ),
             nullable=False,
