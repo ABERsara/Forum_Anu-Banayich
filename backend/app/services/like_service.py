@@ -19,17 +19,18 @@ from app.schemas.like import LikeResponse
 
 def _may_view_professional_query(query: ProfessionalQuery, user: User) -> bool:
     """
-    Temporary, isolated visibility check for PROFESSIONAL_QUERY — no such
-    check exists anywhere else in the code yet. ABF-140 will replace this
-    with a check against frozen visibility fields snapshotted on the query
-    itself; until then this joins through asker_id to the asker's live User
-    row, in the spirit of forum_service._content_filter.
+    Visibility check for PROFESSIONAL_QUERY, shared with the public Q&A feed
+    (see professional_service.get_public_qa()) — both compare against the
+    asker's cell as frozen onto the query at creation time
+    (asker_user_type/asker_sector), not a live join to the asker's current
+    profile. Keeps a single visibility mechanism instead of two: a user's
+    like access to an old question no longer shifts if they edit their own
+    profile later.
 
     ADMIN sees everything. USER sees their own question, or any public
-    question whose asker shares their group+sector (the "visible to all
-    members of the asker's group/sector" rule from professional.py's
-    docstring). PROFESSIONAL/MODERATOR are never expected here — the
-    endpoint's require_role blocks them first.
+    question whose asker's frozen cell matches their own. PROFESSIONAL/
+    MODERATOR are never expected here — the endpoint's require_role blocks
+    them first.
     """
     if user.role == UserRole.ADMIN:
         return True
@@ -40,12 +41,13 @@ def _may_view_professional_query(query: ProfessionalQuery, user: User) -> bool:
     if not query.is_public:
         return False
 
-    asker = query.asker
-    if asker.user_type is None or asker.sector is None:
+    if query.asker_user_type is None or query.asker_sector is None:
         return False
     if user.user_type is None or user.sector is None:
         return False
-    return bool(asker.user_type == user.user_type and asker.sector == user.sector)
+    return bool(
+        query.asker_user_type == user.user_type and query.asker_sector == user.sector
+    )
 
 
 def _like_count(db: Session, target_type: LikeTargetType, target_id: str) -> int:
