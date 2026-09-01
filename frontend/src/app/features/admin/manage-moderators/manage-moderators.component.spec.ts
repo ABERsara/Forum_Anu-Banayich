@@ -1,14 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ManageModeratorsComponent } from './manage-moderators.component';
 import { AdminService } from '../../../core/services/admin.service';
 import { AccountStatus, Sector, UserRole, UserType } from '../../../core/constants';
 import type { ModeratorAdminView } from '../../../core/models';
-import { translocoTesting } from '../../../../testing/transloco-testing';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 const WIDOWS_SEPHARDIC = { group: UserType.WIDOW, sector: Sector.SEPHARDIC };
 const WIDOWERS_SEPHARDIC = { group: UserType.WIDOWER, sector: Sector.SEPHARDIC };
@@ -26,6 +26,17 @@ function makeModerator(overrides: Partial<ModeratorAdminView> = {}): ModeratorAd
     created_at: '2026-06-30T04:18:27',
     ...overrides,
   };
+}
+
+/**
+ * A moderator whose own details carry no Hebrew.
+ *
+ * A person's name and email address are theirs, not UI — out of scope for this
+ * ticket and never translated. Feeding Latin details to the `HEBREW` sweeps
+ * below keeps them pointed at the copy they are meant to guard.
+ */
+function makeLatinModerator(overrides: Partial<ModeratorAdminView> = {}): ModeratorAdminView {
+  return makeModerator({ first_name: 'Sarah', last_name: 'Levy', ...overrides });
 }
 
 describe('ManageModeratorsComponent', () => {
@@ -201,7 +212,10 @@ describe('ManageModeratorsComponent', () => {
       });
       expect(component.moderators().map((m) => m.id)).toEqual(['m2', 'm1']);
       expect(component.isFormOpen()).toBe(false);
-      expect(component.successMessage()).toContain('רבקה אברמסון');
+      expect(component.successMessage()).toEqual({
+        key: 'admin.manage_moderators.appointed',
+        name: 'רבקה אברמסון',
+      });
     });
 
     it('sends null instead of a blank alert email', () => {
@@ -247,8 +261,10 @@ describe('ManageModeratorsComponent', () => {
       fillAddForm();
 
       component.save();
+      fixture.detectChanges();
 
-      expect(component.actionError()).toBe('כתובת המייל כבר רשומה במערכת');
+      expect(component.actionError()).toEqual({ key: '', text: 'כתובת המייל כבר רשומה במערכת' });
+      expect(fixture.nativeElement.textContent).toContain('כתובת המייל כבר רשומה במערכת');
       expect(component.isSaving()).toBe(false);
       expect(component.isFormOpen()).toBe(true);
     });
@@ -258,8 +274,13 @@ describe('ManageModeratorsComponent', () => {
       fillAddForm();
 
       component.save();
+      fixture.detectChanges();
 
-      expect(component.actionError()).toBe('אירעה שגיאה בשמירת הממונה. נסה שוב.');
+      expect(component.actionError()).toEqual({
+        key: 'admin.errors.save_moderator_failed',
+        text: '',
+      });
+      expect(fixture.nativeElement.textContent).toContain('אירעה שגיאה בשמירת הממונה. נסה שוב.');
     });
   });
 
@@ -288,7 +309,10 @@ describe('ManageModeratorsComponent', () => {
       });
       expect(component.moderators()).toEqual([updated]);
       expect(component.isFormOpen()).toBe(false);
-      expect(component.successMessage()).toBe('ההקצאות של שרה לוי עודכנו.');
+      expect(component.successMessage()).toEqual({
+        key: 'admin.manage_moderators.assignments_updated',
+        name: 'שרה לוי',
+      });
     });
 
     it('clears the alert email by sending null', () => {
@@ -332,7 +356,10 @@ describe('ManageModeratorsComponent', () => {
       expect(component.moderators()).toEqual([]);
       expect(component.pendingRemoval()).toBeNull();
       expect(component.isRemoving()).toBe(false);
-      expect(component.successMessage()).toContain('הוסר מרשימת הממונים');
+      expect(component.successMessage()).toEqual({
+        key: 'admin.manage_moderators.removed',
+        name: 'שרה לוי',
+      });
     });
 
     it('closes the form when the row it was editing is removed', () => {
@@ -363,10 +390,349 @@ describe('ManageModeratorsComponent', () => {
       component.askRemove(makeModerator());
 
       component.confirmRemove();
+      fixture.detectChanges();
 
-      expect(component.actionError()).toBe('הממונה כבר הוסר מהמערכת');
+      expect(component.actionError()).toEqual({ key: '', text: 'הממונה כבר הוסר מהמערכת' });
+      expect(fixture.nativeElement.textContent).toContain('הממונה כבר הוסר מהמערכת');
       expect(component.moderators().length).toBe(1);
       expect(component.isRemoving()).toBe(false);
+    });
+  });
+
+  describe('i18n', () => {
+    function text(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function heading(): string {
+      return fixture.nativeElement.querySelector('h1').textContent.trim();
+    }
+
+    function rowActionLabels(): (string | null)[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.roster__actions button'),
+      ).map((button) => button.getAttribute('aria-label'));
+    }
+
+    function switchToEnglish(): void {
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+    }
+
+    /**
+     * Rebuilds the screen against one set of service responses. The default
+     * roster carries Latin details, so the `HEBREW` sweeps below fail on our
+     * own copy rather than on a moderator's name.
+     */
+    async function renderWith(overrides: Partial<typeof adminServiceMock> = {}): Promise<void> {
+      TestBed.resetTestingModule();
+      adminServiceMock = {
+        getModerators: vi.fn().mockReturnValue(of([makeLatinModerator()])),
+        addModerator: vi.fn(),
+        updateModerator: vi.fn(),
+        removeModerator: vi.fn(),
+        ...overrides,
+      };
+
+      await TestBed.configureTestingModule({
+        imports: [ManageModeratorsComponent, translocoTesting()],
+        providers: [provideRouter([]), { provide: AdminService, useValue: adminServiceMock }],
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(ManageModeratorsComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    }
+
+    it('reads the roster in Hebrew exactly as it did before the keys went in', async () => {
+      await renderWith({ getModerators: vi.fn().mockReturnValue(of([makeModerator()])) });
+
+      expect(text()).toContain('חזרה ללוח הבקרה');
+      expect(heading()).toBe('ניהול ממונים');
+      expect(text()).toContain('הוספת ממונה');
+      expect(text()).toContain('ממונה מקבל התראה על דיווחים בתאים שהוצאו לו.');
+      expect(text()).toContain('התראות נשלחות אל: alerts.sara@example.com');
+      expect(text()).toContain('תאים באחריותו');
+      expect(text()).toContain('אלמנות – ספרדי');
+      expect(text()).toContain('עריכה');
+      expect(text()).toContain('הסרה');
+    });
+
+    it('leaves no Hebrew in the roster in English', async () => {
+      await renderWith();
+
+      switchToEnglish();
+
+      expect(heading()).toBe('Manage moderators');
+      expect(text()).toContain('Back to the dashboard');
+      expect(text()).toContain('Add a moderator');
+      expect(text()).toContain('A moderator is alerted to reports in the cells assigned to them.');
+      expect(text()).toContain('Alerts are sent to: alerts.sara@example.com');
+      expect(text()).toContain('The cells in their charge');
+      expect(text()).toContain('Widows – Sephardic');
+      expect(text()).toContain('Edit');
+      expect(text()).toContain('Remove');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('names each row action after the moderator, in the language on screen', async () => {
+      await renderWith();
+
+      expect(rowActionLabels()).toEqual(['עריכת Sarah Levy', 'הסרת Sarah Levy']);
+
+      switchToEnglish();
+
+      expect(rowActionLabels()).toEqual(['Edit Sarah Levy', 'Remove Sarah Levy']);
+    });
+
+    it('translates the line a moderator with no cells gets', async () => {
+      await renderWith({
+        getModerators: vi.fn().mockReturnValue(of([makeLatinModerator({ moderator_cells: [] })])),
+      });
+      expect(text()).toContain('לא הוצאו תאים.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('No cells are assigned.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('reads the appointment form in Hebrew exactly as it did before', async () => {
+      await renderWith();
+      component.openAddForm();
+      fixture.detectChanges();
+
+      expect(text()).toContain('שם פרטי');
+      expect(text()).toContain('שם משפחה');
+      expect(text()).toContain('דוא"ל');
+      expect(text()).toContain('דוא"ל להתראות (רשות)');
+      expect(text()).toContain('אם לא יוזן, ההתראות יישלחו לכתובת הדוא"ל של הממונה.');
+      expect(text()).toContain('תאים שבאחריות הממונה');
+      expect(text()).toContain('ביטול');
+    });
+
+    it('leaves no Hebrew in the appointment form in English', async () => {
+      await renderWith();
+      component.openAddForm();
+      fixture.detectChanges();
+
+      switchToEnglish();
+
+      expect(text()).toContain('First name');
+      expect(text()).toContain('Last name');
+      expect(text()).toContain('Email');
+      expect(text()).toContain('Alert email (optional)');
+      expect(text()).toContain(
+        "If it is left empty, alerts are sent to the moderator's own email address.",
+      );
+      expect(text()).toContain("The cells in the moderator's charge");
+      expect(text()).toContain('Cancel');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** The tally is a parameter, so the sentence can put it where each language does. */
+    it('counts the ticked cells inside one sentence, in both languages', async () => {
+      await renderWith();
+      component.openAddForm();
+      component.toggleCell(UserType.WIDOW, Sector.SEPHARDIC);
+      component.toggleCell(UserType.WIDOWER, Sector.SEPHARDIC);
+      fixture.detectChanges();
+      const caption = (): string =>
+        fixture.nativeElement.querySelector('.matrix__caption').textContent.trim();
+      expect(caption()).toBe('יש לסמן כל תא שבאחריות הממונה. נבחרו 2 תאים.');
+
+      switchToEnglish();
+
+      expect(caption()).toBe("Tick every cell in the moderator's charge. 2 cells are selected.");
+    });
+
+    /** Every checkbox in the matrix names its own cell, for a screen reader. */
+    it('names each cell checkbox in the language on screen', async () => {
+      await renderWith();
+      component.openAddForm();
+      fixture.detectChanges();
+      const firstCell = (): string | null =>
+        fixture.nativeElement.querySelector('.matrix__checkbox').getAttribute('aria-label');
+      expect(firstCell()).toBe('אלמנים – חסידי');
+
+      switchToEnglish();
+
+      expect(firstCell()).toBe('Widowers – Hasidic');
+    });
+
+    it('translates the validation messages an incomplete form raises', async () => {
+      await renderWith();
+      component.openAddForm();
+      component.form.patchValue({ alert_email: 'not-an-address' });
+      component.save();
+      fixture.detectChanges();
+
+      expect(text()).toContain('נא להזין שם פרטי (2 עד 100 תווים)');
+      expect(text()).toContain('נא להזין שם משפחה (2 עד 100 תווים)');
+      expect(text()).toContain('נא להזין כתובת דוא"ל תקינה');
+      expect(text()).toContain('נא לבחור לפחות תא אחד');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Please enter a first name (2 to 100 characters)');
+      expect(text()).toContain('Please enter a last name (2 to 100 characters)');
+      expect(text()).toContain('Please enter a valid email address');
+      expect(text()).toContain('Please choose at least one cell');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** The edit panel names the person; the appointment panel names the screen. */
+    it('translates the panel heading in both modes', async () => {
+      await renderWith();
+      component.openEditForm(makeLatinModerator());
+      fixture.detectChanges();
+      const panelTitle = (): string =>
+        fixture.nativeElement.querySelector('.panel__title').textContent.trim();
+      const panelLabel = (): string | null =>
+        fixture.nativeElement.querySelector('.panel').getAttribute('aria-label');
+      expect(panelTitle()).toBe('עריכת Sarah Levy');
+      expect(panelLabel()).toBe('עריכת ממונה');
+      expect(text()).toContain('שמירת שינויים');
+
+      switchToEnglish();
+
+      expect(panelTitle()).toBe('Edit Sarah Levy');
+      expect(panelLabel()).toBe('Edit a moderator');
+      expect(text()).toContain('Save changes');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the caption under the spinner while a save is in flight', async () => {
+      await renderWith({ addModerator: vi.fn().mockReturnValue(NEVER) });
+      component.openAddForm();
+      component.form.patchValue({
+        first_name: 'Rivka',
+        last_name: 'Abramson',
+        email: 'rivka@example.com',
+      });
+      component.toggleCell(UserType.WIDOW, Sector.SEPHARDIC);
+      component.save();
+      fixture.detectChanges();
+      expect(text()).toContain('שומר...');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Saving...');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the empty state', async () => {
+      await renderWith({ getModerators: vi.fn().mockReturnValue(of([])) });
+      expect(text()).toContain('עדיין לא מונו ממונים.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('No moderators have been appointed yet.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the caption under the spinner while the roster loads', async () => {
+      await renderWith({ getModerators: vi.fn().mockReturnValue(NEVER) });
+      expect(text()).toContain('טוען ממונים...');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Loading moderators...');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** Our own copy is a key, so a failure already on screen follows the switch. */
+    it('re-renders the load failure in the new language', async () => {
+      await renderWith({ getModerators: vi.fn().mockReturnValue(throwError(() => ({}))) });
+      expect(text()).toContain('אירעה שגיאה בטעינת הממונים. נסה לרענן את הדף.');
+
+      switchToEnglish();
+
+      expect(text()).toContain(
+        'Something went wrong loading the moderators. Please refresh the page.',
+      );
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('re-renders our own removal failure in the new language', async () => {
+      await renderWith({ removeModerator: vi.fn().mockReturnValue(throwError(() => ({}))) });
+
+      component.askRemove(makeLatinModerator());
+      component.confirmRemove();
+      fixture.detectChanges();
+      expect(text()).toContain('אירעה שגיאה בהסרת הממונה. נסה שוב.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Something went wrong removing the moderator.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** The sentence the API wrote is not ours to translate — it stays put. */
+    it('leaves the sentence the API sent exactly as it came', async () => {
+      await renderWith({
+        removeModerator: vi
+          .fn()
+          .mockReturnValue(throwError(() => ({ error: { detail: 'הממונה כבר הוסר מהמערכת' } }))),
+      });
+
+      component.askRemove(makeLatinModerator());
+      component.confirmRemove();
+      fixture.detectChanges();
+
+      switchToEnglish();
+
+      expect(text()).toContain('הממונה כבר הוסר מהמערכת');
+    });
+
+    /** The confirmation names the person, so it is a key *and* a parameter. */
+    it('re-renders a confirmation that is already on screen, name and all', async () => {
+      await renderWith({ removeModerator: vi.fn().mockReturnValue(of(undefined)) });
+
+      component.askRemove(makeLatinModerator());
+      component.confirmRemove();
+      fixture.detectChanges();
+      expect(text()).toContain('Sarah Levy הוסר מרשימת הממונים.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Sarah Levy was removed from the moderator roster.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the copy it hands the removal dialog, name and all', async () => {
+      await renderWith();
+
+      component.askRemove(makeLatinModerator());
+      fixture.detectChanges();
+      expect(text()).toContain('הסרת ממונה');
+      expect(text()).toContain('Sarah Levy יוסר מרשימת הממונים ולא יקבל עוד התראות על דיווחים.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Remove moderator');
+      expect(text()).toContain(
+        'Sarah Levy will be removed from the moderator roster and will no longer receive report alerts.',
+      );
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** A moderator's name and address are content, not UI: they survive the switch. */
+    it('leaves what the moderator is called alone', async () => {
+      await renderWith({ getModerators: vi.fn().mockReturnValue(of([makeModerator()])) });
+
+      switchToEnglish();
+
+      expect(text()).toContain('שרה לוי');
+      expect(text()).toContain('alerts.sara@example.com');
+    });
+
+    it('does not pin its own text direction — it follows <html dir>', async () => {
+      await renderWith();
+
+      const page = fixture.nativeElement.querySelector('.page') as HTMLElement;
+      expect(page.hasAttribute('dir')).toBe(false);
+      expect(page.style.direction).toBe('');
     });
   });
 });

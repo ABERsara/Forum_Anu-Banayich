@@ -1,26 +1,33 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
 <div class="page">
-  <a routerLink="/admin">← חזרה ללוח הבקרה</a>
+  <a routerLink="/admin">← {{ 'admin.back_to_dashboard' | transloco }}</a>
 
-  <h1>הרשמות ממתינות לאישור</h1>
-  <p class="page__hint">
-    כל הרשמה טעונה אישור של שני מנהלים. יש לפתוח את הבקשה, לבחון את הפרטים והמסמכים שהוגשו, ורק אז
-    לאשר או לדחות.
-  </p>
+  <h1>{{ 'admin.pending_registrations.title' | transloco }}</h1>
+  <p class="page__hint">{{ 'admin.pending_registrations.hint' | transloco }}</p>
 
-  <app-error-display [message]="actionError() ?? ''" />
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch. -->
+  @if (actionError().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (actionError().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
 
   @if (isLoading()) {
-    <app-loading-spinner message="טוען הרשמות..." />
+    <app-loading-spinner [message]="'admin.pending_registrations.loading' | transloco" />
   } @else if (hasError()) {
-    <app-error-display message="אירעה שגיאה בטעינת ההרשמות. נסי לרענן את הדף." />
+    <app-error-display [message]="'admin.errors.load_registrations_failed' | transloco" />
   } @else if (registrations().length === 0) {
-    <p>אין הרשמות ממתינות כרגע.</p>
+    <p>{{ 'admin.pending_registrations.empty' | transloco }}</p>
   } @else {
     <ul class="queue">
       @for (reg of registrations(); track reg.id) {
         <li class="queue__item">
           <div class="queue__row">
             <div class="queue__summary">
+              <!-- An applicant's own name and address are theirs, not UI:
+                   shown as they came, in either interface language. -->
               <h2 class="queue__name">{{ fullName(reg) }}</h2>
               <p class="queue__meta">
                 <span>{{ reg.email }}</span>
@@ -30,7 +37,15 @@
                 @if (reg.sector) {
                   <span> · {{ sectorLabels[reg.sector] | transloco }}</span>
                 }
-                <span> · הוגשה ב-{{ reg.created_at | date: 'dd/MM/yyyy' }}</span>
+                <!-- The date sits inside the sentence, so it goes in as a
+                     parameter: English puts it after "Submitted on". -->
+                <span>
+                  ·
+                  {{
+                    'admin.pending_registrations.submitted_on'
+                      | transloco: { date: reg.created_at | date: 'dd/MM/yyyy' }
+                  }}
+                </span>
               </p>
               <span class="badge">{{ statusLabels[reg.account_status] | transloco }}</span>
             </div>
@@ -41,25 +56,37 @@
                 [ariaExpanded]="isOpen(reg.id)"
                 [ariaControls]="'registration-detail-' + reg.id"
                 [ariaLabel]="
-                  (isOpen(reg.id) ? 'סגירת פרטי הבקשה של ' : 'בדיקת הבקשה של ') + fullName(reg)
+                  (isOpen(reg.id)
+                    ? 'admin.pending_registrations.close_aria'
+                    : 'admin.pending_registrations.review_aria'
+                  ) | transloco: { name: fullName(reg) }
                 "
                 (clicked)="toggleDetail(reg.id)"
               >
-                {{ isOpen(reg.id) ? 'סגירה' : 'בדיקה' }}
+                {{
+                  (isOpen(reg.id)
+                    ? 'admin.pending_registrations.close'
+                    : 'admin.pending_registrations.review'
+                  ) | transloco
+                }}
               </app-button>
               <app-button
                 variant="primary"
-                [ariaLabel]="'אישור הבקשה של ' + fullName(reg)"
+                [ariaLabel]="
+                  'admin.pending_registrations.approve_aria' | transloco: { name: fullName(reg) }
+                "
                 (clicked)="approve(reg.id)"
               >
-                אישור
+                {{ 'admin.pending_registrations.approve' | transloco }}
               </app-button>
               <app-button
                 variant="danger"
-                [ariaLabel]="'דחיית הבקשה של ' + fullName(reg)"
+                [ariaLabel]="
+                  'admin.pending_registrations.reject_aria' | transloco: { name: fullName(reg) }
+                "
                 (clicked)="reject(reg.id)"
               >
-                דחייה
+                {{ 'admin.pending_registrations.reject' | transloco }}
               </app-button>
             </div>
           </div>
@@ -69,76 +96,98 @@
             <section
               class="detail"
               [id]="'registration-detail-' + reg.id"
-              [attr.aria-label]="'פרטי הבקשה של ' + fullName(reg)"
+              [attr.aria-label]="
+                'admin.pending_registrations.details_aria' | transloco: { name: fullName(reg) }
+              "
             >
               @if (isDetailLoading()) {
-                <app-loading-spinner message="טוען את פרטי הבקשה..." />
-              } @else if (detailError()) {
-                <app-error-display [message]="detailError()" />
+                <app-loading-spinner
+                  [message]="'admin.pending_registrations.loading_detail' | transloco"
+                />
+              } @else if (detailError().text; as text) {
+                <app-error-display [message]="text" />
+              } @else if (detailError().key; as key) {
+                <app-error-display [message]="key | transloco" />
               } @else if (detail(); as request) {
-                <p class="detail__progress">{{ approvalProgress(request) }}</p>
+                <p class="detail__progress">{{ progressKey(request) | transloco }}</p>
 
-                <h3 class="detail__title">פרטי המבקש/ת</h3>
+                <h3 class="detail__title">
+                  {{ 'admin.pending_registrations.applicant_title' | transloco }}
+                </h3>
                 <dl class="detail__fields">
                   <div class="detail__field">
-                    <dt>שם מלא</dt>
+                    <dt>{{ 'admin.pending_registrations.full_name_label' | transloco }}</dt>
                     <dd>{{ fullName(request) }}</dd>
                   </div>
                   <div class="detail__field">
-                    <dt>סוג משתמש</dt>
+                    <dt>{{ 'admin.pending_registrations.user_type_label' | transloco }}</dt>
                     <dd>{{ userTypeLabel(request) }}</dd>
                   </div>
                   <div class="detail__field">
-                    <dt>מגזר</dt>
+                    <dt>{{ 'admin.pending_registrations.sector_label' | transloco }}</dt>
                     <dd>{{ sectorLabel(request) }}</dd>
                   </div>
                   <div class="detail__field">
-                    <dt>תעודת זהות</dt>
+                    <dt>{{ 'admin.pending_registrations.id_number_label' | transloco }}</dt>
                     <dd>
                       {{ orNotProvided(request.id_number) }}
-                      <span class="detail__note">מוצגת כפי שנשמרה — הערך מוצפן במסד הנתונים.</span>
+                      <span class="detail__note">
+                        {{ 'admin.pending_registrations.id_number_note' | transloco }}
+                      </span>
                     </dd>
                   </div>
                   <div class="detail__field">
-                    <dt>תאריך לידה</dt>
+                    <dt>{{ 'admin.pending_registrations.birth_date_label' | transloco }}</dt>
                     <dd>
                       {{
-                        request.birth_date ? (request.birth_date | date: 'dd/MM/yyyy') : notProvided
+                        request.birth_date
+                          ? (request.birth_date | date: 'dd/MM/yyyy')
+                          : ('admin.pending_registrations.not_provided' | transloco)
                       }}
                     </dd>
                   </div>
                   <div class="detail__field">
-                    <dt>דוא"ל</dt>
+                    <dt>{{ 'admin.pending_registrations.email_label' | transloco }}</dt>
                     <dd>{{ request.email }}</dd>
                   </div>
                   <div class="detail__field">
-                    <dt>טלפון</dt>
+                    <dt>{{ 'admin.pending_registrations.phone_label' | transloco }}</dt>
                     <dd>{{ orNotProvided(request.phone) }}</dd>
                   </div>
                   <div class="detail__field">
-                    <dt>תאריך הגשה</dt>
+                    <dt>{{ 'admin.pending_registrations.submitted_at_label' | transloco }}</dt>
                     <dd>{{ request.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
                   </div>
                   <div class="detail__field">
-                    <dt>סטטוס</dt>
+                    <dt>{{ 'admin.pending_registrations.status_label' | transloco }}</dt>
                     <dd>{{ statusLabels[request.account_status] | transloco }}</dd>
                   </div>
                 </dl>
 
-                <h3 class="detail__title">מסמכים שהועלו</h3>
+                <h3 class="detail__title">
+                  {{ 'admin.pending_registrations.documents_title' | transloco }}
+                </h3>
                 @if (request.documents.length === 0) {
-                  <p class="detail__empty">לא הועלו מסמכים עם הבקשה.</p>
+                  <p class="detail__empty">
+                    {{ 'admin.pending_registrations.documents_empty' | transloco }}
+                  </p>
                 } @else {
                   <ul class="documents">
                     @for (document of request.documents; track document.id) {
                       <li class="documents__item">
                         <span class="badge">{{ documentLabel(document) }}</span>
                         <span class="documents__uploaded">
-                          הועלה ב-{{ document.uploaded_at | date: 'dd/MM/yyyy HH:mm' }}
+                          {{
+                            'admin.pending_registrations.uploaded_on'
+                              | transloco: { date: document.uploaded_at | date: 'dd/MM/yyyy HH:mm' }
+                          }}
                         </span>
                         @if (document.expires_on) {
                           <span class="documents__expiry">
-                            בתוקף עד {{ document.expires_on | date: 'dd/MM/yyyy' }}
+                            {{
+                              'admin.pending_registrations.valid_until'
+                                | transloco: { date: document.expires_on | date: 'dd/MM/yyyy' }
+                            }}
                           </span>
                         }
                       </li>
@@ -146,8 +195,7 @@
                   </ul>
                 }
                 <p class="detail__note">
-                  בשלב זה מוצגים פרטי המסמכים בלבד. צפייה בקבצים עצמם תתאפשר בקישור מאובטח ומוגבל
-                  בזמן, בגרסה הבאה.
+                  {{ 'admin.pending_registrations.documents_note' | transloco }}
                 </p>
               }
             </section>
@@ -157,15 +205,17 @@
     </ul>
   }
 
+  <!-- A shared component takes display text, not a key — the pipe runs here
+       (CONTRIBUTING §6). -->
   @if (rejectingId()) {
     <app-confirm-dialog
-      title="דחיית הרשמה"
-      message="פעולה זו תדחה את ההרשמה ותשלח למועמד הודעה עם הסיבה."
-      confirmText="דחייה"
+      [title]="'admin.pending_registrations.reject_dialog_title' | transloco"
+      [message]="'admin.pending_registrations.reject_dialog_message' | transloco"
+      [confirmText]="'admin.pending_registrations.reject' | transloco"
       [isDestructive]="true"
       [requireInput]="true"
-      inputLabel="סיבת הדחייה"
-      inputPlaceholder="לדוגמה: מסמכים חסרים"
+      [inputLabel]="'admin.pending_registrations.reject_reason_label' | transloco"
+      [inputPlaceholder]="'admin.pending_registrations.reject_reason_placeholder' | transloco"
       [inputMinLength]="5"
       (confirmed)="confirmReject($event)"
       (cancelled)="cancelReject()"

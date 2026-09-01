@@ -1,80 +1,111 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
 <div class="page">
-  <a routerLink="/admin">← חזרה ללוח הבקרה</a>
+  <a routerLink="/admin">← {{ 'admin.back_to_dashboard' | transloco }}</a>
 
   <div class="page__header">
-    <h1>ניהול ממונים</h1>
+    <h1>{{ 'admin.manage_moderators.title' | transloco }}</h1>
     @if (!isFormOpen()) {
-      <button type="button" class="btn btn--primary" (click)="openAddForm()">הוספת ממונה</button>
+      <button type="button" class="btn btn--primary" (click)="openAddForm()">
+        {{ 'admin.manage_moderators.add' | transloco }}
+      </button>
     }
   </div>
 
-  <p class="page__hint">
-    ממונה מקבל התראה על דיווחים בתאים שהוצאו לו. תא הוא הצלבה של קבוצה ומגזר, למשל "אלמנות – ספרדי".
-  </p>
+  <p class="page__hint">{{ 'admin.manage_moderators.hint' | transloco }}</p>
 
-  <app-error-display [message]="actionError()" />
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch. -->
+  @if (actionError().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (actionError().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
 
-  @if (successMessage()) {
-    <p class="success-message" role="status">{{ successMessage() }}</p>
+  <!-- Our own confirmation is a key too, and the name it reports is its
+       parameter — the two cannot be two nodes, or English keeps the Hebrew
+       word order (CONTRIBUTING §6). -->
+  @if (successMessage(); as message) {
+    <p class="success-message" role="status">
+      {{ message.key | transloco: { name: message.name } }}
+    </p>
   }
 
   <!-- ─────────────────────────── טופס הוספה / עריכה ─────────────────────────── -->
   @if (isFormOpen()) {
-    <section class="panel" [attr.aria-label]="editing() ? 'עריכת ממונה' : 'הוספת ממונה'">
+    <section
+      class="panel"
+      [attr.aria-label]="
+        (editing() ? 'admin.manage_moderators.edit' : 'admin.manage_moderators.add') | transloco
+      "
+    >
       <h2 class="panel__title">
-        {{ editing() ? 'עריכת ' + fullName(editing()!) : 'הוספת ממונה' }}
+        @if (editing(); as moderator) {
+          {{ 'admin.person_form.edit_name' | transloco: { name: fullName(moderator) } }}
+        } @else {
+          {{ 'admin.manage_moderators.add' | transloco }}
+        }
       </h2>
 
       <form [formGroup]="form" (ngSubmit)="save()" novalidate>
         @if (!editing()) {
           <div class="form-row">
             <div class="form-field">
-              <label for="first_name">שם פרטי</label>
+              <label for="first_name">{{ 'admin.person_form.first_name_label' | transloco }}</label>
               <input id="first_name" type="text" formControlName="first_name" autocomplete="off" />
               @if (form.controls.first_name.invalid && form.controls.first_name.touched) {
-                <span class="field-error">נא להזין שם פרטי (2 עד 100 תווים)</span>
+                <span class="field-error">
+                  {{ 'admin.person_form.first_name_error' | transloco }}
+                </span>
               }
             </div>
 
             <div class="form-field">
-              <label for="last_name">שם משפחה</label>
+              <label for="last_name">{{ 'admin.person_form.last_name_label' | transloco }}</label>
               <input id="last_name" type="text" formControlName="last_name" autocomplete="off" />
               @if (form.controls.last_name.invalid && form.controls.last_name.touched) {
-                <span class="field-error">נא להזין שם משפחה (2 עד 100 תווים)</span>
+                <span class="field-error">
+                  {{ 'admin.person_form.last_name_error' | transloco }}
+                </span>
               }
             </div>
           </div>
 
           <div class="form-field">
-            <label for="email">דוא"ל</label>
+            <label for="email">{{ 'admin.person_form.email_label' | transloco }}</label>
             <input id="email" type="email" formControlName="email" autocomplete="off" />
             @if (form.controls.email.invalid && form.controls.email.touched) {
-              <span class="field-error">נא להזין כתובת דוא"ל תקינה</span>
+              <span class="field-error">{{ 'admin.person_form.email_error' | transloco }}</span>
             }
           </div>
         }
 
         <div class="form-field">
-          <label for="alert_email">דוא"ל להתראות (רשות)</label>
+          <label for="alert_email">
+            {{ 'admin.manage_moderators.alert_email_label' | transloco }}
+          </label>
           <input id="alert_email" type="email" formControlName="alert_email" autocomplete="off" />
-          <span class="field-hint">אם לא יוזן, ההתראות יישלחו לכתובת הדוא"ל של הממונה.</span>
+          <span class="field-hint">
+            {{ 'admin.manage_moderators.alert_email_hint' | transloco }}
+          </span>
           @if (form.controls.alert_email.invalid && form.controls.alert_email.touched) {
-            <span class="field-error">נא להזין כתובת דוא"ל תקינה</span>
+            <span class="field-error">{{ 'admin.person_form.email_error' | transloco }}</span>
           }
         </div>
 
         <!-- מטריצת התאים: שורה לכל קבוצה, עמודה לכל מגזר -->
         <fieldset class="matrix">
-          <legend>תאים שבאחריות הממונה</legend>
+          <legend>{{ 'admin.manage_moderators.cells_legend' | transloco }}</legend>
 
           <div class="matrix__scroll">
             <table class="matrix__table">
+              <!-- The tally sits inside the sentence, so it goes in as a
+                   parameter rather than as a node of its own. -->
               <caption class="matrix__caption">
-                יש לסמן כל תא שבאחריות הממונה. נבחרו
                 {{
-                  selectedCellCount()
+                  'admin.manage_moderators.cells_caption'
+                    | transloco: { count: selectedCellCount() }
                 }}
-                תאים.
               </caption>
               <thead>
                 <tr>
@@ -90,6 +121,8 @@
                     <th scope="row">{{ groupLabels[group] | transloco }}</th>
                     @for (sector of sectors; track sector) {
                       <td>
+                        <!-- Two shared labels joined by a dash: both sides are
+                             already keys, and the pair has none of its own. -->
                         <input
                           type="checkbox"
                           class="matrix__checkbox"
@@ -110,20 +143,23 @@
           </div>
 
           @if (form.controls.moderator_cells.invalid && form.controls.moderator_cells.touched) {
-            <span class="field-error">נא לבחור לפחות תא אחד</span>
+            <span class="field-error">{{ 'admin.manage_moderators.cells_error' | transloco }}</span>
           }
         </fieldset>
 
         @if (isSaving()) {
-          <app-loading-spinner message="שומר..." />
+          <app-loading-spinner [message]="'admin.person_form.saving' | transloco" />
         }
 
         <div class="panel__actions">
           <button type="submit" class="btn btn--primary" [disabled]="isSaving()">
-            {{ editing() ? 'שמירת שינויים' : 'הוספת ממונה' }}
+            {{
+              (editing() ? 'admin.person_form.save_changes' : 'admin.manage_moderators.add')
+                | transloco
+            }}
           </button>
           <button type="button" class="btn" (click)="closeForm()" [disabled]="isSaving()">
-            ביטול
+            {{ 'common.cancel' | transloco }}
           </button>
         </div>
       </form>
@@ -132,22 +168,31 @@
 
   <!-- ───────────────────────────── רשימת הממונים ───────────────────────────── -->
   @if (isLoading()) {
-    <app-loading-spinner message="טוען ממונים..." />
+    <app-loading-spinner [message]="'admin.manage_moderators.loading' | transloco" />
   } @else if (hasError()) {
-    <app-error-display message="אירעה שגיאה בטעינת הממונים. נסה לרענן את הדף." />
+    <app-error-display [message]="'admin.errors.load_moderators_failed' | transloco" />
   } @else if (moderators().length === 0) {
-    <p>עדיין לא מונו ממונים.</p>
+    <p>{{ 'admin.manage_moderators.empty' | transloco }}</p>
   } @else {
     <ul class="roster">
       @for (moderator of moderators(); track moderator.id) {
         <li class="roster__item">
           <div class="roster__main">
+            <!-- A moderator's own name and address are theirs, not UI: shown
+                 as they came, in either interface language. -->
             <h2 class="roster__name">{{ fullName(moderator) }}</h2>
-            <p class="roster__alert">התראות נשלחות אל: {{ alertAddress(moderator) }}</p>
+            <p class="roster__alert">
+              {{
+                'admin.manage_moderators.alerts_sent_to'
+                  | transloco: { email: alertAddress(moderator) }
+              }}
+            </p>
 
-            <h3 class="roster__cells-title">תאים באחריותו</h3>
+            <h3 class="roster__cells-title">
+              {{ 'admin.manage_moderators.cells_title' | transloco }}
+            </h3>
             @if (moderator.moderator_cells.length === 0) {
-              <p class="roster__no-cells">לא הוצאו תאים.</p>
+              <p class="roster__no-cells">{{ 'admin.manage_moderators.no_cells' | transloco }}</p>
             } @else {
               <ul class="roster__cells">
                 @for (cell of moderator.moderator_cells; track cell.group + '|' + cell.sector) {
@@ -161,19 +206,23 @@
             <button
               type="button"
               class="btn"
-              [attr.aria-label]="'עריכת ' + fullName(moderator)"
+              [attr.aria-label]="
+                'admin.person_form.edit_name' | transloco: { name: fullName(moderator) }
+              "
               (click)="openEditForm(moderator)"
             >
-              עריכה
+              {{ 'admin.person_form.edit' | transloco }}
             </button>
             <button
               type="button"
               class="btn btn--danger"
               [disabled]="isRemoving() && pendingRemoval()?.id === moderator.id"
-              [attr.aria-label]="'הסרת ' + fullName(moderator)"
+              [attr.aria-label]="
+                'admin.manage_moderators.remove_name' | transloco: { name: fullName(moderator) }
+              "
               (click)="askRemove(moderator)"
             >
-              הסרה
+              {{ 'admin.manage_moderators.remove' | transloco }}
             </button>
           </div>
         </li>
@@ -181,11 +230,15 @@
     </ul>
   }
 
+  <!-- A shared component takes display text, not a key — the pipe runs here
+       (CONTRIBUTING §6). -->
   @if (pendingRemoval(); as moderator) {
     <app-confirm-dialog
-      title="הסרת ממונה"
-      [message]="fullName(moderator) + ' יוסר מרשימת הממונים ולא יקבל עוד התראות על דיווחים.'"
-      confirmText="הסרה"
+      [title]="'admin.manage_moderators.remove_dialog_title' | transloco"
+      [message]="
+        'admin.manage_moderators.remove_dialog_message' | transloco: { name: fullName(moderator) }
+      "
+      [confirmText]="'admin.manage_moderators.remove' | transloco"
       [isDestructive]="true"
       (confirmed)="confirmRemove()"
       (cancelled)="cancelRemove()"

@@ -34,7 +34,9 @@ import {
   ModeratorUpdateRequest,
 } from '../../../core/models';
 import { LabelService } from '../../../core/i18n/label.service';
+import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { AdminService } from '../../../core/services/admin.service';
+import { ActionMessage } from '../action-message';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -68,8 +70,10 @@ export class ManageModeratorsComponent implements OnInit {
   readonly moderators = signal<ModeratorAdminView[]>([]);
   readonly isLoading = signal(false);
   readonly hasError = signal(false);
-  readonly actionError = signal('');
-  readonly successMessage = signal('');
+  /** What went wrong on save or remove, as a key of ours or the API's own sentence. */
+  readonly actionError = signal<ScreenError>(NO_ERROR);
+  /** Our own confirmation, held as a key and a name so it follows a language switch. */
+  readonly successMessage = signal<ActionMessage | null>(null);
   readonly isSaving = signal(false);
   readonly isFormOpen = signal(false);
   /** The moderator being edited; null while the form is appointing a new one. */
@@ -231,16 +235,22 @@ export class ManageModeratorsComponent implements OnInit {
       next: (saved) => {
         if (editing) {
           this.replaceRow(saved);
-          this.successMessage.set(`ההקצאות של ${this.fullName(saved)} עודכנו.`);
+          this.successMessage.set({
+            key: 'admin.manage_moderators.assignments_updated',
+            name: this.fullName(saved),
+          });
         } else {
           this.insertRow(saved);
-          this.successMessage.set(`${this.fullName(saved)} מונה לממונה.`);
+          this.successMessage.set({
+            key: 'admin.manage_moderators.appointed',
+            name: this.fullName(saved),
+          });
         }
         this.isSaving.set(false);
         this.closeForm();
       },
       error: (err: HttpErrorResponse) => {
-        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בשמירת הממונה. נסה שוב.'));
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.save_moderator_failed'));
         this.isSaving.set(false);
       },
     });
@@ -269,7 +279,10 @@ export class ManageModeratorsComponent implements OnInit {
     this.adminService.removeModerator(moderator.id).subscribe({
       next: () => {
         this.moderators.update((rows) => rows.filter((row) => row.id !== moderator.id));
-        this.successMessage.set(`${this.fullName(moderator)} הוסר מרשימת הממונים.`);
+        this.successMessage.set({
+          key: 'admin.manage_moderators.removed',
+          name: this.fullName(moderator),
+        });
         // The form cannot stay open on a row that is no longer on the roster.
         if (this.editing()?.id === moderator.id) {
           this.closeForm();
@@ -278,7 +291,7 @@ export class ManageModeratorsComponent implements OnInit {
         this.pendingRemoval.set(null);
       },
       error: (err: HttpErrorResponse) => {
-        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בהסרת הממונה. נסה שוב.'));
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.remove_moderator_failed'));
         this.isRemoving.set(false);
         this.pendingRemoval.set(null);
       },
@@ -353,13 +366,8 @@ export class ManageModeratorsComponent implements OnInit {
     );
   }
 
-  private messageFrom(err: HttpErrorResponse, fallback: string): string {
-    const detail: unknown = err.error?.detail;
-    return typeof detail === 'string' ? detail : fallback;
-  }
-
   private clearMessages(): void {
-    this.actionError.set('');
-    this.successMessage.set('');
+    this.actionError.set(NO_ERROR);
+    this.successMessage.set(null);
   }
 }
