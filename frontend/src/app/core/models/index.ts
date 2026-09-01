@@ -341,6 +341,17 @@ export interface PublicQA {
   domain: ProfessionalDomain | null;
   is_featured: boolean;
   answered_at: string | null;
+  like_count: number;
+  liked_by_me: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Likes
+// ---------------------------------------------------------------------------
+
+export interface LikeResponse {
+  liked: boolean;
+  like_count: number;
 }
 
 // ---------------------------------------------------------------------------
