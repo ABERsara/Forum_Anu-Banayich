@@ -71,19 +71,22 @@ def ask_question(
     return professional_service.create_query(db, data, current_user)
 
 
-@router.get("/questions/public", response_model=list[PublicQAResponse])
+@router.get(
+    "/questions/public",
+    response_model=list[PublicQAResponse],
+    dependencies=[Depends(require_role(UserRole.USER, UserRole.ADMIN))],
+)
 def public_qa_feed(
     domain: ProfessionalDomain | None = Query(None),
     page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[PublicQAResponse]:
     """
     Public Q&A knowledge base – answered questions visible to the user's group/sector.
-
-    TODO: call professional_service.get_public_qa(db, current_user, domain, page)
     """
-    return []
+    return professional_service.get_public_qa(db, current_user, domain, page, page_size)
 
 
 @router.get(

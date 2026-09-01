@@ -59,5 +59,7 @@ class PublicQAResponse(BaseModel):
     domain: ProfessionalDomain | None = None
     is_featured: bool
     answered_at: datetime | None = None
+    like_count: int
+    liked_by_me: bool
 
     model_config = {"from_attributes": True}
