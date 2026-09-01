@@ -144,19 +144,40 @@ describe('AdminDashboardComponent', () => {
     });
 
     /**
-     * The card and four of the nav links name the pages they open rather than
-     * describing them, so each renders that page's own title key. If one of
-     * those keys is renamed, this is what says so.
+     * Two of the nav links name a page this ticket migrates itself, in that
+     * page's exact words, so each renders that page's own title key instead of
+     * holding a second copy of them. If one of those keys is renamed, this is
+     * what says so.
      */
-    it("calls each page it links to by the page's own title", async () => {
+    it("calls the two pages it migrates by the page's own title", async () => {
       await renderWith(vi.fn().mockReturnValue(of([REGISTRATION])));
       const transloco = TestBed.inject(TranslocoService);
 
-      expect(text()).toContain(transloco.translate('admin.pending_registrations.title'));
       expect(navLabels()).toContain(transloco.translate('admin.active_users.title'));
-      expect(navLabels()).toContain(transloco.translate('admin.manage_professionals.title'));
-      expect(navLabels()).toContain(transloco.translate('admin.manage_moderators.title'));
       expect(navLabels()).toContain(transloco.translate('admin.broadcast.title'));
+    });
+
+    /**
+     * The card and the two management links point at screens ABF-133 migrates,
+     * so their copy is the dashboard's own: this ticket does not define — or
+     * borrow — a title key for a screen it never touches. The rename below is
+     * what the sharing would have leaked through.
+     */
+    it('keeps its own copy for the pages another ticket migrates', async () => {
+      await renderWith(vi.fn().mockReturnValue(of([REGISTRATION])));
+      const transloco = TestBed.inject(TranslocoService);
+
+      expect(text()).toContain(transloco.translate('admin.dashboard.pending_card_label'));
+      expect(navLabels()).toContain(transloco.translate('admin.dashboard.nav_professionals'));
+      expect(navLabels()).toContain(transloco.translate('admin.dashboard.nav_moderators'));
+
+      transloco.setTranslationKey('admin.manage_professionals.title', 'שם אחר לגמרי', {
+        lang: 'he',
+      });
+      fixture.detectChanges();
+
+      expect(navLabels()).toContain('ניהול אנשי מקצוע');
+      expect(text()).not.toContain('שם אחר לגמרי');
     });
 
     /**

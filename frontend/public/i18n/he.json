@@ -31,7 +31,10 @@
     },
     "dashboard": {
       "title": "לוח בקרה – מנהל",
+      "pending_card_label": "הרשמות ממתינות לאישור",
       "nav_registrations": "הרשמות ממתינות",
+      "nav_professionals": "ניהול אנשי מקצוע",
+      "nav_moderators": "ניהול ממונים",
       "nav_audit_log": "יומן פעולות",
       "nav_reports": "דיווחים"
     },

@@ -31,7 +31,10 @@
     },
     "dashboard": {
       "title": "Admin dashboard",
+      "pending_card_label": "Registrations awaiting approval",
       "nav_registrations": "Pending registrations",
+      "nav_professionals": "Manage professionals",
+      "nav_moderators": "Manage moderators",
       "nav_audit_log": "Audit log",
       "nav_reports": "Reports"
     },
