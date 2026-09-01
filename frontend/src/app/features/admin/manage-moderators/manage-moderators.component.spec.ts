@@ -288,6 +288,7 @@ describe('ManageModeratorsComponent', () => {
       });
       expect(component.moderators()).toEqual([updated]);
       expect(component.isFormOpen()).toBe(false);
+      expect(component.successMessage()).toBe('ההקצאות של שרה לוי עודכנו.');
     });
 
     it('clears the alert email by sending null', () => {

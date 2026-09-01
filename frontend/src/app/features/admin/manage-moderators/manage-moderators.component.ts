@@ -231,7 +231,7 @@ export class ManageModeratorsComponent implements OnInit {
       next: (saved) => {
         if (editing) {
           this.replaceRow(saved);
-          this.successMessage.set(`ההצאות של ${this.fullName(saved)} עודכנו.`);
+          this.successMessage.set(`ההקצאות של ${this.fullName(saved)} עודכנו.`);
         } else {
           this.insertRow(saved);
           this.successMessage.set(`${this.fullName(saved)} מונה לממונה.`);
