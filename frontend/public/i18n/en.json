@@ -15,6 +15,49 @@
     "register": "Sign up",
     "messages": "Messages"
   },
+  "admin": {
+    "back_to_dashboard": "Back to the dashboard",
+    "dashboard": {
+      "title": "Admin dashboard",
+      "nav_registrations": "Pending registrations",
+      "nav_audit_log": "Audit log",
+      "nav_reports": "Reports"
+    },
+    "pending_registrations": {
+      "title": "Registrations awaiting approval"
+    },
+    "active_users": {
+      "title": "Active users",
+      "empty": "There are no active users right now.",
+      "suspend": "Suspend",
+      "suspend_message": "This will suspend the user for the number of hours you set, and send them a message with the reason."
+    },
+    "manage_professionals": {
+      "title": "Manage professionals"
+    },
+    "manage_moderators": {
+      "title": "Manage moderators"
+    },
+    "broadcast": {
+      "title": "Broadcast to all users",
+      "hint": "The post will appear in the forum list of every active user, regardless of group or sector.",
+      "title_label": "Title",
+      "title_placeholder": "Broadcast title",
+      "title_error": "Please enter a title (2 to 256 characters)",
+      "content_label": "Content",
+      "content_placeholder": "Message content",
+      "content_error": "Please enter content (up to 5000 characters)",
+      "sending": "Sending broadcast...",
+      "submit": "Send broadcast",
+      "success": "The broadcast was sent to all users."
+    },
+    "errors": {
+      "load_pending_count_failed": "Something went wrong loading the number of pending registrations",
+      "load_users_failed": "Something went wrong loading the users. Please refresh the page.",
+      "suspend_failed": "Something went wrong suspending the user. Please try again.",
+      "broadcast_failed": "Something went wrong sending the broadcast."
+    }
+  },
   "advice": {
     "back_to_professionals": "Back to the professionals list",
     "list": {

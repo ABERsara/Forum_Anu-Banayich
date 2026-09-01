@@ -15,6 +15,49 @@
     "register": "הרשמה",
     "messages": "הודעות"
   },
+  "admin": {
+    "back_to_dashboard": "חזרה ללוח הבקרה",
+    "dashboard": {
+      "title": "לוח בקרה – מנהל",
+      "nav_registrations": "הרשמות ממתינות",
+      "nav_audit_log": "יומן פעולות",
+      "nav_reports": "דיווחים"
+    },
+    "pending_registrations": {
+      "title": "הרשמות ממתינות לאישור"
+    },
+    "active_users": {
+      "title": "משתמשים פעילים",
+      "empty": "אין משתמשים פעילים כרגע.",
+      "suspend": "השעה",
+      "suspend_message": "פעולה זו תשעה את המשתמש למספר השעות שנקבעו, ותשלח לו הודעה עם הסיבה."
+    },
+    "manage_professionals": {
+      "title": "ניהול אנשי מקצוע"
+    },
+    "manage_moderators": {
+      "title": "ניהול ממונים"
+    },
+    "broadcast": {
+      "title": "שידור לכלל המשתמשים",
+      "hint": "הפוסט יופיע ברשימת הפורום של כל המשתמשים הפעילים, ללא קשר לקבוצה או מגזר.",
+      "title_label": "כותרת",
+      "title_placeholder": "כותרת השידור",
+      "title_error": "נא להזין כותרת (2 עד 256 תווים)",
+      "content_label": "תוכן",
+      "content_placeholder": "תוכן ההודעה",
+      "content_error": "נא להזין תוכן (עד 5000 תווים)",
+      "sending": "שולח שידור...",
+      "submit": "שלח שידור",
+      "success": "השידור נשלח בהצלחה לכלל המשתמשים."
+    },
+    "errors": {
+      "load_pending_count_failed": "שגיאה בטעינת מספר ההרשמות הממתינות",
+      "load_users_failed": "אירעה שגיאה בטעינת המשתמשים. נסה לרענן את הדף.",
+      "suspend_failed": "אירעה שגיאה בהשעיית המשתמש. נסה שוב.",
+      "broadcast_failed": "שגיאה בשליחת השידור."
+    }
+  },
   "advice": {
     "back_to_professionals": "חזרה לרשימת אנשי מקצוע",
     "list": {
