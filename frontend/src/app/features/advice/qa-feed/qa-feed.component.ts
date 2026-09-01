@@ -13,6 +13,7 @@
 
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { PublicQA } from '../../../core/models';
 import { PROFESSIONAL_DOMAIN_LABELS, ProfessionalDomain } from '../../../core/constants';
@@ -21,12 +22,16 @@ import { ProfessionalService } from '../../../core/services/professional.service
 @Component({
   selector: 'app-qa-feed',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   template: `
-    <div style="padding: 1rem; direction: rtl">
-      <a routerLink="/advice">← חזרה לייעוץ מקצועי</a>
-      <h1>שאלות ותשובות קהילתיות</h1>
-      <!-- TODO: domain filter, list of Q&As, pagination -->
+    <!-- No direction here: the page inherits it from <html dir>, which
+         LocaleService sets from the active language (CONTRIBUTING §6). -->
+    <div style="padding: 1rem">
+      <a routerLink="/advice">← {{ 'advice.qa_feed.back_to_advice' | transloco }}</a>
+      <h1>{{ 'advice.qa_feed.title' | transloco }}</h1>
+      <!-- TODO: domain filter, list of Q&As, pagination — all still to be
+           written, and their copy needs keys of its own under advice.qa_feed.*
+           when it is. -->
       <p>TODO: implement Q&A feed</p>
     </div>
   `,

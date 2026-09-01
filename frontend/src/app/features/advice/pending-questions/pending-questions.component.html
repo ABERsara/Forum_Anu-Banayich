@@ -1,20 +1,28 @@
-<div class="pending-questions" dir="rtl">
-  <a routerLink="/home">← חזרה לעמוד הבית</a>
-  <h1 class="pending-questions__title">שאלות ממתינות לתשובה</h1>
-  <p class="pending-questions__intro">
-    השאלות מוצגות לפי סדר הגעתן — הוותיקה ביותר ראשונה. פרטי השואל/ת חסויים.
-  </p>
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="pending-questions">
+  <a routerLink="/home">← {{ 'advice.pending.back_to_home' | transloco }}</a>
+  <h1 class="pending-questions__title">{{ 'advice.pending.title' | transloco }}</h1>
+  <p class="pending-questions__intro">{{ 'advice.pending.intro' | transloco }}</p>
 
-  <app-error-display [message]="errorMessage()" />
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch. -->
+  @if (error().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (error().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
 
-  @if (successMessage()) {
-    <p class="pending-questions__success" role="status">{{ successMessage() }}</p>
+  <!-- Held as a key and piped here, so a confirmation already on screen
+       follows a language switch instead of freezing (CONTRIBUTING §6). -->
+  @if (successKey(); as key) {
+    <p class="pending-questions__success" role="status">{{ key | transloco }}</p>
   }
 
   @if (isLoading()) {
-    <app-loading-spinner message="טוען שאלות ממתינות..." />
+    <app-loading-spinner [message]="'advice.pending.loading' | transloco" />
   } @else if (questions().length === 0) {
-    <p class="pending-questions__empty">אין כרגע שאלות שממתינות לתשובתך.</p>
+    <p class="pending-questions__empty">{{ 'advice.pending.empty' | transloco }}</p>
   } @else {
     <form [formGroup]="answers">
       @for (question of questions(); track question.id) {
@@ -22,29 +30,40 @@
 
         <article class="question-card">
           <div class="question-card__meta">
+            <!-- The asker's alias or name, and the question itself, are not UI
+                 copy: shown as they came, in either interface language. -->
             <h2 class="question-card__asker">{{ askerLabel(question) }}</h2>
             @if (topic(question)) {
               <span class="question-card__topic">{{ topic(question) | transloco }}</span>
             }
-            <span>נשאלה ב-{{ question.created_at | date: 'dd/MM/yyyy' }}</span>
+            <span>
+              {{
+                'advice.pending.asked_on'
+                  | transloco: { date: question.created_at | date: 'dd/MM/yyyy' }
+              }}
+            </span>
           </div>
 
           <p class="question-card__content">{{ question.content }}</p>
 
           <div class="question-card__field">
-            <label [attr.for]="'answer-' + question.id">התשובה שלך</label>
+            <label [attr.for]="'answer-' + question.id">
+              {{ 'advice.pending.answer_label' | transloco }}
+            </label>
             <textarea
               [id]="'answer-' + question.id"
               [formControlName]="question.id"
               [attr.maxlength]="answerMaxLength"
               rows="6"
-              placeholder="כתוב/כתבי כאן את התשובה (10 עד 5000 תווים)"
+              [placeholder]="'advice.pending.answer_placeholder' | transloco"
             ></textarea>
             <span class="question-card__counter">
               {{ control.value.length }} / {{ answerMaxLength }}
             </span>
             @if (control.invalid && control.touched) {
-              <span class="question-card__error">נא להזין תשובה באורך 10 עד 5000 תווים</span>
+              <span class="question-card__error">
+                {{ 'advice.pending.answer_error' | transloco }}
+              </span>
             }
           </div>
 
@@ -54,7 +73,10 @@
             [disabled]="control.invalid || submittingId() === question.id"
             (click)="submit(question)"
           >
-            {{ submittingId() === question.id ? 'שולח תשובה...' : 'שליחת תשובה' }}
+            {{
+              (submittingId() === question.id ? 'advice.pending.sending' : 'advice.pending.submit')
+                | transloco
+            }}
           </button>
         </article>
       }

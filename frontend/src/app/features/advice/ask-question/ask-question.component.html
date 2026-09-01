@@ -1,66 +1,74 @@
-<div class="ask-question-page" dir="rtl">
-  <a routerLink="/advice">← חזרה לרשימת אנשי מקצוע</a>
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="ask-question-page">
+  <a routerLink="/advice">← {{ 'advice.back_to_professionals' | transloco }}</a>
 
   <div class="ask-question-card">
-    <h1 class="ask-question-title">שאלה מקצועית</h1>
+    <h1 class="ask-question-title">{{ 'advice.ask.title' | transloco }}</h1>
     @if (professionalId) {
-      <p class="ask-question-hint">השאלה תישלח לאיש המקצוע הנבחר.</p>
+      <p class="ask-question-hint">{{ 'advice.ask.hint_professional' | transloco }}</p>
     } @else {
-      <p class="ask-question-hint">בחר/י תחום — השאלה תישלח לכל אנשי המקצוע בתחום זה.</p>
+      <p class="ask-question-hint">{{ 'advice.ask.hint_domain' | transloco }}</p>
     }
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
       @if (!professionalId) {
         <div class="form-field">
-          <label for="domain">תחום</label>
+          <label for="domain">{{ 'advice.ask.domain_label' | transloco }}</label>
           <select id="domain" formControlName="domain">
-            <option [ngValue]="null">בחר/י תחום</option>
+            <option [ngValue]="null">{{ 'advice.ask.domain_placeholder' | transloco }}</option>
             @for (domain of domainOptions; track domain) {
               <option [ngValue]="domain">{{ domainLabels[domain] | transloco }}</option>
             }
           </select>
           @if (form.controls.domain.invalid && form.controls.domain.touched) {
-            <span class="field-error">נא לבחור תחום</span>
+            <span class="field-error">{{ 'advice.ask.domain_error' | transloco }}</span>
           }
         </div>
       }
 
       <div class="form-field">
-        <label for="content">השאלה שלך</label>
+        <label for="content">{{ 'advice.ask.content_label' | transloco }}</label>
         <textarea
           id="content"
           rows="8"
           formControlName="content"
-          placeholder="פרט/י את שאלתך (10 עד 2000 תווים)"
+          [placeholder]="'advice.ask.content_placeholder' | transloco"
         ></textarea>
         <span class="char-counter">{{ contentLength }} / 2000</span>
         @if (form.controls.content.invalid && form.controls.content.touched) {
-          <span class="field-error">נא להזין שאלה (10 עד 2000 תווים)</span>
+          <span class="field-error">{{ 'advice.ask.content_error' | transloco }}</span>
         }
       </div>
 
       <div class="form-field form-field--checkbox">
         <label>
           <input type="checkbox" formControlName="is_public" />
-          האם לפרסם את השאלה והתשובה לחברי הקהילה?
+          {{ 'advice.ask.is_public_label' | transloco }}
         </label>
       </div>
 
       <div class="form-field form-field--checkbox">
         <label>
           <input type="checkbox" formControlName="show_real_name" />
-          הצג/י את שמי האמיתי לאיש המקצוע
+          {{ 'advice.ask.show_real_name_label' | transloco }}
         </label>
       </div>
 
-      <app-error-display [message]="errorMessage()" />
+      <!-- The API's own `detail` is a finished sentence and is shown as it
+           came; our fallback is a key, so it follows a language switch. -->
+      @if (error().text; as text) {
+        <app-error-display [message]="text" />
+      } @else if (error().key; as key) {
+        <app-error-display [message]="key | transloco" />
+      }
 
       @if (isLoading()) {
-        <app-loading-spinner message="שולח שאלה..." />
+        <app-loading-spinner [message]="'advice.ask.sending' | transloco" />
       }
 
       <button type="submit" class="btn-submit" [disabled]="form.invalid || isLoading()">
-        שלח שאלה
+        {{ 'advice.ask.submit' | transloco }}
       </button>
     </form>
   </div>
