@@ -12,6 +12,7 @@ TODO list for junior developer:
 """
 
 import enum
+import logging
 from datetime import UTC, datetime
 from typing import TypeVar
 
@@ -40,6 +41,8 @@ from app.schemas.professional import (
 )
 from app.schemas.user import ProfessionalProfile, UserPublic
 from app.services import email_service
+
+logger = logging.getLogger(__name__)
 
 
 def _build_alias(user: User) -> str:
@@ -382,8 +385,16 @@ def get_public_qa(
 
     results = []
     for item, like_count, liked_by_me in rows:
-        # The status == ANSWERED filter above guarantees this is set.
-        assert item.answer is not None
+        # The status == ANSWERED filter above guarantees this is set; skip
+        # instead of crashing the whole page if that invariant is ever
+        # violated (e.g. by a manual DB edit) — a single malformed row
+        # should not 500 the entire feed for everyone.
+        if item.answer is None:
+            logger.error(
+                f"get_public_qa(): query {item.id} is ANSWERED but has no "
+                "answer text, skipping"
+            )
+            continue
         results.append(
             PublicQAResponse(
                 id=item.id,

@@ -5,9 +5,11 @@
  */
 
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { Subscription } from 'rxjs';
 
 import { PROFESSIONAL_DOMAIN_LABELS, ProfessionalDomain } from '../../../core/constants';
 import { PublicQA } from '../../../core/models';
@@ -27,6 +29,7 @@ const PAGE_SIZE = 20;
 })
 export class QaFeedComponent implements OnInit {
   private readonly professionalService = inject(ProfessionalService);
+  private readonly destroyRef = inject(DestroyRef);
 
   items = signal<PublicQA[]>([]);
   isLoading = signal(false);
@@ -39,6 +42,7 @@ export class QaFeedComponent implements OnInit {
   likeErrorId = signal<string | null>(null);
 
   private page = 1;
+  private loadSubscription?: Subscription;
 
   readonly domainLabels = PROFESSIONAL_DOMAIN_LABELS;
   readonly domains = Object.values(ProfessionalDomain);
@@ -59,23 +63,30 @@ export class QaFeedComponent implements OnInit {
 
   toggleLike(item: PublicQA): void {
     this.likeErrorId.set(null);
-    this.professionalService.toggleLike(item.id).subscribe({
-      next: (result) => {
-        this.items.update((current) =>
-          current.map((existing) =>
-            existing.id === item.id
-              ? { ...existing, liked_by_me: result.liked, like_count: result.like_count }
-              : existing,
-          ),
-        );
-      },
-      error: () => {
-        this.likeErrorId.set(item.id);
-      },
-    });
+    this.professionalService
+      .toggleLike(item.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.items.update((current) =>
+            current.map((existing) =>
+              existing.id === item.id
+                ? { ...existing, liked_by_me: result.liked, like_count: result.like_count }
+                : existing,
+            ),
+          );
+        },
+        error: () => {
+          this.likeErrorId.set(item.id);
+        },
+      });
   }
 
   private load(reset: boolean): void {
+    // A domain change while a previous request is still in flight must not
+    // let a late, now-stale response overwrite the newer one — cancel it.
+    this.loadSubscription?.unsubscribe();
+
     if (reset) {
       this.page = 1;
       this.hasError.set(false);
@@ -85,20 +96,27 @@ export class QaFeedComponent implements OnInit {
     }
 
     const domain = this.selectedDomain() || undefined;
-    this.professionalService.getPublicQA(domain, this.page, PAGE_SIZE).subscribe({
-      next: (results) => {
-        this.items.update((current) => (reset ? results : [...current, ...results]));
-        this.hasMore.set(results.length === PAGE_SIZE);
-        this.page += 1;
-        this.isLoading.set(false);
-        this.isLoadingMore.set(false);
-      },
-      error: (err) => {
-        this.hasError.set(true);
-        this.errorKey.set(errorKeyFrom(err));
-        this.isLoading.set(false);
-        this.isLoadingMore.set(false);
-      },
-    });
+    this.loadSubscription = this.professionalService
+      .getPublicQA(domain, this.page, PAGE_SIZE)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (results) => {
+          this.items.update((current) => (reset ? results : [...current, ...results]));
+          // A full page might still be the last one (total count divides
+          // evenly by PAGE_SIZE) — that shows "load more" for one extra
+          // request that comes back empty, a known, accepted tradeoff rather
+          // than changing the endpoint to return an explicit has_more flag.
+          this.hasMore.set(results.length === PAGE_SIZE);
+          this.page += 1;
+          this.isLoading.set(false);
+          this.isLoadingMore.set(false);
+        },
+        error: (err) => {
+          this.hasError.set(true);
+          this.errorKey.set(errorKeyFrom(err));
+          this.isLoading.set(false);
+          this.isLoadingMore.set(false);
+        },
+      });
   }
 }

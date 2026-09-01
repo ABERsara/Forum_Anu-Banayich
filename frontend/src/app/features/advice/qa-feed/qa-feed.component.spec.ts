@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { QaFeedComponent } from './qa-feed.component';
@@ -85,6 +85,31 @@ describe('QaFeedComponent', () => {
       1,
       20,
     );
+  });
+
+  it('ignores a stale response from a superseded domain change', async () => {
+    const firstRequest = new Subject<PublicQA[]>();
+    const secondRequest = new Subject<PublicQA[]>();
+    professionalServiceMock.getPublicQA
+      .mockReturnValueOnce(of([makeItem({ id: 'initial' })])) // ngOnInit's load
+      .mockReturnValueOnce(firstRequest.asObservable())
+      .mockReturnValueOnce(secondRequest.asObservable());
+    await setup();
+
+    component.onDomainChange({
+      target: { value: ProfessionalDomain.LAWYER },
+    } as unknown as Event);
+    component.onDomainChange({
+      target: { value: ProfessionalDomain.ACCOUNTANT },
+    } as unknown as Event);
+
+    // The newer (second) request resolves first...
+    secondRequest.next([makeItem({ id: 'accountant-result' })]);
+    // ...then the older, now-superseded request resolves late. It must be
+    // ignored rather than overwriting the newer result.
+    firstRequest.next([makeItem({ id: 'lawyer-result' })]);
+
+    expect(component.items().map((item) => item.id)).toEqual(['accountant-result']);
   });
 
   it('hides "load more" when the last page came back shorter than the page size', async () => {

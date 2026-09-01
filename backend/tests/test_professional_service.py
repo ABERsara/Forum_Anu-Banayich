@@ -846,6 +846,33 @@ class TestGetPublicQA:
         ] == [query.id]
         assert professional_service.get_public_qa(db_session, new_cell_viewer) == []
 
+    def test_skips_a_malformed_answered_row_instead_of_raising(
+        self, db_session: Session, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """
+        status=ANSWERED should always come with an answer (answer_query()
+        sets both together) — but if that invariant is ever violated, e.g. by
+        a manual DB edit, one malformed row must not 500 the whole feed for
+        everyone. It's skipped and logged instead.
+        """
+        asker = _make_asker(db_session)
+        _make_query(
+            db_session, asker, is_public=True, status=QueryStatus.ANSWERED, answer=None
+        )
+        good = _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה תקינה לשאלה השנייה",
+        )
+
+        with caplog.at_level("ERROR"):
+            results = professional_service.get_public_qa(db_session, asker)
+
+        assert [r.id for r in results] == [good.id]
+        assert "skipping" in caplog.text
+
 
 class TestAnswerQuery:
     def test_stores_the_answer_and_closes_the_question(

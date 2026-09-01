@@ -35,6 +35,10 @@
               type="button"
               class="like-button"
               [class.liked]="item.liked_by_me"
+              [attr.aria-label]="
+                (item.liked_by_me ? 'advice.qa_feed.unlike_aria' : 'advice.qa_feed.like_aria')
+                  | transloco: { count: item.like_count }
+              "
               (click)="toggleLike(item)"
             >
               <span aria-hidden="true">👍</span>
