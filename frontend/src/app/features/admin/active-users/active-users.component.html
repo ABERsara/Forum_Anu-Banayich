@@ -1,20 +1,28 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
 <div class="page">
-  <a routerLink="/admin">← חזרה ללוח הבקרה</a>
-  <h1>משתמשים פעילים</h1>
+  <a routerLink="/admin">← {{ 'admin.back_to_dashboard' | transloco }}</a>
+  <h1>{{ 'admin.active_users.title' | transloco }}</h1>
 
-  @if (actionError()) {
-    <app-error-display [message]="actionError()!" />
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch. -->
+  @if (actionError().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (actionError().key; as key) {
+    <app-error-display [message]="key | transloco" />
   }
 
   @if (isLoading()) {
     <app-loading-spinner />
   } @else if (hasError()) {
-    <app-error-display message="אירעה שגיאה בטעינת המשתמשים. נסה לרענן את הדף." />
+    <app-error-display [message]="'admin.errors.load_users_failed' | transloco" />
   } @else if (users().length === 0) {
-    <p>אין משתמשים פעילים כרגע.</p>
+    <p>{{ 'admin.active_users.empty' | transloco }}</p>
   } @else {
     @for (user of users(); track user.id) {
       <div class="user-card">
+        <!-- A person's own name and address, not UI: shown as they came, in
+             either interface language. -->
         <strong>{{ user.first_name }} {{ user.last_name }}</strong>
         <span> | {{ user.email }}</span>
         <span>
@@ -22,15 +30,17 @@
           {{ sectorLabels[user.sector!] | transloco }}</span
         >
         <div class="user-card__actions">
-          <button (click)="suspend(user.id)">השעה</button>
+          <button (click)="suspend(user.id)">{{ 'admin.active_users.suspend' | transloco }}</button>
         </div>
       </div>
     }
   }
 
+  <!-- A shared component takes display text, not a key — the pipe runs here
+       (CONTRIBUTING §6). -->
   @if (suspendingId()) {
     <app-suspend-dialog
-      message="פעולה זו תשעה את המשתמש למספר השעות שנקבעו, ותשלח לו הודעה עם הסיבה."
+      [message]="'admin.active_users.suspend_message' | transloco"
       (confirmed)="confirmSuspend($event)"
       (cancelled)="cancelSuspend()"
     />
