@@ -31,14 +31,20 @@ h1 {
 .qa-question {
   color: $color-text;
   font-weight: $font-weight-medium;
-  margin-bottom: $spacing-sm;
+  margin-bottom: $spacing-xs;
 }
 
 .qa-answer {
   color: $color-text;
-  margin: 0 0 $spacing-sm;
+  margin: 0 0 $spacing-xs;
   padding-top: $spacing-sm;
   border-top: 1px solid $color-border;
+}
+
+.qa-attribution {
+  font-size: $font-size-sm;
+  color: $color-text-muted;
+  margin: 0 0 $spacing-sm;
 }
 
 .qa-meta {

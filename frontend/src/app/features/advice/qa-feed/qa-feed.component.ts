@@ -61,6 +61,20 @@ export class QaFeedComponent implements OnInit {
     this.load(false);
   }
 
+  /** The asker's real name if they opted in when asking, otherwise their anonymized alias. */
+  askerName(item: PublicQA): string {
+    return item.asker ? `${item.asker.first_name} ${item.asker.last_name}` : item.asker_alias;
+  }
+
+  /** The answering professional's name — always shown, null only for the theoretical
+   *  case of a general/domain question that was never actually targeted at anyone
+   *  (unreachable from the current UI, which always asks a specific professional). */
+  professionalName(item: PublicQA): string | null {
+    return item.professional
+      ? `${item.professional.first_name} ${item.professional.last_name}`
+      : null;
+  }
+
   toggleLike(item: PublicQA): void {
     this.likeErrorId.set(null);
     this.professionalService

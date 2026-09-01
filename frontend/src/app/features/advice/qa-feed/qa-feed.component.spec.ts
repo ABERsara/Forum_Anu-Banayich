@@ -19,6 +19,15 @@ function makeItem(overrides: Partial<PublicQA> = {}): PublicQA {
     answered_at: '2026-07-14T10:00:00',
     like_count: 0,
     liked_by_me: false,
+    professional: {
+      id: 'pro1',
+      first_name: 'משה',
+      last_name: 'כהן',
+      professional_domain: ProfessionalDomain.LAWYER,
+      professional_description: null,
+    },
+    asker_alias: 'אלמנה – ספרדי',
+    asker: null,
     ...overrides,
   };
 }
@@ -58,6 +67,30 @@ describe('QaFeedComponent', () => {
     expect(professionalServiceMock.getPublicQA).toHaveBeenCalledWith(undefined, 1, 20);
     expect(component.isLoading()).toBe(false);
     expect(component.items().length).toBe(1);
+  });
+
+  it('shows the answering professional by name', async () => {
+    await setup();
+
+    expect(component.professionalName(component.items()[0])).toBe('משה כהן');
+  });
+
+  it('falls back to the anonymized alias when the asker did not opt in', async () => {
+    professionalServiceMock.getPublicQA.mockReturnValue(
+      of([makeItem({ asker: null, asker_alias: 'אלמנה – ספרדי' })]),
+    );
+    await setup();
+
+    expect(component.askerName(component.items()[0])).toBe('אלמנה – ספרדי');
+  });
+
+  it('shows the asker by real name once they opted in', async () => {
+    professionalServiceMock.getPublicQA.mockReturnValue(
+      of([makeItem({ asker: { id: 'u1', first_name: 'שרה', last_name: 'לוי' } })]),
+    );
+    await setup();
+
+    expect(component.askerName(component.items()[0])).toBe('שרה לוי');
   });
 
   it('shows a generic error state when loading fails', async () => {
