@@ -15,6 +15,62 @@
     "register": "Sign up",
     "messages": "Messages"
   },
+  "advice": {
+    "back_to_professionals": "Back to the professionals list",
+    "list": {
+      "title": "Professional advice",
+      "public_qa_link": "Public questions and answers",
+      "filter_label": "Filter by field:",
+      "filter_all": "All",
+      "empty": "No professionals are available.",
+      "ask_link": "Ask a question"
+    },
+    "ask": {
+      "title": "Professional question",
+      "hint_professional": "Your question will be sent to the professional you chose.",
+      "hint_domain": "Choose a field — your question will be sent to every professional in it.",
+      "domain_label": "Field",
+      "domain_placeholder": "Choose a field",
+      "domain_error": "Please choose a field",
+      "content_label": "Your question",
+      "content_placeholder": "Describe your question (10 to 2000 characters)",
+      "content_error": "Please enter a question (10 to 2000 characters)",
+      "is_public_label": "Publish this question and its answer to the community?",
+      "show_real_name_label": "Show my real name to the professional",
+      "sending": "Sending question...",
+      "submit": "Send question"
+    },
+    "my_questions": {
+      "title": "My questions",
+      "loading": "Loading questions...",
+      "empty": "You have not asked any questions yet."
+    },
+    "qa_feed": {
+      "back_to_advice": "Back to professional advice",
+      "title": "Community questions and answers"
+    },
+    "pending": {
+      "back_to_home": "Back to the home page",
+      "title": "Questions awaiting an answer",
+      "intro": "Questions are listed in the order they arrived — oldest first. The asker's details are confidential.",
+      "loading": "Loading pending questions...",
+      "empty": "No questions are waiting for your answer right now.",
+      "asked_on": "Asked on {{date}}",
+      "answer_label": "Your answer",
+      "answer_placeholder": "Write your answer here (10 to 5000 characters)",
+      "answer_error": "Please enter an answer of 10 to 5000 characters",
+      "sending": "Sending answer...",
+      "submit": "Send answer",
+      "success": "Your answer was sent, and the asker has been notified by email."
+    },
+    "errors": {
+      "load_professionals_failed": "Something went wrong loading the professionals list. Please try again later.",
+      "ask_failed": "Something went wrong sending the question.",
+      "load_my_questions_failed": "Something went wrong loading your questions.",
+      "load_pending_failed": "Something went wrong loading the pending questions.",
+      "answer_failed": "Something went wrong sending the answer."
+    }
+  },
   "auth": {
     "login": {
       "title": "Log in",
