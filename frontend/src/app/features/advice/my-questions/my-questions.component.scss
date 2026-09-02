@@ -68,7 +68,7 @@ h1 {
   border: 1px solid $color-border;
   border-radius: $radius-md;
   background: transparent;
-  padding: 0.25rem 0.75rem;
+  padding: $spacing-xs $spacing-sm;
   margin-top: $spacing-sm;
   cursor: pointer;
   color: $color-text-muted;

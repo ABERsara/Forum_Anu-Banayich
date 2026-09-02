@@ -19,8 +19,14 @@
             {{ statusLabels[question.status] | transloco }}
           </span>
         </div>
-        @if (question.status === queryStatus.ANSWERED && question.answer) {
-          <p class="question-answer">{{ question.answer }}</p>
+        @if (question.status === queryStatus.ANSWERED) {
+          @if (question.answer) {
+            <p class="question-answer">{{ question.answer }}</p>
+          }
+          <!-- Gated on status alone, not on question.answer: ANSWERED always
+               carries an answer (answer_query() sets both together), so the
+               like button shouldn't disappear if that invariant is ever
+               violated. -->
           @if (question.is_public) {
             <button
               type="button"

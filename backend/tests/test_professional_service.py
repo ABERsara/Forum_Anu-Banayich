@@ -446,6 +446,26 @@ class TestGetMyQuestions:
         # (asker), not about whether anyone liked it.
         assert results[0].liked_by_me is False
 
+    def test_liked_by_me_true_when_the_asker_liked_her_own_question(
+        self, db_session: Session
+    ) -> None:
+        asker = _make_asker(db_session)
+        query = _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה שהשואלת עצמה תלייק",
+        )
+        like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, asker
+        )
+
+        results = professional_service.get_my_questions(db_session, asker)
+
+        assert results[0].like_count == 1
+        assert results[0].liked_by_me is True
+
     def test_unanswered_question_has_no_likes(self, db_session: Session) -> None:
         asker = _make_asker(db_session)
         _make_query(db_session, asker, is_public=True, status=QueryStatus.OPEN)

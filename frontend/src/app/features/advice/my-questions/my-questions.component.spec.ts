@@ -172,6 +172,25 @@ describe('MyQuestionsComponent', () => {
     expect(likeButton?.textContent).toContain('3');
   });
 
+  it('still shows the like button for a public, answered question with no answer text', async () => {
+    professionalServiceMock = {
+      getMyQuestions: vi.fn().mockReturnValue(
+        of([
+          makeQuestion({
+            is_public: true,
+            status: QueryStatus.ANSWERED,
+            answer: null,
+            like_count: 1,
+          }),
+        ]),
+      ),
+      toggleLike: vi.fn(),
+    };
+    await setup();
+
+    expect(fixture.nativeElement.querySelector('.like-button')).not.toBeNull();
+  });
+
   it('hides the like button for a private question, even when answered', async () => {
     professionalServiceMock = {
       getMyQuestions: vi.fn().mockReturnValue(
