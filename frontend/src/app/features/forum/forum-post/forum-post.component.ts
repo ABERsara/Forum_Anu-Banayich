@@ -4,8 +4,10 @@
 
 import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ReportTargetType } from '../../../core/constants';
 import { ForumPost } from '../../../core/models';
@@ -22,6 +24,7 @@ import { ReportButtonComponent } from '../../../shared/components/report-button/
   imports: [
     RouterLink,
     DatePipe,
+    TranslocoPipe,
     LoadingSpinnerComponent,
     ErrorDisplayComponent,
     ConfirmDialogComponent,
@@ -35,6 +38,7 @@ export class ForumPostComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly forumService = inject(ForumService);
   private readonly authService = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly reportTargetType = ReportTargetType.FORUM_POST;
 
@@ -43,6 +47,8 @@ export class ForumPostComponent implements OnInit {
   errorMessage = signal<string | null>(null);
   showDeleteConfirm = signal(false);
   deleteError = signal<string | null>(null);
+  likeError = signal(false);
+  isLiking = signal(false);
 
   canDelete = computed(() => {
     const post = this.post();
@@ -77,6 +83,30 @@ export class ForumPostComponent implements OnInit {
 
   onDeleteCancelled(): void {
     this.showDeleteConfirm.set(false);
+  }
+
+  toggleLike(): void {
+    const post = this.post();
+    if (!post || this.isLiking()) return;
+    this.likeError.set(false);
+    this.isLiking.set(true);
+    this.forumService
+      .toggleLike(post.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.post.update((current) =>
+            current
+              ? { ...current, liked_by_me: result.liked, like_count: result.like_count }
+              : current,
+          );
+          this.isLiking.set(false);
+        },
+        error: () => {
+          this.likeError.set(true);
+          this.isLiking.set(false);
+        },
+      });
   }
 
   onDeleteConfirmed(): void {

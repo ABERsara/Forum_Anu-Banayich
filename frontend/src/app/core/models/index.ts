@@ -271,6 +271,8 @@ export interface ForumPost {
   report_count: number;
   author: UserPublic;
   attachment_url: string | null;
+  like_count: number;
+  liked_by_me: boolean;
   created_at: string;
   updated_at: string;
 }

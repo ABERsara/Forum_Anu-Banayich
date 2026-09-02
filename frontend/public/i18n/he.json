@@ -28,6 +28,13 @@
       "send": "שלח"
     }
   },
+  "forum": {
+    "post": {
+      "like_error": "אירעה שגיאה בסימון לייק. נסה שוב.",
+      "like_aria": "לייק — {{count}}",
+      "unlike_aria": "ביטול לייק — {{count}}"
+    }
+  },
   "advice": {
     "qa_feed": {
       "back_link": "→ חזרה לייעוץ מקצועי",

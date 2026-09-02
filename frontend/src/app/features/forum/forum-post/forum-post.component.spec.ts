@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ForumPostComponent } from './forum-post.component';
@@ -16,6 +16,7 @@ import {
 import type { ForumPost, UserProfile } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
+import { translocoTesting } from '../../../../testing/transloco-testing';
 
 function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
   return {
@@ -28,6 +29,8 @@ function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
     report_count: 0,
     author: { id: 'author-1', first_name: 'שרה', last_name: 'לוי' },
     attachment_url: null,
+    like_count: 0,
+    liked_by_me: false,
     created_at: '2026-07-01T10:00:00',
     updated_at: '2026-07-01T10:00:00',
     ...overrides,
@@ -56,6 +59,7 @@ describe('ForumPostComponent', () => {
   let forumServiceMock: {
     getPost: ReturnType<typeof vi.fn>;
     deletePost: ReturnType<typeof vi.fn>;
+    toggleLike: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     currentUser: ReturnType<typeof vi.fn>;
@@ -68,6 +72,7 @@ describe('ForumPostComponent', () => {
     forumServiceMock = {
       getPost: vi.fn().mockReturnValue(of(makePost())),
       deletePost: vi.fn().mockReturnValue(of(makePost({ status: PostStatus.DELETED }))),
+      toggleLike: vi.fn().mockReturnValue(of({ liked: true, like_count: 1 })),
     };
     authServiceMock = {
       currentUser: vi.fn().mockReturnValue(currentUser),
@@ -77,7 +82,7 @@ describe('ForumPostComponent', () => {
     navigateSpy = vi.fn();
 
     TestBed.configureTestingModule({
-      imports: [ForumPostComponent],
+      imports: [ForumPostComponent, translocoTesting()],
       providers: [
         { provide: ForumService, useValue: forumServiceMock },
         { provide: AuthService, useValue: authServiceMock },
@@ -218,6 +223,58 @@ describe('ForumPostComponent', () => {
 
       expect(component.deleteError()).toBe('אירעה שגיאה במחיקת ההודעה. נסה שוב.');
       expect(navigateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('like flow', () => {
+    it('toggles the like and updates the post from the response', () => {
+      setup(makeUser());
+      forumServiceMock.toggleLike.mockReturnValue(of({ liked: true, like_count: 4 }));
+
+      component.toggleLike();
+
+      expect(forumServiceMock.toggleLike).toHaveBeenCalledWith('post-1');
+      expect(component.post()?.liked_by_me).toBe(true);
+      expect(component.post()?.like_count).toBe(4);
+    });
+
+    it('sets likeError and leaves the post unchanged when the toggle fails', () => {
+      setup(makeUser());
+      forumServiceMock.toggleLike.mockReturnValue(throwError(() => ({ status: 500 })));
+
+      component.toggleLike();
+
+      expect(component.likeError()).toBe(true);
+      expect(component.post()?.liked_by_me).toBe(false);
+    });
+
+    it('clears a previous likeError on a new attempt', () => {
+      setup(makeUser());
+      forumServiceMock.toggleLike.mockReturnValue(throwError(() => ({ status: 500 })));
+      component.toggleLike();
+      expect(component.likeError()).toBe(true);
+
+      forumServiceMock.toggleLike.mockReturnValue(of({ liked: true, like_count: 1 }));
+      component.toggleLike();
+
+      expect(component.likeError()).toBe(false);
+    });
+
+    it('ignores a second click while the first toggle is still in flight', () => {
+      setup(makeUser());
+      const pending = new Subject<{ liked: boolean; like_count: number }>();
+      forumServiceMock.toggleLike.mockReturnValue(pending);
+
+      component.toggleLike();
+      expect(component.isLiking()).toBe(true);
+      component.toggleLike();
+
+      expect(forumServiceMock.toggleLike).toHaveBeenCalledTimes(1);
+
+      pending.next({ liked: true, like_count: 1 });
+      pending.complete();
+
+      expect(component.isLiking()).toBe(false);
     });
   });
 });

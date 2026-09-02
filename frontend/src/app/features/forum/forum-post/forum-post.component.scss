@@ -11,6 +11,36 @@
     white-space: pre-wrap;
   }
 
+  &__engagement {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    margin-top: $spacing-md;
+  }
+
+  &__like-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-xs;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    background: transparent;
+    padding: 0.25rem 0.75rem;
+    cursor: pointer;
+    color: $color-text-muted;
+    font-family: inherit;
+
+    &--liked {
+      color: $color-primary;
+      border-color: $color-primary;
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
+  }
+
   &__actions {
     display: flex;
     gap: $spacing-sm;

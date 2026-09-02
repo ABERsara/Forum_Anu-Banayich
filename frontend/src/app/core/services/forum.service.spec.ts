@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { ForumService, buildConversationKey } from './forum.service';
 import { environment } from '../../../environments/environment';
 import { GroupVisibility, PostStatus, SectorVisibility } from '../constants';
-import type { DirectMessage, ForumPost, ForumPostList, UserPublic } from '../models';
+import type { DirectMessage, ForumPost, ForumPostList, LikeResponse, UserPublic } from '../models';
 
 const MOCK_POST: ForumPost = {
   id: 'post-1',
@@ -17,6 +17,8 @@ const MOCK_POST: ForumPost = {
   report_count: 0,
   author: { id: 'user-1', first_name: 'שרה', last_name: 'לוי' },
   attachment_url: null,
+  like_count: 0,
+  liked_by_me: false,
   created_at: '2026-07-14T00:00:00',
   updated_at: '2026-07-14T00:00:00',
 };
@@ -106,6 +108,18 @@ describe('ForumService', () => {
     const updatedPost: ForumPost = { ...MOCK_POST, title: 'כותרת מעודכנת' };
     req.flush(updatedPost);
     expect(result).toEqual(updatedPost);
+  });
+
+  it('toggleLike PATCHes the like endpoint for the given post', () => {
+    let result: LikeResponse | undefined;
+    service.toggleLike('post-1').subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/forum/posts/post-1/like`);
+    expect(req.request.method).toBe('PATCH');
+
+    const response: LikeResponse = { liked: true, like_count: 1 };
+    req.flush(response);
+    expect(result).toEqual(response);
   });
 
   describe('buildConversationKey', () => {
