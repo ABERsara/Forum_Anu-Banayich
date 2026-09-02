@@ -93,7 +93,9 @@
       "loading_more": "טוען...",
       "like_error": "הלייק לא נשמר. נסה שוב.",
       "like_aria": "לייק — {{count}}",
-      "unlike_aria": "ביטול לייק — {{count}}"
+      "unlike_aria": "ביטול לייק — {{count}}",
+      "asked_by": "שאלה מאת {{name}}",
+      "answered_by": "תשובה מאת {{name}}"
     },
     "pending": {
       "back_to_home": "חזרה לעמוד הבית",
