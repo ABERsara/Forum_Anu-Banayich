@@ -25,7 +25,15 @@
       @for (item of items(); track item.id) {
         <div class="qa-card">
           <p class="qa-question">{{ item.content }}</p>
+          <p class="qa-attribution">
+            {{ 'advice.qa_feed.asked_by' | transloco: { name: askerName(item) } }}
+          </p>
           <p class="qa-answer">{{ item.answer }}</p>
+          @if (professionalName(item); as proName) {
+            <p class="qa-attribution">
+              {{ 'advice.qa_feed.answered_by' | transloco: { name: proName } }}
+            </p>
+          }
           <div class="qa-meta">
             @if (item.domain) {
               <span>{{ domainLabels[item.domain] | transloco }}</span>
