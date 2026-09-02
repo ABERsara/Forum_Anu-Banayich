@@ -341,9 +341,16 @@ def get_public_qa(
     like_count/liked_by_me are aggregated in this same query via subqueries
     rather than per-row, to avoid an N+1 query per item in the list.
     """
-    query = db.query(ProfessionalQuery).filter(
-        ProfessionalQuery.is_public.is_(True),
-        ProfessionalQuery.status == QueryStatus.ANSWERED,
+    query = (
+        db.query(ProfessionalQuery)
+        .options(
+            joinedload(ProfessionalQuery.professional),
+            joinedload(ProfessionalQuery.asker),
+        )
+        .filter(
+            ProfessionalQuery.is_public.is_(True),
+            ProfessionalQuery.status == QueryStatus.ANSWERED,
+        )
     )
 
     if current_user.role != UserRole.ADMIN:
@@ -405,6 +412,13 @@ def get_public_qa(
                 answered_at=item.answered_at,
                 like_count=like_count,
                 liked_by_me=liked_by_me,
+                professional=ProfessionalProfile.model_validate(item.professional)
+                if item.professional is not None
+                else None,
+                asker_alias=_build_alias(item.asker),
+                asker=UserPublic.model_validate(item.asker)
+                if item.show_real_name
+                else None,
             )
         )
     return results

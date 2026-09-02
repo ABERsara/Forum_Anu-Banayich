@@ -595,6 +595,58 @@ class TestGetPublicQA:
 
         assert [r.id for r in results] == [visible.id]
 
+    def test_shows_the_answering_professional_by_name(
+        self, db_session: Session
+    ) -> None:
+        asker = _make_asker(db_session)
+        professional = _make_professional(db_session)
+        _make_query(
+            db_session,
+            asker,
+            professional=professional,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה מהמקצוען שאמור להופיע בשמו",
+        )
+
+        results = professional_service.get_public_qa(db_session, asker)
+
+        assert results[0].professional is not None
+        assert results[0].professional.id == professional.id
+
+    def test_hides_the_askers_real_name_by_default(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה לשאלה שנשארת אנונימית מבחינת השואלת",
+        )
+
+        results = professional_service.get_public_qa(db_session, asker)
+
+        assert results[0].asker is None
+        assert results[0].asker_alias == "אלמנה – ספרדי"
+
+    def test_reveals_the_askers_name_when_they_chose_to(
+        self, db_session: Session
+    ) -> None:
+        asker = _make_asker(db_session)
+        _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            show_real_name=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה לשאלה שבה השואלת בחרה לחשוף את שמה",
+        )
+
+        results = professional_service.get_public_qa(db_session, asker)
+
+        assert results[0].asker is not None
+        assert results[0].asker.id == asker.id
+
     def test_same_cell_user_sees_it_different_cell_does_not(
         self, db_session: Session
     ) -> None:
