@@ -61,5 +61,12 @@ class PublicQAResponse(BaseModel):
     answered_at: datetime | None = None
     like_count: int
     liked_by_me: bool
+    # Who answered: always shown, same as ProfessionalQueryResponse — not a
+    # privacy concern, the name is already public in the professional catalog.
+    professional: ProfessionalProfile | None = None
+    # Who asked: real name only if they opted in when asking, otherwise the
+    # same anonymized alias used everywhere else in this module.
+    asker_alias: str  # e.g. "אלמנה – ספרדי"
+    asker: UserPublic | None = None  # only if show_real_name=True
 
     model_config = {"from_attributes": True}

@@ -56,7 +56,9 @@
       "loading_more": "Loading...",
       "like_error": "Couldn't save the like. Please try again.",
       "like_aria": "Like — {{count}}",
-      "unlike_aria": "Unlike — {{count}}"
+      "unlike_aria": "Unlike — {{count}}",
+      "asked_by": "Asked by {{name}}",
+      "answered_by": "Answered by {{name}}"
     },
     "pending": {
       "back_to_home": "Back to the home page",
