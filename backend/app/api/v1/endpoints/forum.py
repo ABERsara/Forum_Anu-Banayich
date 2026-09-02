@@ -195,8 +195,13 @@ def get_conversation_messages(
     """
     Return the full history of one conversation, oldest first.
 
+    Marks the messages sent to current_user as read (ABF-119) before
+    fetching — two explicit steps, since get_conversation_messages() itself
+    is a pure read.
+
     No pagination (out of scope for ABF-118 — see the ticket's "לא נכנס" list).
     """
+    forum_service.mark_conversation_read(db, current_user, conversation_key)
     results = forum_service.get_conversation_messages(
         db, current_user, conversation_key
     )

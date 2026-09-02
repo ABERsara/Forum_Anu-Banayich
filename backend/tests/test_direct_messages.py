@@ -261,29 +261,28 @@ class TestGetConversationMessages:
 
         assert [r["content"] for r in results] == ["ראשונה", "שנייה"]
 
-    def test_marks_received_messages_as_read_but_not_sent_ones(self, db_session):
+    def test_does_not_mutate_is_read(self, db_session):
+        """
+        Pure read, no side effects — marking as read is
+        mark_conversation_read()'s job, not this function's (ABF-119 code
+        review: a get_* function silently writing was a footgun for future
+        callers assuming it's a safe, idempotent read).
+        """
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
         b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
         forum_service.send_direct_message(
-            db_session, DirectMessageCreate(recipient_id=b.id, content="מאה לבי"), a
-        )
-        forum_service.send_direct_message(
-            db_session, DirectMessageCreate(recipient_id=a.id, content="מבי לאה"), b
+            db_session, DirectMessageCreate(recipient_id=a.id, content="הי"), b
         )
         key = forum_service.build_conversation_key(a.id, b.id)
 
-        results = forum_service.get_conversation_messages(db_session, a, key)
-
-        by_content = {r["content"]: r["is_read"] for r in results}
-        assert by_content["מבי לאה"] is True  # sent to a (the reader) — now read
-        assert by_content["מאה לבי"] is False  # sent by a — untouched
+        forum_service.get_conversation_messages(db_session, a, key)
 
         row = (
             db_session.query(DirectMessage)
-            .filter(DirectMessage.sender_id == b.id, DirectMessage.recipient_id == a.id)
+            .filter(DirectMessage.sender_id == b.id)
             .one()
         )
-        assert row.is_read is True
+        assert row.is_read is False
 
     def test_well_formed_key_with_no_messages_returns_empty_list(self, db_session):
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
@@ -347,6 +346,90 @@ class TestGetConversationMessages:
 
         try:
             forum_service.get_conversation_messages(db_session, admin, key)
+            raise AssertionError("expected HTTPException")
+        except Exception as exc:
+            assert exc.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# mark_conversation_read()
+# ---------------------------------------------------------------------------
+
+
+class TestMarkConversationRead:
+    def test_marks_received_messages_as_read_but_not_sent_ones(self, db_session):
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="מאה לבי"), a
+        )
+        forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=a.id, content="מבי לאה"), b
+        )
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        forum_service.mark_conversation_read(db_session, a, key)
+
+        sent_to_a = (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.sender_id == b.id, DirectMessage.recipient_id == a.id)
+            .one()
+        )
+        sent_by_a = (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.sender_id == a.id, DirectMessage.recipient_id == b.id)
+            .one()
+        )
+        assert sent_to_a.is_read is True
+        assert sent_by_a.is_read is False  # sent by a — untouched
+
+    def test_idempotent_second_call_is_a_noop(self, db_session):
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=a.id, content="הי"), b
+        )
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        forum_service.mark_conversation_read(db_session, a, key)
+        forum_service.mark_conversation_read(db_session, a, key)  # should not raise
+
+        row = (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.sender_id == b.id)
+            .one()
+        )
+        assert row.is_read is True
+
+    def test_non_participant_raises_403_and_logs_audit(self, db_session):
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        snooper = _make_user(
+            db_session, "c@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        try:
+            forum_service.mark_conversation_read(db_session, snooper, key)
+            raise AssertionError("expected HTTPException")
+        except Exception as exc:
+            assert exc.status_code == 403
+
+        entry = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == AuditAction.DIRECT_MESSAGE_ACCESS_DENIED)
+            .one()
+        )
+        assert entry.actor_id == snooper.id
+
+    def test_moderator_cannot_mark_read(self, db_session):
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        try:
+            forum_service.mark_conversation_read(db_session, moderator, key)
             raise AssertionError("expected HTTPException")
         except Exception as exc:
             assert exc.status_code == 403
@@ -551,7 +634,7 @@ class TestGetInbox:
         assert forum_service.get_inbox(db_session, me).items[0].unread_count == 2
 
         key = forum_service.build_conversation_key(me.id, alice.id)
-        forum_service.get_conversation_messages(db_session, me, key)
+        forum_service.mark_conversation_read(db_session, me, key)
 
         assert forum_service.get_inbox(db_session, me).items[0].unread_count == 0
 
@@ -737,6 +820,26 @@ class TestGetConversationMessagesEndpoint:
         body = r.json()
         assert len(body) == 1
         assert body[0]["content"] == "הי"
+
+    async def test_opening_a_conversation_marks_it_read(self, client, db_session):
+        """End-to-end: the route wires mark_conversation_read() + get_conversation_messages() together."""
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=a.id, content="הי"), b
+        )
+        key = forum_service.build_conversation_key(a.id, b.id)
+        _login_as(a)
+
+        r = await client.get(f"{CONVERSATIONS_BASE}/{key}/messages")
+
+        assert r.status_code == 200
+        row = (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.sender_id == b.id)
+            .one()
+        )
+        assert row.is_read is True
 
     async def test_non_participant_returns_403(self, client, db_session):
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)

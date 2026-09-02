@@ -507,29 +507,17 @@ def send_direct_message(
     return _to_response_dict(message)
 
 
-def get_conversation_messages(
+def _authorize_conversation_access(
     db: Session, current_user: User, conversation_key: str
-) -> list[DirectMessageData]:
+) -> None:
     """
-    Return every message for a conversation_key, oldest first.
-
-    No pagination (out of scope — spec §5.3's 1,000/conversation cap isn't
-    enforced here either).
-
-    Marks every message *sent to* current_user in this conversation as read
-    (ABF-119): opening a conversation is what "reading" it means for the
-    inbox's unread_count to stay accurate — this only clears the viewer's
-    own counter, it is not a "seen by" indicator shown back to the sender
-    (no read-receipts UI exists, and this adds none).
-
-    A well-formed key for a conversation with zero messages yet returns an
-    empty list (200), not 404 — "no messages" is a normal empty state, not
-    an error. What's checked is the caller's role and whether current_user
-    is one of the two participants encoded in the key; wrong role, a
-    malformed key, or one that doesn't include current_user all get the
-    same generic 403 — and the same audit log entry (§9.3: any attempted
-    access to private content that isn't the caller's own must be logged,
-    including denied attempts).
+    Shared guard for both reading and marking-read a conversation: the
+    caller must be USER role AND one of the two participants encoded in
+    conversation_key. A malformed key, wrong role, or non-participant all
+    get the same generic 403 and the same audit log entry (§9.3: any
+    attempted access to private content that isn't the caller's own must be
+    logged, including denied attempts) — none of these are distinguishable
+    to the caller.
     """
     parsed = _parse_conversation_key(conversation_key)
     if (
@@ -547,12 +535,49 @@ def get_conversation_messages(
         )
         raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
 
+
+def mark_conversation_read(
+    db: Session, current_user: User, conversation_key: str
+) -> None:
+    """
+    Mark every message *sent to* current_user in this conversation as read.
+
+    A separate, explicit write step (ABF-119 code review) rather than a side
+    effect buried inside get_conversation_messages() — a function named
+    get_* should stay a safe, idempotent read. The router calls this first,
+    then get_conversation_messages() to fetch the now-up-to-date history.
+    Idempotent by construction: calling it again just finds nothing left to
+    update.
+
+    This only clears the viewer's own unread counter — it is not a "seen by"
+    indicator shown back to the sender (no read-receipts UI exists, and this
+    adds none).
+    """
+    _authorize_conversation_access(db, current_user, conversation_key)
+
     db.query(DirectMessage).filter(
         DirectMessage.conversation_key == conversation_key,
         DirectMessage.recipient_id == current_user.id,
         DirectMessage.is_read.is_(False),
     ).update({"is_read": True})
     db.commit()
+
+
+def get_conversation_messages(
+    db: Session, current_user: User, conversation_key: str
+) -> list[DirectMessageData]:
+    """
+    Return every message for a conversation_key, oldest first.
+
+    Pure read, no side effects — see mark_conversation_read() for marking
+    messages read. No pagination either (out of scope — spec §5.3's
+    1,000/conversation cap isn't enforced here).
+
+    A well-formed key for a conversation with zero messages yet returns an
+    empty list (200), not 404 — "no messages" is a normal empty state, not
+    an error.
+    """
+    _authorize_conversation_access(db, current_user, conversation_key)
 
     messages = (
         db.query(DirectMessage)
@@ -578,9 +603,9 @@ def get_inbox(
     (COUNT DISTINCT conversation_key); still a fixed two queries overall.
 
     Only the page's own rows get decrypted — bounded by page_size, never the
-    full history. Unlike get_conversation_messages(), this never mutates
-    is_read — merely listing conversations isn't "reading" one, only opening
-    it is. No audit entry on success either, same asymmetry as
+    full history. Never mutates is_read (that's mark_conversation_read()'s
+    job) — merely listing conversations isn't "reading" one, only opening it
+    is. No audit entry on success either, same asymmetry as
     get_conversation_messages() (only denied access is logged).
     """
     if current_user.role != UserRole.USER:
