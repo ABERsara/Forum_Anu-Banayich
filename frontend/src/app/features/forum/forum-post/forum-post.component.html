@@ -16,7 +16,27 @@
       <a [href]="post.attachment_url" target="_blank" rel="noopener">קובץ מצורף</a>
     }
 
-    <app-report-button [contentType]="reportTargetType" [contentId]="post.id" />
+    <div class="forum-post__engagement">
+      <button
+        type="button"
+        class="forum-post__like-btn"
+        [class.forum-post__like-btn--liked]="post.liked_by_me"
+        [attr.aria-label]="
+          (post.liked_by_me ? 'forum.post.unlike_aria' : 'forum.post.like_aria')
+            | transloco: { count: post.like_count }
+        "
+        [disabled]="isLiking()"
+        (click)="toggleLike()"
+      >
+        <span aria-hidden="true">👍</span>
+        <span>{{ post.like_count }}</span>
+      </button>
+      <app-report-button [contentType]="reportTargetType" [contentId]="post.id" />
+    </div>
+
+    @if (likeError()) {
+      <app-error-display [message]="'forum.post.like_error' | transloco" />
+    }
 
     @if (canEdit() || canDelete()) {
       <div class="forum-post__actions">

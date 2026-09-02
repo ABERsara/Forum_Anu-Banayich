@@ -5,6 +5,7 @@ GET    /forum/posts           – list posts (auto-filtered by group+sector)
 POST   /forum/posts           – create a new post
 GET    /forum/posts/{id}      – single post
 PATCH  /forum/posts/{id}      – edit a post (author only)
+PATCH  /forum/posts/{id}/like – toggle a like (user/admin only)
 DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
 POST   /forum/broadcast       – admin-only post visible to all users
@@ -18,7 +19,7 @@ GET    /cells/me/members                  – other ACTIVE users in your own cel
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.constants import UserRole
+from app.core.constants import LikeTargetType, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.forum import (
@@ -31,9 +32,10 @@ from app.schemas.forum import (
     ForumPostResponse,
     ForumPostUpdate,
 )
+from app.schemas.like import LikeResponse
 from app.schemas.report import ReportCreate, ReportResponse
 from app.schemas.user import UserPublic
-from app.services import forum_service, report_service
+from app.services import forum_service, like_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
 
@@ -81,6 +83,22 @@ def get_post(
     """
     post = forum_service.get_post_by_id(db, post_id, current_user)
     return ForumPostResponse.model_validate(post)
+
+
+@router.patch(
+    "/forum/posts/{post_id}/like",
+    response_model=LikeResponse,
+    dependencies=[Depends(require_role(UserRole.USER, UserRole.ADMIN))],
+)
+def like_post(
+    post_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> LikeResponse:
+    """Toggle a like on a forum post."""
+    return like_service.toggle_like(
+        db, LikeTargetType.FORUM_POST, post_id, current_user
+    )
 
 
 @router.patch("/forum/posts/{post_id}", response_model=ForumPostResponse)

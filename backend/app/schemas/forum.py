@@ -46,6 +46,12 @@ class ForumPostResponse(BaseModel):
     report_count: int
     author: UserPublic
     attachment_url: str | None = None
+    # Not populated by every endpoint that returns a ForumPostResponse —
+    # only get_posts()/get_post_by_id() (ABF-143) compute real values via
+    # the likes table; create/update/delete/broadcast fall back to these
+    # defaults since they build the response straight from the ORM object.
+    like_count: int = 0
+    liked_by_me: bool = False
     created_at: datetime
     updated_at: datetime
 

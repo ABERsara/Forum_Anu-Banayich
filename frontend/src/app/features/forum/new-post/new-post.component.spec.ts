@@ -44,6 +44,8 @@ const CREATED_POST: ForumPost = {
   report_count: 0,
   author: { id: 'author-1', first_name: 'שרה', last_name: 'לוי' },
   attachment_url: null,
+  like_count: 0,
+  liked_by_me: false,
   created_at: '2026-07-16T10:00:00',
   updated_at: '2026-07-16T10:00:00',
 };
