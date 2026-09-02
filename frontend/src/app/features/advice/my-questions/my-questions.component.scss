@@ -60,3 +60,21 @@ h1 {
     color: $color-text-muted;
   }
 }
+
+.like-button {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: transparent;
+  padding: $spacing-xs $spacing-sm;
+  margin-top: $spacing-sm;
+  cursor: pointer;
+  color: $color-text-muted;
+
+  &.liked {
+    color: $color-primary;
+    border-color: $color-primary;
+  }
+}

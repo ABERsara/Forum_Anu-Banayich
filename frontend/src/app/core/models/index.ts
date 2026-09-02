@@ -332,6 +332,8 @@ export interface ProfessionalQuery {
   asker: UserPublic | null;
   created_at: string;
   answered_at: string | null;
+  like_count: number;
+  liked_by_me: boolean;
 }
 
 export interface PublicQA {
