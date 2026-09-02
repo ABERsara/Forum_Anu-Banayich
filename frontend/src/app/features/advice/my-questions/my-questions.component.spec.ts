@@ -23,6 +23,8 @@ function makeQuestion(overrides: Partial<ProfessionalQuery> = {}): ProfessionalQ
     asker: null,
     created_at: '2026-07-14T10:00:00',
     answered_at: null,
+    like_count: 0,
+    liked_by_me: false,
     ...overrides,
   };
 }
@@ -30,7 +32,10 @@ function makeQuestion(overrides: Partial<ProfessionalQuery> = {}): ProfessionalQ
 describe('MyQuestionsComponent', () => {
   let fixture: ComponentFixture<MyQuestionsComponent>;
   let component: MyQuestionsComponent;
-  let professionalServiceMock: { getMyQuestions: ReturnType<typeof vi.fn> };
+  let professionalServiceMock: {
+    getMyQuestions: ReturnType<typeof vi.fn>;
+    toggleLike: ReturnType<typeof vi.fn>;
+  };
 
   async function setup(): Promise<void> {
     await TestBed.configureTestingModule({
@@ -49,12 +54,13 @@ describe('MyQuestionsComponent', () => {
   it('loads questions on init', async () => {
     professionalServiceMock = {
       getMyQuestions: vi.fn().mockReturnValue(of([makeQuestion()])),
+      toggleLike: vi.fn(),
     };
     await setup();
 
     expect(component.isLoading()).toBe(false);
     expect(component.errorMessage()).toBe('');
-    expect(component.questions.length).toBe(1);
+    expect(component.questions().length).toBe(1);
   });
 
   it('shows an error message when loading fails', async () => {
@@ -62,6 +68,7 @@ describe('MyQuestionsComponent', () => {
       getMyQuestions: vi
         .fn()
         .mockReturnValue(throwError(() => ({ error: { detail: 'שגיאת שרת' } }))),
+      toggleLike: vi.fn(),
     };
     await setup();
 
@@ -84,10 +91,11 @@ describe('MyQuestionsComponent', () => {
           }),
         ]),
       ),
+      toggleLike: vi.fn(),
     };
     await setup();
 
-    expect(component.target(component.questions[0])).toBe('דוד כהן');
+    expect(component.target(component.questions()[0])).toBe('דוד כהן');
   });
 
   it('falls back to the domain label when there is no specific professional', async () => {
@@ -95,10 +103,11 @@ describe('MyQuestionsComponent', () => {
       getMyQuestions: vi
         .fn()
         .mockReturnValue(of([makeQuestion({ domain: ProfessionalDomain.RABBI })])),
+      toggleLike: vi.fn(),
     };
     await setup();
 
-    expect(component.target(component.questions[0])).toBe('רב/דיין');
+    expect(component.target(component.questions()[0])).toBe('רב/דיין');
   });
 
   it('shows the answer text when the question was answered', async () => {
@@ -111,6 +120,7 @@ describe('MyQuestionsComponent', () => {
           }),
         ]),
       ),
+      toggleLike: vi.fn(),
     };
     await setup();
 
@@ -121,6 +131,7 @@ describe('MyQuestionsComponent', () => {
   it('does not show an answer block for an open question', async () => {
     professionalServiceMock = {
       getMyQuestions: vi.fn().mockReturnValue(of([makeQuestion({ status: QueryStatus.OPEN })])),
+      toggleLike: vi.fn(),
     };
     await setup();
 
@@ -133,10 +144,103 @@ describe('MyQuestionsComponent', () => {
       getMyQuestions: vi
         .fn()
         .mockReturnValue(of([makeQuestion({ status: QueryStatus.ANSWERED, answer: null })])),
+      toggleLike: vi.fn(),
     };
     await setup();
 
     const answerEl = fixture.nativeElement.querySelector('.question-answer');
     expect(answerEl).toBeNull();
+  });
+
+  it('shows the like button for a public, answered question', async () => {
+    professionalServiceMock = {
+      getMyQuestions: vi.fn().mockReturnValue(
+        of([
+          makeQuestion({
+            is_public: true,
+            status: QueryStatus.ANSWERED,
+            answer: 'תשובה לשאלה ציבורית',
+            like_count: 3,
+          }),
+        ]),
+      ),
+      toggleLike: vi.fn(),
+    };
+    await setup();
+
+    const likeButton = fixture.nativeElement.querySelector('.like-button');
+    expect(likeButton?.textContent).toContain('3');
+  });
+
+  it('hides the like button for a private question, even when answered', async () => {
+    professionalServiceMock = {
+      getMyQuestions: vi.fn().mockReturnValue(
+        of([
+          makeQuestion({
+            is_public: false,
+            status: QueryStatus.ANSWERED,
+            answer: 'תשובה לשאלה פרטית',
+          }),
+        ]),
+      ),
+      toggleLike: vi.fn(),
+    };
+    await setup();
+
+    expect(fixture.nativeElement.querySelector('.like-button')).toBeNull();
+  });
+
+  it('hides the like button for a public question still awaiting an answer', async () => {
+    professionalServiceMock = {
+      getMyQuestions: vi
+        .fn()
+        .mockReturnValue(of([makeQuestion({ is_public: true, status: QueryStatus.OPEN })])),
+      toggleLike: vi.fn(),
+    };
+    await setup();
+
+    expect(fixture.nativeElement.querySelector('.like-button')).toBeNull();
+  });
+
+  it('updates the question in place when a like is toggled', async () => {
+    const question = makeQuestion({
+      is_public: true,
+      status: QueryStatus.ANSWERED,
+      answer: 'תשובה לשאלה ציבורית',
+      like_count: 2,
+      liked_by_me: false,
+    });
+    professionalServiceMock = {
+      getMyQuestions: vi.fn().mockReturnValue(of([question])),
+      toggleLike: vi.fn().mockReturnValue(of({ liked: true, like_count: 3 })),
+    };
+    await setup();
+
+    component.toggleLike(component.questions()[0]);
+
+    expect(professionalServiceMock.toggleLike).toHaveBeenCalledWith('q1');
+    expect(component.questions()[0].liked_by_me).toBe(true);
+    expect(component.questions()[0].like_count).toBe(3);
+  });
+
+  it('flags the affected question when a like toggle fails, without touching its state', async () => {
+    const question = makeQuestion({
+      is_public: true,
+      status: QueryStatus.ANSWERED,
+      answer: 'תשובה לשאלה ציבורית',
+      like_count: 2,
+      liked_by_me: false,
+    });
+    professionalServiceMock = {
+      getMyQuestions: vi.fn().mockReturnValue(of([question])),
+      toggleLike: vi.fn().mockReturnValue(throwError(() => ({}))),
+    };
+    await setup();
+
+    component.toggleLike(component.questions()[0]);
+
+    expect(component.likeErrorId()).toBe('q1');
+    expect(component.questions()[0].liked_by_me).toBe(false);
+    expect(component.questions()[0].like_count).toBe(2);
   });
 });

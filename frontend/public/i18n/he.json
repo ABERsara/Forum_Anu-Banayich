@@ -43,6 +43,11 @@
       "unlike_aria": "ביטול לייק — {{count}}",
       "asked_by": "שאלה מאת {{name}}",
       "answered_by": "תשובה מאת {{name}}"
+    },
+    "my_questions": {
+      "like_error": "הלייק לא נשמר. נסה שוב.",
+      "like_aria": "לייק — {{count}}",
+      "unlike_aria": "ביטול לייק — {{count}}"
     }
   },
   "constants": {

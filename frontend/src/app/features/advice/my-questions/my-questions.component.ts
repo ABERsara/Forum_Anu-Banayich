@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -24,10 +25,13 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 export class MyQuestionsComponent implements OnInit {
   private readonly professionalService = inject(ProfessionalService);
   private readonly labels = inject(LabelService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  questions: ProfessionalQuery[] = [];
+  questions = signal<ProfessionalQuery[]>([]);
   isLoading = signal(false);
   errorMessage = signal('');
+  /** Id of the question whose like toggle just failed, so only that card shows the error. */
+  likeErrorId = signal<string | null>(null);
 
   readonly domainLabels = PROFESSIONAL_DOMAIN_LABELS;
   readonly statusLabels = QUERY_STATUS_LABELS;
@@ -37,7 +41,7 @@ export class MyQuestionsComponent implements OnInit {
     this.isLoading.set(true);
     this.professionalService.getMyQuestions().subscribe({
       next: (questions) => {
-        this.questions = questions;
+        this.questions.set(questions);
         this.isLoading.set(false);
       },
       error: (err) => {
@@ -58,5 +62,26 @@ export class MyQuestionsComponent implements OnInit {
       return `${question.professional.first_name} ${question.professional.last_name}`;
     }
     return question.domain ? this.labels.label(this.domainLabels[question.domain]) : '';
+  }
+
+  toggleLike(question: ProfessionalQuery): void {
+    this.likeErrorId.set(null);
+    this.professionalService
+      .toggleLike(question.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.questions.update((current) =>
+            current.map((existing) =>
+              existing.id === question.id
+                ? { ...existing, liked_by_me: result.liked, like_count: result.like_count }
+                : existing,
+            ),
+          );
+        },
+        error: () => {
+          this.likeErrorId.set(question.id);
+        },
+      });
   }
 }

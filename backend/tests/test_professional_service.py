@@ -425,6 +425,94 @@ class TestGetMyQuestions:
         assert results[0].content == "שאלה שנייה שנשאלה על ידי המשתמש"
         assert results[1].content == "שאלה ראשונה שנשאלה על ידי המשתמש"
 
+    def test_like_count_and_liked_by_me(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        liker = _make_asker(db_session, email="liker@example.com")
+        query = _make_query(
+            db_session,
+            asker,
+            is_public=True,
+            status=QueryStatus.ANSWERED,
+            answer="תשובה שתקבל לייק אחד",
+        )
+        like_service.toggle_like(
+            db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, liker
+        )
+
+        results = professional_service.get_my_questions(db_session, asker)
+
+        assert results[0].like_count == 1
+        # The asker herself never liked it – liked_by_me is about the caller
+        # (asker), not about whether anyone liked it.
+        assert results[0].liked_by_me is False
+
+    def test_unanswered_question_has_no_likes(self, db_session: Session) -> None:
+        asker = _make_asker(db_session)
+        _make_query(db_session, asker, is_public=True, status=QueryStatus.OPEN)
+
+        results = professional_service.get_my_questions(db_session, asker)
+
+        assert results[0].like_count == 0
+        assert results[0].liked_by_me is False
+
+    def test_like_count_and_liked_by_me_avoid_n_plus_one(
+        self, db_session: Session, db_engine: Engine
+    ) -> None:
+        """
+        like_count/liked_by_me must come from one SELECT for the whole list,
+        not one extra query per row – the same concern get_public_qa() pins
+        for its own like aggregation.
+        """
+        asker = _make_asker(db_session)
+        queries = [
+            _make_query(
+                db_session,
+                asker,
+                is_public=True,
+                status=QueryStatus.ANSWERED,
+                answer=f"תשובה מספר {i}",
+                content=f"שאלה מספר {i} לבדיקת ביצועים",
+            )
+            for i in range(5)
+        ]
+        for query in queries[:3]:
+            like_service.toggle_like(
+                db_session, LikeTargetType.PROFESSIONAL_QUERY, query.id, asker
+            )
+
+        # Force any pending lazy-refresh of `asker` (its attributes were
+        # expired by the commits above) to happen now, outside the counted
+        # window below — get_my_questions() reads asker.id, and that first
+        # touch would otherwise cost its own SELECT unrelated to the per-row
+        # concern this test is actually pinning.
+        _ = asker.id
+
+        statements: list[str] = []
+
+        def _record(
+            conn: Connection,
+            cursor: Any,
+            statement: str,
+            parameters: Any,
+            context: Any,
+            executemany: bool,
+        ) -> None:
+            statements.append(statement)
+
+        event.listen(db_engine, "before_cursor_execute", _record)
+        try:
+            results = professional_service.get_my_questions(db_session, asker)
+        finally:
+            event.remove(db_engine, "before_cursor_execute", _record)
+
+        assert len(results) == 5
+        select_statements = [
+            s for s in statements if s.strip().upper().startswith("SELECT")
+        ]
+        assert len(select_statements) == 1, (
+            "expected a single SELECT for the whole list, not one per row"
+        )
+
 
 class TestGetPendingQuestions:
     def test_returns_question_addressed_to_this_professional(

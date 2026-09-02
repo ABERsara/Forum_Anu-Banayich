@@ -6,10 +6,10 @@
 
   @if (isLoading()) {
     <app-loading-spinner message="טוען שאלות..." />
-  } @else if (questions.length === 0) {
+  } @else if (questions().length === 0) {
     <p class="empty-state">עדיין לא שאלת שאלות.</p>
   } @else {
-    @for (question of questions; track question.id) {
+    @for (question of questions(); track question.id) {
       <div class="question-card">
         <p class="question-content">{{ question.content }}</p>
         <div class="question-meta">
@@ -21,6 +21,26 @@
         </div>
         @if (question.status === queryStatus.ANSWERED && question.answer) {
           <p class="question-answer">{{ question.answer }}</p>
+          @if (question.is_public) {
+            <button
+              type="button"
+              class="like-button"
+              [class.liked]="question.liked_by_me"
+              [attr.aria-label]="
+                (question.liked_by_me
+                  ? 'advice.my_questions.unlike_aria'
+                  : 'advice.my_questions.like_aria'
+                ) | transloco: { count: question.like_count }
+              "
+              (click)="toggleLike(question)"
+            >
+              <span aria-hidden="true">👍</span>
+              <span>{{ question.like_count }}</span>
+            </button>
+            @if (likeErrorId() === question.id) {
+              <app-error-display [message]="'advice.my_questions.like_error' | transloco" />
+            }
+          }
         }
       </div>
     }

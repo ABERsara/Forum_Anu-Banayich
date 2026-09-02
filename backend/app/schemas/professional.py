@@ -40,6 +40,8 @@ class ProfessionalQueryResponse(BaseModel):
     asker: UserPublic | None = None  # only if show_real_name=True
     created_at: datetime
     answered_at: datetime | None = None
+    like_count: int
+    liked_by_me: bool
 
     model_config = {"from_attributes": True}
 
