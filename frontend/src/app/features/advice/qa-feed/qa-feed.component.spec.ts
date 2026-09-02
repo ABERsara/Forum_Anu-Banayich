@@ -75,6 +75,14 @@ describe('QaFeedComponent', () => {
     expect(component.professionalName(component.items()[0])).toBe('משה כהן');
   });
 
+  it('hides the answered-by attribution for a domain question with no professional attached', async () => {
+    professionalServiceMock.getPublicQA.mockReturnValue(of([makeItem({ professional: null })]));
+    await setup();
+
+    expect(component.professionalName(component.items()[0])).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('תשובה מאת');
+  });
+
   it('falls back to the anonymized alias when the asker did not opt in', async () => {
     professionalServiceMock.getPublicQA.mockReturnValue(
       of([makeItem({ asker: null, asker_alias: 'אלמנה – ספרדי' })]),
