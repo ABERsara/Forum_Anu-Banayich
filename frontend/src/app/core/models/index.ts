@@ -343,6 +343,9 @@ export interface PublicQA {
   answered_at: string | null;
   like_count: number;
   liked_by_me: boolean;
+  professional: ProfessionalProfile | null;
+  asker_alias: string;
+  asker: UserPublic | null;
 }
 
 // ---------------------------------------------------------------------------
