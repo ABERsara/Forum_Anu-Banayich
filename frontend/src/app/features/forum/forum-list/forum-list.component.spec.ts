@@ -1,14 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ForumListComponent } from './forum-list.component';
 import { GroupVisibility, PostStatus, SectorVisibility } from '../../../core/constants';
 import type { ForumPost, ForumPostList } from '../../../core/models';
 import { ForumService } from '../../../core/services/forum.service';
-import { translocoTesting } from '../../../../testing/transloco-testing';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
   return {
@@ -25,6 +25,23 @@ function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
     updated_at: '2026-07-01T10:00:00',
     ...overrides,
   };
+}
+
+/**
+ * A post whose own text carries no Hebrew.
+ *
+ * A post's title, body and author name are user-generated content — out of
+ * scope for ABF-130 and never translated. Feeding Latin content to the
+ * `HEBREW` sweeps below keeps them pointed at the UI copy, which is the thing
+ * they are meant to guard.
+ */
+function makeLatinPost(overrides: Partial<ForumPost> = {}): ForumPost {
+  return makePost({
+    title: 'A question about the paperwork',
+    content: 'Body text',
+    author: { id: 'u1', first_name: 'Sara', last_name: 'Levi' },
+    ...overrides,
+  });
 }
 
 function makeList(overrides: Partial<ForumPostList> = {}): ForumPostList {
@@ -147,5 +164,93 @@ describe('ForumListComponent', () => {
     expect(text).toContain('Widows');
     expect(text).toContain('Hasidic');
     expect(text).not.toContain('אלמנות');
+  });
+
+  describe('i18n', () => {
+    function text(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function heading(): string {
+      return fixture.nativeElement.querySelector('h1').textContent.trim();
+    }
+
+    function switchToEnglish(): void {
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+    }
+
+    /** Re-renders the list against a different service response. */
+    function renderWith(response: Observable<ForumPostList>): void {
+      forumServiceMock.getPosts.mockReturnValue(response);
+      fixture = TestBed.createComponent(ForumListComponent);
+      fixture.detectChanges();
+    }
+
+    it('reads in Hebrew exactly as it did before the keys went in', () => {
+      expect(heading()).toBe('פורום הקהילה');
+      expect(text()).toContain('+ פרסום הודעה חדשה');
+      expect(text()).toContain('הקודם');
+      expect(text()).toContain('עמוד 1 מתוך 1');
+      expect(text()).toContain('הבא');
+    });
+
+    it('leaves no Hebrew on the page in English', () => {
+      renderWith(of(makeList({ items: [makeLatinPost()] })));
+
+      switchToEnglish();
+
+      expect(heading()).toBe('Community forum');
+      expect(text()).toContain('+ New post');
+      expect(text()).toContain('Previous');
+      expect(text()).toContain('Next');
+      expect(text()).toContain('Widows');
+      expect(text()).toContain('Hasidic');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('keeps the page numbers when the sentence around them changes', () => {
+      renderWith(of(makeList({ items: [makeLatinPost()], total: 45, page: 2, page_size: 20 })));
+      expect(text()).toContain('עמוד 2 מתוך 3');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Page 2 of 3');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the empty state', () => {
+      renderWith(of(makeList({ items: [], total: 0 })));
+
+      switchToEnglish();
+
+      expect(text()).toContain('No posts yet. Be the first to post!');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** The failure is held as a key, so it follows the switch instead of freezing. */
+    it('re-renders a load failure that is already on screen', () => {
+      renderWith(throwError(() => ({})));
+      expect(text()).toContain('אירעה שגיאה בטעינת הפוסטים. נסה לרענן את הדף.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Something went wrong loading the posts. Please refresh the page.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** Out of scope by the ticket: a post is written by a user, not by us. */
+    it('leaves user-generated content in the language it was written in', () => {
+      renderWith(of(makeList({ items: [makePost({ title: 'כותרת שמשתמש כתב' })] })));
+
+      switchToEnglish();
+
+      expect(text()).toContain('כותרת שמשתמש כתב');
+      expect(text()).toContain('שרה');
+    });
+
+    it('does not pin its own text direction — it follows <html dir>', () => {
+      expect(fixture.nativeElement.querySelector('.forum-list').hasAttribute('dir')).toBe(false);
+    });
   });
 });

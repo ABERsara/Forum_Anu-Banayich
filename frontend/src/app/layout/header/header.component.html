@@ -1,10 +1,10 @@
 <header class="header">
   <div class="header__inner">
-    <a class="header__logo" routerLink="/home">הפורום</a>
+    <a class="header__logo" routerLink="/home">{{ 'header.brand' | transloco }}</a>
 
     <nav class="header__nav">
       @if (auth.isLoggedIn()) {
-        <a routerLink="/home" routerLinkActive="active">בית</a>
+        <a routerLink="/home" routerLinkActive="active">{{ 'header.home' | transloco }}</a>
         @if (auth.isUser()) {
           <a routerLink="/messages" routerLinkActive="active" class="header__messages">
             <span class="header__messages-icon" aria-hidden="true">
@@ -23,14 +23,16 @@
                 />
               </svg>
             </span>
-            הודעות
+            {{ 'header.messages' | transloco }}
             <!-- Unread badge lands here once the inbox task (Sprint 5, task 4) exposes unread counts -->
           </a>
         }
-        <button type="button" class="header__logout" (click)="logout()">התנתקות</button>
+        <button type="button" class="header__logout" (click)="logout()">
+          {{ 'header.logout' | transloco }}
+        </button>
       } @else {
-        <a routerLink="/login" routerLinkActive="active">כניסה</a>
-        <a routerLink="/register" routerLinkActive="active">הרשמה</a>
+        <a routerLink="/login" routerLinkActive="active">{{ 'header.login' | transloco }}</a>
+        <a routerLink="/register" routerLinkActive="active">{{ 'header.register' | transloco }}</a>
       }
       <app-language-toggle [isHebrew]="isHebrew()" (toggled)="toggleLang()" />
     </nav>

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -16,6 +17,7 @@ import {
 import type { ForumPost, UserProfile } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
   return {
@@ -32,6 +34,23 @@ function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
     updated_at: '2026-07-01T10:00:00',
     ...overrides,
   };
+}
+
+/**
+ * A post whose own text carries no Hebrew.
+ *
+ * A post's title, body and author name are user-generated content — out of
+ * scope for ABF-130 and never translated. Feeding Latin content to the
+ * `HEBREW` sweeps below keeps them pointed at the UI copy, which is the thing
+ * they are meant to guard.
+ */
+function makeLatinPost(overrides: Partial<ForumPost> = {}): ForumPost {
+  return makePost({
+    title: 'A question about the paperwork',
+    content: 'Body text',
+    author: { id: 'author-1', first_name: 'Sara', last_name: 'Levi' },
+    ...overrides,
+  });
 }
 
 function makeUser(overrides: Partial<UserProfile> = {}): UserProfile {
@@ -64,9 +83,14 @@ describe('ForumPostComponent', () => {
   };
   let navigateSpy: ReturnType<typeof vi.fn>;
 
-  function setup(currentUser: UserProfile | null, isModerator = false, isAdmin = false): void {
+  function setup(
+    currentUser: UserProfile | null,
+    isModerator = false,
+    isAdmin = false,
+    post: ForumPost = makePost(),
+  ): void {
     forumServiceMock = {
-      getPost: vi.fn().mockReturnValue(of(makePost())),
+      getPost: vi.fn().mockReturnValue(of(post)),
       deletePost: vi.fn().mockReturnValue(of(makePost({ status: PostStatus.DELETED }))),
     };
     authServiceMock = {
@@ -77,7 +101,7 @@ describe('ForumPostComponent', () => {
     navigateSpy = vi.fn();
 
     TestBed.configureTestingModule({
-      imports: [ForumPostComponent],
+      imports: [ForumPostComponent, translocoTesting()],
       providers: [
         { provide: ForumService, useValue: forumServiceMock },
         { provide: AuthService, useValue: authServiceMock },
@@ -91,6 +115,15 @@ describe('ForumPostComponent', () => {
 
     fixture = TestBed.createComponent(ForumPostComponent);
     component = fixture.componentInstance;
+    fixture.detectChanges();
+  }
+
+  function text(): string {
+    return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  }
+
+  function switchToEnglish(): void {
+    TestBed.inject(TranslocoService).setActiveLang('en');
     fixture.detectChanges();
   }
 
@@ -108,8 +141,10 @@ describe('ForumPostComponent', () => {
       forumServiceMock.getPost.mockReturnValue(throwError(() => ({ status: 404 })));
 
       component.ngOnInit();
+      fixture.detectChanges();
 
-      expect(component.errorMessage()).toBe('ההודעה לא נמצאה.');
+      expect(component.errorKey()).toBe('forum.errors.not_found');
+      expect(text()).toContain('ההודעה לא נמצאה.');
     });
 
     it('shows a permission message on 403', () => {
@@ -117,8 +152,10 @@ describe('ForumPostComponent', () => {
       forumServiceMock.getPost.mockReturnValue(throwError(() => ({ status: 403 })));
 
       component.ngOnInit();
+      fixture.detectChanges();
 
-      expect(component.errorMessage()).toBe('אין לך הרשאה לצפות בהודעה זו.');
+      expect(component.errorKey()).toBe('forum.errors.view_forbidden');
+      expect(text()).toContain('אין לך הרשאה לצפות בהודעה זו.');
     });
 
     it('shows a generic message on other errors', () => {
@@ -126,8 +163,10 @@ describe('ForumPostComponent', () => {
       forumServiceMock.getPost.mockReturnValue(throwError(() => ({ status: 500 })));
 
       component.ngOnInit();
+      fixture.detectChanges();
 
-      expect(component.errorMessage()).toBe('אירעה שגיאה בטעינת ההודעה. נסה לרענן את הדף.');
+      expect(component.errorKey()).toBe('forum.errors.load_post_failed');
+      expect(text()).toContain('אירעה שגיאה בטעינת ההודעה. נסה לרענן את הדף.');
     });
   });
 
@@ -215,9 +254,89 @@ describe('ForumPostComponent', () => {
       component.onDeleteClick();
 
       component.onDeleteConfirmed();
+      fixture.detectChanges();
 
-      expect(component.deleteError()).toBe('אירעה שגיאה במחיקת ההודעה. נסה שוב.');
+      expect(component.deleteErrorKey()).toBe('forum.errors.delete_failed');
+      expect(text()).toContain('אירעה שגיאה במחיקת ההודעה. נסה שוב.');
       expect(navigateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('i18n', () => {
+    it('reads in Hebrew exactly as it did before the keys went in', () => {
+      setup(makeUser(), false, false, makePost({ attachment_url: 'https://example.test/f.pdf' }));
+
+      expect(text()).toContain('חזרה לפורום');
+      expect(text()).toContain('קובץ מצורף');
+      expect(text()).toContain('עריכה');
+      expect(text()).toContain('מחיקה');
+    });
+
+    it('leaves no Hebrew on the page in English', () => {
+      setup(
+        makeUser({ first_name: 'Sara', last_name: 'Levi' }),
+        false,
+        false,
+        makeLatinPost({ attachment_url: 'https://example.test/f.pdf' }),
+      );
+
+      switchToEnglish();
+
+      expect(text()).toContain('Back to the forum');
+      expect(text()).toContain('Attachment');
+      expect(text()).toContain('Edit');
+      expect(text()).toContain('Delete');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /**
+     * The dialog is dumb — it renders whatever string it is handed — so a key
+     * passed by mistake would land on screen verbatim. This asserts on both the
+     * text that should be there and the key that should not.
+     */
+    it('hands the confirm dialog translated text, not raw keys', () => {
+      setup(makeUser(), false, false, makeLatinPost());
+      component.onDeleteClick();
+      fixture.detectChanges();
+
+      expect(text()).toContain('מחיקת הודעה');
+      expect(text()).toContain('פעולה זו תמחק את ההודעה. לא ניתן לשחזר.');
+      expect(text()).not.toContain('forum.delete_post');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Delete post');
+      expect(text()).toContain('This will delete the post. It cannot be undone.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** The failure is held as a key, so it follows the switch instead of freezing. */
+    it('re-renders a failure that is already on screen', () => {
+      setup(makeUser());
+      forumServiceMock.getPost.mockReturnValue(throwError(() => ({ status: 403 })));
+      component.ngOnInit();
+      fixture.detectChanges();
+      expect(text()).toContain('אין לך הרשאה לצפות בהודעה זו.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('You do not have permission to view this post.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** Out of scope by the ticket: a post is written by a user, not by us. */
+    it('leaves user-generated content in the language it was written in', () => {
+      setup(makeUser());
+
+      switchToEnglish();
+
+      expect(text()).toContain('תוכן ההודעה');
+    });
+
+    it('does not pin its own text direction — it follows <html dir>', () => {
+      setup(makeUser());
+
+      expect(fixture.nativeElement.querySelector('.forum-post').hasAttribute('dir')).toBe(false);
     });
   });
 });

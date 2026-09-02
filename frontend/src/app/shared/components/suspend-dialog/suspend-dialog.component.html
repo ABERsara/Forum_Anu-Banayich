@@ -1,11 +1,13 @@
 <div class="overlay">
-  <div class="dialog" dir="rtl">
-    <h2 class="dialog__title">{{ title() }}</h2>
+  <div class="dialog">
+    <h2 class="dialog__title">{{ title() || ('shared.suspend_dialog.title' | transloco) }}</h2>
     @if (message()) {
       <p class="dialog__message">{{ message() }}</p>
     }
     <div class="dialog__field">
-      <label class="dialog__label" for="suspend-dialog-hours">מספר שעות</label>
+      <label class="dialog__label" for="suspend-dialog-hours">
+        {{ 'shared.suspend_dialog.hours_label' | transloco }}
+      </label>
       <input
         id="suspend-dialog-hours"
         class="dialog__input"
@@ -16,20 +18,22 @@
       />
     </div>
     <div class="dialog__field">
-      <label class="dialog__label" for="suspend-dialog-reason">סיבת ההשעייה</label>
+      <label class="dialog__label" for="suspend-dialog-reason">
+        {{ 'shared.suspend_dialog.reason_label' | transloco }}
+      </label>
       <textarea
         id="suspend-dialog-reason"
         class="dialog__textarea"
         rows="3"
         maxlength="100"
-        placeholder="לדוגמה: הפרת כללי הפורום"
+        [placeholder]="'shared.suspend_dialog.reason_placeholder' | transloco"
         [value]="reasonValue()"
         (input)="onReasonChange($any($event.target).value)"
       ></textarea>
     </div>
     <div class="dialog__actions">
       <button class="btn btn--cancel" type="button" (click)="cancelled.emit()">
-        {{ cancelText() }}
+        {{ cancelText() || ('common.cancel' | transloco) }}
       </button>
       <button
         class="btn btn--danger"
@@ -37,7 +41,7 @@
         [disabled]="isConfirmDisabled"
         (click)="onConfirm()"
       >
-        {{ confirmText() }}
+        {{ confirmText() || ('shared.suspend_dialog.confirm' | transloco) }}
       </button>
     </div>
   </div>

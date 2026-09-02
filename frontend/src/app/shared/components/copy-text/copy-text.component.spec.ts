@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
 import { vi } from 'vitest';
 
 import { CopyTextComponent } from './copy-text.component';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 describe('CopyTextComponent', () => {
   let fixture: ComponentFixture<CopyTextComponent>;
@@ -16,7 +18,7 @@ describe('CopyTextComponent', () => {
     });
 
     await TestBed.configureTestingModule({
-      imports: [CopyTextComponent],
+      imports: [CopyTextComponent, translocoTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CopyTextComponent);
@@ -103,5 +105,20 @@ describe('CopyTextComponent', () => {
 
     const label = fixture.nativeElement.querySelector('.copy-btn__label') as HTMLElement;
     expect(label.textContent?.trim()).toBe('Copy ID');
+  });
+
+  it('falls back to a generic label in English under an English locale', async () => {
+    TestBed.inject(TranslocoService).setActiveLang('en');
+    fixture.detectChanges();
+
+    const label = fixture.nativeElement.querySelector('.copy-btn__label') as HTMLElement;
+    expect(label.textContent?.trim()).toBe('Copy');
+
+    (fixture.nativeElement.querySelector('.copy-btn') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(label.textContent?.trim()).toBe('Copied!');
+    expect((fixture.nativeElement as HTMLElement).textContent ?? '').not.toMatch(HEBREW);
   });
 });

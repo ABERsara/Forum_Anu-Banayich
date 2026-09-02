@@ -1,11 +1,266 @@
 {
   "common": {
     "lang_he": "עברית",
-    "lang_en": "English"
+    "lang_en": "English",
+    "cancel": "Cancel",
+    "loading": "Loading..."
   },
   "header": {
     "switch_to_hebrew": "Switch to Hebrew",
-    "switch_to_english": "Switch to English"
+    "switch_to_english": "Switch to English",
+    "brand": "The Forum",
+    "home": "Home",
+    "logout": "Log out",
+    "login": "Log in",
+    "register": "Sign up",
+    "messages": "Messages"
+  },
+  "advice": {
+    "back_to_professionals": "Back to the professionals list",
+    "list": {
+      "title": "Professional advice",
+      "public_qa_link": "Public questions and answers",
+      "filter_label": "Filter by field:",
+      "filter_all": "All",
+      "empty": "No professionals are available.",
+      "ask_link": "Ask a question"
+    },
+    "ask": {
+      "title": "Professional question",
+      "hint_professional": "Your question will be sent to the professional you chose.",
+      "hint_domain": "Choose a field — your question will be sent to every professional in it.",
+      "domain_label": "Field",
+      "domain_placeholder": "Choose a field",
+      "domain_error": "Please choose a field",
+      "content_label": "Your question",
+      "content_placeholder": "Describe your question (10 to 2000 characters)",
+      "content_error": "Please enter a question (10 to 2000 characters)",
+      "is_public_label": "Publish this question and its answer to the community?",
+      "show_real_name_label": "Show my real name to the professional",
+      "sending": "Sending question...",
+      "submit": "Send question"
+    },
+    "my_questions": {
+      "title": "My questions",
+      "loading": "Loading questions...",
+      "empty": "You have not asked any questions yet."
+    },
+    "qa_feed": {
+      "back_link": "← Back to professional advice",
+      "title": "Community Q&A",
+      "domain_filter_label": "Filter by domain:",
+      "domain_filter_all": "All",
+      "loading": "Loading questions and answers...",
+      "empty": "There are no public questions and answers in your cell yet.",
+      "load_more": "Load more",
+      "loading_more": "Loading...",
+      "like_error": "Couldn't save the like. Please try again.",
+      "like_aria": "Like — {{count}}",
+      "unlike_aria": "Unlike — {{count}}",
+      "asked_by": "Asked by {{name}}",
+      "answered_by": "Answered by {{name}}"
+    },
+    "pending": {
+      "back_to_home": "Back to the home page",
+      "title": "Questions awaiting an answer",
+      "intro": "Questions are listed in the order they arrived — oldest first. The asker's details are confidential.",
+      "loading": "Loading pending questions...",
+      "empty": "No questions are waiting for your answer right now.",
+      "asked_on": "Asked on {{date}}",
+      "answer_label": "Your answer",
+      "answer_placeholder": "Write your answer here (10 to 5000 characters)",
+      "answer_error": "Please enter an answer of 10 to 5000 characters",
+      "sending": "Sending answer...",
+      "submit": "Send answer",
+      "success": "Your answer was sent, and the asker has been notified by email."
+    },
+    "errors": {
+      "load_professionals_failed": "Something went wrong loading the professionals list. Please try again later.",
+      "ask_failed": "Something went wrong sending the question.",
+      "load_my_questions_failed": "Something went wrong loading your questions.",
+      "load_pending_failed": "Something went wrong loading the pending questions.",
+      "answer_failed": "Something went wrong sending the answer."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Log in",
+      "email_label": "Email",
+      "email_placeholder": "your@email.com",
+      "email_error": "Please enter a valid email address",
+      "password_label": "Password",
+      "password_placeholder": "Password",
+      "password_error": "Please enter a password",
+      "signing_in": "Signing in...",
+      "submit": "Log in",
+      "divider": "or",
+      "google": "Sign in with Google",
+      "no_account": "Don't have an account?",
+      "register_link": "Sign up here",
+      "error_generic": "Login failed. Please check your details.",
+      "error_google": "Google sign-in was cancelled or failed."
+    },
+    "register": {
+      "title": "Sign up",
+      "step": "Step {{current}} of 4",
+      "select_placeholder": "Choose",
+      "first_name_label": "First name",
+      "first_name_error": "Please enter a first name (at least 2 characters)",
+      "last_name_label": "Last name",
+      "last_name_error": "Please enter a last name (at least 2 characters)",
+      "id_number_label": "ID number",
+      "id_number_error": "Please enter a valid ID number (at least 7 digits)",
+      "birth_date_label": "Date of birth",
+      "birth_date_error": "Please choose a date of birth",
+      "user_type_label": "User type",
+      "user_type_error": "Please choose a user type",
+      "sector_label": "Sector",
+      "sector_error": "Please choose a sector",
+      "next": "Continue",
+      "email_label": "Email",
+      "email_error": "Please enter a valid email address",
+      "phone_label": "Phone",
+      "phone_error": "Please enter a valid phone number (9-15 digits only)",
+      "password_label": "Password",
+      "password_error": "The password must be at least 8 characters",
+      "send_otp": "Send OTP code",
+      "otp_sent_to": "A verification code was sent to: {{email}}",
+      "otp_label": "Verification code",
+      "otp_error": "Please enter the verification code (at least 4 digits)",
+      "otp_resent": "A new code was sent",
+      "verify_otp": "Verify code",
+      "resend_otp": "Resend code",
+      "selfie": "Selfie photo",
+      "id_document": "Identity document",
+      "choose_death_certificate": "Choose a death certificate",
+      "choose_selfie": "Choose a selfie photo",
+      "choose_id_card": "Choose an ID card",
+      "choose_passport": "Choose a passport",
+      "declare_accuracy": "I declare that all the details and documents I have provided are true and accurate",
+      "declare_terms": "I have read and agree to the terms of use and the privacy policy",
+      "declare_authorization": "I declare that I am eligible to register under the user type I selected",
+      "finish": "Finish",
+      "have_account": "Already have an account? Log in here",
+      "error_generic": "Registration failed. Please try again.",
+      "error_otp": "Wrong code. Please try again.",
+      "error_resend": "Sending the code failed."
+    },
+    "pending": {
+      "title": "Your registration was received",
+      "message": "Your registration was received and is awaiting approval. We will notify you by email.",
+      "back_to_login": "Back to the login screen"
+    }
+  },
+  "forum": {
+    "back_to_list": "Back to the forum",
+    "list": {
+      "title": "Community forum",
+      "empty": "No posts yet. Be the first to post!",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{current}} of {{total}}"
+    },
+    "post": {
+      "attachment": "Attachment",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "delete_post": {
+      "title": "Delete post",
+      "message": "This will delete the post. It cannot be undone.",
+      "confirm": "Delete"
+    },
+    "post_form": {
+      "title_label": "Title",
+      "title_error": "Please enter a title (2 to 256 characters)",
+      "content_label": "Content",
+      "content_error": "Please enter content (up to 5000 characters)"
+    },
+    "new_post": {
+      "title": "New post",
+      "group_label": "Audience – group",
+      "sector_label": "Audience – sector",
+      "attachment_label": "Attach a file (optional)",
+      "publishing": "Publishing...",
+      "submit": "Publish"
+    },
+    "edit_post": {
+      "title": "Edit post",
+      "saving": "Saving...",
+      "submit": "Save"
+    },
+    "errors": {
+      "load_posts_failed": "Something went wrong loading the posts. Please refresh the page.",
+      "load_post_failed": "Something went wrong loading the post. Please refresh the page.",
+      "not_found": "The post was not found.",
+      "view_forbidden": "You do not have permission to view this post.",
+      "edit_forbidden": "You do not have permission to edit this post.",
+      "create_failed": "Something went wrong publishing the post.",
+      "save_failed": "Something went wrong. Please try again.",
+      "delete_failed": "Something went wrong deleting the post. Please try again."
+    }
+  },
+  "home": {
+    "title": "Welcome",
+    "greeting": "Hello, {{name}}",
+    "forum": {
+      "title": "Forum",
+      "subtitle": "Questions and answers from the community",
+      "body": "Sharing, support and answers from community members."
+    },
+    "advice": {
+      "title": "Advice",
+      "subtitle": "Reach out to a professional",
+      "body": "Personal, professional advice on whatever is on your mind."
+    },
+    "admin": {
+      "title": "Administration",
+      "subtitle": "Admin dashboard",
+      "body": "Manage users, registration approvals and content."
+    },
+    "moderator": {
+      "title": "Moderator",
+      "subtitle": "Reports and complaints",
+      "body": "Review the reports users have filed."
+    },
+    "professional": {
+      "title": "Professional advice",
+      "subtitle": "Questions awaiting your answer",
+      "body": "View the questions sent to you and answer the asker."
+    }
+  },
+  "shared": {
+    "confirm_dialog": {
+      "title": "Are you sure?",
+      "confirm": "Confirm"
+    },
+    "suspend_dialog": {
+      "title": "Suspend user",
+      "confirm": "Suspend",
+      "hours_label": "Number of hours",
+      "reason_label": "Reason for the suspension",
+      "reason_placeholder": "For example: breach of the forum rules"
+    },
+    "report": {
+      "button": "Report",
+      "submitted": "Your report was sent, thank you.",
+      "dialog_title": "Report content",
+      "reason_label": "Reason for the report",
+      "description_label": "Details (optional)",
+      "submit": "Send report",
+      "error_duplicate": "You have already reported this content.",
+      "error_generic": "Something went wrong sending the report. Please try again."
+    },
+    "file_upload": {
+      "choose_file": "Choose file",
+      "clear": "Clear",
+      "preview_alt": "Preview",
+      "file_too_large": "The file is too large. The maximum size is {{max}} MB"
+    },
+    "copy_text": {
+      "copy": "Copy",
+      "copied": "Copied!"
+    }
   },
   "errors": {
     "dm_forbidden": "You don't have permission to send or view this message.",
@@ -26,23 +281,6 @@
       "new_message_label": "New message",
       "placeholder": "Write a message...",
       "send": "Send"
-    }
-  },
-  "advice": {
-    "qa_feed": {
-      "back_link": "← Back to professional advice",
-      "title": "Community Q&A",
-      "domain_filter_label": "Filter by domain:",
-      "domain_filter_all": "All",
-      "loading": "Loading questions and answers...",
-      "empty": "There are no public questions and answers in your cell yet.",
-      "load_more": "Load more",
-      "loading_more": "Loading...",
-      "like_error": "Couldn't save the like. Please try again.",
-      "like_aria": "Like — {{count}}",
-      "unlike_aria": "Unlike — {{count}}",
-      "asked_by": "Asked by {{name}}",
-      "answered_by": "Answered by {{name}}"
     }
   },
   "constants": {

@@ -1,25 +1,40 @@
 import { Component, DestroyRef, inject, input, output } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-file-upload',
   standalone: true,
+  imports: [TranslocoPipe],
   templateUrl: './file-upload.component.html',
   styleUrl: './file-upload.component.scss',
 })
 export class FileUploadComponent {
   accept = input<string>('image/*,.pdf');
   maxSizeMb = input<number>(5);
-  label = input<string>('בחר קובץ');
+  /**
+   * Button text — already translated by the caller. Falls back to a generic
+   * "choose file" in the active language. See `confirm-dialog.component.ts`.
+   */
+  label = input<string>('');
   ariaLabel = input<string>('');
   variant = input<'default' | 'primary'>('default');
 
   fileSelected = output<File>();
+  /**
+   * The size complaint, as text.
+   *
+   * The caller owns where this message is shown, so it is resolved here rather
+   * than emitted as a key — the output contract stays a plain string. The one
+   * consequence: a message already on screen keeps the language it was raised
+   * in until the next file is picked.
+   */
   validationError = output<string>();
 
   previewUrl: string | null = null;
   selectedFileName: string | null = null;
 
   private readonly destroyRef = inject(DestroyRef);
+  private readonly transloco = inject(TranslocoService);
 
   constructor() {
     this.destroyRef.onDestroy(() => {
@@ -36,7 +51,9 @@ export class FileUploadComponent {
     this.clearPreview();
 
     if (file.size / 1024 / 1024 > this.maxSizeMb()) {
-      this.validationError.emit(`הקובץ גדול מדי. הגודל המקסימלי הוא ${this.maxSizeMb()} MB`);
+      this.validationError.emit(
+        this.transloco.translate('shared.file_upload.file_too_large', { max: this.maxSizeMb() }),
+      );
       input.value = '';
       return;
     }

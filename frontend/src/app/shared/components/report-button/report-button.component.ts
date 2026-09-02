@@ -24,13 +24,21 @@ export class ReportButtonComponent {
   description = signal('');
   isSubmitting = signal(false);
   isSubmitted = signal(false);
-  errorMessage = signal<string | null>(null);
+
+  /**
+   * The failure to show, as a translation key rather than as text.
+   *
+   * The template runs it through the `transloco` pipe, so a message that is on
+   * screen when the reader switches language switches with it. Resolving it
+   * here instead would freeze it in the language it was raised in.
+   */
+  errorKey = signal<string | null>(null);
 
   readonly reasonOptions = Object.values(ReportReason);
   readonly reasonLabels = REPORT_REASON_LABELS;
 
   onOpenClick(): void {
-    this.errorMessage.set(null);
+    this.errorKey.set(null);
     this.showDialog.set(true);
   }
 
@@ -48,7 +56,7 @@ export class ReportButtonComponent {
 
   onSubmit(): void {
     this.isSubmitting.set(true);
-    this.errorMessage.set(null);
+    this.errorKey.set(null);
     this.reportService
       .fileReport({
         target_type: this.contentType(),
@@ -64,8 +72,8 @@ export class ReportButtonComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.isSubmitting.set(false);
-          this.errorMessage.set(
-            err.status === 409 ? 'כבר דיווחת על תוכן זה.' : 'אירעה שגיאה בשליחת הדיווח. נסה שוב.',
+          this.errorKey.set(
+            err.status === 409 ? 'shared.report.error_duplicate' : 'shared.report.error_generic',
           );
         },
       });

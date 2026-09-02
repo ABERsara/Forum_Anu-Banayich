@@ -360,8 +360,12 @@ data: { roles: ['admin'] },
 **מוסכמת שמות מפתחות**: dot notation, `<module>.<element>` (למשל `common.copy`, `forum.report.button`). דוגמאות אמיתיות מ-ABF-126:
 `common.lang_he`, `common.lang_en`, `header.switch_to_hebrew`, `header.switch_to_english`.
 
-מפתח חסר ב-EN — OK בינתיים. העיקר שה-hook קיים. **חריג: מרחב `constants.*`** — שם שתי
-השפות חייבות להיות מלאות, ו-`core/constants/index.spec.ts` מפיל את הבילד אם מפתח חסר באחת מהן.
+**שתי השפות חייבות להיות מלאות.** `core/i18n/translations.spec.ts` מפיל את הבילד אם מפתח קיים
+בקובץ אחד ולא בשני, אם ערך כלשהו ריק, או אם אותו מפתח מַפנה לפרמטרים שונים בשתי השפות
+(`{{name}}` שנעלם בצד אחד = משפט שבולע את השם). זה החליף את ההקלה של ABF-126 ("מפתח חסר
+ב-EN — OK בינתיים"): כל שבעת טיקטי המיגרציה מחויבים ממילא לשתי השפות בקריטריוני הקבלה,
+והשומר רק אוכף את מה שהם כבר דורשים. `core/constants/index.spec.ts` ממשיך לשמור בנוסף
+על מרחב `constants.*` — שם גם *עודף* תרגום (מפתח שאף מיפוי לא מצביע עליו) הוא כשל.
 
 ### תוויות משותפות — אל תתרגמו אותן שוב (ABF-127)
 
@@ -395,6 +399,158 @@ this.labels.label(SECTOR_LABELS[user.sector]);
 ```ts
 TestBed.configureTestingModule({ imports: [MyComponent, translocoTesting()] });
 ```
+
+### קומפוננטות משותפות — מי מתרגם את הטקסט (ABF-128)
+
+`shared/components/` ו-`layout/header/` כבר migrated. **הכלל: קלט טקסט של קומפוננטה משותפת
+מקבל טקסט מתורגם, לא מפתח.** הקומפוננטה המשותפת היא dumb — היא מרנדרת את המחרוזת שקיבלה
+כמו שהיא, וה-pipe רץ אצל *הקורא*:
+
+```html
+<!-- ✅ הקורא מתרגם -->
+<app-confirm-dialog
+  [title]="'forum.delete_post.title' | transloco"
+  [confirmText]="'forum.delete_post.confirm' | transloco"
+/>
+<app-card [title]="'home.forum.title' | transloco" />
+<app-loading-spinner [message]="'common.loading' | transloco" />
+<app-error-display [message]="'forum.load_failed' | transloco" />
+```
+
+```html
+<!-- ❌ מפתח גולמי כערך — הקומפוננטה לא מתרגמת, והמפתח יגיע למסך -->
+<app-confirm-dialog title="forum.delete_post.title" />
+```
+
+למה כך: המפתח `forum.*` שייך למודול שקורא, לא לקומפוננטה המשותפת — כך אף מודול לא נוגע
+ב-`shared/` בטיקט שלו, ובדיוק כפי שקומפוננטה משותפת לא יודעת מאיזה מודול הגיעה המחרוזת,
+היא גם לא צריכה לדעת באיזה מרחב מפתחות הוא משתמש.
+
+**ברירות המחדל** של הדיאלוגים (`shared.confirm_dialog.*`, `shared.suspend_dialog.*`,
+`shared.file_upload.choose_file`, `shared.copy_text.*`) הן הטקסט היחיד שהקומפוננטות האלה
+מחזיקות בעצמן, והן נכנסות רק כשהקורא לא העביר כלום. קורא שעדיין מעביר מחרוזת עברית קשיחה
+(מודול שטרם עבר מיגרציה) ממשיך לעבוד בדיוק כמו קודם.
+
+`common.cancel` ו-`common.loading` הם מפתחות חוצי-מודולים — אל תוסיפו `forum.cancel` משלכם.
+
+**דיווח שגיאה שנשמר ב-signal** — שמרו את ה*מפתח* והריצו pipe בתבנית, לא טקסט מתורגם:
+
+```ts
+// ✅ מתחלף עם השפה גם כשההודעה כבר על המסך — ראו report-button.component.ts
+errorKey.set(err.status === 409 ? 'shared.report.error_duplicate' : 'shared.report.error_generic');
+```
+
+```html
+@if (errorKey(); as key) {
+  <app-error-display [message]="key | transloco" />
+}
+```
+
+**כיוון טקסט:** אל תכתבו `dir="rtl"` בתבנית ואל תכתבו `text-align: right`. `LocaleService`
+מגדיר `<html dir>` לפי השפה, והכול יורש ממנו; ל-CSS השתמשו במאפיינים לוגיים
+(`text-align: start`, `margin-inline-start`). `dir="ltr"` על שדה שהתוכן שלו תמיד LTR (אימייל,
+למשל) הוא כיוון של *הערך* ולא של העמוד — הוא נשאר.
+
+**בבדיקות** — `HEBREW` מ-`src/testing/transloco-testing.ts`. אחרי מעבר ל-EN,
+`expect(text).not.toMatch(HEBREW)` נופל על *כל* מחרוזת שנשכחה, לא רק על זו שנזכרתם לבדוק:
+
+```ts
+TestBed.inject(TranslocoService).setActiveLang('en');
+fixture.detectChanges();
+expect(fixture.nativeElement.textContent).not.toMatch(HEBREW);
+```
+
+### שגיאה מהשרת מול קופי שלנו (ABF-129)
+
+מסכי ה-auth מציגים שגיאה משני מקורות, ואי אפשר לטפל בשניהם אותו דבר:
+
+- **הקופי שלנו** — "קוד שגוי", "שגיאה בכניסה" — נשמר כ**מפתח** ורץ ב-pipe בתבנית, כדי שהודעה
+  שכבר על המסך תתחלף עם השפה במקום לקפוא בשפה שבה נוצרה.
+- **`error.detail` שהשרת החזיר** — "אימייל כבר קיים" — הוא כבר משפט גמור, ומוצג כמו שהוא.
+  לבלוע אותו יעלה לקורא/ת בדיוק את מה שההודעה הגנרית שלנו לא יודעת לתת: *למה* הבקשה נכשלה.
+
+`features/auth/auth-error.ts` מחזיק את שני השדות ב-`AuthError` אחד, כך שלא ייתכן ששניהם
+מלאים, ו-`authErrorFrom` שומר בדיוק על סדר העדיפויות של ה-`err.error?.detail ?? '...'`
+שהיה שם קודם:
+
+```ts
+// ✅ detail מהשרת אם הגיע, אחרת המפתח שלנו
+this.error.set(authErrorFrom(err, 'auth.login.error_generic'));
+```
+
+```html
+@if (error().text; as text) {
+  <app-error-display [message]="text" />
+} @else if (error().key) {
+  <app-error-display [message]="error().key | transloco" />
+}
+```
+
+אותו כלל חל על טקסט שקומפוננטה משותפת כבר תרגמה בעצמה — למשל ה-`validationError` של
+`app-file-upload`: הוא מגיע כטקסט, ולכן נכנס ל-`text` ולא ל-`key`.
+
+השרת עדיין כותב את המשפטים האלה בעברית בכל שפת ממשק; מפתחות תרגום הוא מדבר רק בהודעות
+הישירות (ABF-118). להעביר גם את `/auth/*` למפתחות זה שינוי backend, לא טיקט מיגרציה.
+
+### תוכן שמשתמשים כתבו — לא מתרגמים (ABF-130)
+
+כותרת של פוסט, גוף ההודעה, שם הכותב/ת — אלה **תוכן של משתמש/ת, לא UI**. הם מוצגים בשפה שבה
+נכתבו, בשתי שפות הממשק, ואין להם מפתח. הגבול הזה חוזר בכל אחד מטיקטי המיגרציה שנשארו.
+
+**בבדיקות זה משנה בפועל:** `expect(text()).not.toMatch(HEBREW)` נופל גם על עברית של fixture,
+כלומר על בדיוק מה שהוא לא אמור לשמור עליו. לכן ה-fixture של הסריקה מחזיק תוכן לטיני
+(`makeLatinPost` ב-`features/forum/*.spec.ts`), והסריקה נשארת מכוונת לקופי שלנו:
+
+```ts
+// ✅ הסריקה בודקת את ה-UI, לא את ה-fixture
+renderWith(of(makeList({ items: [makeLatinPost()] })));
+switchToEnglish();
+expect(text()).not.toMatch(HEBREW);
+```
+
+ולצידה בדיקה הפוכה, שמוודאת שתוכן עברי של משתמש/ת **כן** נשאר על המסך אחרי מעבר לאנגלית.
+
+**מפתח שמשמש שני מסכים באותו מודול** יושב במרחב משלו ולא מוכפל: `forum.post_form.*` (תווית
+שדה + הודעת ולידציה) משותף ל-new-post ול-edit-post, ו-`forum.back_to_list` לשלושה מסכים. זו
+אותה מוסכמה של ABF-127, מדרגה אחת פנימה — תווית משותפת ל*כל* המודולים יושבת ב-`constants.*`.
+
+### מיגרציה לא מאחדת קופי (ABF-131)
+
+קריטריון הקבלה של כל טיקטי המיגרציה הוא ש**העברית תיראה בדיוק כמו קודם**. לכן שני מסכים
+שמנסחים אחרת את אותו הדבר מקבלים **שני מפתחות**, גם כשמתחשק לאחד:
+
+```jsonc
+// ✅ שני קישורים לאותו עמוד, בשני ניסוחים שהיו שם לפני הטיקט
+"advice.back_to_professionals": "חזרה לרשימת אנשי מקצוע",  // ask-question, my-questions
+"advice.qa_feed.back_to_advice": "חזרה לייעוץ מקצועי"       // qa-feed
+```
+
+```jsonc
+// ❌ מפתח אחד לשניהם — משנה את הטקסט העברי על אחד המסכים
+"advice.back": "חזרה לרשימת אנשי מקצוע"
+```
+
+איחוד הניסוחים הוא **שינוי קופי**, לא מיגרציה — טיקט נפרד, אחרי שהמפתחות במקום. זה לא סותר את
+הכלל של ABF-130 על מפתח ששני מסכים חולקים: שם הטקסט **זהה** בשני המסכים ולכן מפתח אחד; כאן הוא שונה.
+
+**ערך בתוך משפט — פרמטר, לא שרשור.** סדר המילים משתנה בין השפות, ומשפט שנבנה משני צמתים נפרדים
+לא יכול להתהפך:
+
+```html
+<!-- ✅ he: "נשאלה ב-14/07/2026"  ·  en: "Asked on 14/07/2026" -->
+{{ 'advice.pending.asked_on' | transloco: { date: question.created_at | date: 'dd/MM/yyyy' } }}
+```
+
+```html
+<!-- ❌ הטקסט לפני התאריך והתאריך הם שני צמתים — באנגלית זה נשאר בסדר העברי -->
+{{ 'advice.pending.asked_on' | transloco }}{{ question.created_at | date: 'dd/MM/yyyy' }}
+```
+
+`translations.spec.ts` כבר אוכף שהפרמטר קיים בשתי השפות.
+
+**גם קומפוננטה שהיא stub עוברת מיגרציה.** ל-`qa-feed` יש היום רק כותרת וקישור חזרה, והשאר
+`TODO` — שניהם עברו למפתחות עכשיו, כדי שמי שיממש את הפיצ'ר יוסיף **מפתחות** ולא עברית קשיחה
+שתחייב טיקט מיגרציה שני.
 
 ---
 

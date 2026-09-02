@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
 import { vi } from 'vitest';
 
 import { SuspendDialogComponent } from './suspend-dialog.component';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 describe('SuspendDialogComponent', () => {
   let fixture: ComponentFixture<SuspendDialogComponent>;
@@ -9,7 +11,7 @@ describe('SuspendDialogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SuspendDialogComponent],
+      imports: [SuspendDialogComponent, translocoTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(SuspendDialogComponent);
@@ -95,5 +97,61 @@ describe('SuspendDialogComponent', () => {
     cancelButton().click();
 
     expect(cancelled).toHaveBeenCalled();
+  });
+
+  describe('text', () => {
+    function dialogText(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function reasonTextarea(): HTMLTextAreaElement {
+      return fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    }
+
+    it('falls back to the generic Hebrew prompt when the caller passes no text', () => {
+      expect(fixture.nativeElement.querySelector('.dialog__title').textContent.trim()).toBe(
+        'השעיית משתמש',
+      );
+      expect(confirmButton().textContent?.trim()).toBe('השעה');
+      expect(cancelButton().textContent?.trim()).toBe('ביטול');
+    });
+
+    it('labels its own hours and reason fields', () => {
+      const labels = [...fixture.nativeElement.querySelectorAll('.dialog__label')].map(
+        (el: Element) => el.textContent?.trim(),
+      );
+
+      expect(labels).toEqual(['מספר שעות', 'סיבת ההשעייה']);
+      expect(reasonTextarea().placeholder).toBe('לדוגמה: הפרת כללי הפורום');
+    });
+
+    /** As in confirm-dialog: un-migrated call sites still pass Hebrew literals. */
+    it('renders caller-supplied text verbatim, translated or not', () => {
+      fixture.componentRef.setInput('title', 'השעיית שרה לוי');
+      fixture.componentRef.setInput('confirmText', 'להשעות');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.dialog__title').textContent.trim()).toBe(
+        'השעיית שרה לוי',
+      );
+      expect(confirmButton().textContent?.trim()).toBe('להשעות');
+    });
+
+    it('shows the whole dialog in English under an English locale', () => {
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.dialog__title').textContent.trim()).toBe(
+        'Suspend user',
+      );
+      expect(confirmButton().textContent?.trim()).toBe('Suspend');
+      expect(cancelButton().textContent?.trim()).toBe('Cancel');
+      expect(reasonTextarea().placeholder).toBe('For example: breach of the forum rules');
+      expect(dialogText()).not.toMatch(HEBREW);
+    });
+
+    it('does not pin its own text direction — it follows <html dir>', () => {
+      expect(fixture.nativeElement.querySelector('.dialog').hasAttribute('dir')).toBe(false);
+    });
   });
 });
