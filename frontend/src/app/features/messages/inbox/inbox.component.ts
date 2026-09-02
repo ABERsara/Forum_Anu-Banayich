@@ -8,9 +8,11 @@
  */
 
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoModule } from '@jsverse/transloco';
+import { Subscription } from 'rxjs';
 
 import { ConversationSummary } from '../../../core/models';
 import { ForumService } from '../../../core/services/forum.service';
@@ -27,7 +29,9 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 })
 export class InboxComponent implements OnInit {
   private readonly forumService = inject(ForumService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly pageSize = 20;
+  private loadSubscription?: Subscription;
 
   conversations = signal<ConversationSummary[]>([]);
   isLoading = signal(false);
@@ -59,20 +63,28 @@ export class InboxComponent implements OnInit {
   }
 
   private loadInbox(page: number): void {
+    // A previous page request still in flight must not let a late, now-stale
+    // response overwrite a newer one (e.g. rapid next/previous clicks) —
+    // cancel it, same pattern as qa-feed.component.ts's load().
+    this.loadSubscription?.unsubscribe();
+
     this.isLoading.set(true);
     this.hasError.set(false);
-    this.forumService.getInbox(page, this.pageSize).subscribe({
-      next: (result) => {
-        this.conversations.set(result.items);
-        this.total.set(result.total);
-        this.page.set(result.page);
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        this.hasError.set(true);
-        this.loadErrorKey.set(errorKeyFrom(err));
-        this.isLoading.set(false);
-      },
-    });
+    this.loadSubscription = this.forumService
+      .getInbox(page, this.pageSize)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.conversations.set(result.items);
+          this.total.set(result.total);
+          this.page.set(result.page);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          this.hasError.set(true);
+          this.loadErrorKey.set(errorKeyFrom(err));
+          this.isLoading.set(false);
+        },
+      });
   }
 }

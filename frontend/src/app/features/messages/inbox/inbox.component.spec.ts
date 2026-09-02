@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { InboxComponent } from './inbox.component';
@@ -113,5 +113,45 @@ describe('InboxComponent', () => {
     (el.querySelectorAll('.inbox__pagination button')[1] as HTMLButtonElement).click();
 
     expect(forumServiceMock.getInbox).toHaveBeenCalledWith(2, 20);
+  });
+
+  it('ignores a stale response that resolves after a newer page request', () => {
+    const page1$ = new Subject<ConversationList>();
+    const page2$ = new Subject<ConversationList>();
+    forumServiceMock = {
+      getInbox: vi.fn((page: number) => (page === 1 ? page1$ : page2$)),
+    };
+    setup();
+    page1$.next(
+      makeList([makeConversation({ other_user: { id: 'p1', first_name: 'א', last_name: 'ב' } })], {
+        total: 25,
+      }),
+    );
+    fixture.detectChanges();
+
+    (
+      (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '.inbox__pagination button',
+      )[1] as HTMLButtonElement
+    ).click(); // triggers page 2 while nothing here resolves it yet
+
+    // The newer (page 2) request resolves first...
+    page2$.next(
+      makeList([makeConversation({ other_user: { id: 'p2', first_name: 'ג', last_name: 'ד' } })], {
+        page: 2,
+        total: 25,
+      }),
+    );
+    // ...then the older (page 1) request finally resolves, late — must be ignored.
+    page1$.next(
+      makeList(
+        [makeConversation({ other_user: { id: 'p1-late', first_name: 'ה', last_name: 'ו' } })],
+        {
+          total: 25,
+        },
+      ),
+    );
+
+    expect(component.conversations().map((c) => c.other_user.id)).toEqual(['p2']);
   });
 });
