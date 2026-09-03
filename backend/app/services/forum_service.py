@@ -817,7 +817,7 @@ def get_inbox(
     (COUNT DISTINCT conversation_key); still a fixed two queries overall.
 
     Only the page's own rows get decrypted — bounded by page_size, never the
-    full history. Never mutates is_read (that's mark_conversation_read()'s
+    full history. Never mutates read_at (that's mark_conversation_read()'s
     job) — merely listing conversations isn't "reading" one, only opening it
     is. No audit entry on success either, same asymmetry as
     get_conversation_messages() (only denied access is logged).
