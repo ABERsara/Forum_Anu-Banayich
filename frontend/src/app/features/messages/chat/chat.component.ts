@@ -41,6 +41,7 @@ import { DirectMessage, DirectMessageSendResult, UserPublic } from '../../../cor
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
 import { errorKeyFrom } from '../../../core/utils/error-key.util';
+import { utcIso } from '../../../core/utils/utc-date.util';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
@@ -181,12 +182,6 @@ export class ChatComponent implements OnInit {
     const cursor = this.nextCursor;
     if (!myUserId || !cursor || !this.hasMore() || this.isLoadingOlder()) return;
 
-    // Measured *before* the request, not in the callback: by then the new
-    // messages are already in the signal and the height has moved.
-    const log = this.messageLog?.nativeElement;
-    const heightBefore = log?.scrollHeight ?? 0;
-    const topBefore = log?.scrollTop ?? 0;
-
     this.isLoadingOlder.set(true);
     this.olderErrorKey.set('');
     this.forumService
@@ -194,12 +189,19 @@ export class ChatComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (page) => {
+          // Measured here, at the answer: still before the signal write that
+          // moves the height, but after the round trip. Measuring before the
+          // request went out would anchor to a position the reader may have
+          // scrolled away from while it was in flight — and pulling her back
+          // to it is the same jump this exists to prevent.
+          const { height: heightBefore, top: topBefore } = this.logPosition();
+
           const older = page.items.map((message) => this.toChatMessage(message));
           this.messages.update((current) => [...older, ...current]);
           this.hasMore.set(page.has_more);
           this.nextCursor = page.next_cursor;
           this.isLoadingOlder.set(false);
-          this.olderLoadedCount.set(older.length);
+          this.announceOlderLoaded(older.length);
           this.anchorScrollAfterPrepend(heightBefore, topBefore);
         },
         error: (err) => {
@@ -293,7 +295,14 @@ export class ChatComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (page) => {
-          this.messages.set(page.items.map((message) => this.toChatMessage(message)));
+          const stored = page.items.map((message) => this.toChatMessage(message));
+          // Whatever is still in flight stays on screen. The composer is live
+          // from the first paint, so on a slow connection a message can be
+          // sent before the opening page comes back — and setting the list
+          // outright would take that optimistic bubble down with it, leaving
+          // `onSent` no local id to swap. The send would not roll back and it
+          // would not fail; the message would simply be gone.
+          this.messages.update((current) => [...stored, ...current.filter((m) => m.pending)]);
           this.hasMore.set(page.has_more);
           this.nextCursor = page.next_cursor;
           this.isLoading.set(false);
@@ -311,7 +320,9 @@ export class ChatComponent implements OnInit {
     return {
       id: message.id,
       content: message.content,
-      createdAt: message.created_at,
+      // The server's timestamps carry no zone; the optimistic bubble's does.
+      // Without this the two render hours apart — see utc-date.util.ts.
+      createdAt: utcIso(message.created_at),
       mine: message.sender.id === this.auth.currentUser()?.id,
       readAt: message.read_at,
       pending: false,
@@ -355,6 +366,37 @@ export class ChatComponent implements OnInit {
 
   private setOtherUserName(user: UserPublic): void {
     this.otherUserName.set(`${user.first_name} ${user.last_name}`);
+  }
+
+  /**
+   * Say how many older messages arrived — every time, not only the first.
+   *
+   * Two pages of the same size produce the same sentence, and a live region
+   * announces a *change*: an unchanged one is silent. A signal set to the
+   * value it already holds does not even notify, so the second page of fifty
+   * reached neither the DOM nor the reader. Emptying the region first gives
+   * the announcement something to change from.
+   *
+   * A timeout here, unlike the scroll anchoring below, and for the opposite
+   * reason: the empty state has to be committed and *seen* by the assistive
+   * technology, so the two writes must land in separate tasks rather than be
+   * collapsed into one render.
+   */
+  private announceOlderLoaded(count: number): void {
+    this.olderLoadedCount.set(0);
+    setTimeout(() => this.olderLoadedCount.set(count));
+  }
+
+  /**
+   * Where the log is scrolled to right now.
+   *
+   * Its own method for the same reason scrollTopAfterPrepend is: jsdom does
+   * no layout, so *when* the measurement is taken is the only part of the
+   * anchoring a test can pin down directly.
+   */
+  logPosition(): { height: number; top: number } {
+    const log = this.messageLog?.nativeElement;
+    return { height: log?.scrollHeight ?? 0, top: log?.scrollTop ?? 0 };
   }
 
   /**

@@ -142,6 +142,37 @@ describe('ChatComponent', () => {
     });
   }
 
+  /**
+   * The older-messages announcement is emptied and refilled one task later, so
+   * that a second page of the same size is still a change the reader hears.
+   * Anything asserting on that region has to let the second task run.
+   */
+  function flushAnnouncement(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve));
+  }
+
+  /**
+   * A request that answers when the test says so.
+   *
+   * Enough of the Observable surface for the component, which only ever pipes
+   * takeUntilDestroyed and subscribes. Returns the observer so the test can
+   * decide what happens in between — which is where the interesting bugs are.
+   */
+  function deferred<T>(): { hold: unknown; respond: (value: T) => void } {
+    let next: ((value: T) => void) | undefined;
+    return {
+      hold: {
+        pipe: () => ({
+          subscribe: (observer: { next: (value: T) => void }) => {
+            next = observer.next;
+            return { unsubscribe: () => undefined };
+          },
+        }),
+      },
+      respond: (value: T) => next!(value),
+    };
+  }
+
   beforeEach(() => {
     forumServiceMock = {
       getConversation: vi.fn().mockReturnValue(of(makePage([makeMessage()]))),
@@ -211,6 +242,20 @@ describe('ChatComponent', () => {
     expect(component.messages().map((m) => m.mine)).toEqual([true, false]);
     expect(queryAll('.chat__message--mine').length).toBe(1);
     expect(queryAll('.chat__message--theirs').length).toBe(1);
+  });
+
+  it('reads the zone-less timestamps the server sends as the UTC they are', () => {
+    forumServiceMock.getConversation.mockReturnValue(
+      of(makePage([makeMessage({ created_at: '2026-08-01T10:00:00' })])),
+    );
+    setup();
+
+    // Both `new Date(...)` and the date pipe read a date-time with no offset
+    // as *local* time. An optimistic bubble is built from toISOString(), which
+    // does carry a Z — so without this the same message showed one clock time
+    // while it was in flight and jumped to another when the server answered.
+    expect(component.messages()[0].createdAt).toBe('2026-08-01T10:00:00Z');
+    expect(query('time')!.getAttribute('datetime')).toBe('2026-08-01T10:00:00Z');
   });
 
   // -------------------------------------------------------------------------
@@ -323,6 +368,24 @@ describe('ChatComponent', () => {
       expect(component.scrollTopAfterPrepend(1000, 0, 1600)).toBe(600);
     });
 
+    it('measures where she is when the page answers, not when it was asked for', () => {
+      setupWithHistory();
+      const page = deferred<ConversationMessagesPage>();
+      forumServiceMock.getConversation.mockReturnValue(page.hold);
+      const measure = vi.spyOn(component, 'logPosition');
+
+      component.loadOlder();
+
+      // The request is still open, and she can keep scrolling while it is.
+      // Anchoring to where she was when it left would pull her back to a
+      // place she has since chosen to leave — the same jump, later.
+      expect(measure).not.toHaveBeenCalled();
+
+      page.respond(makePage(manyMessages(3, 'older')));
+
+      expect(measure).toHaveBeenCalledTimes(1);
+    });
+
     it('reports a failure to load older messages without losing the ones on screen', () => {
       setupWithHistory();
       forumServiceMock.getConversation.mockReturnValue(throwError(() => ({ status: 500 })));
@@ -335,13 +398,40 @@ describe('ChatComponent', () => {
       expect(text()).toContain('טעינת ההודעות הקודמות נכשלה');
     });
 
-    it('announces how many older messages arrived, without reading them out', () => {
+    it('announces how many older messages arrived, without reading them out', async () => {
       setupWithHistory();
 
       component.loadOlder();
+      await flushAnnouncement();
       fixture.detectChanges();
 
       const status = query('[role="status"].chat__sr-only')!;
+      expect(status.textContent).toContain('נטענו 3 הודעות קודמות');
+    });
+
+    it('announces the next page too, even when it is exactly the same size', async () => {
+      setupWithHistory();
+
+      component.loadOlder();
+      await flushAnnouncement();
+      fixture.detectChanges();
+      const status = query('[role="status"].chat__sr-only')!;
+      expect(status.textContent).toContain('נטענו 3 הודעות קודמות');
+
+      forumServiceMock.getConversation.mockReturnValue(
+        of(makePage(manyMessages(3, 'oldest'), { has_more: true, next_cursor: 'cursor-3' })),
+      );
+      component.loadOlder();
+      fixture.detectChanges();
+
+      // Emptied first, on purpose. A live region announces a *change*, and
+      // "3 earlier messages" following "3 earlier messages" is not one — the
+      // second page would arrive in silence.
+      expect(status.textContent?.trim()).toBe('');
+
+      await flushAnnouncement();
+      fixture.detectChanges();
+
       expect(status.textContent).toContain('נטענו 3 הודעות קודמות');
     });
 
@@ -395,6 +485,31 @@ describe('ChatComponent', () => {
       expect(component.messages().at(-1)!.id).toBe('msg-stored');
       expect(component.messages().at(-1)!.pending).toBe(false);
       expect(component.messages().length).toBe(2);
+    });
+
+    it('keeps a message sent before the opening page came back', () => {
+      const history = deferred<ConversationMessagesPage>();
+      const send = deferred<DirectMessageSendResult>();
+      forumServiceMock.getConversation.mockReturnValue(history.hold);
+      forumServiceMock.sendMessage.mockReturnValue(send.hold);
+      setup();
+
+      // Nothing disables the composer while the history loads, so on a slow
+      // connection this is an ordinary thing to do — and setting the list
+      // from the page would take the optimistic bubble down with it. `onSent`
+      // would then find no local id to swap: not a rollback, a disappearance.
+      component.draft.set('הי!');
+      component.send();
+      history.respond(makePage([makeMessage({ id: 'old-1' })]));
+      fixture.detectChanges();
+
+      expect(component.messages().map((m) => m.pending)).toEqual([false, true]);
+      expect(component.messages()[0].id).toBe('old-1');
+      expect(text()).toContain('בשליחה');
+
+      send.respond(makeSendResult());
+
+      expect(component.messages().map((m) => m.id)).toEqual(['old-1', 'msg-stored']);
     });
 
     it('sends the trimmed content to the person the route names', () => {
@@ -513,7 +628,10 @@ describe('ChatComponent', () => {
 
       expect(text()).toContain('השיחה הגיעה למגבלת 1,000 ההודעות');
       expect(text()).toContain('ההודעה הישנה ביותר נמחקה כדי לפנות מקום');
-      expect(query('.chat__notice')!.getAttribute('role')).toBe('status');
+      // The region was on the page before the notice was; only its content
+      // changed. A role="status" element inserted together with its text is a
+      // region that never changed, and announces nothing.
+      expect(query('.chat__notice')!.closest('[role="status"]')).not.toBeNull();
     });
 
     it('takes exactly the messages the server named off the screen', () => {
@@ -619,7 +737,7 @@ describe('ChatComponent', () => {
       fixture.detectChanges();
 
       const limit = query('.chat__limit')!;
-      expect(limit.getAttribute('role')).toBe('status');
+      expect(limit.closest('[role="status"]')).not.toBeNull();
       expect(limit.textContent).toContain('הגעתם למגבלת 2,000 התווים');
     });
 
@@ -665,6 +783,18 @@ describe('ChatComponent', () => {
       expect(text()).toContain('טוען הודעות...');
     });
 
+    it('keeps its live regions on the page while they have nothing to say', () => {
+      setup();
+
+      // Every one of them, empty and already present. This is the whole
+      // reason they are wrappers rather than the notices themselves.
+      const regions = queryAll('.chat__live');
+      expect(regions.length).toBeGreaterThan(0);
+      expect(regions.every((region) => region.getAttribute('role') === 'status')).toBe(true);
+      expect(regions.every((region) => region.textContent?.trim() === '')).toBe(true);
+      expect(query('[role="status"].chat__sr-only')).not.toBeNull();
+    });
+
     it('says who wrote each message in words, not only in colour', () => {
       forumServiceMock.getConversation.mockReturnValue(
         of(
@@ -686,7 +816,7 @@ describe('ChatComponent', () => {
       const label = query<HTMLLabelElement>('label[for="chat-new-message"]')!;
       expect(label.textContent?.trim()).toBe('הודעה חדשה');
       expect(query('ol.chat__messages')).not.toBeNull();
-      expect(query('time')!.getAttribute('datetime')).toBe('2026-08-01T10:00:00');
+      expect(query('time')!.getAttribute('datetime')).toBe('2026-08-01T10:00:00Z');
     });
   });
 

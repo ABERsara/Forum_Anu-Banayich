@@ -180,9 +180,12 @@ def send_message(
     """
     Send a private message to another member of your own cell.
 
-    The response carries the stored message plus `pruned_count` — how many of
-    the conversation's oldest messages spec §5.3's 1,000 cap cost this send —
-    so the screen can say so instead of dropping history silently.
+    The response carries the stored message plus `pruned_message_ids` — which
+    of the conversation's oldest messages spec §5.3's 1,000 cap cost this send
+    — and `conversation_limit`, the cap itself. Ids rather than a count
+    because the messages that go are the oldest *prunable* ones: anything
+    under an open report is skipped, so a client trimming the top of its list
+    by count would drop the wrong ones and keep showing a deleted message.
     """
     result = forum_service.send_direct_message(db, data, current_user)
     return DirectMessageSendResponse.model_validate(result)

@@ -89,14 +89,24 @@
   </section>
 
   <form class="chat__composer" (submit)="$event.preventDefault(); send()">
-    @if (pruneNotice(); as notice) {
-      <p class="chat__notice" role="status">
-        {{
-          (notice.count === 1 ? 'messages.chat.pruned_notice' : 'messages.chat.pruned_notice_many')
-            | transloco: { limit: notice.limit | number, count: notice.count }
-        }}
-      </p>
-    }
+    <!--
+      The live region is this wrapper, not the notice inside it — same rule as
+      the older-messages status above. A role="status" element that arrives in
+      the DOM already carrying its text is a region that never changed, and an
+      unchanged region announces nothing.
+    -->
+    <div class="chat__live" role="status">
+      @if (pruneNotice(); as notice) {
+        <p class="chat__notice">
+          {{
+            (notice.count === 1
+              ? 'messages.chat.pruned_notice'
+              : 'messages.chat.pruned_notice_many'
+            ) | transloco: { limit: notice.limit | number, count: notice.count }
+          }}
+        </p>
+      }
+    </div>
     @if (sendErrorKey(); as key) {
       <app-error-display [message]="key | transloco" />
     }
@@ -134,10 +144,12 @@
           | transloco: { count: draft().length | number, max: maxLength | number }
       }}
     </p>
-    @if (atLimit()) {
-      <p class="chat__limit" role="status">
-        {{ 'messages.chat.limit_reached' | transloco: { max: maxLength | number } }}
-      </p>
-    }
+    <div class="chat__live" role="status">
+      @if (atLimit()) {
+        <p class="chat__limit">
+          {{ 'messages.chat.limit_reached' | transloco: { max: maxLength | number } }}
+        </p>
+      }
+    </div>
   </form>
 </div>
