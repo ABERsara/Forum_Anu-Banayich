@@ -14,5 +14,6 @@ import { Component, input } from '@angular/core';
   styleUrl: './error-display.component.scss',
 })
 export class ErrorDisplayComponent {
+  /** The failure to show — already translated by the caller. */
   message = input<string>('');
 }

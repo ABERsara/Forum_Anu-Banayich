@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
+import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { AdminService } from '../../../core/services/admin.service';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -9,7 +11,13 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 @Component({
   selector: 'app-broadcast',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    TranslocoPipe,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './broadcast.component.html',
   styleUrl: './broadcast.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,8 +32,10 @@ export class BroadcastComponent {
   });
 
   isLoading = signal(false);
-  errorMessage = signal('');
-  successMessage = signal('');
+  /** What went wrong on send, as a key of ours or a sentence the API sent. */
+  error = signal<ScreenError>(NO_ERROR);
+  /** Our own confirmation, held as a key so it follows a language switch. */
+  successKey = signal('');
 
   get contentLength(): number {
     return this.form.controls.content.value?.length ?? 0;
@@ -38,19 +48,19 @@ export class BroadcastComponent {
     }
 
     this.isLoading.set(true);
-    this.errorMessage.set('');
-    this.successMessage.set('');
+    this.error.set(NO_ERROR);
+    this.successKey.set('');
 
     this.adminService
       .sendBroadcast({ title: this.form.value.title!, content: this.form.value.content! })
       .subscribe({
         next: () => {
           this.isLoading.set(false);
-          this.successMessage.set('השידור נשלח בהצלחה לכלל המשתמשים.');
+          this.successKey.set('admin.broadcast.success');
           this.form.reset();
         },
         error: (err) => {
-          this.errorMessage.set(err.error?.detail ?? 'שגיאה בשליחת השידור.');
+          this.error.set(screenErrorFrom(err, 'admin.errors.broadcast_failed'));
           this.isLoading.set(false);
         },
       });

@@ -1,21 +1,34 @@
 import { Component, input, output, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 export interface SuspendDialogResult {
   hours: number;
   reason: string;
 }
 
+/**
+ * Suspension dialog: how many hours, and why.
+ *
+ * Text inputs take display text, not translation keys — see
+ * `confirm-dialog.component.ts` for the reasoning. The hours/reason field
+ * labels belong to this dialog rather than to a caller, so those stay here as
+ * keys under `shared.suspend_dialog.*`.
+ */
 @Component({
   selector: 'app-suspend-dialog',
   standalone: true,
+  imports: [TranslocoPipe],
   templateUrl: './suspend-dialog.component.html',
   styleUrl: './suspend-dialog.component.scss',
 })
 export class SuspendDialogComponent {
-  title = input<string>('השעיית משתמש');
+  /** Heading. Falls back to a generic "suspend user". */
+  title = input<string>('');
   message = input<string>('');
-  confirmText = input<string>('השעה');
-  cancelText = input<string>('ביטול');
+  /** Confirm button text. Falls back to a generic "suspend". */
+  confirmText = input<string>('');
+  /** Cancel button text. Falls back to a generic "cancel". */
+  cancelText = input<string>('');
 
   hoursValue = signal(48);
   reasonValue = signal('');

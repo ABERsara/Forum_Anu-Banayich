@@ -1,19 +1,29 @@
-<main class="home" dir="rtl">
+<main class="home">
   @if (auth.currentUser(); as user) {
-    <h1 class="home__title">ברוכים הבאים</h1>
-    <p class="home__subtitle">שלום, {{ user.first_name }} {{ user.last_name }}</p>
+    <h1 class="home__title">{{ 'home.title' | transloco }}</h1>
+    <p class="home__subtitle">
+      {{ 'home.greeting' | transloco: { name: user.first_name + ' ' + user.last_name } }}
+    </p>
 
     <div class="home__cards">
       @if (auth.isUser()) {
         <a routerLink="/forum" class="home__card-link">
-          <app-card title="פורום" subtitle="שאלות ותשובות מהקהילה" [elevated]="true">
-            שיתוף, תמיכה ותשובות מחברי הקהילה.
+          <app-card
+            [title]="'home.forum.title' | transloco"
+            [subtitle]="'home.forum.subtitle' | transloco"
+            [elevated]="true"
+          >
+            {{ 'home.forum.body' | transloco }}
           </app-card>
         </a>
 
         <a routerLink="/advice" class="home__card-link">
-          <app-card title="ייעוץ" subtitle="פנייה לאיש מקצוע" [elevated]="true">
-            קבלת ייעוץ אישי ומקצועי בנושאים שמעסיקים אתכם.
+          <app-card
+            [title]="'home.advice.title' | transloco"
+            [subtitle]="'home.advice.subtitle' | transloco"
+            [elevated]="true"
+          >
+            {{ 'home.advice.body' | transloco }}
           </app-card>
         </a>
 
@@ -26,29 +36,41 @@
 
       @if (auth.isAdmin()) {
         <a routerLink="/admin" class="home__card-link">
-          <app-card title="ניהול" subtitle="לוח בקרה למנהלים" [elevated]="true">
-            ניהול משתמשים, אישורי הרשמה ותוכן.
+          <app-card
+            [title]="'home.admin.title' | transloco"
+            [subtitle]="'home.admin.subtitle' | transloco"
+            [elevated]="true"
+          >
+            {{ 'home.admin.body' | transloco }}
           </app-card>
         </a>
       }
 
       @if (auth.isModerator()) {
         <a routerLink="/moderator" class="home__card-link">
-          <app-card title="מבקר" subtitle="דוחות ותלונות" [elevated]="true">
-            סקירת דוחות שהוגשו על ידי משתמשים.
+          <app-card
+            [title]="'home.moderator.title' | transloco"
+            [subtitle]="'home.moderator.subtitle' | transloco"
+            [elevated]="true"
+          >
+            {{ 'home.moderator.body' | transloco }}
           </app-card>
         </a>
       }
 
       @if (auth.isProfessional()) {
         <a routerLink="/professional" class="home__card-link">
-          <app-card title="ייעוץ מקצועי" subtitle="שאלות הממתינות לתשובתך" [elevated]="true">
-            צפייה בשאלות שהופנו אליך והגשת תשובה לשואל/ת.
+          <app-card
+            [title]="'home.professional.title' | transloco"
+            [subtitle]="'home.professional.subtitle' | transloco"
+            [elevated]="true"
+          >
+            {{ 'home.professional.body' | transloco }}
           </app-card>
         </a>
       }
     </div>
   } @else {
-    <app-loading-spinner message="טוען..." />
+    <app-loading-spinner [message]="'common.loading' | transloco" />
   }
 </main>

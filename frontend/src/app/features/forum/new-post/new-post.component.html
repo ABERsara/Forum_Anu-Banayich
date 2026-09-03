@@ -1,29 +1,31 @@
-<div class="new-post-page" dir="rtl">
-  <a routerLink="/forum">← חזרה לפורום</a>
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="new-post-page">
+  <a routerLink="/forum">← {{ 'forum.back_to_list' | transloco }}</a>
 
   <div class="new-post-card">
-    <h1 class="new-post-title">פרסום הודעה חדשה</h1>
+    <h1 class="new-post-title">{{ 'forum.new_post.title' | transloco }}</h1>
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
       <div class="form-field">
-        <label for="title">כותרת</label>
+        <label for="title">{{ 'forum.post_form.title_label' | transloco }}</label>
         <input id="title" type="text" formControlName="title" />
         @if (form.controls.title.invalid && form.controls.title.touched) {
-          <span class="field-error">נא להזין כותרת (2 עד 256 תווים)</span>
+          <span class="field-error">{{ 'forum.post_form.title_error' | transloco }}</span>
         }
       </div>
 
       <div class="form-field">
-        <label for="content">תוכן</label>
+        <label for="content">{{ 'forum.post_form.content_label' | transloco }}</label>
         <textarea id="content" rows="8" formControlName="content"></textarea>
         <span class="char-counter">{{ contentLength }} / 5000</span>
         @if (form.controls.content.invalid && form.controls.content.touched) {
-          <span class="field-error">נא להזין תוכן (עד 5000 תווים)</span>
+          <span class="field-error">{{ 'forum.post_form.content_error' | transloco }}</span>
         }
       </div>
 
       <div class="form-field">
-        <label for="group_visibility">קהל יעד – קבוצה</label>
+        <label for="group_visibility">{{ 'forum.new_post.group_label' | transloco }}</label>
         <select id="group_visibility" formControlName="group_visibility">
           @for (option of groupOptions(); track option) {
             <option [ngValue]="option">{{ groupVisibilityLabels[option] | transloco }}</option>
@@ -32,7 +34,7 @@
       </div>
 
       <div class="form-field">
-        <label for="sector_visibility">קהל יעד – מגזר</label>
+        <label for="sector_visibility">{{ 'forum.new_post.sector_label' | transloco }}</label>
         <select id="sector_visibility" formControlName="sector_visibility">
           @for (option of sectorOptions(); track option) {
             <option [ngValue]="option">{{ sectorVisibilityLabels[option] | transloco }}</option>
@@ -42,23 +44,29 @@
 
       <div class="form-field">
         <app-file-upload
-          label="צירוף קובץ (אופציונלי)"
+          [label]="'forum.new_post.attachment_label' | transloco"
           (fileSelected)="onFileSelected($event)"
           (validationError)="onFileError($event)"
         />
+        <!-- The size complaint arrives from app-file-upload already resolved,
+             so it is shown as-is rather than piped (CONTRIBUTING §6). -->
         @if (fileError(); as fileErr) {
           <app-error-display [message]="fileErr" />
         }
       </div>
 
-      <app-error-display [message]="errorMessage()" />
+      @if (error().text; as text) {
+        <app-error-display [message]="text" />
+      } @else if (error().key; as key) {
+        <app-error-display [message]="key | transloco" />
+      }
 
       @if (isLoading()) {
-        <app-loading-spinner message="מפרסם..." />
+        <app-loading-spinner [message]="'forum.new_post.publishing' | transloco" />
       }
 
       <button type="submit" class="btn-submit" [disabled]="form.invalid || isLoading()">
-        פרסם
+        {{ 'forum.new_post.submit' | transloco }}
       </button>
     </form>
   </div>

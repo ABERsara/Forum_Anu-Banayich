@@ -1,8 +1,11 @@
+@let idleLabel = label() || ('shared.copy_text.copy' | transloco);
+@let doneLabel = successLabel() || ('shared.copy_text.copied' | transloco);
+
 <button
   type="button"
   class="copy-btn"
   [class.copy-btn--copied]="isCopied()"
-  [attr.aria-label]="isCopied() ? successLabel() : label() + ': ' + text()"
+  [attr.aria-label]="isCopied() ? doneLabel : idleLabel + ': ' + text()"
   [attr.aria-pressed]="isCopied()"
   (click)="copy()"
 >
@@ -52,5 +55,5 @@
     }
   </span>
 
-  <span class="copy-btn__label">{{ isCopied() ? successLabel() : label() }}</span>
+  <span class="copy-btn__label">{{ isCopied() ? doneLabel : idleLabel }}</span>
 </button>

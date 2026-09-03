@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { TranslocoService } from '@jsverse/transloco';
+import { Subject, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { EditPostComponent } from './edit-post.component';
@@ -16,6 +17,7 @@ import {
 import type { ForumPost, UserProfile } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
   return {
@@ -56,14 +58,19 @@ describe('EditPostComponent', () => {
   let forumServiceMock: { getPost: ReturnType<typeof vi.fn>; updatePost: ReturnType<typeof vi.fn> };
   let router: Router;
 
-  async function setup(currentUser: UserProfile | null = makeUser()): Promise<void> {
+  /** `loadFailure`, when given, is thrown by `getPost` instead of the post. */
+  async function setup(
+    currentUser: UserProfile | null = makeUser(),
+    post: ForumPost = makePost(),
+    loadFailure?: unknown,
+  ): Promise<void> {
     forumServiceMock = {
-      getPost: vi.fn().mockReturnValue(of(makePost())),
+      getPost: vi.fn().mockReturnValue(loadFailure ? throwError(() => loadFailure) : of(post)),
       updatePost: vi.fn().mockReturnValue(of(makePost({ title: 'כותרת מעודכנת' }))),
     };
 
     await TestBed.configureTestingModule({
-      imports: [EditPostComponent],
+      imports: [EditPostComponent, translocoTesting()],
       providers: [
         provideRouter([]),
         { provide: ForumService, useValue: forumServiceMock },
@@ -83,6 +90,15 @@ describe('EditPostComponent', () => {
     fixture.detectChanges();
   }
 
+  function text(): string {
+    return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  }
+
+  function switchToEnglish(): void {
+    TestBed.inject(TranslocoService).setActiveLang('en');
+    fixture.detectChanges();
+  }
+
   describe('loading the post', () => {
     it('loads the post and pre-fills the form', async () => {
       await setup();
@@ -95,27 +111,10 @@ describe('EditPostComponent', () => {
     });
 
     it('shows a not-found message on 404', async () => {
-      forumServiceMock = {
-        getPost: vi.fn().mockReturnValue(throwError(() => ({ status: 404 }))),
-        updatePost: vi.fn(),
-      };
-      await TestBed.configureTestingModule({
-        imports: [EditPostComponent],
-        providers: [
-          provideRouter([]),
-          { provide: ForumService, useValue: forumServiceMock },
-          { provide: AuthService, useValue: { currentUser: () => makeUser() } },
-          {
-            provide: ActivatedRoute,
-            useValue: { snapshot: { paramMap: convertToParamMap({ id: 'post-1' }) } },
-          },
-        ],
-      }).compileComponents();
-      fixture = TestBed.createComponent(EditPostComponent);
-      component = fixture.componentInstance;
-      fixture.detectChanges();
+      await setup(makeUser(), makePost(), { status: 404 });
 
-      expect(component.loadError()).toBe('ההודעה לא נמצאה.');
+      expect(component.loadErrorKey()).toBe('forum.errors.not_found');
+      expect(text()).toContain('ההודעה לא נמצאה.');
     });
   });
 
@@ -162,9 +161,93 @@ describe('EditPostComponent', () => {
       component.form.setValue({ title: 'כותרת מעודכנת', content: 'תוכן ההודעה' });
 
       component.onSubmit();
+      fixture.detectChanges();
 
-      expect(component.saveError()).toBe('אין לך הרשאה לערוך הודעה זו.');
+      expect(component.saveErrorKey()).toBe('forum.errors.edit_forbidden');
+      expect(text()).toContain('אין לך הרשאה לערוך הודעה זו.');
       expect(component.isSaving()).toBe(false);
+    });
+  });
+
+  describe('i18n', () => {
+    it('reads in Hebrew exactly as it did before the keys went in', async () => {
+      await setup();
+
+      expect(fixture.nativeElement.querySelector('.edit-post-title').textContent.trim()).toBe(
+        'עריכת הודעה',
+      );
+      expect(text()).toContain('חזרה לפורום');
+      expect(text()).toContain('כותרת');
+      expect(text()).toContain('תוכן');
+      expect(text()).toContain('שמירה');
+    });
+
+    it('leaves no Hebrew on the page in English', async () => {
+      await setup();
+
+      switchToEnglish();
+
+      expect(fixture.nativeElement.querySelector('.edit-post-title').textContent.trim()).toBe(
+        'Edit post',
+      );
+      expect(text()).toContain('Back to the forum');
+      expect(text()).toContain('Title');
+      expect(text()).toContain('Content');
+      expect(text()).toContain('Save');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the validation messages too', async () => {
+      await setup();
+      component.form.setValue({ title: '', content: '' });
+
+      component.onSubmit();
+      switchToEnglish();
+
+      expect(text()).toContain('Please enter a title (2 to 256 characters)');
+      expect(text()).toContain('Please enter content (up to 5000 characters)');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('captions the spinner in English', async () => {
+      await setup();
+      forumServiceMock.updatePost.mockReturnValue(new Subject());
+      component.form.setValue({ title: 'An updated title', content: 'Body text' });
+
+      component.onSubmit();
+      switchToEnglish();
+
+      expect(text()).toContain('Saving...');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the "not your post" notice', async () => {
+      await setup(makeUser({ id: 'someone-else' }));
+      expect(text()).toContain('אין לך הרשאה לערוך הודעה זו.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('You do not have permission to edit this post.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** The failure is held as a key, so it follows the switch instead of freezing. */
+    it('re-renders a load failure that is already on screen', async () => {
+      await setup(makeUser(), makePost(), { status: 500 });
+      expect(text()).toContain('אירעה שגיאה. נסה שוב.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Something went wrong. Please try again.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('does not pin its own text direction — it follows <html dir>', async () => {
+      await setup();
+
+      expect(fixture.nativeElement.querySelector('.edit-post-page').hasAttribute('dir')).toBe(
+        false,
+      );
     });
   });
 });

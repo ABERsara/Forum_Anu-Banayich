@@ -1,11 +1,303 @@
 {
   "common": {
     "lang_he": "עברית",
-    "lang_en": "English"
+    "lang_en": "English",
+    "cancel": "ביטול",
+    "loading": "טוען..."
   },
   "header": {
     "switch_to_hebrew": "עבור לעברית",
-    "switch_to_english": "עבור לאנגלית"
+    "switch_to_english": "עבור לאנגלית",
+    "brand": "הפורום",
+    "home": "בית",
+    "logout": "התנתקות",
+    "login": "כניסה",
+    "register": "הרשמה",
+    "messages": "הודעות"
+  },
+  "admin": {
+    "back_to_dashboard": "חזרה ללוח הבקרה",
+    "dashboard": {
+      "title": "לוח בקרה – מנהל",
+      "pending_card_label": "הרשמות ממתינות לאישור",
+      "nav_registrations": "הרשמות ממתינות",
+      "nav_professionals": "ניהול אנשי מקצוע",
+      "nav_moderators": "ניהול ממונים",
+      "nav_audit_log": "יומן פעולות",
+      "nav_reports": "דיווחים"
+    },
+    "active_users": {
+      "title": "משתמשים פעילים",
+      "empty": "אין משתמשים פעילים כרגע.",
+      "suspend": "השעה",
+      "suspend_message": "פעולה זו תשעה את המשתמש למספר השעות שנקבעו, ותשלח לו הודעה עם הסיבה."
+    },
+    "broadcast": {
+      "title": "שידור לכלל המשתמשים",
+      "hint": "הפוסט יופיע ברשימת הפורום של כל המשתמשים הפעילים, ללא קשר לקבוצה או מגזר.",
+      "title_label": "כותרת",
+      "title_placeholder": "כותרת השידור",
+      "title_error": "נא להזין כותרת (2 עד 256 תווים)",
+      "content_label": "תוכן",
+      "content_placeholder": "תוכן ההודעה",
+      "content_error": "נא להזין תוכן (עד 5000 תווים)",
+      "sending": "שולח שידור...",
+      "submit": "שלח שידור",
+      "success": "השידור נשלח בהצלחה לכלל המשתמשים."
+    },
+    "errors": {
+      "load_pending_count_failed": "שגיאה בטעינת מספר ההרשמות הממתינות",
+      "load_users_failed": "אירעה שגיאה בטעינת המשתמשים. נסה לרענן את הדף.",
+      "suspend_failed": "אירעה שגיאה בהשעיית המשתמש. נסה שוב.",
+      "broadcast_failed": "שגיאה בשליחת השידור."
+    }
+  },
+  "advice": {
+    "back_to_professionals": "חזרה לרשימת אנשי מקצוע",
+    "list": {
+      "title": "ייעוץ מקצועי",
+      "public_qa_link": "לשאלות ותשובות ציבוריות",
+      "filter_label": "סינון לפי תחום:",
+      "filter_all": "הכל",
+      "empty": "לא נמצאו אנשי מקצוע זמינים.",
+      "ask_link": "שאל/י שאלה"
+    },
+    "ask": {
+      "title": "שאלה מקצועית",
+      "hint_professional": "השאלה תישלח לאיש המקצוע הנבחר.",
+      "hint_domain": "בחר/י תחום — השאלה תישלח לכל אנשי המקצוע בתחום זה.",
+      "domain_label": "תחום",
+      "domain_placeholder": "בחר/י תחום",
+      "domain_error": "נא לבחור תחום",
+      "content_label": "השאלה שלך",
+      "content_placeholder": "פרט/י את שאלתך (10 עד 2000 תווים)",
+      "content_error": "נא להזין שאלה (10 עד 2000 תווים)",
+      "is_public_label": "האם לפרסם את השאלה והתשובה לחברי הקהילה?",
+      "show_real_name_label": "הצג/י את שמי האמיתי לאיש המקצוע",
+      "sending": "שולח שאלה...",
+      "submit": "שלח שאלה"
+    },
+    "my_questions": {
+      "title": "השאלות שלי",
+      "loading": "טוען שאלות...",
+      "empty": "עדיין לא שאלת שאלות."
+    },
+    "qa_feed": {
+      "back_link": "→ חזרה לייעוץ מקצועי",
+      "title": "שאלות ותשובות קהילתיות",
+      "domain_filter_label": "סינון לפי תחום:",
+      "domain_filter_all": "הכל",
+      "loading": "טוען שאלות ותשובות...",
+      "empty": "אין עדיין שאלות ותשובות ציבוריות בתא שלך.",
+      "load_more": "טען עוד",
+      "loading_more": "טוען...",
+      "like_error": "הלייק לא נשמר. נסה שוב.",
+      "like_aria": "לייק — {{count}}",
+      "unlike_aria": "ביטול לייק — {{count}}",
+      "asked_by": "שאלה מאת {{name}}",
+      "answered_by": "תשובה מאת {{name}}"
+    },
+    "pending": {
+      "back_to_home": "חזרה לעמוד הבית",
+      "title": "שאלות ממתינות לתשובה",
+      "intro": "השאלות מוצגות לפי סדר הגעתן — הוותיקה ביותר ראשונה. פרטי השואל/ת חסויים.",
+      "loading": "טוען שאלות ממתינות...",
+      "empty": "אין כרגע שאלות שממתינות לתשובתך.",
+      "asked_on": "נשאלה ב-{{date}}",
+      "answer_label": "התשובה שלך",
+      "answer_placeholder": "כתוב/כתבי כאן את התשובה (10 עד 5000 תווים)",
+      "answer_error": "נא להזין תשובה באורך 10 עד 5000 תווים",
+      "sending": "שולח תשובה...",
+      "submit": "שליחת תשובה",
+      "success": "התשובה נשלחה, והשואל/ת קיבל/ה על כך התראה במייל."
+    },
+    "errors": {
+      "load_professionals_failed": "אירעה שגיאה בטעינת רשימת אנשי המקצוע. נסה שוב מאוחר יותר.",
+      "ask_failed": "שגיאה בשליחת השאלה.",
+      "load_my_questions_failed": "שגיאה בטעינת השאלות שלך.",
+      "load_pending_failed": "שגיאה בטעינת השאלות הממתינות.",
+      "answer_failed": "שגיאה בשליחת התשובה."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "כניסה למערכת",
+      "email_label": "אימייל",
+      "email_placeholder": "your@email.com",
+      "email_error": "נא להזין כתובת אימייל תקינה",
+      "password_label": "סיסמה",
+      "password_placeholder": "סיסמה",
+      "password_error": "נא להזין סיסמה",
+      "signing_in": "מתחבר/ת...",
+      "submit": "כניסה",
+      "divider": "או",
+      "google": "התחבר עם Google",
+      "no_account": "אין לך חשבון?",
+      "register_link": "הירשם/י כאן",
+      "error_generic": "שגיאה בכניסה. בדוק/י את הפרטים.",
+      "error_google": "הכניסה עם Google בוטלה או נכשלה."
+    },
+    "register": {
+      "title": "הרשמה למערכת",
+      "step": "שלב {{current}} מתוך 4",
+      "select_placeholder": "בחר/י",
+      "first_name_label": "שם פרטי",
+      "first_name_error": "נא להזין שם פרטי (לפחות 2 תווים)",
+      "last_name_label": "שם משפחה",
+      "last_name_error": "נא להזין שם משפחה (לפחות 2 תווים)",
+      "id_number_label": "תעודת זהות",
+      "id_number_error": "נא להזין תעודת זהות תקינה (לפחות 7 ספרות)",
+      "birth_date_label": "תאריך לידה",
+      "birth_date_error": "נא לבחור תאריך לידה",
+      "user_type_label": "סוג משתמש",
+      "user_type_error": "נא לבחור סוג משתמש",
+      "sector_label": "שיוך עדתי",
+      "sector_error": "נא לבחור שיוך עדתי",
+      "next": "המשך",
+      "email_label": "אימייל",
+      "email_error": "נא להזין כתובת אימייל תקינה",
+      "phone_label": "טלפון",
+      "phone_error": "נא להזין מספר טלפון תקין (9-15 ספרות בלבד)",
+      "password_label": "סיסמה",
+      "password_error": "הסיסמה חייבת להכיל לפחות 8 תווים",
+      "send_otp": "שלח קוד OTP",
+      "otp_sent_to": "קוד אימות נשלח לאימייל: {{email}}",
+      "otp_label": "קוד אימות",
+      "otp_error": "נא להזין קוד אימות (לפחות 4 ספרות)",
+      "otp_resent": "קוד חדש נשלח",
+      "verify_otp": "אמת/י קוד",
+      "resend_otp": "שלח/י קוד מחדש",
+      "selfie": "תמונת סלפי",
+      "id_document": "מסמך מזהה",
+      "choose_death_certificate": "בחר/י תעודת פטירה",
+      "choose_selfie": "בחר/י תמונת סלפי",
+      "choose_id_card": "בחר/י תעודת זהות",
+      "choose_passport": "בחר/י דרכון",
+      "declare_accuracy": "אני מצהיר/ה כי כל הפרטים והמסמכים שמסרתי נכונים ומדויקים",
+      "declare_terms": "קראתי ואני מסכים/ה לתנאי השימוש ומדיניות הפרטיות",
+      "declare_authorization": "אני מצהיר/ה כי אני זכאי/ת להירשם למערכת בהתאם לסוג המשתמש שבחרתי",
+      "finish": "סיום",
+      "have_account": "יש לך חשבון? כנס/י כאן",
+      "error_generic": "שגיאה בהרשמה. נסה/י שוב.",
+      "error_otp": "קוד שגוי. נסה/י שוב.",
+      "error_resend": "שליחת הקוד נכשלה."
+    },
+    "pending": {
+      "title": "הרשמתך התקבלה",
+      "message": "הרשמתך התקבלה ואישורך נמצא בבדיקה, תקבל/י על כך הודעה באימייל.",
+      "back_to_login": "חזרה למסך הכניסה"
+    }
+  },
+  "forum": {
+    "back_to_list": "חזרה לפורום",
+    "list": {
+      "title": "פורום הקהילה",
+      "empty": "אין הודעות עדיין. היה הראשון לפרסם!",
+      "previous": "הקודם",
+      "next": "הבא",
+      "page": "עמוד {{current}} מתוך {{total}}"
+    },
+    "post": {
+      "attachment": "קובץ מצורף",
+      "edit": "עריכה",
+      "delete": "מחיקה"
+    },
+    "delete_post": {
+      "title": "מחיקת הודעה",
+      "message": "פעולה זו תמחק את ההודעה. לא ניתן לשחזר.",
+      "confirm": "מחיקה"
+    },
+    "post_form": {
+      "title_label": "כותרת",
+      "title_error": "נא להזין כותרת (2 עד 256 תווים)",
+      "content_label": "תוכן",
+      "content_error": "נא להזין תוכן (עד 5000 תווים)"
+    },
+    "new_post": {
+      "title": "פרסום הודעה חדשה",
+      "group_label": "קהל יעד – קבוצה",
+      "sector_label": "קהל יעד – מגזר",
+      "attachment_label": "צירוף קובץ (אופציונלי)",
+      "publishing": "מפרסם...",
+      "submit": "פרסם"
+    },
+    "edit_post": {
+      "title": "עריכת הודעה",
+      "saving": "שומר...",
+      "submit": "שמירה"
+    },
+    "errors": {
+      "load_posts_failed": "אירעה שגיאה בטעינת הפוסטים. נסה לרענן את הדף.",
+      "load_post_failed": "אירעה שגיאה בטעינת ההודעה. נסה לרענן את הדף.",
+      "not_found": "ההודעה לא נמצאה.",
+      "view_forbidden": "אין לך הרשאה לצפות בהודעה זו.",
+      "edit_forbidden": "אין לך הרשאה לערוך הודעה זו.",
+      "create_failed": "אירעה שגיאה בפרסום ההודעה.",
+      "save_failed": "אירעה שגיאה. נסה שוב.",
+      "delete_failed": "אירעה שגיאה במחיקת ההודעה. נסה שוב."
+    }
+  },
+  "home": {
+    "title": "ברוכים הבאים",
+    "greeting": "שלום, {{name}}",
+    "forum": {
+      "title": "פורום",
+      "subtitle": "שאלות ותשובות מהקהילה",
+      "body": "שיתוף, תמיכה ותשובות מחברי הקהילה."
+    },
+    "advice": {
+      "title": "ייעוץ",
+      "subtitle": "פנייה לאיש מקצוע",
+      "body": "קבלת ייעוץ אישי ומקצועי בנושאים שמעסיקים אתכם."
+    },
+    "admin": {
+      "title": "ניהול",
+      "subtitle": "לוח בקרה למנהלים",
+      "body": "ניהול משתמשים, אישורי הרשמה ותוכן."
+    },
+    "moderator": {
+      "title": "מבקר",
+      "subtitle": "דוחות ותלונות",
+      "body": "סקירת דוחות שהוגשו על ידי משתמשים."
+    },
+    "professional": {
+      "title": "ייעוץ מקצועי",
+      "subtitle": "שאלות הממתינות לתשובתך",
+      "body": "צפייה בשאלות שהופנו אליך והגשת תשובה לשואל/ת."
+    }
+  },
+  "shared": {
+    "confirm_dialog": {
+      "title": "האם לאשר?",
+      "confirm": "אישור"
+    },
+    "suspend_dialog": {
+      "title": "השעיית משתמש",
+      "confirm": "השעה",
+      "hours_label": "מספר שעות",
+      "reason_label": "סיבת ההשעייה",
+      "reason_placeholder": "לדוגמה: הפרת כללי הפורום"
+    },
+    "report": {
+      "button": "דיווח",
+      "submitted": "הדיווח נשלח, תודה.",
+      "dialog_title": "דיווח על תוכן",
+      "reason_label": "סיבת הדיווח",
+      "description_label": "פירוט (לא חובה)",
+      "submit": "שליחת דיווח",
+      "error_duplicate": "כבר דיווחת על תוכן זה.",
+      "error_generic": "אירעה שגיאה בשליחת הדיווח. נסה שוב."
+    },
+    "file_upload": {
+      "choose_file": "בחר קובץ",
+      "clear": "נקה",
+      "preview_alt": "תצוגה מקדימה",
+      "file_too_large": "הקובץ גדול מדי. הגודל המקסימלי הוא {{max}} MB"
+    },
+    "copy_text": {
+      "copy": "העתק",
+      "copied": "הועתק!"
+    }
   },
   "errors": {
     "dm_forbidden": "אין לך הרשאה לשלוח או לצפות בהודעה זו.",
@@ -37,23 +329,6 @@
       "new_message_label": "הודעה חדשה",
       "placeholder": "כתבו הודעה...",
       "send": "שלח"
-    }
-  },
-  "advice": {
-    "qa_feed": {
-      "back_link": "→ חזרה לייעוץ מקצועי",
-      "title": "שאלות ותשובות קהילתיות",
-      "domain_filter_label": "סינון לפי תחום:",
-      "domain_filter_all": "הכל",
-      "loading": "טוען שאלות ותשובות...",
-      "empty": "אין עדיין שאלות ותשובות ציבוריות בתא שלך.",
-      "load_more": "טען עוד",
-      "loading_more": "טוען...",
-      "like_error": "הלייק לא נשמר. נסה שוב.",
-      "like_aria": "לייק — {{count}}",
-      "unlike_aria": "ביטול לייק — {{count}}",
-      "asked_by": "שאלה מאת {{name}}",
-      "answered_by": "תשובה מאת {{name}}"
     }
   },
   "constants": {
