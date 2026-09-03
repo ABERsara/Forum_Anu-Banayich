@@ -1,71 +1,102 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
 <div class="page">
-  <a routerLink="/admin">← חזרה ללוח הבקרה</a>
+  <a routerLink="/admin">← {{ 'admin.back_to_dashboard' | transloco }}</a>
 
   <div class="page__header">
-    <h1>ניהול אנשי מקצוע</h1>
+    <h1>{{ 'admin.manage_professionals.title' | transloco }}</h1>
     @if (!isFormOpen()) {
-      <app-button variant="primary" (clicked)="openAddForm()">הוספת איש מקצוע</app-button>
+      <app-button variant="primary" (clicked)="openAddForm()">
+        {{ 'admin.manage_professionals.add' | transloco }}
+      </app-button>
     }
   </div>
 
-  <p class="page__hint">
-    איש מקצוע פעיל מופיע בקטלוג הייעוץ של המשתמשים שהקבוצה והמגזר שלהם מסומנים אצלו.
-  </p>
+  <p class="page__hint">{{ 'admin.manage_professionals.hint' | transloco }}</p>
 
-  <app-error-display [message]="actionError()" />
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch. -->
+  @if (actionError().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (actionError().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
 
-  @if (successMessage()) {
-    <p class="success-message" role="status">{{ successMessage() }}</p>
+  <!-- Our own confirmation is a key too, and the name it reports is its
+       parameter — the two cannot be two nodes, or English keeps the Hebrew
+       word order (CONTRIBUTING §6). -->
+  @if (successMessage(); as message) {
+    <p class="success-message" role="status">
+      {{ message.key | transloco: { name: message.name } }}
+    </p>
   }
 
   <!-- ─────────────────────────── טופס הוספה / עריכה ─────────────────────────── -->
   @if (isFormOpen()) {
-    <section class="panel" [attr.aria-label]="editing() ? 'עריכת איש מקצוע' : 'הוספת איש מקצוע'">
+    <section
+      class="panel"
+      [attr.aria-label]="
+        (editing() ? 'admin.manage_professionals.edit' : 'admin.manage_professionals.add')
+          | transloco
+      "
+    >
       <h2 class="panel__title">
-        {{ editing() ? 'עריכת ' + fullName(editing()!) : 'הוספת איש מקצוע' }}
+        @if (editing(); as professional) {
+          {{ 'admin.person_form.edit_name' | transloco: { name: fullName(professional) } }}
+        } @else {
+          {{ 'admin.manage_professionals.add' | transloco }}
+        }
       </h2>
 
       <form [formGroup]="form" (ngSubmit)="save()" novalidate>
         @if (!editing()) {
           <div class="form-row">
             <div class="form-field">
-              <label for="first_name">שם פרטי</label>
+              <label for="first_name">{{ 'admin.person_form.first_name_label' | transloco }}</label>
               <input id="first_name" type="text" formControlName="first_name" autocomplete="off" />
               @if (form.controls.first_name.invalid && form.controls.first_name.touched) {
-                <span class="field-error">נא להזין שם פרטי (2 עד 100 תווים)</span>
+                <span class="field-error">
+                  {{ 'admin.person_form.first_name_error' | transloco }}
+                </span>
               }
             </div>
 
             <div class="form-field">
-              <label for="last_name">שם משפחה</label>
+              <label for="last_name">{{ 'admin.person_form.last_name_label' | transloco }}</label>
               <input id="last_name" type="text" formControlName="last_name" autocomplete="off" />
               @if (form.controls.last_name.invalid && form.controls.last_name.touched) {
-                <span class="field-error">נא להזין שם משפחה (2 עד 100 תווים)</span>
+                <span class="field-error">
+                  {{ 'admin.person_form.last_name_error' | transloco }}
+                </span>
               }
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-field">
-              <label for="email">דוא"ל</label>
+              <label for="email">{{ 'admin.person_form.email_label' | transloco }}</label>
               <input id="email" type="email" formControlName="email" autocomplete="off" />
               @if (form.controls.email.invalid && form.controls.email.touched) {
-                <span class="field-error">נא להזין כתובת דוא"ל תקינה</span>
+                <span class="field-error">{{ 'admin.person_form.email_error' | transloco }}</span>
               }
             </div>
 
             <div class="form-field">
-              <label for="phone">טלפון (רשות)</label>
+              <label for="phone">{{ 'admin.manage_professionals.phone_label' | transloco }}</label>
               <input id="phone" type="tel" formControlName="phone" autocomplete="off" />
               @if (form.controls.phone.invalid && form.controls.phone.touched) {
-                <span class="field-error">מספר טלפון צריך להכיל 9 עד 15 תווים</span>
+                <span class="field-error">
+                  {{ 'admin.manage_professionals.phone_error' | transloco }}
+                </span>
               }
             </div>
           </div>
         }
 
         <div class="form-field">
-          <label for="professional_domain">תחום</label>
+          <label for="professional_domain">
+            {{ 'admin.manage_professionals.domain_label' | transloco }}
+          </label>
           <select id="professional_domain" formControlName="professional_domain">
             @for (domain of domains; track domain) {
               <option [value]="domain">{{ domainLabels[domain] | transloco }}</option>
@@ -74,7 +105,7 @@
         </div>
 
         <fieldset class="checkbox-group">
-          <legend>קבוצות שהוא משרת</legend>
+          <legend>{{ 'admin.manage_professionals.groups_legend' | transloco }}</legend>
           <div class="checkbox-group__options">
             @for (group of groupOptions; track group) {
               <label class="checkbox-option">
@@ -90,12 +121,14 @@
           @if (
             form.controls.professional_groups.invalid && form.controls.professional_groups.touched
           ) {
-            <span class="field-error">נא לבחור לפחות קבוצה אחת</span>
+            <span class="field-error">
+              {{ 'admin.manage_professionals.groups_error' | transloco }}
+            </span>
           }
         </fieldset>
 
         <fieldset class="checkbox-group">
-          <legend>מגזרים שהוא משרת</legend>
+          <legend>{{ 'admin.manage_professionals.sectors_legend' | transloco }}</legend>
           <div class="checkbox-group__options">
             @for (sector of sectorOptions; track sector) {
               <label class="checkbox-option">
@@ -111,18 +144,22 @@
           @if (
             form.controls.professional_sectors.invalid && form.controls.professional_sectors.touched
           ) {
-            <span class="field-error">נא לבחור לפחות מגזר אחד</span>
+            <span class="field-error">
+              {{ 'admin.manage_professionals.sectors_error' | transloco }}
+            </span>
           }
         </fieldset>
 
         <div class="form-field">
-          <label for="professional_description">תיאור קצר</label>
+          <label for="professional_description">
+            {{ 'admin.manage_professionals.description_label' | transloco }}
+          </label>
           <textarea
             id="professional_description"
             rows="4"
             formControlName="professional_description"
             [attr.maxlength]="descriptionMaxLength"
-            placeholder="למשל: עורך דין המתמחה בענייני ירושה וצוואות"
+            [placeholder]="'admin.manage_professionals.description_placeholder' | transloco"
           ></textarea>
           <span class="char-counter">
             {{ form.controls.professional_description.value.length }} / {{ descriptionMaxLength }}
@@ -131,19 +168,24 @@
 
         <label class="checkbox-option checkbox-option--standalone">
           <input type="checkbox" formControlName="is_active_professional" />
-          מופיע בקטלוג הייעוץ
+          {{ 'admin.manage_professionals.is_listed_label' | transloco }}
         </label>
 
         @if (isSaving()) {
-          <app-loading-spinner message="שומר..." />
+          <app-loading-spinner [message]="'admin.person_form.saving' | transloco" />
         }
 
         <div class="panel__actions">
           <app-button type="submit" variant="primary" [disabled]="isSaving()">
-            {{ editing() ? 'שמירת שינויים' : 'הוספה לקטלוג' }}
+            {{
+              (editing()
+                ? 'admin.person_form.save_changes'
+                : 'admin.manage_professionals.add_submit'
+              ) | transloco
+            }}
           </app-button>
           <app-button variant="secondary" [disabled]="isSaving()" (clicked)="closeForm()">
-            ביטול
+            {{ 'common.cancel' | transloco }}
           </app-button>
         </div>
       </form>
@@ -152,11 +194,11 @@
 
   <!-- ────────────────────────────── קטלוג קיים ────────────────────────────── -->
   @if (isLoading()) {
-    <app-loading-spinner message="טוען אנשי מקצוע..." />
+    <app-loading-spinner [message]="'admin.manage_professionals.loading' | transloco" />
   } @else if (hasError()) {
-    <app-error-display message="אירעה שגיאה בטעינת אנשי המקצוע. נסה לרענן את הדף." />
+    <app-error-display [message]="'admin.errors.load_professionals_failed' | transloco" />
   } @else if (professionals().length === 0) {
-    <p>עדיין אין אנשי מקצוע בקטלוג.</p>
+    <p>{{ 'admin.manage_professionals.empty' | transloco }}</p>
   } @else {
     <ul class="catalog">
       @for (professional of professionals(); track professional.id) {
@@ -166,13 +208,20 @@
         >
           <div class="catalog__main">
             <div class="catalog__heading">
+              <!-- A professional's own name and the description they were given
+                   are content, not UI: shown as they came, in either language. -->
               <h2 class="catalog__name">{{ fullName(professional) }}</h2>
               <span
                 class="badge"
                 [class.badge--active]="professional.is_active_professional"
                 [class.badge--inactive]="!professional.is_active_professional"
               >
-                {{ professional.is_active_professional ? 'פעיל' : 'מושבת' }}
+                {{
+                  (professional.is_active_professional
+                    ? 'admin.manage_professionals.badge_active'
+                    : 'admin.manage_professionals.badge_inactive'
+                  ) | transloco
+                }}
               </span>
             </div>
 
@@ -183,9 +232,9 @@
             }
 
             <dl class="catalog__audience">
-              <dt>קבוצות</dt>
+              <dt>{{ 'admin.manage_professionals.groups' | transloco }}</dt>
               <dd>{{ audienceLabel(professional.professional_groups, groupLabels) || '—' }}</dd>
-              <dt>מגזרים</dt>
+              <dt>{{ 'admin.manage_professionals.sectors' | transloco }}</dt>
               <dd>{{ audienceLabel(professional.professional_sectors, sectorLabels) || '—' }}</dd>
             </dl>
           </div>
@@ -193,10 +242,12 @@
           <div class="catalog__actions">
             <app-button
               variant="secondary"
-              [ariaLabel]="'עריכת ' + fullName(professional)"
+              [ariaLabel]="
+                'admin.person_form.edit_name' | transloco: { name: fullName(professional) }
+              "
               (clicked)="openEditForm(professional)"
             >
-              עריכה
+              {{ 'admin.person_form.edit' | transloco }}
             </app-button>
             <!-- Locked while this row is open in the form, so the two cannot
                  write conflicting values for is_active_professional. -->
@@ -204,11 +255,19 @@
               variant="secondary"
               [disabled]="togglingId() === professional.id || editing()?.id === professional.id"
               [ariaLabel]="
-                (professional.is_active_professional ? 'השבתת ' : 'הפעלת ') + fullName(professional)
+                (professional.is_active_professional
+                  ? 'admin.manage_professionals.deactivate_name'
+                  : 'admin.manage_professionals.activate_name'
+                ) | transloco: { name: fullName(professional) }
               "
               (clicked)="toggleActive(professional)"
             >
-              {{ professional.is_active_professional ? 'השבתה' : 'הפעלה' }}
+              {{
+                (professional.is_active_professional
+                  ? 'admin.manage_professionals.deactivate'
+                  : 'admin.manage_professionals.activate'
+                ) | transloco
+              }}
             </app-button>
           </div>
         </li>

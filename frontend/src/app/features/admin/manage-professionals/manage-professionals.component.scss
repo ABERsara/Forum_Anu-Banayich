@@ -4,7 +4,6 @@
 
 .page {
   padding: $spacing-md;
-  direction: rtl;
 
   &__header {
     @include flex-between;

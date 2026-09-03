@@ -34,7 +34,9 @@ import {
   ProfessionalUpdateRequest,
 } from '../../../core/models';
 import { LabelService } from '../../../core/i18n/label.service';
+import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { AdminService } from '../../../core/services/admin.service';
+import { ActionMessage } from '../action-message';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -71,8 +73,10 @@ export class ManageProfessionalsComponent implements OnInit {
   readonly professionals = signal<ProfessionalAdminView[]>([]);
   readonly isLoading = signal(false);
   readonly hasError = signal(false);
-  readonly actionError = signal('');
-  readonly successMessage = signal('');
+  /** What went wrong on save or toggle, as a key of ours or the API's own sentence. */
+  readonly actionError = signal<ScreenError>(NO_ERROR);
+  /** Our own confirmation, held as a key and a name so it follows a language switch. */
+  readonly successMessage = signal<ActionMessage | null>(null);
   readonly isSaving = signal(false);
   readonly isFormOpen = signal(false);
   /** The professional being edited; null while the form is adding a new one. */
@@ -146,7 +150,7 @@ export class ManageProfessionalsComponent implements OnInit {
   domainLabel(professional: ProfessionalAdminView): string {
     return professional.professional_domain
       ? this.labels.label(this.domainLabels[professional.professional_domain])
-      : 'ללא תחום';
+      : this.labels.label('admin.manage_professionals.no_domain');
   }
 
   /**
@@ -235,16 +239,22 @@ export class ManageProfessionalsComponent implements OnInit {
       next: (saved) => {
         if (editing) {
           this.replaceRow(saved);
-          this.successMessage.set(`הפרטים של ${this.fullName(saved)} עודכנו.`);
+          this.successMessage.set({
+            key: 'admin.manage_professionals.updated',
+            name: this.fullName(saved),
+          });
         } else {
           this.insertRow(saved);
-          this.successMessage.set(`${this.fullName(saved)} נוסף לקטלוג אנשי המקצוע.`);
+          this.successMessage.set({
+            key: 'admin.manage_professionals.added',
+            name: this.fullName(saved),
+          });
         }
         this.isSaving.set(false);
         this.closeForm();
       },
       error: (err: HttpErrorResponse) => {
-        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בשמירת איש המקצוע. נסה שוב.'));
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.save_professional_failed'));
         this.isSaving.set(false);
       },
     });
@@ -265,15 +275,16 @@ export class ManageProfessionalsComponent implements OnInit {
     this.adminService.updateProfessional(professional.id, body).subscribe({
       next: (saved) => {
         this.replaceRow(saved);
-        this.successMessage.set(
-          saved.is_active_professional
-            ? `${this.fullName(saved)} מופיע שוב בקטלוג.`
-            : `${this.fullName(saved)} הושבת ואינו מופיע בקטלוג.`,
-        );
+        this.successMessage.set({
+          key: saved.is_active_professional
+            ? 'admin.manage_professionals.relisted'
+            : 'admin.manage_professionals.unlisted',
+          name: this.fullName(saved),
+        });
         this.togglingId.set(null);
       },
       error: (err: HttpErrorResponse) => {
-        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בעדכון הסטטוס. נסה שוב.'));
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.toggle_professional_failed'));
         this.togglingId.set(null);
       },
     });
@@ -322,13 +333,8 @@ export class ManageProfessionalsComponent implements OnInit {
     );
   }
 
-  private messageFrom(err: HttpErrorResponse, fallback: string): string {
-    const detail: unknown = err.error?.detail;
-    return typeof detail === 'string' ? detail : fallback;
-  }
-
   private clearMessages(): void {
-    this.actionError.set('');
-    this.successMessage.set('');
+    this.actionError.set(NO_ERROR);
+    this.successMessage.set(null);
   }
 }
