@@ -11,7 +11,9 @@ TODO list for junior developer:
   [ ] implement search_users_for_dm() – name search within same group/sector
 """
 
-from datetime import datetime
+import base64
+import binascii
+from datetime import UTC, datetime
 from typing import TypedDict
 
 from cryptography.exceptions import InvalidTag
@@ -19,16 +21,20 @@ from fastapi import HTTPException
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Query, Session, joinedload
 
+from app.core.config import settings
 from app.core.constants import (
     AccountStatus,
     AuditAction,
     GroupVisibility,
     PostStatus,
+    ReportDecision,
+    ReportTargetType,
     SectorVisibility,
     UserRole,
 )
 from app.core.encryption import decrypt_message, encrypt_message
 from app.models.forum import DirectMessage, ForumPost
+from app.models.report import Report
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
@@ -52,6 +58,22 @@ from app.services.user_service import get_user_by_id
 #: hardcoded Hebrew.
 _DM_FORBIDDEN_MESSAGE = "errors.dm_forbidden"
 
+#: A history cursor the server did not issue. A translation key too, for the
+#: same reason as _DM_FORBIDDEN_MESSAGE above.
+_INVALID_CURSOR_MESSAGE = "errors.invalid_cursor"
+
+
+#: Default and maximum number of messages one history request returns. The
+#: default is a screenful and then some; the maximum bounds how much content
+#: a single request can be made to decrypt.
+CONVERSATION_PAGE_SIZE = 50
+CONVERSATION_MAX_PAGE_SIZE = 100
+
+#: Separates the two halves of a history cursor before base64 — see
+#: _encode_cursor(). ':' is taken by conversation_key, '|' never appears in an
+#: ISO timestamp or a uuid4.
+_CURSOR_SEPARATOR = "|"
+
 
 class DirectMessageData(TypedDict):
     """A decrypted DirectMessage row, shaped for DirectMessageResponse."""
@@ -60,8 +82,25 @@ class DirectMessageData(TypedDict):
     sender: User
     recipient: User
     content: str
-    is_read: bool
+    read_at: datetime | None
     created_at: datetime
+
+
+class ConversationPageData(TypedDict):
+    """One page of history, shaped for ConversationMessagesPage."""
+
+    items: list[DirectMessageData]
+    has_more: bool
+    next_cursor: str | None
+
+
+class SentMessageData(TypedDict):
+    """A stored message plus the cost of enforcing the cap, for
+    DirectMessageSendResponse."""
+
+    message: DirectMessageData
+    pruned_count: int
+    conversation_limit: int
 
 
 def _content_filter(query: Query[ForumPost], current_user: User) -> Query[ForumPost]:
@@ -455,14 +494,14 @@ def _to_response_dict(message: DirectMessage) -> DirectMessageData:
         "sender": message.sender,
         "recipient": message.recipient,
         "content": content,
-        "is_read": message.is_read,
+        "read_at": message.read_at,
         "created_at": message.created_at,
     }
 
 
 def send_direct_message(
     db: Session, data: DirectMessageCreate, sender: User
-) -> DirectMessageData:
+) -> SentMessageData:
     """
     Send a private message within the sender's own cell.
 
@@ -472,6 +511,10 @@ def send_direct_message(
     covers the sender's own role: a non-USER sender is denied and audited
     the same way as any other blocked send (§9.3 — a moderator's attempt to
     send a private message is itself an access to private content).
+
+    The new message is stored first and the cap enforced after, never the
+    other way round: pruning ahead of a send that then fails validation would
+    delete history to make room for nothing.
     """
     recipient = (
         None if sender.role != UserRole.USER else get_user_by_id(db, data.recipient_id)
@@ -487,24 +530,111 @@ def send_direct_message(
         )
         raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
 
+    conversation_key = build_conversation_key(sender.id, recipient.id)
     encrypted_content, key_version = encrypt_message(data.content)
     message = DirectMessage(
         sender_id=sender.id,
         recipient_id=recipient.id,
-        conversation_key=build_conversation_key(sender.id, recipient.id),
+        conversation_key=conversation_key,
         content=encrypted_content,
         key_version=key_version,
     )
     db.add(message)
     db.commit()
 
+    message_id = message.id
+    pruned_count = _enforce_conversation_limit(
+        db, sender, conversation_key, keep_message_id=message_id
+    )
+
     message = (
         db.query(DirectMessage)
         .options(joinedload(DirectMessage.sender), joinedload(DirectMessage.recipient))
-        .filter(DirectMessage.id == message.id)
+        .filter(DirectMessage.id == message_id)
         .one()
     )
-    return _to_response_dict(message)
+    return {
+        "message": _to_response_dict(message),
+        "pruned_count": pruned_count,
+        "conversation_limit": settings.MAX_MESSAGES_PER_CONVERSATION,
+    }
+
+
+def _enforce_conversation_limit(
+    db: Session, actor: User, conversation_key: str, keep_message_id: str
+) -> int:
+    """
+    Hold the conversation at spec §5.3's cap of 1,000 messages, and return how
+    many were deleted to do it.
+
+    FIFO — oldest first — with two messages it will never touch:
+
+    * `keep_message_id`, the message this send just stored. It is the newest
+      row, so FIFO reaches it last and normally never; but when every older
+      message is exempt it would be the only candidate left, and a send that
+      deletes its own message is the one outcome that is never right.
+    * anything carrying an **open** report (decision PENDING). A moderator can
+      only ever see a private message that was reported to them (§5.3), so
+      pruning a reported message would destroy the evidence before the report
+      is ruled on. Once the report is decided the message is ordinary history
+      again, so the exemption expires by itself.
+
+    Those exemptions make the cap a target rather than an invariant: a
+    conversation whose oldest messages are all under open report grows past
+    1,000 instead of deleting them, and shrinks back once they are decided.
+
+    Normally deletes exactly one row — the cap is checked on every send, so a
+    conversation can only ever be one over. The loop is for a conversation
+    that arrived over the cap another way (a restored backup, a lowered cap).
+
+    Deletion is permanent and it is the user's own content, so each removed
+    message gets its own audit entry (§9.3) — never with the content in it,
+    which is exactly what an audit log must not carry.
+    """
+    limit = settings.MAX_MESSAGES_PER_CONVERSATION
+    total = (
+        db.query(func.count(DirectMessage.id))
+        .filter(DirectMessage.conversation_key == conversation_key)
+        .scalar()
+        or 0
+    )
+    overflow = total - limit
+    if overflow <= 0:
+        return 0
+
+    reported_message_ids = (
+        db.query(Report.target_id)
+        .filter(
+            Report.target_type == ReportTargetType.DIRECT_MESSAGE,
+            Report.decision == ReportDecision.PENDING,
+        )
+        .scalar_subquery()
+    )
+    doomed = (
+        db.query(DirectMessage)
+        .filter(
+            DirectMessage.conversation_key == conversation_key,
+            DirectMessage.id != keep_message_id,
+            DirectMessage.id.notin_(reported_message_ids),
+        )
+        .order_by(DirectMessage.created_at.asc(), DirectMessage.id.asc())
+        .limit(overflow)
+        .all()
+    )
+
+    for message in doomed:
+        message_id = message.id
+        db.delete(message)
+        log_action(
+            db,
+            actor=actor,
+            action=AuditAction.DIRECT_MESSAGE_PRUNED,
+            entity_type="DirectMessage",
+            entity_id=message_id,
+            details={"conversation_key": conversation_key, "reason": "storage_cap"},
+        )
+
+    return len(doomed)
 
 
 def _authorize_conversation_access(
@@ -549,44 +679,126 @@ def mark_conversation_read(
     Idempotent by construction: calling it again just finds nothing left to
     update.
 
-    This only clears the viewer's own unread counter — it is not a "seen by"
-    indicator shown back to the sender (no read-receipts UI exists, and this
-    adds none).
+    `recipient_id == current_user.id` is the whole of the acceptance criterion
+    "a sender never marks her own message read": that filter is what keeps the
+    receipt on the sender's own bubble honest, because since ABF-120 read_at is
+    shown back to her. Drop it and every message would light up as read the
+    moment its author opened the thread.
+
+    Already-read messages keep their original read_at (`read_at IS NULL` in the
+    filter) — re-opening a conversation must not move the timestamp of a
+    message that was read yesterday.
     """
     _authorize_conversation_access(db, current_user, conversation_key)
 
     db.query(DirectMessage).filter(
         DirectMessage.conversation_key == conversation_key,
         DirectMessage.recipient_id == current_user.id,
-        DirectMessage.is_read.is_(False),
-    ).update({"is_read": True})
+        DirectMessage.read_at.is_(None),
+    ).update({"read_at": datetime.now(UTC).replace(tzinfo=None)})
     db.commit()
 
 
-def get_conversation_messages(
-    db: Session, current_user: User, conversation_key: str
-) -> list[DirectMessageData]:
+def _encode_cursor(message: DirectMessage) -> str:
     """
-    Return every message for a conversation_key, oldest first.
+    Name one row in the conversation's ordering, as an opaque string.
+
+    The pair (created_at, id) — not created_at alone, and not an offset. Two
+    messages can share a timestamp, so the id is what makes the ordering a
+    total one; without it a page boundary landing inside a tie repeats a
+    message on one page and drops it from the next, which is precisely the
+    "no duplicates" acceptance criterion.
+
+    base64 because a cursor is not the client's to build: only a value this
+    function produced is a valid one.
+    """
+    raw = f"{message.created_at.isoformat()}{_CURSOR_SEPARATOR}{message.id}"
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def _decode_cursor(cursor: str) -> tuple[datetime, str]:
+    """
+    Read a cursor back into (created_at, id).
+
+    Anything unreadable is a 400 with a translation key — not a 500, and not a
+    silent fall back to "start from the newest": a client paging with a
+    corrupted cursor should be told, not quietly served the top of the list
+    again forever.
+    """
+    try:
+        padding = "=" * (-len(cursor) % 4)
+        raw = base64.urlsafe_b64decode(cursor + padding).decode("utf-8")
+        created_at_text, message_id = raw.split(_CURSOR_SEPARATOR, 1)
+        return datetime.fromisoformat(created_at_text), message_id
+    except (ValueError, binascii.Error, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=_INVALID_CURSOR_MESSAGE) from exc
+
+
+def get_conversation_messages(
+    db: Session,
+    current_user: User,
+    conversation_key: str,
+    limit: int = CONVERSATION_PAGE_SIZE,
+    before: str | None = None,
+) -> ConversationPageData:
+    """
+    Return one page of a conversation's history, oldest first *within the page*.
+
+    Paging runs backwards through time: with no cursor the newest `limit`
+    messages come back (what a chat screen opens on), and `next_cursor` walks
+    towards the oldest. Ordering by (created_at, id) descending and slicing on
+    that same pair is what keeps a page seam stable while new messages keep
+    arriving at the other end — an offset counted from a list that grows at
+    the top re-serves or skips a row on every new arrival.
 
     Pure read, no side effects — see mark_conversation_read() for marking
-    messages read. No pagination either (out of scope — spec §5.3's
-    1,000/conversation cap isn't enforced here).
+    messages read.
 
-    A well-formed key for a conversation with zero messages yet returns an
-    empty list (200), not 404 — "no messages" is a normal empty state, not
-    an error.
+    A well-formed key for a conversation with no messages yet returns an empty
+    page (200), not 404 — "no messages" is a normal empty state, not an error.
     """
     _authorize_conversation_access(db, current_user, conversation_key)
 
-    messages = (
+    query = (
         db.query(DirectMessage)
         .options(joinedload(DirectMessage.sender), joinedload(DirectMessage.recipient))
         .filter(DirectMessage.conversation_key == conversation_key)
-        .order_by(DirectMessage.created_at.asc())
+    )
+
+    if before is not None:
+        cursor_created_at, cursor_id = _decode_cursor(before)
+        # Spelled out as OR/AND rather than a row-value comparison so the same
+        # expression compiles on both databases: SQLite only learned row
+        # values in 3.15, and SQLite is this app's dev database.
+        query = query.filter(
+            or_(
+                DirectMessage.created_at < cursor_created_at,
+                and_(
+                    DirectMessage.created_at == cursor_created_at,
+                    DirectMessage.id < cursor_id,
+                ),
+            )
+        )
+
+    # One row more than asked for: its presence *is* has_more, and it is
+    # dropped rather than returned. Cheaper than a second COUNT(*), and it
+    # cannot disagree with the page it describes the way a separate count can.
+    rows = (
+        query.order_by(DirectMessage.created_at.desc(), DirectMessage.id.desc())
+        .limit(limit + 1)
         .all()
     )
-    return [_to_response_dict(message) for message in messages]
+    has_more = len(rows) > limit
+    page = list(reversed(rows[:limit]))
+
+    return {
+        "items": [_to_response_dict(message) for message in page],
+        "has_more": has_more,
+        # The cursor is the page's OLDEST row — the next request asks for what
+        # comes before it. Null when nothing older exists, so a client that
+        # only looks at the cursor cannot loop forever.
+        "next_cursor": _encode_cursor(page[0]) if has_more and page else None,
+    }
 
 
 def get_inbox(
@@ -627,7 +839,7 @@ def get_inbox(
         else_=DirectMessage.sender_id,
     ).label("partner_id")
     unread_flag = case(
-        (and_(DirectMessage.recipient_id == me, DirectMessage.is_read.is_(False)), 1),
+        (and_(DirectMessage.recipient_id == me, DirectMessage.read_at.is_(None)), 1),
         else_=0,
     )
 

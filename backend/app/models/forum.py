@@ -12,7 +12,7 @@ Key rule (enforced in forum_service.py):
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -91,6 +91,16 @@ class DirectMessage(Base):
             "conversation_key",
             "created_at",
         ),
+        # The inbox's per-conversation unread aggregation (ABF-119) filters on
+        # recipient_id + "not read yet". Declared here as well as in the
+        # migration that first created it: the model is what
+        # Base.metadata.create_all() builds, so an index that lives only in a
+        # migration silently does not exist for anything created that way.
+        Index(
+            "ix_direct_messages_recipient_unread",
+            "recipient_id",
+            "read_at",
+        ),
     )
 
     id: Mapped[str] = mapped_column(
@@ -118,9 +128,28 @@ class DirectMessage(Base):
     # app/core/encryption.py)
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
-    is_read: Mapped[bool] = mapped_column(default=False)
+    # When the RECIPIENT opened the conversation — NULL until then, and the
+    # single source of truth for "read" (there is no is_read boolean beside
+    # it to drift from). A timestamp rather than a flag because the receipt
+    # the sender sees is "read", and a flag cannot answer "when".
+    #
+    # Only ever written for the viewer's own received messages, never for the
+    # ones they sent — see mark_conversation_read().
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Python-side default *as well as* the server one, unlike the rest of the
+    # models here. SQLite's CURRENT_TIMESTAMP resolves to whole seconds, so
+    # every message sent inside the same second shared a created_at — and the
+    # history cursor (ABF-120) orders by exactly this column. A shared sort
+    # key is what makes a paged list repeat or skip a row at the page seam.
+    # datetime.now(UTC) is microsecond-precise on both databases; naive-UTC to
+    # match what func.now() already writes and what user_service.py compares
+    # created_at against.
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        server_default=func.now(),
     )
 
     # ------------------------------------------------------------------

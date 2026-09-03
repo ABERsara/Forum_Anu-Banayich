@@ -69,14 +69,58 @@ class DirectMessageCreate(BaseModel):
 
 
 class DirectMessageResponse(BaseModel):
+    """
+    One message as both participants see it.
+
+    `read_at` is null until the RECIPIENT opens the conversation. It is the
+    only read state on the wire — the sender reads it as the receipt on her
+    own bubble, the recipient as "this was already mine to read".
+    """
+
     id: str
     sender: UserPublic
     recipient: UserPublic
     content: str
-    is_read: bool
+    read_at: datetime | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DirectMessageSendResponse(BaseModel):
+    """
+    POST /messages – the stored message, plus what enforcing the storage cap
+    cost this conversation.
+
+    `pruned_count` is normally 0, and 1 on the send that crosses spec
+    section 5.3's cap. It is on the send response rather than left implicit
+    because the acceptance criterion is that the user is *told* an old
+    message was dropped; a screen cannot say so if the API does not.
+    `conversation_limit` travels with it so the notice can name the real
+    number instead of hardcoding a copy of a server setting.
+    """
+
+    message: DirectMessageResponse
+    pruned_count: int
+    conversation_limit: int
+
+
+class ConversationMessagesPage(BaseModel):
+    """
+    GET /conversations/{key}/messages – one page of history, oldest first.
+
+    Cursor-based, not offset-based: a conversation grows from the newest end
+    while the reader pages towards the oldest, and an offset counted from a
+    moving end re-reads or skips rows every time a message arrives mid-scroll.
+    A cursor names a row, so it keeps meaning whatever arrives after it.
+
+    `next_cursor` points *older* — feed it back as `before` for the previous
+    page. It is null exactly when `has_more` is false.
+    """
+
+    items: list[DirectMessageResponse]
+    has_more: bool
+    next_cursor: str | None
 
 
 class ConversationSummary(BaseModel):
