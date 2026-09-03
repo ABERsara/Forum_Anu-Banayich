@@ -1,7 +1,7 @@
 """add agent tables
 
 Revision ID: 79daa6708dd8
-Revises: cd7c2f0dab77
+Revises: aac7e1fb8f49
 Create Date: 2026-08-31 00:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "79daa6708dd8"
-down_revision: str | Sequence[str] | None = "cd7c2f0dab77"
+down_revision: str | Sequence[str] | None = "aac7e1fb8f49"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
