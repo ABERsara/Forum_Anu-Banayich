@@ -185,7 +185,7 @@ class TestSendDirectMessage:
 
         assert result["message"]["content"] == "שלום, מה שלומך?"
         assert result["message"]["read_at"] is None  # unread until b opens it
-        assert result["pruned_count"] == 0
+        assert result["pruned_message_ids"] == []
         assert result["conversation_limit"] == settings.MAX_MESSAGES_PER_CONVERSATION
 
         row = (
@@ -921,7 +921,7 @@ class TestConversationLimit:
             db_session, DirectMessageCreate(recipient_id=b.id, content="החמישית"), a
         )
 
-        assert result["pruned_count"] == 0
+        assert result["pruned_message_ids"] == []
         assert db_session.query(DirectMessage).count() == 5
 
     def test_the_next_send_deletes_the_oldest_message_only(
@@ -938,7 +938,7 @@ class TestConversationLimit:
             db_session, DirectMessageCreate(recipient_id=b.id, content="השישית"), a
         )
 
-        assert result["pruned_count"] == 1
+        assert result["pruned_message_ids"] == [oldest_id]
         assert db_session.query(DirectMessage).count() == 5
         assert (
             db_session.query(DirectMessage)
@@ -959,6 +959,40 @@ class TestConversationLimit:
             "message-0004",
             "השישית",
         ]
+
+    def test_the_ids_name_the_messages_that_actually_went(
+        self, db_session, monkeypatch
+    ):
+        """
+        Why the response carries ids and not a count. With the oldest message
+        protected, the message deleted is the *second* oldest — so a client
+        trimming "the first N off the top" would take the wrong bubble off the
+        screen and leave the deleted one showing.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 5)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 5)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        oldest = _oldest_message(db_session, key)
+        oldest_id = oldest.id
+        _report_message(db_session, b, oldest, ReportDecision.PENDING)
+        second_oldest_id = (
+            db_session.query(DirectMessage)
+            .filter(
+                DirectMessage.conversation_key == key,
+                DirectMessage.id != oldest_id,
+            )
+            .order_by(DirectMessage.created_at.asc(), DirectMessage.id.asc())
+            .first()
+            .id
+        )
+
+        result = forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="השישית"), a
+        )
+
+        assert result["pruned_message_ids"] == [second_oldest_id]
 
     def test_an_openly_reported_message_is_skipped_and_the_next_one_goes(
         self, db_session, monkeypatch
@@ -1050,7 +1084,7 @@ class TestConversationLimit:
             db_session, DirectMessageCreate(recipient_id=b.id, content="הרביעית"), a
         )
 
-        assert result["pruned_count"] == 0
+        assert result["pruned_message_ids"] == []
         assert (
             db_session.query(DirectMessage)
             .filter(DirectMessage.conversation_key == key)
@@ -1168,7 +1202,7 @@ class TestConversationLimit:
             db_session, DirectMessageCreate(recipient_id=b.id, content="האחרונה"), a
         )
 
-        assert result["pruned_count"] == 1
+        assert len(result["pruned_message_ids"]) == 1
         page = forum_service.get_conversation_messages(db_session, a, key)
         assert [m["content"] for m in page["items"]] == ["האחרונה"]
 
@@ -1260,7 +1294,7 @@ class TestSendMessageEndpoint:
         assert body["message"]["sender"]["id"] == sender.id
         assert body["message"]["recipient"]["id"] == recipient.id
         assert body["message"]["read_at"] is None
-        assert body["pruned_count"] == 0
+        assert body["pruned_message_ids"] == []
         assert body["conversation_limit"] == settings.MAX_MESSAGES_PER_CONVERSATION
 
     async def test_cross_cell_recipient_id_returns_403(self, client, db_session):
