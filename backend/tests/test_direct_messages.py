@@ -1297,6 +1297,34 @@ class TestSendMessageEndpoint:
         assert body["pruned_message_ids"] == []
         assert body["conversation_limit"] == settings.MAX_MESSAGES_PER_CONVERSATION
 
+    async def test_crossing_the_cap_reports_what_it_deleted(
+        self, client, db_session, monkeypatch
+    ):
+        """
+        The acceptance criterion end to end: on the message past the cap, the
+        response says which older message went, and names the limit — the two
+        things the screen needs to tell the user rather than losing history in
+        silence.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 3)
+        sender = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        recipient = _make_user(
+            db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        _seed_conversation(db_session, sender, recipient, 3)
+        key = forum_service.build_conversation_key(sender.id, recipient.id)
+        oldest_id = _oldest_message(db_session, key).id
+        _login_as(sender)
+
+        r = await client.post(
+            MESSAGES_BASE, json={"recipient_id": recipient.id, "content": "הרביעית"}
+        )
+
+        assert r.status_code == 201
+        body = r.json()
+        assert body["pruned_message_ids"] == [oldest_id]
+        assert body["conversation_limit"] == 3
+
     async def test_cross_cell_recipient_id_returns_403(self, client, db_session):
         """§4.2: rejected even when the id is sent manually to the API."""
         sender = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
@@ -1525,6 +1553,38 @@ class TestGetConversationMessagesEndpoint:
         r = await client.get(f"{CONVERSATIONS_BASE}/{key}/messages")
 
         assert r.status_code == 403
+
+    async def test_non_participant_with_a_valid_cursor_still_returns_403(
+        self, client, db_session
+    ):
+        """
+        §4.2, straight at the API: a cursor is not a way in. The outsider here
+        holds a cursor this conversation really issued, and still gets the same
+        403 as with no cursor at all — permission is checked before the cursor
+        is even read, so the reply cannot say whether the cursor was good.
+        """
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        outsider = _make_user(
+            db_session, "c@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        _seed_conversation(db_session, a, b, 4)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        _login_as(a)
+        cursor = (
+            await client.get(
+                f"{CONVERSATIONS_BASE}/{key}/messages", params={"limit": 2}
+            )
+        ).json()["next_cursor"]
+
+        _login_as(outsider)
+        r = await client.get(
+            f"{CONVERSATIONS_BASE}/{key}/messages",
+            params={"limit": 2, "before": cursor},
+        )
+
+        assert r.status_code == 403
+        assert r.json()["detail"] == "errors.dm_forbidden"
 
     async def test_moderator_returns_403(self, client, db_session):
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
