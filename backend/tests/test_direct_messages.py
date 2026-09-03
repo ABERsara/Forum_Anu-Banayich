@@ -1,26 +1,39 @@
 """
-Tests for private messaging between cell members (ABF-118) and the
-conversations inbox built on top of it (ABF-119).
+Tests for private messaging between cell members (ABF-118), the conversations
+inbox built on top of it (ABF-119), and the full conversation screen's server
+half — cursor paging, read_at receipts and the §5.3 storage cap (ABF-114).
 
 Two layers, matching test_forum_service.py / test_forum_endpoints.py:
-  - TestCanMessage / TestSend* / TestGetConversationMessages / TestGetCellMembers /
-    TestGetInbox exercise forum_service functions directly.
+  - TestCanMessage / TestSend* / TestGetConversationMessages /
+    TestConversationLimit / TestGetCellMembers / TestGetInbox exercise
+    forum_service functions directly.
   - TestSendMessageEndpoint / TestGetConversationMessagesEndpoint /
     TestGetCellMembersEndpoint / TestGetInboxEndpoint go through the real HTTP
     routes, hitting the API directly rather than through any UI — required by
     §4.2's positive AND negative permission checks.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import event
 
-from app.core.constants import AccountStatus, AuditAction, Sector, UserRole, UserType
+from app.core.config import settings
+from app.core.constants import (
+    AccountStatus,
+    AuditAction,
+    ReportDecision,
+    ReportReason,
+    ReportTargetType,
+    Sector,
+    UserRole,
+    UserType,
+)
 from app.core.dependencies import get_current_active_user, get_current_user
 from app.core.encryption import decrypt_message
 from app.main import app
 from app.models.audit import AuditLog
 from app.models.forum import DirectMessage
+from app.models.report import Report
 from app.models.user import User
 from app.schemas.forum import DirectMessageCreate
 from app.services import forum_service
@@ -57,6 +70,43 @@ def _login_as(user: User) -> None:
     """Bypass real JWT auth, same technique as test_forum_endpoints.py."""
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_current_active_user] = lambda: user
+
+
+def _send(db_session, sender: User, recipient: User, content: str) -> dict:
+    """Send one message and hand back the DirectMessageData inside the result."""
+    return forum_service.send_direct_message(
+        db_session,
+        DirectMessageCreate(recipient_id=recipient.id, content=content),
+        sender,
+    )["message"]
+
+
+def _seed_conversation(db_session, sender: User, recipient: User, count: int) -> None:
+    """
+    Write `count` messages straight to the table, one second apart.
+
+    Bypasses send_direct_message() on purpose: these tests need a specific
+    history length and a known order, not the cap enforcement that a real send
+    would also run. Content is stored encrypted here too, so anything that
+    reads it back goes through the same decrypt path as production.
+    """
+    from app.core.encryption import encrypt_message
+
+    base = datetime(2026, 8, 1, 12, 0, 0)
+    key = forum_service.build_conversation_key(sender.id, recipient.id)
+    for index in range(count):
+        encrypted, key_version = encrypt_message(f"message-{index:04d}")
+        db_session.add(
+            DirectMessage(
+                sender_id=sender.id,
+                recipient_id=recipient.id,
+                conversation_key=key,
+                content=encrypted,
+                key_version=key_version,
+                created_at=base + timedelta(seconds=index),
+            )
+        )
+    db_session.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -133,11 +183,14 @@ class TestSendDirectMessage:
             sender,
         )
 
-        assert result["content"] == "שלום, מה שלומך?"
+        assert result["message"]["content"] == "שלום, מה שלומך?"
+        assert result["message"]["read_at"] is None  # unread until b opens it
+        assert result["pruned_message_ids"] == []
+        assert result["conversation_limit"] == settings.MAX_MESSAGES_PER_CONVERSATION
 
         row = (
             db_session.query(DirectMessage)
-            .filter(DirectMessage.id == result["id"])
+            .filter(DirectMessage.id == result["message"]["id"])
             .one()
         )
         assert row.content != "שלום, מה שלומך?"
@@ -257,11 +310,13 @@ class TestGetConversationMessages:
         )
 
         key = forum_service.build_conversation_key(a.id, b.id)
-        results = forum_service.get_conversation_messages(db_session, a, key)
+        page = forum_service.get_conversation_messages(db_session, a, key)
 
-        assert [r["content"] for r in results] == ["ראשונה", "שנייה"]
+        assert [r["content"] for r in page["items"]] == ["ראשונה", "שנייה"]
+        assert page["has_more"] is False
+        assert page["next_cursor"] is None
 
-    def test_does_not_mutate_is_read(self, db_session):
+    def test_does_not_mutate_read_at(self, db_session):
         """
         Pure read, no side effects — marking as read is
         mark_conversation_read()'s job, not this function's (ABF-119 code
@@ -282,16 +337,160 @@ class TestGetConversationMessages:
             .filter(DirectMessage.sender_id == b.id)
             .one()
         )
-        assert row.is_read is False
+        assert row.read_at is None
 
-    def test_well_formed_key_with_no_messages_returns_empty_list(self, db_session):
+    def test_well_formed_key_with_no_messages_returns_empty_page(self, db_session):
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
         b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
 
         key = forum_service.build_conversation_key(a.id, b.id)
-        results = forum_service.get_conversation_messages(db_session, a, key)
+        page = forum_service.get_conversation_messages(db_session, a, key)
 
-        assert results == []
+        assert page == {"items": [], "has_more": False, "next_cursor": None}
+
+    def test_first_page_holds_the_newest_messages_oldest_first_inside_it(
+        self, db_session
+    ):
+        """
+        A chat screen opens on the *end* of the history, and renders top-down.
+        Both halves of that live here: which messages a cursor-less request
+        returns (the last `limit`), and in which order they arrive (ascending,
+        so the client appends without reversing anything).
+        """
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 10)
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        page = forum_service.get_conversation_messages(db_session, a, key, limit=4)
+
+        assert [m["content"] for m in page["items"]] == [
+            "message-0006",
+            "message-0007",
+            "message-0008",
+            "message-0009",
+        ]
+        assert page["has_more"] is True
+        assert page["next_cursor"] is not None
+
+    def test_paging_back_covers_every_message_exactly_once(self, db_session):
+        """
+        The acceptance criterion — scrolling back with neither a gap nor a
+        duplicate — checked over the whole history rather than one seam.
+        """
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 25)
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        collected: list[str] = []
+        cursor = None
+        pages = 0
+        while True:
+            page = forum_service.get_conversation_messages(
+                db_session, a, key, limit=7, before=cursor
+            )
+            collected = [m["content"] for m in page["items"]] + collected
+            pages += 1
+            if not page["has_more"]:
+                break
+            cursor = page["next_cursor"]
+
+        assert pages == 4  # 7 + 7 + 7 + 4
+        assert collected == [f"message-{i:04d}" for i in range(25)]
+        assert len(set(collected)) == 25
+
+    def test_a_message_arriving_mid_scroll_does_not_shift_the_older_pages(
+        self, db_session
+    ):
+        """
+        Why the cursor exists at all. With OFFSET, a message appended while the
+        reader is paging backwards pushes every older row one place along, and
+        the next page re-serves a row already on screen. The cursor names a
+        row, so what comes before it does not move.
+        """
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 10)
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        first = forum_service.get_conversation_messages(db_session, a, key, limit=4)
+        _send(db_session, b, a, "הודעה שהגיעה תוך כדי גלילה")
+
+        second = forum_service.get_conversation_messages(
+            db_session, a, key, limit=4, before=first["next_cursor"]
+        )
+
+        assert [m["content"] for m in second["items"]] == [
+            "message-0002",
+            "message-0003",
+            "message-0004",
+            "message-0005",
+        ]
+        assert not set(m["id"] for m in second["items"]) & set(
+            m["id"] for m in first["items"]
+        )
+
+    def test_messages_sharing_a_timestamp_are_not_repeated_across_the_seam(
+        self, db_session
+    ):
+        """
+        The tie-break half of the cursor. Every message here carries the same
+        created_at, so ordering on that column alone leaves the page boundary
+        undefined — and an undefined boundary is what returns a row twice.
+        """
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 6)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        db_session.query(DirectMessage).update(
+            {"created_at": datetime(2026, 8, 1, 12, 0, 0)}
+        )
+        db_session.commit()
+
+        first = forum_service.get_conversation_messages(db_session, a, key, limit=3)
+        second = forum_service.get_conversation_messages(
+            db_session, a, key, limit=3, before=first["next_cursor"]
+        )
+
+        ids = [m["id"] for m in second["items"]] + [m["id"] for m in first["items"]]
+        assert len(set(ids)) == 6
+        assert second["has_more"] is False
+
+    def test_unreadable_cursor_raises_400(self, db_session):
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        try:
+            forum_service.get_conversation_messages(
+                db_session, a, key, before="not-a-cursor"
+            )
+            raise AssertionError("expected HTTPException")
+        except Exception as exc:
+            assert exc.status_code == 400
+            assert exc.detail == "errors.invalid_cursor"
+
+    def test_a_cursor_is_checked_after_permission_not_before(self, db_session):
+        """
+        A malformed cursor must not become a way to tell a conversation that
+        exists from one that does not: an outsider gets the same 403 either
+        way, and never the 400.
+        """
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        snooper = _make_user(
+            db_session, "c@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        try:
+            forum_service.get_conversation_messages(
+                db_session, snooper, key, before="not-a-cursor"
+            )
+            raise AssertionError("expected HTTPException")
+        except Exception as exc:
+            assert exc.status_code == 403
 
     def test_non_participant_raises_403_and_logs_audit(self, db_session):
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
@@ -380,8 +579,8 @@ class TestMarkConversationRead:
             .filter(DirectMessage.sender_id == a.id, DirectMessage.recipient_id == b.id)
             .one()
         )
-        assert sent_to_a.is_read is True
-        assert sent_by_a.is_read is False  # sent by a — untouched
+        assert sent_to_a.read_at is not None
+        assert sent_by_a.read_at is None  # sent by a — untouched
 
     def test_idempotent_second_call_is_a_noop(self, db_session):
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
@@ -392,14 +591,21 @@ class TestMarkConversationRead:
         key = forum_service.build_conversation_key(a.id, b.id)
 
         forum_service.mark_conversation_read(db_session, a, key)
-        forum_service.mark_conversation_read(db_session, a, key)  # should not raise
-
         row = (
             db_session.query(DirectMessage)
             .filter(DirectMessage.sender_id == b.id)
             .one()
         )
-        assert row.is_read is True
+        first_read_at = row.read_at
+        assert first_read_at is not None
+
+        forum_service.mark_conversation_read(db_session, a, key)  # should not raise
+
+        db_session.refresh(row)
+        # Not merely "still read" — the *same* instant. Re-opening a thread
+        # must not restamp a message that was read yesterday, which is what a
+        # receipt showing a time depends on.
+        assert row.read_at == first_read_at
 
     def test_non_participant_raises_403_and_logs_audit(self, db_session):
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
@@ -442,18 +648,14 @@ class TestMarkConversationRead:
 
 def _send_at(db_session, sender, recipient, content, when):
     """
-    Send a message, then pin its created_at explicitly.
+    Send a message, then pin its created_at to a chosen instant.
 
-    SQLite's CURRENT_TIMESTAMP only has one-second resolution, so messages
-    sent back-to-back within a test can otherwise tie — making "latest
-    message" ordering ambiguous in a way that never happens against Postgres
-    (microsecond precision) in production.
+    Not a workaround for tied timestamps any more — ABF-114 gave
+    DirectMessage.created_at a Python-side microsecond default, so
+    back-to-back sends no longer collide even on SQLite. It is here so a test
+    can put a message at a *specific* time, days apart, without sleeping.
     """
-    result = forum_service.send_direct_message(
-        db_session,
-        DirectMessageCreate(recipient_id=recipient.id, content=content),
-        sender,
-    )
+    result = _send(db_session, sender, recipient, content)
     db_session.query(DirectMessage).filter(DirectMessage.id == result["id"]).update(
         {"created_at": when}
     )
@@ -660,6 +862,377 @@ class TestGetInbox:
 
 
 # ---------------------------------------------------------------------------
+# _enforce_conversation_limit() — spec §5.3's 1,000-message cap
+# ---------------------------------------------------------------------------
+
+
+def _report_message(db_session, reporter: User, message: DirectMessage, decision):
+    """File a report on one private message, at the given decision state."""
+    report = Report(
+        reporter_id=reporter.id,
+        target_type=ReportTargetType.DIRECT_MESSAGE,
+        target_id=message.id,
+        reported_user_id=message.sender_id,
+        reason=ReportReason.HARASSMENT,
+        decision=decision,
+    )
+    db_session.add(report)
+    db_session.commit()
+    return report
+
+
+def _oldest_message(db_session, conversation_key: str) -> DirectMessage:
+    return (
+        db_session.query(DirectMessage)
+        .filter(DirectMessage.conversation_key == conversation_key)
+        .order_by(DirectMessage.created_at.asc(), DirectMessage.id.asc())
+        .first()
+    )
+
+
+class TestConversationLimit:
+    """
+    The cap is read from settings, so these tests lower it instead of writing
+    a thousand rows — the behaviour under test is "one over the limit", not
+    the number itself.
+    """
+
+    def test_send_below_the_cap_deletes_nothing(self, db_session, monkeypatch):
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 5)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 3)
+
+        result = _send(db_session, a, b, "עוד אחת")
+
+        assert result is not None
+        assert db_session.query(DirectMessage).count() == 4
+
+    def test_the_send_that_reaches_the_cap_exactly_deletes_nothing(
+        self, db_session, monkeypatch
+    ):
+        """The boundary: 1,000 is allowed, only the 1,001st costs a message."""
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 5)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 4)
+
+        result = forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="החמישית"), a
+        )
+
+        assert result["pruned_message_ids"] == []
+        assert db_session.query(DirectMessage).count() == 5
+
+    def test_the_next_send_deletes_the_oldest_message_only(
+        self, db_session, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 5)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 5)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        oldest_id = _oldest_message(db_session, key).id
+
+        result = forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="השישית"), a
+        )
+
+        assert result["pruned_message_ids"] == [oldest_id]
+        assert db_session.query(DirectMessage).count() == 5
+        assert (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.id == oldest_id)
+            .first()
+            is None
+        )
+        remaining = [
+            m["content"]
+            for m in forum_service.get_conversation_messages(db_session, a, key)[
+                "items"
+            ]
+        ]
+        assert remaining == [
+            "message-0001",
+            "message-0002",
+            "message-0003",
+            "message-0004",
+            "השישית",
+        ]
+
+    def test_the_ids_name_the_messages_that_actually_went(
+        self, db_session, monkeypatch
+    ):
+        """
+        Why the response carries ids and not a count. With the oldest message
+        protected, the message deleted is the *second* oldest — so a client
+        trimming "the first N off the top" would take the wrong bubble off the
+        screen and leave the deleted one showing.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 5)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 5)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        oldest = _oldest_message(db_session, key)
+        oldest_id = oldest.id
+        _report_message(db_session, b, oldest, ReportDecision.PENDING)
+        second_oldest_id = (
+            db_session.query(DirectMessage)
+            .filter(
+                DirectMessage.conversation_key == key,
+                DirectMessage.id != oldest_id,
+            )
+            .order_by(DirectMessage.created_at.asc(), DirectMessage.id.asc())
+            .first()
+            .id
+        )
+
+        result = forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="השישית"), a
+        )
+
+        assert result["pruned_message_ids"] == [second_oldest_id]
+
+    def test_an_openly_reported_message_is_skipped_and_the_next_one_goes(
+        self, db_session, monkeypatch
+    ):
+        """
+        The §5.3 exemption. A moderator may only ever see a private message
+        that was reported to them, so pruning one with an open report would
+        destroy the evidence before the report is ruled on.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 5)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 5)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        oldest = _oldest_message(db_session, key)
+        oldest_id = oldest.id
+        _report_message(db_session, b, oldest, ReportDecision.PENDING)
+
+        forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="השישית"), a
+        )
+
+        assert (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.id == oldest_id)
+            .first()
+            is not None
+        )
+        remaining = [
+            m["content"]
+            for m in forum_service.get_conversation_messages(db_session, a, key)[
+                "items"
+            ]
+        ]
+        assert remaining == [
+            "message-0000",
+            "message-0002",
+            "message-0003",
+            "message-0004",
+            "השישית",
+        ]
+
+    def test_a_decided_report_stops_protecting_its_message(
+        self, db_session, monkeypatch
+    ):
+        """
+        "Open" is the whole of the exemption: once a moderator has ruled, the
+        message is ordinary history again and prunes in its turn. Without this
+        a single old report would pin a message in place forever.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 5)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 5)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        oldest = _oldest_message(db_session, key)
+        oldest_id = oldest.id
+        _report_message(db_session, b, oldest, ReportDecision.INVALID)
+
+        forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="השישית"), a
+        )
+
+        assert (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.id == oldest_id)
+            .first()
+            is None
+        )
+
+    def test_a_conversation_of_nothing_but_reported_messages_keeps_all_of_them(
+        self, db_session, monkeypatch
+    ):
+        """
+        The cap is a target, not an invariant. When every candidate is
+        protected the conversation grows past the limit rather than deleting
+        evidence, and pruned_count says nothing was dropped — so the screen
+        does not announce a deletion that never happened.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 3)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 3)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        for message in db_session.query(DirectMessage).all():
+            _report_message(db_session, b, message, ReportDecision.PENDING)
+
+        result = forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="הרביעית"), a
+        )
+
+        assert result["pruned_message_ids"] == []
+        assert (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.conversation_key == key)
+            .count()
+            == 4
+        )
+
+    def test_a_report_on_a_forum_post_does_not_protect_a_message(
+        self, db_session, monkeypatch
+    ):
+        """
+        The exemption matches on target_type as well as id. Report ids are
+        opaque strings, so a report filed against some other kind of content
+        must not accidentally shield a message that happens to share its id.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 5)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 5)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        oldest_id = _oldest_message(db_session, key).id
+        db_session.add(
+            Report(
+                reporter_id=b.id,
+                target_type=ReportTargetType.FORUM_POST,
+                target_id=oldest_id,
+                reported_user_id=a.id,
+                reason=ReportReason.SPAM,
+                decision=ReportDecision.PENDING,
+            )
+        )
+        db_session.commit()
+
+        forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="השישית"), a
+        )
+
+        assert (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.id == oldest_id)
+            .first()
+            is None
+        )
+
+    def test_a_pruned_message_leaves_an_audit_entry_without_its_content(
+        self, db_session, monkeypatch
+    ):
+        """
+        §9.3 — deleting a user's own content is a sensitive action, and the
+        audit log is the only place it stays visible. It records which message
+        went, never a word of what it said.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 3)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 3)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        oldest_id = _oldest_message(db_session, key).id
+
+        forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="סודי ביותר"), a
+        )
+
+        entry = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == AuditAction.DIRECT_MESSAGE_PRUNED)
+            .one()
+        )
+        assert entry.actor_id == a.id
+        assert entry.entity_type == "DirectMessage"
+        assert entry.entity_id == oldest_id
+        assert entry.details == {
+            "conversation_key": key,
+            "reason": "storage_cap",
+        }
+        assert "message-0000" not in str(entry.details)
+
+    def test_the_cap_counts_one_conversation_not_the_whole_table(
+        self, db_session, monkeypatch
+    ):
+        """
+        §5.3 caps messages *per conversation*. Grouping by conversation_key is
+        what keeps a busy pair from evicting a quiet pair's history.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 3)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        c = _make_user(db_session, "c@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 3)
+        _seed_conversation(db_session, a, c, 2)
+        other_key = forum_service.build_conversation_key(a.id, c.id)
+
+        forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="הרביעית"), a
+        )
+
+        assert (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.conversation_key == other_key)
+            .count()
+            == 2
+        )
+
+    def test_the_message_just_sent_is_never_the_one_deleted(
+        self, db_session, monkeypatch
+    ):
+        """A cap of one: the new message must survive its own send."""
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 1)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 1)
+        key = forum_service.build_conversation_key(a.id, b.id)
+
+        result = forum_service.send_direct_message(
+            db_session, DirectMessageCreate(recipient_id=b.id, content="האחרונה"), a
+        )
+
+        assert len(result["pruned_message_ids"]) == 1
+        page = forum_service.get_conversation_messages(db_session, a, key)
+        assert [m["content"] for m in page["items"]] == ["האחרונה"]
+
+    def test_a_blocked_send_prunes_nothing(self, db_session, monkeypatch):
+        """
+        Enforcement runs after the message is stored, never before: a send
+        that is rejected must not have cost the conversation any history.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 2)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        outsider = _make_user(
+            db_session, "x@example.com", UserType.WIDOWER, Sector.SEPHARDIC
+        )
+        _seed_conversation(db_session, a, b, 3)
+
+        try:
+            forum_service.send_direct_message(
+                db_session,
+                DirectMessageCreate(recipient_id=outsider.id, content="שלום"),
+                a,
+            )
+            raise AssertionError("expected HTTPException")
+        except Exception as exc:
+            assert exc.status_code == 403
+
+        assert db_session.query(DirectMessage).count() == 3
+
+
+# ---------------------------------------------------------------------------
 # get_cell_members()
 # ---------------------------------------------------------------------------
 
@@ -717,9 +1290,40 @@ class TestSendMessageEndpoint:
 
         assert r.status_code == 201
         body = r.json()
-        assert body["content"] == "שלום"
-        assert body["sender"]["id"] == sender.id
-        assert body["recipient"]["id"] == recipient.id
+        assert body["message"]["content"] == "שלום"
+        assert body["message"]["sender"]["id"] == sender.id
+        assert body["message"]["recipient"]["id"] == recipient.id
+        assert body["message"]["read_at"] is None
+        assert body["pruned_message_ids"] == []
+        assert body["conversation_limit"] == settings.MAX_MESSAGES_PER_CONVERSATION
+
+    async def test_crossing_the_cap_reports_what_it_deleted(
+        self, client, db_session, monkeypatch
+    ):
+        """
+        The acceptance criterion end to end: on the message past the cap, the
+        response says which older message went, and names the limit — the two
+        things the screen needs to tell the user rather than losing history in
+        silence.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 3)
+        sender = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        recipient = _make_user(
+            db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        _seed_conversation(db_session, sender, recipient, 3)
+        key = forum_service.build_conversation_key(sender.id, recipient.id)
+        oldest_id = _oldest_message(db_session, key).id
+        _login_as(sender)
+
+        r = await client.post(
+            MESSAGES_BASE, json={"recipient_id": recipient.id, "content": "הרביעית"}
+        )
+
+        assert r.status_code == 201
+        body = r.json()
+        assert body["pruned_message_ids"] == [oldest_id]
+        assert body["conversation_limit"] == 3
 
     async def test_cross_cell_recipient_id_returns_403(self, client, db_session):
         """§4.2: rejected even when the id is sent manually to the API."""
@@ -818,8 +1422,10 @@ class TestGetConversationMessagesEndpoint:
 
         assert r.status_code == 200
         body = r.json()
-        assert len(body) == 1
-        assert body[0]["content"] == "הי"
+        assert len(body["items"]) == 1
+        assert body["items"][0]["content"] == "הי"
+        assert body["has_more"] is False
+        assert body["next_cursor"] is None
 
     async def test_opening_a_conversation_marks_it_read(self, client, db_session):
         """End-to-end: the route wires mark_conversation_read() + get_conversation_messages() together."""
@@ -839,7 +1445,101 @@ class TestGetConversationMessagesEndpoint:
             .filter(DirectMessage.sender_id == b.id)
             .one()
         )
-        assert row.is_read is True
+        assert row.read_at is not None
+
+    async def test_scrolling_back_does_not_mark_anything_read(self, client, db_session):
+        """
+        Only opening a conversation says "seen". A request carrying a cursor is
+        the reader scrolling back through what she has already been shown, and
+        the route must not turn that into a write on every page.
+        """
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, b, a, 6)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        _login_as(a)
+
+        first = await client.get(
+            f"{CONVERSATIONS_BASE}/{key}/messages", params={"limit": 3}
+        )
+        db_session.query(DirectMessage).update({"read_at": None})
+        db_session.commit()
+
+        r = await client.get(
+            f"{CONVERSATIONS_BASE}/{key}/messages",
+            params={"limit": 3, "before": first.json()["next_cursor"]},
+        )
+
+        assert r.status_code == 200
+        unread = (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.read_at.is_(None))
+            .count()
+        )
+        assert unread == 6
+
+    async def test_paging_walks_the_history_without_repeating_a_message(
+        self, client, db_session
+    ):
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 7)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        _login_as(a)
+
+        first = (
+            await client.get(
+                f"{CONVERSATIONS_BASE}/{key}/messages", params={"limit": 3}
+            )
+        ).json()
+        second = (
+            await client.get(
+                f"{CONVERSATIONS_BASE}/{key}/messages",
+                params={"limit": 3, "before": first["next_cursor"]},
+            )
+        ).json()
+        third = (
+            await client.get(
+                f"{CONVERSATIONS_BASE}/{key}/messages",
+                params={"limit": 3, "before": second["next_cursor"]},
+            )
+        ).json()
+
+        contents = [
+            m["content"] for page in (third, second, first) for m in page["items"]
+        ]
+        assert contents == [f"message-{i:04d}" for i in range(7)]
+        assert third["has_more"] is False
+        assert third["next_cursor"] is None
+
+    async def test_unreadable_cursor_returns_400_with_a_translation_key(
+        self, client, db_session
+    ):
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        _login_as(a)
+
+        r = await client.get(
+            f"{CONVERSATIONS_BASE}/{key}/messages", params={"before": "%%%"}
+        )
+
+        assert r.status_code == 400
+        assert r.json()["detail"] == "errors.invalid_cursor"
+
+    async def test_limit_above_the_maximum_is_rejected(self, client, db_session):
+        """The page size bounds how much content one request can decrypt."""
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        _login_as(a)
+
+        r = await client.get(
+            f"{CONVERSATIONS_BASE}/{key}/messages",
+            params={"limit": forum_service.CONVERSATION_MAX_PAGE_SIZE + 1},
+        )
+
+        assert r.status_code == 422
 
     async def test_non_participant_returns_403(self, client, db_session):
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
@@ -853,6 +1553,38 @@ class TestGetConversationMessagesEndpoint:
         r = await client.get(f"{CONVERSATIONS_BASE}/{key}/messages")
 
         assert r.status_code == 403
+
+    async def test_non_participant_with_a_valid_cursor_still_returns_403(
+        self, client, db_session
+    ):
+        """
+        §4.2, straight at the API: a cursor is not a way in. The outsider here
+        holds a cursor this conversation really issued, and still gets the same
+        403 as with no cursor at all — permission is checked before the cursor
+        is even read, so the reply cannot say whether the cursor was good.
+        """
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        outsider = _make_user(
+            db_session, "c@example.com", UserType.WIDOW, Sector.HASIDIC
+        )
+        _seed_conversation(db_session, a, b, 4)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        _login_as(a)
+        cursor = (
+            await client.get(
+                f"{CONVERSATIONS_BASE}/{key}/messages", params={"limit": 2}
+            )
+        ).json()["next_cursor"]
+
+        _login_as(outsider)
+        r = await client.get(
+            f"{CONVERSATIONS_BASE}/{key}/messages",
+            params={"limit": 2, "before": cursor},
+        )
+
+        assert r.status_code == 403
+        assert r.json()["detail"] == "errors.dm_forbidden"
 
     async def test_moderator_returns_403(self, client, db_session):
         a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
