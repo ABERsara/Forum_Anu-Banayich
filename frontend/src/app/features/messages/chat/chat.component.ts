@@ -1,5 +1,5 @@
 /**
- * Chat (direct-message conversation) screen — ABF-118, rebuilt by ABF-120.
+ * Chat (direct-message conversation) screen — ABF-118, rebuilt by ABF-114.
  *
  * ABF-118 loaded a conversation whole and appended to the end of it, which is
  * fine for the twenty messages a new conversation has and nothing like the
@@ -339,7 +339,7 @@ export class ChatComponent implements OnInit {
           if (match && !this.otherUserName()) this.setOtherUserName(match);
         },
         // A name-lookup failure shouldn't block the conversation itself —
-        // and since ABF-120 it does not even cost the name, which the history
+        // and since ABF-114 it does not even cost the name, which the history
         // below carries too.
         error: () => undefined,
       });

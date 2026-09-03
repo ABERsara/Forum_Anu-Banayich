@@ -140,7 +140,7 @@ class DirectMessage(Base):
     # Python-side default *as well as* the server one, unlike the rest of the
     # models here. SQLite's CURRENT_TIMESTAMP resolves to whole seconds, so
     # every message sent inside the same second shared a created_at — and the
-    # history cursor (ABF-120) orders by exactly this column. A shared sort
+    # history cursor (ABF-114) orders by exactly this column. A shared sort
     # key is what makes a paged list repeat or skip a row at the page seam.
     # datetime.now(UTC) is microsecond-precise on both databases; naive-UTC to
     # match what func.now() already writes and what user_service.py compares

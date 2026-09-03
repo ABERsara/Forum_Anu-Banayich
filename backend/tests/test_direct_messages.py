@@ -1,7 +1,7 @@
 """
 Tests for private messaging between cell members (ABF-118), the conversations
 inbox built on top of it (ABF-119), and the full conversation screen's server
-half — cursor paging, read_at receipts and the §5.3 storage cap (ABF-120).
+half — cursor paging, read_at receipts and the §5.3 storage cap (ABF-114).
 
 Two layers, matching test_forum_service.py / test_forum_endpoints.py:
   - TestCanMessage / TestSend* / TestGetConversationMessages /
@@ -650,7 +650,7 @@ def _send_at(db_session, sender, recipient, content, when):
     """
     Send a message, then pin its created_at to a chosen instant.
 
-    Not a workaround for tied timestamps any more — ABF-120 gave
+    Not a workaround for tied timestamps any more — ABF-114 gave
     DirectMessage.created_at a Python-side microsecond default, so
     back-to-back sends no longer collide even on SQLite. It is here so a test
     can put a message at a *specific* time, days apart, without sleeping.

@@ -11,7 +11,7 @@ import app.core.config as _cfg
 
 BACKEND_DIR = Path(__file__).parent.parent  # backend/
 
-# The merge revision that ABF-120's read_at migration sits directly on top of.
+# The merge revision that ABF-114's read_at migration sits directly on top of.
 REVISION_BEFORE_READ_AT = "aac7e1fb8f49"
 EXPECTED_TABLES = {
     "users",
@@ -123,7 +123,7 @@ def test_read_at_migration_carries_the_read_flag_across_in_both_directions(
 ) -> None:
     """
     A schema swap that loses which messages were already read would show every
-    old message as unread — and, since ABF-120 shows read_at back to the
+    old message as unread — and, since ABF-114 shows read_at back to the
     sender, would un-read a receipt she has already seen. read_at cannot
     recover the instant a boolean never stored, so it takes created_at: a
     lower bound the row can actually prove, rather than an invented "now".

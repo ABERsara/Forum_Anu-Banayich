@@ -683,7 +683,7 @@ def mark_conversation_read(
 
     `recipient_id == current_user.id` is the whole of the acceptance criterion
     "a sender never marks her own message read": that filter is what keeps the
-    receipt on the sender's own bubble honest, because since ABF-120 read_at is
+    receipt on the sender's own bubble honest, because since ABF-114 read_at is
     shown back to her. Drop it and every message would light up as read the
     moment its author opened the thread.
 
