@@ -18,8 +18,11 @@ from app.models.user import User
 
 def get_visible_domains(db: Session, user: User) -> list[AgentDomain]:
     """
-    Return the active agent domains this user may see, ordered by name
-    (case-insensitive, so the order does not flip between SQLite and Postgres).
+    Return the active agent domains this user may see, ordered by lower(name)
+    then id — deterministic, and case-insensitive for Latin names. Hebrew
+    ordering still depends on the DB collation (SQLite compares code points,
+    Postgres uses its locale), which is cosmetic here: the catalog is a
+    handful of domains.
 
     Visibility rule (DB-side, mirrors forum_service._content_filter):
         (group_visibility == user's group  OR  group_visibility == ALL)
@@ -52,6 +55,6 @@ def get_visible_domains(db: Session, user: User) -> list[AgentDomain]:
                 AgentDomain.sector_visibility == SectorVisibility.ALL,
             ),
         )
-        .order_by(func.lower(AgentDomain.name))
+        .order_by(func.lower(AgentDomain.name), AgentDomain.id)
         .all()
     )

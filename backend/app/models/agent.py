@@ -14,7 +14,18 @@ tickets (ABF-121/122) build on.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+    true,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.constants import (
@@ -49,7 +60,9 @@ class AgentDomain(Base):
         Enum(ProfessionalDomain), nullable=False
     )
 
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
@@ -95,7 +108,7 @@ class AgentConversation(Base):
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     user_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("users.id"), nullable=False
+        String(36), ForeignKey("users.id"), nullable=False, index=True
     )
     domain_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("agent_domains.id"), nullable=False, index=True
@@ -116,12 +129,23 @@ class AgentConversation(Base):
 
 class AgentMessage(Base):
     __tablename__ = "agent_messages"
+    # Composite, like DirectMessage: messages are always read time-ordered
+    # within a conversation (WHERE conversation_id = ? ORDER BY created_at).
+    # This also serves plain conversation_id lookups, so no separate
+    # single-column index is needed.
+    __table_args__ = (
+        Index(
+            "ix_agent_messages_conversation_created",
+            "conversation_id",
+            "created_at",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     conversation_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("agent_conversations.id"), nullable=False, index=True
+        String(36), ForeignKey("agent_conversations.id"), nullable=False
     )
     role: Mapped[AgentMessageRole] = mapped_column(
         Enum(AgentMessageRole), nullable=False
@@ -132,7 +156,9 @@ class AgentMessage(Base):
     # encrypt_message() this holds plain text; key_version is the
     # MESSAGE_ENCRYPTION_KEY epoch, only version 1 exists.
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    key_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    key_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()

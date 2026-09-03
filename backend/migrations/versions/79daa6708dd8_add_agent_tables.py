@@ -139,6 +139,11 @@ def upgrade() -> None:
         "agent_conversations",
         ["domain_id"],
     )
+    op.create_index(
+        "ix_agent_conversations_user_id",
+        "agent_conversations",
+        ["user_id"],
+    )
     op.create_table(
         "agent_messages",
         sa.Column("id", sa.String(length=36), nullable=False),
@@ -160,16 +165,17 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        "ix_agent_messages_conversation_id",
+        "ix_agent_messages_conversation_created",
         "agent_messages",
-        ["conversation_id"],
+        ["conversation_id", "created_at"],
     )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index("ix_agent_messages_conversation_id", table_name="agent_messages")
+    op.drop_index("ix_agent_messages_conversation_created", table_name="agent_messages")
     op.drop_table("agent_messages")
+    op.drop_index("ix_agent_conversations_user_id", table_name="agent_conversations")
     op.drop_index("ix_agent_conversations_domain_id", table_name="agent_conversations")
     op.drop_table("agent_conversations")
     op.drop_index(

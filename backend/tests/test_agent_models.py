@@ -139,22 +139,31 @@ class TestAgentConversationAndMessages:
     ) -> None:
         domain = _domain(db_session)
         member = _user(db_session, "member2@example.com")
-        conversation = AgentConversation(user_id=member.id, domain_id=domain.id)
-        db_session.add(conversation)
+
+        conv_a = AgentConversation(user_id=member.id, domain_id=domain.id)
+        conv_b = AgentConversation(user_id=member.id, domain_id=domain.id)
+        db_session.add_all([conv_a, conv_b])
         db_session.commit()
-        db_session.add(
-            AgentMessage(
-                conversation_id=conversation.id,
-                role=AgentMessageRole.USER,
-                content="שאלה",
-            )
+        db_session.add_all(
+            [
+                AgentMessage(
+                    conversation_id=conv_a.id,
+                    role=AgentMessageRole.USER,
+                    content="שאלה של א",
+                ),
+                AgentMessage(
+                    conversation_id=conv_b.id,
+                    role=AgentMessageRole.USER,
+                    content="שאלה של ב",
+                ),
+            ]
         )
         db_session.commit()
 
         rows = (
             db_session.query(AgentMessage)
-            .filter(AgentMessage.conversation_id == conversation.id)
+            .filter(AgentMessage.conversation_id == conv_a.id)
             .all()
         )
 
-        assert [m.content for m in rows] == ["שאלה"]
+        assert [m.content for m in rows] == ["שאלה של א"]
