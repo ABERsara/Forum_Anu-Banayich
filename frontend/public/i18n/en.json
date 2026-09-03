@@ -421,6 +421,7 @@
   },
   "errors": {
     "dm_forbidden": "You don't have permission to send or view this message.",
+    "invalid_cursor": "The request for older messages was not valid. Please refresh the page.",
     "internal_server_error": "Internal server error. Please try again later.",
     "generic": "Something went wrong. Please try again."
   },
@@ -446,9 +447,25 @@
       "title_fallback": "Conversation",
       "loading": "Loading messages...",
       "empty": "No messages yet. Write a message to get started.",
+      "log_label": "Conversation history",
+      "history_start": "This is the start of the conversation.",
+      "load_older": "Load older messages",
+      "loading_older": "Loading older messages...",
+      "older_loaded": "{{count}} older messages loaded",
+      "load_older_failed": "Older messages could not be loaded.",
+      "speaker_me": "Me:",
+      "speaker_other": "{{name}}:",
+      "receipt_sending": "Sending...",
+      "receipt_sent": "Sent",
+      "receipt_read": "Read",
       "new_message_label": "New message",
       "placeholder": "Write a message...",
-      "send": "Send"
+      "char_count": "{{count}} of {{max}} characters",
+      "limit_reached": "You have reached the {{max}}-character limit.",
+      "send": "Send",
+      "send_failed": "The message was not sent. Please try again.",
+      "pruned_notice": "This conversation reached its {{limit}}-message limit, so the oldest message was deleted to make room.",
+      "pruned_notice_many": "This conversation reached its {{limit}}-message limit, so the {{count}} oldest messages were deleted to make room."
     }
   },
   "constants": {

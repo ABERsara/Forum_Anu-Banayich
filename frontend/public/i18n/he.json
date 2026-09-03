@@ -421,6 +421,7 @@
   },
   "errors": {
     "dm_forbidden": "אין לך הרשאה לשלוח או לצפות בהודעה זו.",
+    "invalid_cursor": "הבקשה להודעות קודמות לא הייתה תקינה. רעננו את העמוד.",
     "internal_server_error": "שגיאת שרת פנימית. נסו שוב מאוחר יותר.",
     "generic": "אירעה שגיאה. נסו שוב."
   },
@@ -446,9 +447,25 @@
       "title_fallback": "שיחה",
       "loading": "טוען הודעות...",
       "empty": "עדיין אין הודעות. כתבו הודעה כדי להתחיל.",
+      "log_label": "היסטוריית השיחה",
+      "history_start": "זו תחילת השיחה.",
+      "load_older": "טעינת הודעות קודמות",
+      "loading_older": "טוען הודעות קודמות...",
+      "older_loaded": "נטענו {{count}} הודעות קודמות",
+      "load_older_failed": "טעינת ההודעות הקודמות נכשלה.",
+      "speaker_me": "אני:",
+      "speaker_other": "{{name}}:",
+      "receipt_sending": "בשליחה...",
+      "receipt_sent": "נשלח",
+      "receipt_read": "נקרא",
       "new_message_label": "הודעה חדשה",
       "placeholder": "כתבו הודעה...",
-      "send": "שלח"
+      "char_count": "{{count}} מתוך {{max}} תווים",
+      "limit_reached": "הגעתם למגבלת {{max}} התווים.",
+      "send": "שלח",
+      "send_failed": "שליחת ההודעה נכשלה. נסו שוב.",
+      "pruned_notice": "השיחה הגיעה למגבלת {{limit}} ההודעות, וההודעה הישנה ביותר נמחקה כדי לפנות מקום.",
+      "pruned_notice_many": "השיחה הגיעה למגבלת {{limit}} ההודעות, ו-{{count}} ההודעות הישנות ביותר נמחקו כדי לפנות מקום."
     }
   },
   "constants": {
