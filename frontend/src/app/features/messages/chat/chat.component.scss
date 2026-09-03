@@ -158,8 +158,9 @@
     font-size: $font-size-xs;
     // Inherits the bubble's own colour, at full strength. This line carries
     // the read receipt, and both of the quieter options fail the contrast
-    // floor on the blue bubble: $color-text-muted is about 2:1 on it, and
-    // dropping the opacity to 0.85 takes white down to roughly 4.2:1.
+    // floor on the blue bubble: $color-text-muted is 1.07:1 against
+    // $color-primary — all but invisible — and dropping the opacity to 0.85
+    // takes white down to 4.2:1, under the 4.5:1 required.
   }
 
   &__notice,
