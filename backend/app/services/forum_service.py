@@ -99,7 +99,7 @@ class SentMessageData(TypedDict):
     DirectMessageSendResponse."""
 
     message: DirectMessageData
-    pruned_count: int
+    pruned_message_ids: list[str]
     conversation_limit: int
 
 
@@ -543,7 +543,7 @@ def send_direct_message(
     db.commit()
 
     message_id = message.id
-    pruned_count = _enforce_conversation_limit(
+    pruned_message_ids = _enforce_conversation_limit(
         db, sender, conversation_key, keep_message_id=message_id
     )
 
@@ -555,17 +555,17 @@ def send_direct_message(
     )
     return {
         "message": _to_response_dict(message),
-        "pruned_count": pruned_count,
+        "pruned_message_ids": pruned_message_ids,
         "conversation_limit": settings.MAX_MESSAGES_PER_CONVERSATION,
     }
 
 
 def _enforce_conversation_limit(
     db: Session, actor: User, conversation_key: str, keep_message_id: str
-) -> int:
+) -> list[str]:
     """
-    Hold the conversation at spec §5.3's cap of 1,000 messages, and return how
-    many were deleted to do it.
+    Hold the conversation at spec §5.3's cap of 1,000 messages, and return the
+    ids of the messages deleted to do it.
 
     FIFO — oldest first — with two messages it will never touch:
 
@@ -600,7 +600,7 @@ def _enforce_conversation_limit(
     )
     overflow = total - limit
     if overflow <= 0:
-        return 0
+        return []
 
     reported_message_ids = (
         db.query(Report.target_id)
@@ -622,6 +622,7 @@ def _enforce_conversation_limit(
         .all()
     )
 
+    pruned_ids = []
     for message in doomed:
         message_id = message.id
         db.delete(message)
@@ -633,8 +634,9 @@ def _enforce_conversation_limit(
             entity_id=message_id,
             details={"conversation_key": conversation_key, "reason": "storage_cap"},
         )
+        pruned_ids.append(message_id)
 
-    return len(doomed)
+    return pruned_ids
 
 
 def _authorize_conversation_access(

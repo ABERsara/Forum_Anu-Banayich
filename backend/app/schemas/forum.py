@@ -92,16 +92,22 @@ class DirectMessageSendResponse(BaseModel):
     POST /messages – the stored message, plus what enforcing the storage cap
     cost this conversation.
 
-    `pruned_count` is normally 0, and 1 on the send that crosses spec
-    section 5.3's cap. It is on the send response rather than left implicit
-    because the acceptance criterion is that the user is *told* an old
-    message was dropped; a screen cannot say so if the API does not.
-    `conversation_limit` travels with it so the notice can name the real
+    `pruned_message_ids` is normally empty, and holds one id on the send that
+    crosses spec section 5.3's cap. It is on the send response rather than
+    left implicit because the acceptance criterion is that the user is *told*
+    an old message was dropped; a screen cannot say so if the API does not.
+
+    Ids rather than a count: the messages deleted are the oldest *prunable*
+    ones, which is not the same as the oldest ones — anything under an open
+    report is skipped. A client that trimmed by count would take the wrong
+    messages off the screen.
+
+    `conversation_limit` travels with them so the notice can name the real
     number instead of hardcoding a copy of a server setting.
     """
 
     message: DirectMessageResponse
-    pruned_count: int
+    pruned_message_ids: list[str]
     conversation_limit: int
 
 
