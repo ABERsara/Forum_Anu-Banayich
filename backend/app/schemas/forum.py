@@ -86,3 +86,12 @@ class ConversationSummary(BaseModel):
     last_message_preview: str
     last_message_at: datetime
     unread_count: int
+
+
+class ConversationListResponse(BaseModel):
+    """Paginated inbox – one entry per conversation, most recent first."""
+
+    items: list[ConversationSummary]
+    total: int
+    page: int
+    page_size: int
