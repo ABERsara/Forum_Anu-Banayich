@@ -1,4 +1,21 @@
 @use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+// Off-screen but still read aloud. Used by the composer's label, the
+// per-bubble speaker, and the status region that announces older messages —
+// three things a sighted reader gets from layout and colour and a screen
+// reader gets from nothing at all.
+%visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 .chat {
   display: flex;
@@ -10,6 +27,10 @@
   // when the browser chrome shows/hides.
   height: calc(100dvh - 64px);
   padding: $spacing-md;
+
+  &__sr-only {
+    @extend %visually-hidden;
+  }
 
   &__header {
     display: flex;
@@ -24,10 +45,48 @@
     }
   }
 
-  &__body {
+  &__log {
     flex: 1;
     overflow-y: auto;
     padding: $spacing-md 0;
+
+    // The region is focusable so it can be scrolled from the keyboard; a
+    // focusable thing has to show where the focus is.
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__empty,
+  &__history-start {
+    color: $color-text-muted;
+    text-align: center;
+  }
+
+  &__older {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $spacing-sm;
+    padding-bottom: $spacing-md;
+  }
+
+  &__older-button {
+    padding: $spacing-xs $spacing-md;
+    border: 1px solid $color-border;
+    border-radius: $radius-full;
+    background: $color-bg;
+    color: $color-primary;
+    font-size: $font-size-sm;
+    cursor: pointer;
+
+    &:hover {
+      background: $color-bg-subtle;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
   }
 
   &__messages {
@@ -65,11 +124,52 @@
   }
 
   &__bubble {
+    display: flex;
+    flex-direction: column;
     max-width: 75%;
     padding: $spacing-sm $spacing-md;
     border-radius: $radius-lg;
+
+    // A message still in flight is outlined, not dimmed. Fading the bubble
+    // was the obvious choice and the wrong one: opacity blends the background
+    // towards white as well as the text, and white on a 25%-faded
+    // $color-primary lands near 3.3:1 — under the 4.5:1 this screen has to
+    // hold. The dashed edge costs no contrast, and the receipt under the
+    // bubble says "sending" in words for anyone who cannot see either.
+    &--pending {
+      outline: 1px dashed currentcolor;
+      outline-offset: -3px;
+    }
+  }
+
+  &__speaker {
+    @extend %visually-hidden;
+  }
+
+  &__text {
     word-break: break-word;
     white-space: pre-wrap;
+  }
+
+  &__meta {
+    display: flex;
+    gap: $spacing-sm;
+    margin-top: $spacing-xs;
+    font-size: $font-size-xs;
+    // Inherits the bubble's own colour, at full strength. This line carries
+    // the read receipt, and both of the quieter options fail the contrast
+    // floor on the blue bubble: $color-text-muted is about 2:1 on it, and
+    // dropping the opacity to 0.85 takes white down to roughly 4.2:1.
+  }
+
+  &__notice,
+  &__limit {
+    margin: 0 0 $spacing-sm;
+    padding: $spacing-sm $spacing-md;
+    border-radius: $radius-md;
+    background: $color-bg-subtle;
+    color: $color-text;
+    font-size: $font-size-sm;
   }
 
   &__composer-row {
@@ -78,50 +178,45 @@
     padding-top: $spacing-sm;
     border-top: 1px solid $color-border;
 
-    input {
+    textarea {
       flex: 1;
       padding: $spacing-sm;
       border: 1px solid $color-border;
       border-radius: $radius-md;
+      font: inherit;
+      resize: vertical;
 
       &:focus-visible {
-        outline: 2px solid $color-primary;
-        outline-offset: 2px;
+        @include focus-ring;
       }
     }
 
     button {
+      align-self: flex-end;
       padding: $spacing-sm $spacing-md;
       border-radius: $radius-md;
       border: none;
       background: $color-primary;
       color: $color-white;
+      cursor: pointer;
 
       &:disabled {
         background: $color-border;
         color: $color-text-muted;
+        cursor: default;
       }
 
       &:focus-visible {
-        outline: 2px solid $color-primary-dark;
-        outline-offset: 2px;
+        @include focus-ring;
       }
     }
   }
 
-  // Visible to screen readers only — the placeholder already communicates
-  // the field's purpose visually, but a placeholder alone is not an
-  // accessible name.
-  &__composer-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+  &__counter {
+    margin: $spacing-xs 0 0;
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+    text-align: end;
   }
 
   @media (max-width: $bp-sm) {
