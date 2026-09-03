@@ -307,6 +307,13 @@ export interface ConversationSummary {
   unread_count: number;
 }
 
+export interface ConversationList {
+  items: ConversationSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 // ---------------------------------------------------------------------------
 // Professional queries
 // ---------------------------------------------------------------------------
@@ -341,6 +348,20 @@ export interface PublicQA {
   domain: ProfessionalDomain | null;
   is_featured: boolean;
   answered_at: string | null;
+  like_count: number;
+  liked_by_me: boolean;
+  professional: ProfessionalProfile | null;
+  asker_alias: string;
+  asker: UserPublic | null;
+}
+
+// ---------------------------------------------------------------------------
+// Likes
+// ---------------------------------------------------------------------------
+
+export interface LikeResponse {
+  liked: boolean;
+  like_count: number;
 }
 
 // ---------------------------------------------------------------------------

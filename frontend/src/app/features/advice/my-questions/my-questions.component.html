@@ -1,16 +1,26 @@
-<div class="my-questions-page" dir="rtl">
-  <a routerLink="/advice">← חזרה לרשימת אנשי מקצוע</a>
-  <h1>השאלות שלי</h1>
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="my-questions-page">
+  <a routerLink="/advice">← {{ 'advice.back_to_professionals' | transloco }}</a>
+  <h1>{{ 'advice.my_questions.title' | transloco }}</h1>
 
-  <app-error-display [message]="errorMessage()" />
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch. -->
+  @if (error().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (error().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
 
   @if (isLoading()) {
-    <app-loading-spinner message="טוען שאלות..." />
+    <app-loading-spinner [message]="'advice.my_questions.loading' | transloco" />
   } @else if (questions.length === 0) {
-    <p class="empty-state">עדיין לא שאלת שאלות.</p>
+    <p class="empty-state">{{ 'advice.my_questions.empty' | transloco }}</p>
   } @else {
     @for (question of questions; track question.id) {
       <div class="question-card">
+        <!-- The question and its answer are what a person wrote, not UI: shown
+             as they came, in either interface language. -->
         <p class="question-content">{{ question.content }}</p>
         <div class="question-meta">
           <span>{{ target(question) }}</span>

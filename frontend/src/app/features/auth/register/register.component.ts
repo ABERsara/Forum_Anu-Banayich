@@ -28,9 +28,11 @@ import {
   DocumentType,
   Sector,
   UserType,
+  DOCUMENT_TYPE_LABELS,
   SECTOR_LABELS,
   USER_TYPE_LABELS,
 } from '../../../core/constants';
+import { AuthError, NO_ERROR, authErrorFrom } from '../auth-error';
 import { AuthService } from '../../../core/services/auth.service';
 import { RegisterRequest, OtpVerifyRequest } from '../../../core/models';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
@@ -77,7 +79,8 @@ export class RegisterComponent {
   });
 
   isLoading = signal(false);
-  errorMessage = signal('');
+  /** What went wrong, as a key of ours or a sentence the API sent. See `AuthError`. */
+  error = signal<AuthError>(NO_ERROR);
   otpResent = signal(false);
 
   idDocType = signal<DocumentType.ID_CARD | DocumentType.PASSPORT>(DocumentType.ID_CARD);
@@ -108,7 +111,7 @@ export class RegisterComponent {
   }
 
   submitStep2(): void {
-    this.errorMessage.set('');
+    this.error.set(NO_ERROR);
     this.isLoading.set(true);
 
     const payload: RegisterRequest = {
@@ -130,13 +133,13 @@ export class RegisterComponent {
       },
       error: (err) => {
         this.isLoading.set(false);
-        this.errorMessage.set(err.error?.detail ?? 'שגיאה בהרשמה. נסה/י שוב.');
+        this.error.set(authErrorFrom(err, 'auth.register.error_generic'));
       },
     });
   }
 
   submitOtp(): void {
-    this.errorMessage.set('');
+    this.error.set(NO_ERROR);
     this.otpResent.set(false);
     this.isLoading.set(true);
 
@@ -152,13 +155,13 @@ export class RegisterComponent {
       },
       error: (err) => {
         this.isLoading.set(false);
-        this.errorMessage.set(err.error?.detail ?? 'קוד שגוי. נסה/י שוב.');
+        this.error.set(authErrorFrom(err, 'auth.register.error_otp'));
       },
     });
   }
 
   resendOtp(): void {
-    this.errorMessage.set('');
+    this.error.set(NO_ERROR);
     this.otpResent.set(false);
     this.isLoading.set(true);
 
@@ -169,7 +172,7 @@ export class RegisterComponent {
       },
       error: (err) => {
         this.isLoading.set(false);
-        this.errorMessage.set(err.error?.detail ?? 'שליחת הקוד נכשלה.');
+        this.error.set(authErrorFrom(err, 'auth.register.error_resend'));
       },
     });
   }
@@ -192,6 +195,15 @@ export class RegisterComponent {
     this.idDocFile.set(file);
   }
 
+  /**
+   * The size complaint `app-file-upload` raises. It arrives already translated
+   * — the shared component resolves it, because the caller owns where it is
+   * shown — so it lands in `text`, not in `key`.
+   */
+  onUploadError(message: string): void {
+    this.error.set({ key: '', text: message });
+  }
+
   submitStep4(): void {
     this.router.navigate(['/auth/pending']);
   }
@@ -201,6 +213,7 @@ export class RegisterComponent {
   readonly sectors = Object.values(Sector);
   readonly userTypeLabels = USER_TYPE_LABELS;
   readonly sectorLabels = SECTOR_LABELS;
+  readonly documentTypeLabels = DOCUMENT_TYPE_LABELS;
   readonly DocumentType = DocumentType;
 
   nextStep(): void {

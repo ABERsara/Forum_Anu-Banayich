@@ -1,8 +1,12 @@
-<div class="register-container" dir="rtl">
-  <h1>הרשמה למערכת</h1>
-  <p class="step-indicator">שלב {{ currentStep() }} מתוך 4</p>
+<div class="register-container">
+  <h1>{{ 'auth.register.title' | transloco }}</h1>
+  <p class="step-indicator">{{ 'auth.register.step' | transloco: { current: currentStep() } }}</p>
 
-  <app-error-display [message]="errorMessage()" />
+  @if (error().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (error().key) {
+    <app-error-display [message]="error().key | transloco" />
+  }
   @if (isLoading()) {
     <app-loading-spinner size="md" />
   }
@@ -10,47 +14,54 @@
   <form [formGroup]="form" novalidate>
     @if (currentStep() === 1) {
       <div>
-        <label class="register-field">שם פרטי<input formControlName="first_name" /></label>
+        <label class="register-field"
+          >{{ 'auth.register.first_name_label' | transloco }}<input formControlName="first_name"
+        /></label>
         @if (form.controls.first_name.invalid && form.controls.first_name.touched) {
-          <span class="field-error">נא להזין שם פרטי (לפחות 2 תווים)</span>
-        }
-        <label class="register-field">שם משפחה<input formControlName="last_name" /></label>
-        @if (form.controls.last_name.invalid && form.controls.last_name.touched) {
-          <span class="field-error">נא להזין שם משפחה (לפחות 2 תווים)</span>
-        }
-        <label class="register-field">תעודת זהות<input formControlName="id_number" /></label>
-        @if (form.controls.id_number.invalid && form.controls.id_number.touched) {
-          <span class="field-error">נא להזין תעודת זהות תקינה (לפחות 7 ספרות)</span>
+          <span class="field-error">{{ 'auth.register.first_name_error' | transloco }}</span>
         }
         <label class="register-field"
-          >תאריך לידה<input type="date" formControlName="birth_date"
+          >{{ 'auth.register.last_name_label' | transloco }}<input formControlName="last_name"
+        /></label>
+        @if (form.controls.last_name.invalid && form.controls.last_name.touched) {
+          <span class="field-error">{{ 'auth.register.last_name_error' | transloco }}</span>
+        }
+        <label class="register-field"
+          >{{ 'auth.register.id_number_label' | transloco }}<input formControlName="id_number"
+        /></label>
+        @if (form.controls.id_number.invalid && form.controls.id_number.touched) {
+          <span class="field-error">{{ 'auth.register.id_number_error' | transloco }}</span>
+        }
+        <label class="register-field"
+          >{{ 'auth.register.birth_date_label' | transloco
+          }}<input type="date" formControlName="birth_date"
         /></label>
         @if (form.controls.birth_date.invalid && form.controls.birth_date.touched) {
-          <span class="field-error">נא לבחור תאריך לידה</span>
+          <span class="field-error">{{ 'auth.register.birth_date_error' | transloco }}</span>
         }
         <label class="register-field"
-          >סוג משתמש
+          >{{ 'auth.register.user_type_label' | transloco }}
           <select formControlName="user_type">
-            <option value="" disabled>בחר/י</option>
+            <option value="" disabled>{{ 'auth.register.select_placeholder' | transloco }}</option>
             @for (t of userTypes; track t) {
               <option [value]="t">{{ userTypeLabels[t] | transloco }}</option>
             }
           </select>
         </label>
         @if (form.controls.user_type.invalid && form.controls.user_type.touched) {
-          <span class="field-error">נא לבחור סוג משתמש</span>
+          <span class="field-error">{{ 'auth.register.user_type_error' | transloco }}</span>
         }
         <label class="register-field"
-          >שיוך עדתי
+          >{{ 'auth.register.sector_label' | transloco }}
           <select formControlName="sector">
-            <option value="" disabled>בחר/י</option>
+            <option value="" disabled>{{ 'auth.register.select_placeholder' | transloco }}</option>
             @for (s of sectors; track s) {
               <option [value]="s">{{ sectorLabels[s] | transloco }}</option>
             }
           </select>
         </label>
         @if (form.controls.sector.invalid && form.controls.sector.touched) {
-          <span class="field-error">נא לבחור שיוך עדתי</span>
+          <span class="field-error">{{ 'auth.register.sector_error' | transloco }}</span>
         }
         <div class="register-actions">
           <button
@@ -59,28 +70,34 @@
             [disabled]="isStep1Invalid()"
             (click)="nextStep()"
           >
-            המשך
+            {{ 'auth.register.next' | transloco }}
           </button>
         </div>
       </div>
     }
     @if (currentStep() === 2) {
       <div>
+        <!-- dir="ltr" here is the address's own direction, not the page's:
+             an email reads left-to-right in Hebrew too. -->
         <label class="register-field"
-          >אימייל<input dir="ltr" type="email" formControlName="email"
+          >{{ 'auth.register.email_label' | transloco
+          }}<input dir="ltr" type="email" formControlName="email"
         /></label>
         @if (form.controls.email.invalid && form.controls.email.touched) {
-          <span class="field-error">נא להזין כתובת אימייל תקינה</span>
-        }
-        <label class="register-field">טלפון<input type="tel" formControlName="phone" /></label>
-        @if (form.controls.phone.invalid && form.controls.phone.touched) {
-          <span class="field-error">נא להזין מספר טלפון תקין (9-15 ספרות בלבד)</span>
+          <span class="field-error">{{ 'auth.register.email_error' | transloco }}</span>
         }
         <label class="register-field"
-          >סיסמה<input type="password" formControlName="password"
+          >{{ 'auth.register.phone_label' | transloco }}<input type="tel" formControlName="phone"
+        /></label>
+        @if (form.controls.phone.invalid && form.controls.phone.touched) {
+          <span class="field-error">{{ 'auth.register.phone_error' | transloco }}</span>
+        }
+        <label class="register-field"
+          >{{ 'auth.register.password_label' | transloco
+          }}<input type="password" formControlName="password"
         /></label>
         @if (form.controls.password.invalid && form.controls.password.touched) {
-          <span class="field-error">הסיסמה חייבת להכיל לפחות 8 תווים</span>
+          <span class="field-error">{{ 'auth.register.password_error' | transloco }}</span>
         }
         <div class="register-actions">
           <button
@@ -89,16 +106,18 @@
             [disabled]="isLoading() || isStep2Invalid()"
             (click)="submitStep2()"
           >
-            שלח קוד OTP
+            {{ 'auth.register.send_otp' | transloco }}
           </button>
         </div>
       </div>
     }
     @if (currentStep() === 3) {
       <div>
-        <p class="otp-hint">קוד אימות נשלח לאימייל: {{ form.value.email }}</p>
+        <p class="otp-hint">
+          {{ 'auth.register.otp_sent_to' | transloco: { email: form.value.email } }}
+        </p>
         <label class="register-field"
-          >קוד אימות
+          >{{ 'auth.register.otp_label' | transloco }}
           <input
             formControlName="otp_code"
             inputmode="numeric"
@@ -107,10 +126,10 @@
           />
         </label>
         @if (form.controls.otp_code.invalid && form.controls.otp_code.touched) {
-          <span class="field-error">נא להזין קוד אימות (לפחות 4 ספרות)</span>
+          <span class="field-error">{{ 'auth.register.otp_error' | transloco }}</span>
         }
         @if (otpResent()) {
-          <span class="field-success">קוד חדש נשלח</span>
+          <span class="field-success">{{ 'auth.register.otp_resent' | transloco }}</span>
         }
         <div class="register-actions">
           <button
@@ -119,7 +138,7 @@
             [disabled]="isLoading() || isStep3Invalid()"
             (click)="submitOtp()"
           >
-            אמת/י קוד
+            {{ 'auth.register.verify_otp' | transloco }}
           </button>
           <button
             type="button"
@@ -127,33 +146,42 @@
             [disabled]="isLoading()"
             (click)="resendOtp()"
           >
-            שלח/י קוד מחדש
+            {{ 'auth.register.resend_otp' | transloco }}
           </button>
         </div>
       </div>
     }
     @if (currentStep() === 4) {
       <div>
-        <span class="register-field">תעודת פטירה</span>
+        <!--
+          The two id-document buttons pick a `DocumentType`, so they render that
+          enum's shared label (ABF-127) instead of a copy of it under `auth.*`.
+          The section headings are this form's own wording and keep their own
+          keys — "תמונת סלפי" is not what `constants.document_type.selfie` calls
+          the same file, and "מסמך מזהה" names the pair, not one type.
+        -->
+        <span class="register-field">{{
+          documentTypeLabels[DocumentType.DEATH_CERTIFICATE] | transloco
+        }}</span>
         <app-file-upload
           variant="primary"
-          label="בחר/י תעודת פטירה"
-          ariaLabel="תעודת פטירה"
+          [label]="'auth.register.choose_death_certificate' | transloco"
+          [ariaLabel]="documentTypeLabels[DocumentType.DEATH_CERTIFICATE] | transloco"
           (fileSelected)="onDeathCertificateSelected($event)"
-          (validationError)="errorMessage.set($event)"
+          (validationError)="onUploadError($event)"
         />
 
-        <span class="register-field">תמונת סלפי</span>
+        <span class="register-field">{{ 'auth.register.selfie' | transloco }}</span>
         <app-file-upload
           variant="primary"
           accept="image/*"
-          label="בחר/י תמונת סלפי"
-          ariaLabel="תמונת סלפי"
+          [label]="'auth.register.choose_selfie' | transloco"
+          [ariaLabel]="'auth.register.selfie' | transloco"
           (fileSelected)="onSelfieSelected($event)"
-          (validationError)="errorMessage.set($event)"
+          (validationError)="onUploadError($event)"
         />
 
-        <span class="register-field">מסמך מזהה</span>
+        <span class="register-field">{{ 'auth.register.id_document' | transloco }}</span>
         <div class="id-doc-toggle">
           <button
             type="button"
@@ -161,7 +189,7 @@
             [class.id-doc-toggle__btn--active]="idDocType() === DocumentType.ID_CARD"
             (click)="setIdDocType(DocumentType.ID_CARD)"
           >
-            תעודת זהות
+            {{ documentTypeLabels[DocumentType.ID_CARD] | transloco }}
           </button>
           <button
             type="button"
@@ -169,26 +197,29 @@
             [class.id-doc-toggle__btn--active]="idDocType() === DocumentType.PASSPORT"
             (click)="setIdDocType(DocumentType.PASSPORT)"
           >
-            דרכון
+            {{ documentTypeLabels[DocumentType.PASSPORT] | transloco }}
           </button>
         </div>
         <app-file-upload
           variant="primary"
-          [label]="idDocType() === DocumentType.ID_CARD ? 'בחר/י תעודת זהות' : 'בחר/י דרכון'"
-          ariaLabel="מסמך מזהה"
+          [label]="
+            (idDocType() === DocumentType.ID_CARD
+              ? 'auth.register.choose_id_card'
+              : 'auth.register.choose_passport'
+            ) | transloco
+          "
+          [ariaLabel]="'auth.register.id_document' | transloco"
           (fileSelected)="onIdDocSelected($event)"
-          (validationError)="errorMessage.set($event)"
+          (validationError)="onUploadError($event)"
         />
 
         <div class="declaration-field">
           <input type="checkbox" id="declare_accuracy" formControlName="declare_accuracy" />
-          <label for="declare_accuracy"
-            >אני מצהיר/ה כי כל הפרטים והמסמכים שמסרתי נכונים ומדויקים</label
-          >
+          <label for="declare_accuracy">{{ 'auth.register.declare_accuracy' | transloco }}</label>
         </div>
         <div class="declaration-field">
           <input type="checkbox" id="declare_terms" formControlName="declare_terms" />
-          <label for="declare_terms">קראתי ואני מסכים/ה לתנאי השימוש ומדיניות הפרטיות</label>
+          <label for="declare_terms">{{ 'auth.register.declare_terms' | transloco }}</label>
         </div>
         <div class="declaration-field">
           <input
@@ -196,9 +227,9 @@
             id="declare_authorization"
             formControlName="declare_authorization"
           />
-          <label for="declare_authorization"
-            >אני מצהיר/ה כי אני זכאי/ת להירשם למערכת בהתאם לסוג המשתמש שבחרתי</label
-          >
+          <label for="declare_authorization">{{
+            'auth.register.declare_authorization' | transloco
+          }}</label>
         </div>
 
         <div class="register-actions">
@@ -208,12 +239,14 @@
             [disabled]="isStep4Invalid()"
             (click)="submitStep4()"
           >
-            סיום
+            {{ 'auth.register.finish' | transloco }}
           </button>
         </div>
       </div>
     }
   </form>
 
-  <p class="login-link"><a routerLink="/login">יש לך חשבון? כנס/י כאן</a></p>
+  <p class="login-link">
+    <a routerLink="/login">{{ 'auth.register.have_account' | transloco }}</a>
+  </p>
 </div>

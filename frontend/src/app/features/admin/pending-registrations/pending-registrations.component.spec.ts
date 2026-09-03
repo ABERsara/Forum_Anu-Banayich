@@ -1,14 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { Subject, of, throwError } from 'rxjs';
+import { NEVER, Subject, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { PendingRegistrationsComponent } from './pending-registrations.component';
 import { AdminService } from '../../../core/services/admin.service';
 import { AccountStatus, DocumentType, Sector, UserRole, UserType } from '../../../core/constants';
 import type { RegistrationDetail, UserAdminView } from '../../../core/models';
-import { translocoTesting } from '../../../../testing/transloco-testing';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeUser(overrides: Partial<UserAdminView> = {}): UserAdminView {
   return {
@@ -47,6 +47,22 @@ function makeDetail(overrides: Partial<RegistrationDetail> = {}): RegistrationDe
     ],
     ...overrides,
   };
+}
+
+/**
+ * An applicant whose own details carry no Hebrew.
+ *
+ * A person's name, email and the reason a document was filed are theirs, not
+ * UI — out of scope for this ticket and never translated. Feeding Latin
+ * details to the `HEBREW` sweeps below keeps them pointed at the copy they are
+ * meant to guard.
+ */
+function makeLatinUser(overrides: Partial<UserAdminView> = {}): UserAdminView {
+  return makeUser({ first_name: 'Sarah', last_name: 'Levy', ...overrides });
+}
+
+function makeLatinDetail(overrides: Partial<RegistrationDetail> = {}): RegistrationDetail {
+  return makeDetail({ first_name: 'Sarah', last_name: 'Levy', ...overrides });
 }
 
 describe('PendingRegistrationsComponent', () => {
@@ -246,7 +262,7 @@ describe('PendingRegistrationsComponent', () => {
       component.toggleDetail('u1');
       fixture.detectChanges();
 
-      expect(component.detailError()).toBe('ההרשמה אינה ממתינה לאישור');
+      expect(component.detailError()).toEqual({ key: '', text: 'ההרשמה אינה ממתינה לאישור' });
       expect(component.detail()).toBeNull();
       expect(fixture.nativeElement.textContent).toContain('ההרשמה אינה ממתינה לאישור');
     });
@@ -255,9 +271,16 @@ describe('PendingRegistrationsComponent', () => {
       adminServiceMock.getRegistration.mockReturnValue(throwError(() => ({ error: null })));
 
       component.toggleDetail('u1');
+      fixture.detectChanges();
 
-      expect(component.detailError()).toBe('אירעה שגיאה בטעינת פרטי הבקשה. נסי לרענן את הדף.');
+      expect(component.detailError()).toEqual({
+        key: 'admin.errors.load_registration_failed',
+        text: '',
+      });
       expect(component.isDetailLoading()).toBe(false);
+      expect(fixture.nativeElement.textContent).toContain(
+        'אירעה שגיאה בטעינת פרטי הבקשה. נסי לרענן את הדף.',
+      );
     });
   });
 
@@ -334,16 +357,23 @@ describe('PendingRegistrationsComponent', () => {
       );
 
       component.approve('u1');
+      fixture.detectChanges();
 
-      expect(component.actionError()).toBe('לא ניתן לאשר את אותה הרשמה פעמיים');
+      expect(component.actionError()).toEqual({
+        key: '',
+        text: 'לא ניתן לאשר את אותה הרשמה פעמיים',
+      });
+      expect(fixture.nativeElement.textContent).toContain('לא ניתן לאשר את אותה הרשמה פעמיים');
     });
 
     it('falls back to a generic message when approve fails without a detail', () => {
       adminServiceMock.approveRegistration.mockReturnValue(throwError(() => ({ error: null })));
 
       component.approve('u1');
+      fixture.detectChanges();
 
-      expect(component.actionError()).toBe('אירעה שגיאה באישור ההרשמה. נסה שוב.');
+      expect(component.actionError()).toEqual({ key: 'admin.errors.approve_failed', text: '' });
+      expect(fixture.nativeElement.textContent).toContain('אירעה שגיאה באישור ההרשמה. נסה שוב.');
     });
 
     it('opens the confirm dialog for the clicked row on reject', () => {
@@ -384,8 +414,21 @@ describe('PendingRegistrationsComponent', () => {
 
       component.reject('u1');
       component.confirmReject('מסמכים חסרים');
+      fixture.detectChanges();
 
-      expect(component.actionError()).toBe('ההרשמה אינה ממתינה לאישור');
+      expect(component.actionError()).toEqual({ key: '', text: 'ההרשמה אינה ממתינה לאישור' });
+      expect(fixture.nativeElement.textContent).toContain('ההרשמה אינה ממתינה לאישור');
+    });
+
+    it('falls back to our own key when reject fails without a detail', () => {
+      adminServiceMock.rejectRegistration.mockReturnValue(throwError(() => ({ error: null })));
+
+      component.reject('u1');
+      component.confirmReject('מסמכים חסרים');
+      fixture.detectChanges();
+
+      expect(component.actionError()).toEqual({ key: 'admin.errors.reject_failed', text: '' });
+      expect(fixture.nativeElement.textContent).toContain('אירעה שגיאה בדחיית ההרשמה. נסה שוב.');
     });
 
     it('does nothing when confirmReject is called with no row selected', () => {
@@ -393,5 +436,328 @@ describe('PendingRegistrationsComponent', () => {
 
       expect(adminServiceMock.rejectRegistration).not.toHaveBeenCalled();
     });
+  });
+
+  describe('i18n', () => {
+    function text(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function heading(): string {
+      return fixture.nativeElement.querySelector('h1').textContent.trim();
+    }
+
+    function switchToEnglish(): void {
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+    }
+
+    /**
+     * Rebuilds the screen against one set of service responses. The defaults
+     * carry Latin details, so the `HEBREW` sweeps below fail on our own copy
+     * rather than on an applicant's name.
+     */
+    async function renderWith(overrides: Partial<typeof adminServiceMock> = {}): Promise<void> {
+      TestBed.resetTestingModule();
+      adminServiceMock = {
+        getPendingRegistrations: vi.fn().mockReturnValue(of([makeLatinUser()])),
+        getRegistration: vi.fn().mockReturnValue(of(makeLatinDetail())),
+        approveRegistration: vi.fn(),
+        rejectRegistration: vi.fn(),
+        ...overrides,
+      };
+
+      await TestBed.configureTestingModule({
+        imports: [PendingRegistrationsComponent, translocoTesting()],
+        providers: [provideRouter([]), { provide: AdminService, useValue: adminServiceMock }],
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(PendingRegistrationsComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    }
+
+    it('reads the queue in Hebrew exactly as it did before the keys went in', async () => {
+      await renderWith({ getPendingRegistrations: vi.fn().mockReturnValue(of([makeUser()])) });
+
+      expect(text()).toContain('חזרה ללוח הבקרה');
+      expect(heading()).toBe('הרשמות ממתינות לאישור');
+      expect(text()).toContain('כל הרשמה טעונה אישור של שני מנהלים');
+      expect(text()).toContain('הוגשה ב-30/06/2026');
+      expect(text()).toContain('ממתין לאישור מנהלים');
+      expect(text()).toContain('בדיקה');
+      expect(text()).toContain('אישור');
+      expect(text()).toContain('דחייה');
+    });
+
+    it('leaves no Hebrew in the queue in English', async () => {
+      await renderWith();
+
+      switchToEnglish();
+
+      expect(heading()).toBe('Registrations awaiting approval');
+      expect(text()).toContain('Back to the dashboard');
+      expect(text()).toContain('Every registration needs the approval of two admins');
+      expect(text()).toContain('Submitted on 30/06/2026');
+      expect(text()).toContain('Pending admin approval');
+      expect(text()).toContain('Review');
+      expect(text()).toContain('Approve');
+      expect(text()).toContain('Reject');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** Each row's buttons say whose request they act on, in either language. */
+    it('names each action after the applicant, in the language on screen', async () => {
+      await renderWith();
+      const labels = (): (string | null)[] =>
+        Array.from(
+          (fixture.nativeElement as HTMLElement).querySelectorAll('.queue__actions button'),
+        ).map((button) => button.getAttribute('aria-label'));
+
+      expect(labels()).toEqual([
+        'בדיקת הבקשה של Sarah Levy',
+        'אישור הבקשה של Sarah Levy',
+        'דחיית הבקשה של Sarah Levy',
+      ]);
+
+      switchToEnglish();
+
+      expect(labels()).toEqual([
+        "Review Sarah Levy's request",
+        "Approve Sarah Levy's request",
+        "Reject Sarah Levy's request",
+      ]);
+    });
+
+    it('renames the review button once the request is open', async () => {
+      await renderWith();
+      component.toggleDetail('u1');
+      fixture.detectChanges();
+      expect(text()).toContain('סגירה');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Close');
+      expect(
+        (fixture.nativeElement as HTMLElement)
+          .querySelector('.queue__actions button')
+          ?.getAttribute('aria-label'),
+      ).toBe("Close Sarah Levy's request details");
+    });
+
+    it('reads the open request in Hebrew exactly as it did before', async () => {
+      await renderWith({ getPendingRegistrations: vi.fn().mockReturnValue(of([makeUser()])) });
+      component.toggleDetail('u1');
+      fixture.detectChanges();
+
+      expect(text()).toContain('טרם אושרה — נדרשים אישורים של שני מנהלים.');
+      expect(text()).toContain('פרטי המבקש/ת');
+      expect(text()).toContain('שם מלא');
+      expect(text()).toContain('תעודת זהות');
+      expect(text()).toContain('מוצגת כפי שנשמרה — הערך מוצפן במסד הנתונים.');
+      expect(text()).toContain('תאריך הגשה');
+      expect(text()).toContain('מסמכים שהועלו');
+      expect(text()).toContain('הועלה ב-30/06/2026 04:20');
+    });
+
+    it('leaves no Hebrew in the open request in English', async () => {
+      await renderWith();
+      component.toggleDetail('u1');
+      fixture.detectChanges();
+
+      switchToEnglish();
+
+      expect(text()).toContain('Not yet approved — two admin approvals are needed.');
+      expect(text()).toContain('Applicant details');
+      expect(text()).toContain('Full name');
+      expect(text()).toContain('ID number');
+      expect(text()).toContain('Shown as it was stored — the value is encrypted in the database.');
+      expect(text()).toContain('Uploaded documents');
+      expect(text()).toContain('Death certificate');
+      expect(text()).toContain('Uploaded on 30/06/2026 04:20');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates how far the two-admin approval got', async () => {
+      await renderWith({
+        getRegistration: vi.fn().mockReturnValue(
+          of(
+            makeLatinDetail({
+              account_status: AccountStatus.PARTIALLY_APPROVED,
+              first_approver_id: 'a1',
+            }),
+          ),
+        ),
+      });
+      component.toggleDetail('u1');
+      fixture.detectChanges();
+      expect(text()).toContain('מנהל אחד כבר אישר — נדרש אישור של מנהל נוסף.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('One admin has already approved — one more approval is needed.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates a document expiry, and the stand-in for a detail left empty', async () => {
+      await renderWith({
+        getRegistration: vi.fn().mockReturnValue(
+          of(
+            makeLatinDetail({
+              phone: null,
+              birth_date: null,
+              documents: [
+                {
+                  id: 'd1',
+                  doc_type: DocumentType.ID_CARD,
+                  expires_on: '2030-01-31',
+                  uploaded_at: '2026-06-30T04:20:00',
+                },
+              ],
+            }),
+          ),
+        ),
+      });
+      component.toggleDetail('u1');
+      fixture.detectChanges();
+      expect(text()).toContain('בתוקף עד 31/01/2030');
+      expect(text()).toContain('לא צוין');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Valid until 31/01/2030');
+      expect(text()).toContain('Not provided');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the empty state', async () => {
+      await renderWith({ getPendingRegistrations: vi.fn().mockReturnValue(of([])) });
+      expect(text()).toContain('אין הרשמות ממתינות כרגע.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('There are no pending registrations right now.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the caption under the spinner while the queue loads', async () => {
+      await renderWith({ getPendingRegistrations: vi.fn().mockReturnValue(NEVER) });
+      expect(text()).toContain('טוען הרשמות...');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Loading registrations...');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('translates the caption under the spinner while a request loads', async () => {
+      await renderWith({ getRegistration: vi.fn().mockReturnValue(NEVER) });
+      component.toggleDetail('u1');
+      fixture.detectChanges();
+      expect(text()).toContain('טוען את פרטי הבקשה...');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Loading the request details...');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** Our own copy is a key, so a failure already on screen follows the switch. */
+    it('re-renders the load failure in the new language', async () => {
+      await renderWith({
+        getPendingRegistrations: vi.fn().mockReturnValue(throwError(() => ({}))),
+      });
+      expect(text()).toContain('אירעה שגיאה בטעינת ההרשמות. נסי לרענן את הדף.');
+
+      switchToEnglish();
+
+      expect(text()).toContain(
+        'Something went wrong loading the registrations. Please refresh the page.',
+      );
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('re-renders our own approve failure in the new language', async () => {
+      await renderWith({
+        approveRegistration: vi.fn().mockReturnValue(throwError(() => ({}))),
+      });
+
+      component.approve('u1');
+      fixture.detectChanges();
+      expect(text()).toContain('אירעה שגיאה באישור ההרשמה. נסה שוב.');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Something went wrong approving the registration.');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** The sentence the API wrote is not ours to translate — it stays put. */
+    it('leaves the sentence the API sent exactly as it came', async () => {
+      await renderWith({
+        approveRegistration: vi
+          .fn()
+          .mockReturnValue(throwError(() => ({ error: { detail: 'ההרשמה כבר אושרה' } }))),
+      });
+
+      component.approve('u1');
+      fixture.detectChanges();
+
+      switchToEnglish();
+
+      expect(text()).toContain('ההרשמה כבר אושרה');
+    });
+
+    it('translates the copy it hands the reject dialog', async () => {
+      await renderWith();
+
+      component.reject('u1');
+      fixture.detectChanges();
+      expect(text()).toContain('דחיית הרשמה');
+      expect(text()).toContain('פעולה זו תדחה את ההרשמה ותשלח למועמד הודעה עם הסיבה.');
+      expect(text()).toContain('סיבת הדחייה');
+      expect(placeholders()).toContain('לדוגמה: מסמכים חסרים');
+
+      switchToEnglish();
+
+      expect(text()).toContain('Reject registration');
+      expect(text()).toContain(
+        'This will reject the registration and send the applicant a message with the reason.',
+      );
+      expect(text()).toContain('Reason for the rejection');
+      expect(placeholders()).toContain('For example: missing documents');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    /** An applicant's name and address are content, not UI: they survive the switch. */
+    it('leaves what the applicant is called alone', async () => {
+      await renderWith({
+        getPendingRegistrations: vi.fn().mockReturnValue(of([makeUser()])),
+        getRegistration: vi.fn().mockReturnValue(of(makeDetail())),
+      });
+      component.toggleDetail('u1');
+      fixture.detectChanges();
+
+      switchToEnglish();
+
+      expect(text()).toContain('שרה');
+      expect(text()).toContain('לוי');
+      expect(text()).toContain('sarah@example.com');
+    });
+
+    it('does not pin its own text direction — it follows <html dir>', async () => {
+      await renderWith();
+
+      const page = fixture.nativeElement.querySelector('.page') as HTMLElement;
+      expect(page.hasAttribute('dir')).toBe(false);
+      expect(page.style.direction).toBe('');
+    });
+
+    /** Placeholders never reach `textContent`, so the sweeps above cannot see them. */
+    function placeholders(): (string | null)[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('input, textarea'),
+      ).map((field) => field.getAttribute('placeholder'));
+    }
   });
 });
