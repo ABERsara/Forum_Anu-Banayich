@@ -185,6 +185,7 @@ class AuditAction(enum.StrEnum):
     USER_LOGOUT = "user_logout"
     DIRECT_MESSAGE_ACCESS_DENIED = "direct_message_access_denied"
     AGENT_CONVERSATION = "agent_conversation"
+    AGENT_CONVERSATION_ACCESS_DENIED = "agent_conversation_access_denied"
 
 
 # ---------------------------------------------------------------------------

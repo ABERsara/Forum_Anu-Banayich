@@ -15,14 +15,20 @@ request and these are guarantees:
   human advice. The model never gets the chance to fill a void.
 * **The disclaimer is always there.** It is concatenated onto the answer, not
   asked for, so it cannot be dropped or paraphrased away.
+* **A follow-up is read next to the question before it.** "וכמה זה בערך?"
+  names nothing on its own, so retrieval that only sees those four words finds
+  nothing and the agent would refer the user to a human one turn after
+  answering the very question being followed up on. See _retrieve_for().
 
 Nothing written to the audit log describes what was said. The AuditLog row
 records that a conversation happened, whose it was, and how well grounded the
-answer was — SPEC §9.3 wants the trail, not the transcript.
+answer was — SPEC §9.3 wants the trail, not the transcript. Access that was
+*refused* is logged too, and access that was granted is not; see _deny().
 """
 
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import NoReturn
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -48,6 +54,11 @@ logger = logging.getLogger(__name__)
 #: calendar day: a midnight reset would let one user spend two days' budget in
 #: a few minutes either side of it.
 RATE_LIMIT_WINDOW = timedelta(hours=24)
+
+#: How _compose_answer() joins an answer to ANSWER_DISCLAIMER — and therefore
+#: how _without_disclaimer() takes it back off. Named once so the two cannot
+#: drift apart and leave the disclaimer stuck in the history.
+DISCLAIMER_SEPARATOR = "\n\n"
 
 _CONVERSATION_NOT_FOUND = "השיחה לא נמצאה."
 _CONVERSATION_FORBIDDEN = "אין לך הרשאה לצפות בשיחה זו."
@@ -110,7 +121,7 @@ def chat(
     # Stamped before the provider is called, so the question keeps the time it
     # was asked rather than the time the answer came back.
     asked_at = _utc_now()
-    chunks = rag_service.retrieve(db, domain, data.message)
+    chunks = _retrieve_for(db, domain, data.message, history)
     answer = _compose_answer(domain, data.message, chunks, history)
 
     if conversation is None:
@@ -180,9 +191,7 @@ def get_conversation(
     conversation = _get_conversation_in_domain(db, domain, conversation_id)
 
     if conversation.user_id != user.id and user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=_CONVERSATION_FORBIDDEN
-        )
+        _deny(db, user, conversation_id, reason="read_blocked")
 
     return AgentConversationOut.model_validate(conversation)
 
@@ -190,6 +199,28 @@ def get_conversation(
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+
+
+def _deny(db: Session, user: User, conversation_id: str, reason: str) -> NoReturn:
+    """Refuse access to a conversation, and leave a trace that it was refused.
+
+    Denied access is logged and granted access is not — the same asymmetry
+    forum_service applies to direct messages, and for the same reason: a
+    conversation someone was blocked from reading is the event worth being
+    able to look up later. `reason` says which door was tried; nothing about
+    the thread's content is recorded, only its id.
+    """
+    log_action(
+        db,
+        actor=user,
+        action=AuditAction.AGENT_CONVERSATION_ACCESS_DENIED,
+        entity_type="AgentConversation",
+        entity_id=conversation_id,
+        details={"reason": reason},
+    )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail=_CONVERSATION_FORBIDDEN
+    )
 
 
 def _get_conversation_in_domain(
@@ -233,9 +264,7 @@ def _load_own_conversation(
 
     conversation = _get_conversation_in_domain(db, domain, conversation_id)
     if conversation.user_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=_CONVERSATION_FORBIDDEN
-        )
+        _deny(db, user, conversation_id, reason="write_blocked")
     return conversation
 
 
@@ -264,9 +293,60 @@ def _recent_turns(
         .all()
     )
     return [
-        llm_service.HistoryTurn(role=message.role, content=message.content)
+        llm_service.HistoryTurn(
+            role=message.role, content=_without_disclaimer(message.content)
+        )
         for message in reversed(recent)
     ]
+
+
+def _without_disclaimer(content: str) -> str:
+    """An earlier turn as the prompt should see it.
+
+    Every stored agent turn ends in ANSWER_DISCLAIMER, and replaying that back
+    would contradict the rule that tells the model not to write one — besides
+    paying for the same paragraph again on every follow-up. Removed exactly as
+    _compose_answer() attached it, so a passage that merely quotes the
+    disclaimer mid-answer is left alone.
+    """
+    return content.removesuffix(DISCLAIMER_SEPARATOR + llm_service.ANSWER_DISCLAIMER)
+
+
+def _retrieve_for(
+    db: Session,
+    domain: AgentDomain,
+    message: str,
+    history: list[llm_service.HistoryTurn],
+) -> list[AgentKnowledgeChunk]:
+    """Passages for this question, read in the light of the one before it.
+
+    A follow-up carries none of its own subject: "וכמה זה בערך?" is four words
+    that name nothing, so retrieval on the message alone comes back empty and
+    the agent would answer "I have no information on that" one turn after
+    answering the question it is a follow-up to. When that happens and there
+    is a conversation behind the message, the search runs again with the
+    previous question folded in — the words the follow-up is leaning on.
+
+    A fallback rather than the default: a message that already found its own
+    material must not have its ranking dragged towards the earlier subject.
+    And only the previous *user* turn, because the agent's replies are its own
+    words, not a statement of what is being asked about.
+    """
+    chunks = rag_service.retrieve(db, domain, message)
+    if chunks:
+        return chunks
+
+    previous = next(
+        (
+            turn.content
+            for turn in reversed(history)
+            if turn.role == AgentMessageRole.USER
+        ),
+        None,
+    )
+    if previous is None:
+        return []
+    return rag_service.retrieve(db, domain, f"{previous} {message}")
 
 
 def _compose_answer(
@@ -276,7 +356,8 @@ def _compose_answer(
     history: list[llm_service.HistoryTurn],
 ) -> str:
     """The text stored as the agent's turn, disclaimer included."""
-    return f"{_answer_body(domain, question, chunks, history)}\n\n{llm_service.ANSWER_DISCLAIMER}"
+    body = _answer_body(domain, question, chunks, history)
+    return f"{body}{DISCLAIMER_SEPARATOR}{llm_service.ANSWER_DISCLAIMER}"
 
 
 def _answer_body(
