@@ -45,6 +45,7 @@ def upgrade() -> None:
                 "USER_LOGIN",
                 "USER_LOGOUT",
                 "DIRECT_MESSAGE_ACCESS_DENIED",
+                "AGENT_CONVERSATION",
                 name="auditaction",
             ),
             nullable=False,

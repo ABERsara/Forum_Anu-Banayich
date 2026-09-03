@@ -142,6 +142,52 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
 
     # ------------------------------------------------------------------
+    # AI agent – LLM provider (ABF-121 embeddings, ABF-122 generation)
+    #
+    # GEMINI_API_KEY is required for POST /agents/{domain_id}/chat to answer a
+    # question its knowledge base covers: without it that request is a 503,
+    # deliberately, rather than a quiet fallback to "I have no information" —
+    # a missing key must look like a fault, not like an answer. A question the
+    # knowledge base does *not* cover still works with no key at all, because
+    # no provider is called for it.
+    # ------------------------------------------------------------------
+    GEMINI_API_KEY: str = ""
+
+    # Which llm_service provider serves generation. Swapping this to another
+    # registered name (see llm_service.register_provider) is the whole change
+    # needed to move off Gemini – no caller touches a provider class.
+    LLM_PROVIDER: str = "gemini"
+
+    # Gemini model used for generation. Configurable so a model deprecation
+    # is an environment change, not a deploy.
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
+    # Hard ceiling on one generation call. A chat request holds a worker for
+    # its whole duration, so this is what stops a slow provider from taking
+    # the API down with it.
+    LLM_TIMEOUT_SECONDS: float = 20.0
+
+    # ------------------------------------------------------------------
+    # AI agent – conversation limits (can be tuned without code changes)
+    # ------------------------------------------------------------------
+    # Messages one user may send to the agents in a rolling 24 hours,
+    # counted across every domain rather than per agent: the cost being
+    # capped is the provider bill, and that is one bill.
+    AGENT_RATE_LIMIT_PER_DAY: int = 30
+
+    # Longest question accepted, in characters. Enforced by the Pydantic
+    # schema (422), not by the provider's token limit.
+    AGENT_MAX_MESSAGE_LENGTH: int = 1000
+
+    # How many of the conversation's most recent *turns* – a question and the
+    # answer it got – are replayed into the prompt, so "ומה לגבי הילדים שלי"
+    # resolves against what came before it. 3 turns is at most 6 messages.
+    # Costs tokens on every request, which is why it is tunable without a
+    # deploy: raise it if follow-ups lose the thread, lower it if the bill
+    # grows faster than usage.
+    AGENT_HISTORY_TURNS: int = 3
+
+    # ------------------------------------------------------------------
     # Moderation thresholds (can be tuned without code changes)
     # ------------------------------------------------------------------
     AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide

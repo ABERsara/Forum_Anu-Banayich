@@ -26,6 +26,7 @@ from app.core.config import settings
 from app.core.constants import UserRole
 from app.core.security import decode_access_token
 from app.db.session import SessionLocal
+from app.services import agent_service
 from app.services.user_service import ensure_account_active, get_user_by_id
 
 if TYPE_CHECKING:
@@ -97,3 +98,36 @@ def require_role(*roles: UserRole) -> Callable[..., "User"]:
         return current_user
 
     return _check
+
+
+def rate_limit_chat(
+    current_user: "User" = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> "User":
+    """
+    Enforce settings.AGENT_RATE_LIMIT_PER_DAY on the AI agent chat, and return
+    the caller.
+
+    A dependency rather than a check inside the endpoint, and one that returns
+    the caller: the chat endpoint depends on this *instead of* on
+    get_current_active_user, so there is no way to wire the endpoint up and
+    leave the limit off. It runs before the endpoint body does, which is what
+    keeps an over-quota request from reaching retrieval or the provider.
+
+    The window is rolling — see agent_service.messages_left_today().
+
+    Usage:
+        @router.post("/agents/{domain_id}/chat")
+        def chat(user = Depends(rate_limit_chat)):
+            ...
+    """
+    if agent_service.messages_left_today(db, current_user) <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"הגעת למכסת {settings.AGENT_RATE_LIMIT_PER_DAY} ההודעות היומית "
+                "לסוכן. אפשר לנסות שוב מאוחר יותר, או לפנות לייעוץ מקצועי אנושי "
+                "דרך מודול הייעוץ באתר."
+            ),
+        )
+    return current_user
