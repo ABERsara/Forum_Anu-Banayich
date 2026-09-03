@@ -131,6 +131,30 @@ class TestListAgentDomains:
         assert response.status_code == 200
         assert response.json() == []
 
+    async def test_group_match_but_sector_mismatch_is_hidden(
+        self, client, db_session: Session, as_user
+    ) -> None:
+        # AND, not OR, end to end: a domain for the user's own group but a
+        # different sector must not appear.
+        user = _make_user(
+            db_session,
+            "widow@example.com",
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+        )
+        _make_domain(
+            db_session,
+            "widows hasidic",
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+        )
+        as_user(user)
+
+        response = await client.get(BASE)
+
+        assert response.status_code == 200
+        assert response.json() == []
+
     async def test_inactive_domain_is_hidden(
         self, client, db_session: Session, as_user
     ) -> None:

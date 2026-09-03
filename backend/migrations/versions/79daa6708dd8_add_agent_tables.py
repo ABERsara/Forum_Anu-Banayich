@@ -10,6 +10,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "79daa6708dd8"
@@ -25,12 +26,15 @@ def upgrade() -> None:
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("name", sa.String(length=128), nullable=False),
         sa.Column("description", sa.Text(), nullable=False),
-        # group/sector visibility reuse the enum types created for forum_posts
-        # in the initial migration – create_type=False so PostgreSQL does not
-        # try to CREATE TYPE a second time.
+        # group/sector/professional_domain reuse enum types created in the
+        # initial migration. postgresql.ENUM(..., create_type=False) is required:
+        # on generic sa.Enum the create_type kwarg is silently ignored, so an
+        # incremental `alembic upgrade` on an existing Postgres DB would emit a
+        # second CREATE TYPE and fail with DuplicateObject. On SQLite these
+        # render as VARCHAR exactly as a plain sa.Enum would.
         sa.Column(
             "group_visibility",
-            sa.Enum(
+            postgresql.ENUM(
                 "WIDOWERS",
                 "WIDOWS",
                 "ORPHANS_MALE",
@@ -43,7 +47,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "sector_visibility",
-            sa.Enum(
+            postgresql.ENUM(
                 "HASIDIC",
                 "LITVISH",
                 "SEPHARDIC",
@@ -56,7 +60,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "professional_domain",
-            sa.Enum(
+            postgresql.ENUM(
                 "LAWYER",
                 "ACCOUNTANT",
                 "PSYCHOLOGIST",
@@ -70,7 +74,7 @@ def upgrade() -> None:
             ),
             nullable=False,
         ),
-        sa.Column("is_active", sa.Boolean(), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column(
             "created_at",
             sa.DateTime(),
@@ -145,7 +149,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("key_version", sa.Integer(), nullable=False),
+        sa.Column("key_version", sa.Integer(), nullable=False, server_default="1"),
         sa.Column(
             "created_at",
             sa.DateTime(),

@@ -186,14 +186,18 @@ class TestActiveFilter:
 
 
 class TestOrderingAndShape:
-    def test_orders_domains_by_name(self, db_session: Session) -> None:
+    def test_orders_domains_by_name_case_insensitively(
+        self, db_session: Session
+    ) -> None:
         user = _make_user(db_session)
-        for name in ("Zebra", "Alpha", "Mango"):
+        for name in ("Banana", "apple", "Cherry"):
             _make_domain(db_session, name)
 
         result = agent_service.get_visible_domains(db_session, user)
 
-        assert [d.name for d in result] == ["Alpha", "Mango", "Zebra"]
+        # Case-insensitive: apple, Banana, Cherry. A raw binary sort (SQLite's
+        # default) would put the capitalised names before "apple".
+        assert [d.name for d in result] == ["apple", "Banana", "Cherry"]
 
     def test_returns_orm_model_instances(self, db_session: Session) -> None:
         user = _make_user(db_session)
@@ -252,6 +256,60 @@ class TestDifferentUsers:
 
         assert widow_seen == {"for-widows", "for-everyone"}
         assert orphan_seen == {"for-orphans", "for-everyone"}
+
+
+class TestVisibilityEnumMapping:
+    """get_visible_domains() does GroupVisibility(user.user_type.value) and
+    SectorVisibility(user.sector.value). A UserType/Sector member whose value
+    has no matching visibility member would raise ValueError -> 500. Pin that
+    the mappings are total across every enum member."""
+
+    @pytest.mark.parametrize("user_type", list(UserType))
+    def test_every_user_type_maps_to_a_group_visibility(
+        self, user_type: UserType
+    ) -> None:
+        assert GroupVisibility(user_type.value)
+
+    @pytest.mark.parametrize("sector", list(Sector))
+    def test_every_sector_maps_to_a_sector_visibility(self, sector: Sector) -> None:
+        assert SectorVisibility(sector.value)
+
+
+class TestFullGroupMatrix:
+    @pytest.mark.parametrize("user_type", list(UserType))
+    def test_group_specific_domain_is_visible_only_to_its_own_group(
+        self, db_session: Session, user_type: UserType
+    ) -> None:
+        user = _make_user(
+            db_session,
+            email=f"{user_type.value}@example.com",
+            user_type=user_type,
+            sector=Sector.GENERAL,
+        )
+        own = GroupVisibility(user_type.value)
+        other = next(g for g in GroupVisibility if g not in (own, GroupVisibility.ALL))
+        _make_domain(db_session, "mine", own, SectorVisibility.ALL)
+        _make_domain(db_session, "not-mine", other, SectorVisibility.ALL)
+
+        result = agent_service.get_visible_domains(db_session, user)
+
+        assert [d.name for d in result] == ["mine"]
+
+    @pytest.mark.parametrize("sector", list(Sector))
+    def test_all_all_domain_is_visible_to_every_sector(
+        self, db_session: Session, sector: Sector
+    ) -> None:
+        user = _make_user(
+            db_session,
+            email=f"{sector.value}@example.com",
+            user_type=UserType.WIDOWER,
+            sector=sector,
+        )
+        _make_domain(db_session, "broadcast", GroupVisibility.ALL, SectorVisibility.ALL)
+
+        result = agent_service.get_visible_domains(db_session, user)
+
+        assert [d.name for d in result] == ["broadcast"]
 
 
 class TestPrecondition:

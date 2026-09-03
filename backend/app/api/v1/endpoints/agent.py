@@ -17,6 +17,11 @@ from app.services import agent_service
 router = APIRouter(prefix="/agents", tags=["AI Agent"])
 
 
+# USER only, deliberately: ADMIN / MODERATOR / PROFESSIONAL get 403 here. This
+# is the member-facing catalog, filtered by the caller's group/sector. Catalog
+# management and a professional's "domains I maintain" view (SPEC §12.2) belong
+# to a later admin-tools ticket and need a different, unfiltered query. Widening
+# this dependency later is backward-compatible.
 @router.get(
     "",
     response_model=list[AgentDomainResponse],

@@ -65,7 +65,7 @@ class AgentKnowledgeEntry(Base):
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     domain_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("agent_domains.id"), nullable=False
+        String(36), ForeignKey("agent_domains.id"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -98,7 +98,7 @@ class AgentConversation(Base):
         String(36), ForeignKey("users.id"), nullable=False
     )
     domain_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("agent_domains.id"), nullable=False
+        String(36), ForeignKey("agent_domains.id"), nullable=False, index=True
     )
     started_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
@@ -121,15 +121,15 @@ class AgentMessage(Base):
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     conversation_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("agent_conversations.id"), nullable=False
+        String(36), ForeignKey("agent_conversations.id"), nullable=False, index=True
     )
     role: Mapped[AgentMessageRole] = mapped_column(
         Enum(AgentMessageRole), nullable=False
     )
 
     # Server-side encrypted (AES-256-GCM), same mechanism as
-    # DirectMessage.content. Until ABF-118 merges and ABF-121 wires
-    # encrypt_message(), this holds plain text; key_version is the
+    # DirectMessage.content (app/core/encryption.py). Until ABF-121 wires
+    # encrypt_message() this holds plain text; key_version is the
     # MESSAGE_ENCRYPTION_KEY epoch, only version 1 exists.
     content: Mapped[str] = mapped_column(Text, nullable=False)
     key_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

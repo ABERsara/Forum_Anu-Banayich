@@ -8,7 +8,7 @@ sector_visibility matches the user's sector or is "all". Inactive domains are
 never returned.
 """
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.constants import GroupVisibility, SectorVisibility
@@ -18,7 +18,8 @@ from app.models.user import User
 
 def get_visible_domains(db: Session, user: User) -> list[AgentDomain]:
     """
-    Return the active agent domains this user may see, ordered by name.
+    Return the active agent domains this user may see, ordered by name
+    (case-insensitive, so the order does not flip between SQLite and Postgres).
 
     Visibility rule (DB-side, mirrors forum_service._content_filter):
         (group_visibility == user's group  OR  group_visibility == ALL)
@@ -51,6 +52,6 @@ def get_visible_domains(db: Session, user: User) -> list[AgentDomain]:
                 AgentDomain.sector_visibility == SectorVisibility.ALL,
             ),
         )
-        .order_by(AgentDomain.name)
+        .order_by(func.lower(AgentDomain.name))
         .all()
     )
