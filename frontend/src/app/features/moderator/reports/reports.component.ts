@@ -87,13 +87,17 @@ const NO_DESCRIPTION = '–';
           </p>
 
           <div style="margin-top: 0.5rem">
-            <button (click)="decide(report.id, 'valid')">
+            <button type="button" (click)="decide(report.id, 'valid')">
               {{ 'moderator.reports.decide_valid' | transloco }}
             </button>
             <!-- margin-inline-start, not margin-right: the gap belongs between
                  the two buttons, and which physical side that is depends on the
                  page direction (CONTRIBUTING §6). -->
-            <button (click)="decide(report.id, 'invalid')" style="margin-inline-start: 0.5rem">
+            <button
+              type="button"
+              (click)="decide(report.id, 'invalid')"
+              style="margin-inline-start: 0.5rem"
+            >
               {{ 'moderator.reports.decide_invalid' | transloco }}
             </button>
           </div>

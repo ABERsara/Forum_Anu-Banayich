@@ -327,5 +327,19 @@ describe('ModeratorReportsComponent', () => {
       expect(dismiss.style.marginInlineStart).toBe('0.5rem');
       expect(dismiss.style.marginRight).toBe('');
     });
+
+    /**
+     * A <button> with no type is type="submit". Neither decision button submits
+     * anything, and the moment either one lands inside a <form> — a note field
+     * is the next step on this screen — the default would submit it instead of
+     * running the click handler. CONTRIBUTING §5 asks for type="button" always.
+     */
+    it('gives both decision buttons an explicit type="button"', async () => {
+      await renderWith(of(makeList()));
+      const buttons = [...root().querySelectorAll('button')];
+
+      expect(buttons.length).toBe(2);
+      expect(buttons.map((button) => button.getAttribute('type'))).toEqual(['button', 'button']);
+    });
   });
 });
