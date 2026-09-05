@@ -386,6 +386,22 @@
       "body": "צפייה בשאלות שהופנו אליך והגשת תשובה לשואל/ת."
     }
   },
+  "moderator": {
+    "reports": {
+      "title": "לוח בקרת מבקר – דיווחים ממתינים",
+      "loading": "טוען דיווחים...",
+      "empty": "אין דיווחים ממתינים. כל הכבוד!",
+      "report_count": "{{count}} דיווחים",
+      "reason_label": "סיבה:",
+      "description_label": "תיאור:",
+      "content_status_label": "סטטוס תוכן:",
+      "decide_valid": "מחיקת ההודעה (מוצדק)",
+      "decide_invalid": "ביטול הדיווח (שגוי)"
+    },
+    "errors": {
+      "load_reports_failed": "שגיאה בטעינת הדיווחים."
+    }
+  },
   "shared": {
     "confirm_dialog": {
       "title": "האם לאשר?",
