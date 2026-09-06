@@ -1,17 +1,22 @@
 """
-Unit tests for forum_service.get_posts(), its content filter, and create_broadcast_post().
+Unit tests for forum_service.get_posts(), its content filter, create_broadcast_post(),
+and the FORUM_POST branch of like_service.toggle_like().
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import event
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
     AccountStatus,
     AuditAction,
     GroupVisibility,
+    LikeTargetType,
     PostStatus,
     Sector,
     SectorVisibility,
@@ -20,9 +25,10 @@ from app.core.constants import (
 )
 from app.models.audit import AuditLog
 from app.models.forum import ForumPost
+from app.models.like import Like
 from app.models.user import User
 from app.schemas.forum import BroadcastCreate, ForumPostCreate, ForumPostUpdate
-from app.services import forum_service
+from app.services import forum_service, like_service
 
 
 def _make_post(
@@ -462,6 +468,236 @@ class TestGetPostByIdAsModerator:
         result = forum_service.get_post_by_id(db_session, post.id, moderator)
 
         assert result.id == post.id
+
+
+class TestGetPostsLikeFields:
+    def test_like_count_and_liked_by_me(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        liker = make_user("liker@example.com", UserType.WIDOW, Sector.HASIDIC)
+        non_liker = make_user("non-liker@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+        like_service.toggle_like(db_session, LikeTargetType.FORUM_POST, post.id, liker)
+
+        as_liker = forum_service.get_posts(db_session, liker)
+        as_non_liker = forum_service.get_posts(db_session, non_liker)
+
+        assert as_liker.items[0].like_count == 1
+        assert as_liker.items[0].liked_by_me is True
+        assert as_non_liker.items[0].like_count == 1
+        assert as_non_liker.items[0].liked_by_me is False
+
+    def test_avoids_n_plus_one(
+        self, db_session: Session, make_user, db_engine: Engine
+    ) -> None:
+        """
+        like_count/liked_by_me must come from one SELECT for the whole page,
+        not one extra query per post — same concern
+        test_like_count_and_liked_by_me_avoid_n_plus_one pins for public Q&A.
+        """
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        viewer = make_user("viewer@example.com", UserType.WIDOW, Sector.HASIDIC)
+        posts = [
+            _make_post(
+                db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+            )
+            for _ in range(5)
+        ]
+        for post in posts[:3]:
+            like_service.toggle_like(
+                db_session, LikeTargetType.FORUM_POST, post.id, viewer
+            )
+
+        _ = (viewer.role, viewer.user_type, viewer.sector)
+
+        statements: list[str] = []
+
+        def _record(
+            conn: Connection,
+            cursor: Any,
+            statement: str,
+            parameters: Any,
+            context: Any,
+            executemany: bool,
+        ) -> None:
+            statements.append(statement)
+
+        event.listen(db_engine, "before_cursor_execute", _record)
+        try:
+            result = forum_service.get_posts(db_session, viewer)
+        finally:
+            event.remove(db_engine, "before_cursor_execute", _record)
+
+        assert result.total == 5
+        select_statements = [
+            s for s in statements if s.strip().upper().startswith("SELECT")
+        ]
+        # One SELECT for the total count, one for the page itself (with the
+        # like subqueries joined in) — flat regardless of page size, not one
+        # extra query per post.
+        assert len(select_statements) == 2
+
+
+class TestGetPostByIdLikeFields:
+    def test_like_count_and_liked_by_me(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        liker = make_user("liker@example.com", UserType.WIDOW, Sector.HASIDIC)
+        non_liker = make_user("non-liker@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+        like_service.toggle_like(db_session, LikeTargetType.FORUM_POST, post.id, liker)
+
+        # Asserted right after each call, not held onto and compared at the
+        # end — db_session's identity map returns the same ForumPost Python
+        # object for both calls (same PK, same session), so a second call
+        # would silently overwrite the first's like_count/liked_by_me
+        # attributes on that shared instance.
+        as_liker = forum_service.get_post_by_id(db_session, post.id, liker)
+        assert as_liker.like_count == 1
+        assert as_liker.liked_by_me is True
+
+        as_non_liker = forum_service.get_post_by_id(db_session, post.id, non_liker)
+        assert as_non_liker.like_count == 1
+        assert as_non_liker.liked_by_me is False
+
+
+class TestToggleLikeForumPost:
+    def test_first_like_then_toggle_removes_it(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        liker = make_user("liker@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        liked = like_service.toggle_like(
+            db_session, LikeTargetType.FORUM_POST, post.id, liker
+        )
+        assert liked.liked is True
+        assert liked.like_count == 1
+        assert db_session.query(Like).count() == 1
+
+        unliked = like_service.toggle_like(
+            db_session, LikeTargetType.FORUM_POST, post.id, liker
+        )
+        assert unliked.liked is False
+        assert unliked.like_count == 0
+        assert db_session.query(Like).count() == 0
+
+    def test_two_different_users_both_count(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        first_liker = make_user("liker1@example.com", UserType.WIDOW, Sector.HASIDIC)
+        second_liker = make_user("liker2@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        like_service.toggle_like(
+            db_session, LikeTargetType.FORUM_POST, post.id, first_liker
+        )
+        result = like_service.toggle_like(
+            db_session, LikeTargetType.FORUM_POST, post.id, second_liker
+        )
+
+        assert result.like_count == 2
+
+    def test_admin_may_like_post_from_any_cell(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.SEPHARDIC)
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.SEPHARDIC
+        )
+
+        result = like_service.toggle_like(
+            db_session, LikeTargetType.FORUM_POST, post.id, admin
+        )
+
+        assert result.liked is True
+
+    def test_user_in_same_cell_may_like(self, db_session: Session, make_user) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.SEPHARDIC)
+        same_cell_user = make_user(
+            "same-cell@example.com", UserType.WIDOW, Sector.SEPHARDIC
+        )
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.SEPHARDIC
+        )
+
+        result = like_service.toggle_like(
+            db_session, LikeTargetType.FORUM_POST, post.id, same_cell_user
+        )
+
+        assert result.liked is True
+
+    def test_outsider_rejected_on_other_cell_post(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.SEPHARDIC)
+        outsider = make_user("outsider@example.com", UserType.WIDOWER, Sector.HASIDIC)
+        post = _make_post(
+            db_session, author, GroupVisibility.WIDOWS, SectorVisibility.SEPHARDIC
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session, LikeTargetType.FORUM_POST, post.id, outsider
+            )
+        assert exc_info.value.status_code == 403
+
+    def test_rejects_hidden_post_for_non_admin(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session,
+            author,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            status=PostStatus.HIDDEN,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session, LikeTargetType.FORUM_POST, post.id, author
+            )
+        assert exc_info.value.status_code == 403
+
+    def test_rejects_deleted_post_for_non_admin(
+        self, db_session: Session, make_user
+    ) -> None:
+        author = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+        post = _make_post(
+            db_session,
+            author,
+            GroupVisibility.WIDOWS,
+            SectorVisibility.HASIDIC,
+            status=PostStatus.DELETED,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session, LikeTargetType.FORUM_POST, post.id, author
+            )
+        assert exc_info.value.status_code == 403
+
+    def test_rejects_unknown_post_id(self, db_session: Session, make_user) -> None:
+        user = make_user("widow@example.com", UserType.WIDOW, Sector.HASIDIC)
+
+        with pytest.raises(HTTPException) as exc_info:
+            like_service.toggle_like(
+                db_session,
+                LikeTargetType.FORUM_POST,
+                "00000000-0000-0000-0000-000000000000",
+                user,
+            )
+        assert exc_info.value.status_code == 404
 
 
 class TestDeletePost:

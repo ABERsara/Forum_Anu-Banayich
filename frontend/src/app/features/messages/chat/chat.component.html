@@ -4,49 +4,152 @@
     <h1>{{ otherUserName() || ('messages.chat.title_fallback' | transloco) }}</h1>
   </header>
 
-  <div class="chat__body" aria-live="polite" [attr.aria-busy]="isLoading()">
-    @if (isLoading()) {
-      <app-loading-spinner size="md" [message]="'messages.chat.loading' | transloco" />
-    } @else if (hasError()) {
-      <app-error-display [message]="loadErrorKey() | transloco" />
-    } @else if (messages().length === 0) {
-      <p>{{ 'messages.chat.empty' | transloco }}</p>
-    } @else {
-      <ul class="chat__messages">
-        @for (msg of messages(); track msg.id) {
+  <!--
+    tabindex on the scrolling region, not decoration: a keyboard user cannot
+    scroll a container she cannot focus, and this one loads content when it
+    reaches the top. The "load older messages" button below is the same
+    function without any scrolling at all.
+  -->
+  <section
+    #messageLog
+    class="chat__log"
+    tabindex="0"
+    [attr.aria-label]="'messages.chat.log_label' | transloco"
+    (scroll)="onScroll()"
+  >
+    <div class="chat__states" aria-live="polite" [attr.aria-busy]="isLoading()">
+      @if (isLoading()) {
+        <app-loading-spinner size="md" [message]="'messages.chat.loading' | transloco" />
+      } @else if (loadErrorKey(); as key) {
+        <app-error-display [message]="key | transloco" />
+      } @else if (messages().length === 0) {
+        <p class="chat__empty">{{ 'messages.chat.empty' | transloco }}</p>
+      }
+    </div>
+
+    @if (messages().length > 0) {
+      <div class="chat__older">
+        @if (isLoadingOlder()) {
+          <app-loading-spinner size="sm" [message]="'messages.chat.loading_older' | transloco" />
+        } @else if (hasMore()) {
+          <button type="button" class="chat__older-button" (click)="loadOlder()">
+            {{ 'messages.chat.load_older' | transloco }}
+          </button>
+        } @else {
+          <p class="chat__history-start">{{ 'messages.chat.history_start' | transloco }}</p>
+        }
+        @if (olderErrorKey(); as key) {
+          <app-error-display [message]="key | transloco" />
+        }
+      </div>
+
+      <ol class="chat__messages">
+        @for (message of messages(); track message.id) {
           <li
             class="chat__message"
-            [class.chat__message--mine]="isMyMessage(msg)"
-            [class.chat__message--theirs]="!isMyMessage(msg)"
+            [class.chat__message--mine]="message.mine"
+            [class.chat__message--theirs]="!message.mine"
           >
-            <span class="chat__bubble">{{ msg.content }}</span>
+            <div class="chat__bubble" [class.chat__bubble--pending]="message.pending">
+              <!--
+                Who wrote this, in words. On screen the side and the colour of
+                the bubble say it; neither survives being read aloud, and
+                WCAG 1.4.1 does not accept colour as the only carrier.
+              -->
+              <span class="chat__speaker">{{
+                (message.mine ? 'messages.chat.speaker_me' : 'messages.chat.speaker_other')
+                  | transloco: { name: otherUserName() }
+              }}</span>
+              <span class="chat__text">{{ message.content }}</span>
+              <span class="chat__meta">
+                <time [attr.datetime]="message.createdAt">{{
+                  message.createdAt | date: 'shortTime'
+                }}</time>
+                @if (message.mine) {
+                  <span class="chat__receipt">{{ receiptKey(message) | transloco }}</span>
+                }
+              </span>
+            </div>
           </li>
         }
-      </ul>
-      <div #messagesEnd></div>
+      </ol>
     }
-  </div>
 
-  <form class="chat__composer" (submit)="$event.preventDefault(); sendMessage()">
-    @if (sendError()) {
-      <app-error-display [message]="sendErrorKey() | transloco" />
+    <!--
+      Announces the arrival of older messages without announcing the messages
+      themselves. The region is rendered even when empty, because a live
+      region has to exist before its content changes for the change to be
+      noticed at all.
+    -->
+    <p class="chat__sr-only" role="status">
+      @if (olderLoadedCount() > 0) {
+        {{ 'messages.chat.older_loaded' | transloco: { count: olderLoadedCount() } }}
+      }
+    </p>
+  </section>
+
+  <form class="chat__composer" (submit)="$event.preventDefault(); send()">
+    <!--
+      The live region is this wrapper, not the notice inside it — same rule as
+      the older-messages status above. A role="status" element that arrives in
+      the DOM already carrying its text is a region that never changed, and an
+      unchanged region announces nothing.
+    -->
+    <div class="chat__live" role="status">
+      @if (pruneNotice(); as notice) {
+        <p class="chat__notice">
+          {{
+            (notice.count === 1
+              ? 'messages.chat.pruned_notice'
+              : 'messages.chat.pruned_notice_many'
+            ) | transloco: { limit: notice.limit | number, count: notice.count }
+          }}
+        </p>
+      }
+    </div>
+    @if (sendErrorKey(); as key) {
+      <app-error-display [message]="key | transloco" />
     }
+
+    <label class="chat__sr-only" for="chat-new-message">{{
+      'messages.chat.new_message_label' | transloco
+    }}</label>
     <div class="chat__composer-row">
-      <label class="chat__composer-label" for="chat-new-message">{{
-        'messages.chat.new_message_label' | transloco
-      }}</label>
-      <input
+      <textarea
         id="chat-new-message"
         name="newMessage"
-        type="text"
-        [(ngModel)]="newMessage"
+        rows="2"
+        [ngModel]="draft()"
+        (ngModelChange)="draft.set($event)"
+        (keydown.enter)="onEnter($event)"
         [placeholder]="'messages.chat.placeholder' | transloco"
-        maxlength="2000"
-        [disabled]="isSending()"
-      />
-      <button type="submit" [disabled]="!newMessage.trim() || isSending()">
+        [attr.maxlength]="maxLength"
+        aria-describedby="chat-char-count"
+      ></textarea>
+      <button type="submit" [disabled]="!canSend()">
         {{ 'messages.chat.send' | transloco }}
       </button>
+    </div>
+
+    <!--
+      Described-by rather than a live region: the counter changes on every
+      keystroke, and a polite region that re-reads "1 of 2000, 2 of 2000" is
+      worse than no announcement. Screen readers read a description when the
+      field takes focus, which is when the budget is worth knowing. Reaching
+      the limit is a one-off event, so that one does announce.
+    -->
+    <p class="chat__counter" id="chat-char-count">
+      {{
+        'messages.chat.char_count'
+          | transloco: { count: draft().length | number, max: maxLength | number }
+      }}
+    </p>
+    <div class="chat__live" role="status">
+      @if (atLimit()) {
+        <p class="chat__limit">
+          {{ 'messages.chat.limit_reached' | transloco: { max: maxLength | number } }}
+        </p>
+      }
     </div>
   </form>
 </div>
