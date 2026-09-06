@@ -200,7 +200,10 @@
     "my_questions": {
       "title": "השאלות שלי",
       "loading": "טוען שאלות...",
-      "empty": "עדיין לא שאלת שאלות."
+      "empty": "עדיין לא שאלת שאלות.",
+      "like_error": "הלייק לא נשמר. נסה שוב.",
+      "like_aria": "לייק — {{count}}",
+      "unlike_aria": "ביטול לייק — {{count}}"
     },
     "qa_feed": {
       "back_link": "→ חזרה לייעוץ מקצועי",
@@ -384,6 +387,22 @@
       "title": "ייעוץ מקצועי",
       "subtitle": "שאלות הממתינות לתשובתך",
       "body": "צפייה בשאלות שהופנו אליך והגשת תשובה לשואל/ת."
+    }
+  },
+  "moderator": {
+    "reports": {
+      "title": "לוח בקרת מבקר – דיווחים ממתינים",
+      "loading": "טוען דיווחים...",
+      "empty": "אין דיווחים ממתינים. כל הכבוד!",
+      "report_count": "{{count}} דיווחים",
+      "reason_label": "סיבה:",
+      "description_label": "תיאור:",
+      "content_status_label": "סטטוס תוכן:",
+      "decide_valid": "מחיקת ההודעה (מוצדק)",
+      "decide_invalid": "ביטול הדיווח (שגוי)"
+    },
+    "errors": {
+      "load_reports_failed": "שגיאה בטעינת הדיווחים."
     }
   },
   "shared": {

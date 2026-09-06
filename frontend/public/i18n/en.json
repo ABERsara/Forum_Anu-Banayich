@@ -200,7 +200,10 @@
     "my_questions": {
       "title": "My questions",
       "loading": "Loading questions...",
-      "empty": "You have not asked any questions yet."
+      "empty": "You have not asked any questions yet.",
+      "like_error": "Couldn't save the like. Please try again.",
+      "like_aria": "Like — {{count}}",
+      "unlike_aria": "Unlike — {{count}}"
     },
     "qa_feed": {
       "back_link": "← Back to professional advice",
@@ -384,6 +387,22 @@
       "title": "Professional advice",
       "subtitle": "Questions awaiting your answer",
       "body": "View the questions sent to you and answer the asker."
+    }
+  },
+  "moderator": {
+    "reports": {
+      "title": "Moderator dashboard – pending reports",
+      "loading": "Loading reports...",
+      "empty": "No pending reports. Nice work!",
+      "report_count": "{{count}} reports",
+      "reason_label": "Reason:",
+      "description_label": "Description:",
+      "content_status_label": "Content status:",
+      "decide_valid": "Delete the message (valid)",
+      "decide_invalid": "Dismiss the report (invalid)"
+    },
+    "errors": {
+      "load_reports_failed": "Something went wrong loading the reports."
     }
   },
   "shared": {
