@@ -1,23 +1,58 @@
-<div class="cell-members">
-  <h1>{{ 'messages.inbox.title' | transloco }}</h1>
+<div class="inbox">
+  <div class="inbox__header">
+    <h1>{{ 'messages.inbox.title' | transloco }}</h1>
+    <a routerLink="/messages/new" class="inbox__new-link">{{
+      'messages.inbox.new_message' | transloco
+    }}</a>
+  </div>
 
   <div aria-live="polite" [attr.aria-busy]="isLoading()">
     @if (isLoading()) {
       <app-loading-spinner size="md" [message]="'messages.inbox.loading' | transloco" />
     } @else if (hasError()) {
       <app-error-display [message]="loadErrorKey() | transloco" />
-    } @else if (members().length === 0) {
+    } @else if (conversations().length === 0) {
       <p>{{ 'messages.inbox.empty' | transloco }}</p>
     } @else {
-      <ul class="cell-members__list">
-        @for (member of members(); track member.id) {
+      <ul class="inbox__list">
+        @for (conv of conversations(); track conv.other_user.id) {
           <li>
-            <a [routerLink]="['/messages', member.id]" class="cell-members__item">
-              {{ member.first_name }} {{ member.last_name }}
+            <a
+              [routerLink]="['/messages', conv.other_user.id]"
+              class="inbox__item"
+              [attr.aria-label]="
+                (conv.unread_count > 0
+                  ? 'messages.inbox.item_aria_unread'
+                  : 'messages.inbox.item_aria'
+                ) | transloco: { name: otherUserName(conv), count: conv.unread_count }
+              "
+            >
+              <span class="inbox__name" aria-hidden="true">{{ otherUserName(conv) }}</span>
+              <span class="inbox__preview" aria-hidden="true">{{ conv.last_message_preview }}</span>
+              <span class="inbox__date" aria-hidden="true">{{
+                conv.last_message_at | date: 'short'
+              }}</span>
+              @if (conv.unread_count > 0) {
+                <span class="inbox__badge" aria-hidden="true">{{ conv.unread_count }}</span>
+              }
             </a>
           </li>
         }
       </ul>
+
+      @if (totalPages() > 1) {
+        <div class="inbox__pagination">
+          <button (click)="previousPage()" [disabled]="page() <= 1">
+            {{ 'messages.inbox.previous_page' | transloco }}
+          </button>
+          <span>{{
+            'messages.inbox.page_of' | transloco: { page: page(), total: totalPages() }
+          }}</span>
+          <button (click)="nextPage()" [disabled]="page() >= totalPages()">
+            {{ 'messages.inbox.next_page' | transloco }}
+          </button>
+        </div>
+      }
     }
   </div>
 </div>

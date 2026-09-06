@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
 import { vi } from 'vitest';
 
 import { ConfirmDialogComponent } from './confirm-dialog.component';
+import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 describe('ConfirmDialogComponent', () => {
   let fixture: ComponentFixture<ConfirmDialogComponent>;
@@ -9,7 +11,7 @@ describe('ConfirmDialogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ConfirmDialogComponent],
+      imports: [ConfirmDialogComponent, translocoTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ConfirmDialogComponent);
@@ -94,5 +96,59 @@ describe('ConfirmDialogComponent', () => {
     cancelButton().click();
 
     expect(cancelled).toHaveBeenCalled();
+  });
+
+  describe('text', () => {
+    function dialogText(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    it('falls back to the generic Hebrew prompt when the caller passes no text', () => {
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.dialog__title').textContent.trim()).toBe(
+        'האם לאשר?',
+      );
+      expect(confirmButton().textContent?.trim()).toBe('אישור');
+      expect(cancelButton().textContent?.trim()).toBe('ביטול');
+    });
+
+    /**
+     * The dialog renders the text it is handed, untouched. Every feature call
+     * site still passes a Hebrew literal — those move to the `transloco` pipe
+     * in their own migration ticket, and must keep working until they do.
+     */
+    it('renders caller-supplied text verbatim, translated or not', () => {
+      fixture.componentRef.setInput('title', 'מחיקת הודעה');
+      fixture.componentRef.setInput('confirmText', 'מחיקה');
+      fixture.componentRef.setInput('cancelText', 'לא עכשיו');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.dialog__title').textContent.trim()).toBe(
+        'מחיקת הודעה',
+      );
+      expect(confirmButton().textContent?.trim()).toBe('מחיקה');
+      expect(cancelButton().textContent?.trim()).toBe('לא עכשיו');
+    });
+
+    it('shows the generic prompt in English under an English locale', () => {
+      fixture.detectChanges();
+
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.dialog__title').textContent.trim()).toBe(
+        'Are you sure?',
+      );
+      expect(confirmButton().textContent?.trim()).toBe('Confirm');
+      expect(cancelButton().textContent?.trim()).toBe('Cancel');
+      expect(dialogText()).not.toMatch(HEBREW);
+    });
+
+    it('does not pin its own text direction — it follows <html dir>', () => {
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.dialog').hasAttribute('dir')).toBe(false);
+    });
   });
 });

@@ -10,6 +10,7 @@
 
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { AdminService } from '../../../core/services/admin.service';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
@@ -18,7 +19,7 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [RouterLink, LoadingSpinnerComponent, ErrorDisplayComponent],
+  imports: [RouterLink, TranslocoPipe, LoadingSpinnerComponent, ErrorDisplayComponent],
   templateUrl: './admin-dashboard.component.html',
   styleUrl: './admin-dashboard.component.scss',
 })

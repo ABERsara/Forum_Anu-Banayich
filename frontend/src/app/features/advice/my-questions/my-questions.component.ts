@@ -11,6 +11,7 @@ import {
 import { ProfessionalQuery } from '../../../core/models';
 import { LabelService } from '../../../core/i18n/label.service';
 import { ProfessionalService } from '../../../core/services/professional.service';
+import { AdviceError, NO_ERROR, adviceErrorFrom } from '../advice-error';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
@@ -27,7 +28,8 @@ export class MyQuestionsComponent implements OnInit {
 
   questions: ProfessionalQuery[] = [];
   isLoading = signal(false);
-  errorMessage = signal('');
+  /** What went wrong on load, as a key of ours or a sentence the API sent. */
+  error = signal<AdviceError>(NO_ERROR);
 
   readonly domainLabels = PROFESSIONAL_DOMAIN_LABELS;
   readonly statusLabels = QUERY_STATUS_LABELS;
@@ -41,7 +43,7 @@ export class MyQuestionsComponent implements OnInit {
         this.isLoading.set(false);
       },
       error: (err) => {
-        this.errorMessage.set(err.error?.detail ?? 'שגיאה בטעינת השאלות שלך.');
+        this.error.set(adviceErrorFrom(err, 'advice.errors.load_my_questions_failed'));
         this.isLoading.set(false);
       },
     });
