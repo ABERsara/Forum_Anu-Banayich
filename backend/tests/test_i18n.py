@@ -10,7 +10,9 @@ ContextVar, the threadpool Starlette runs our sync endpoints in, the order the
 middleware is installed in — sits in the gap.
 
 TestErrorsInBothLanguages is the ticket's proof of execution: the same request,
-twice, differing only in the header.
+twice, differing only in the header. TestWhatDoesNotFollowTheHeader is the other
+half of that claim — the constraints Pydantic owns rather than us, which answer
+in English either way, and are the one part of a 422 this ticket does not reach.
 """
 
 import asyncio
@@ -179,6 +181,29 @@ class TestMiddleware:
         assert r.status_code == 409
         assert r.json()["detail"] == _msg("auth.email_taken", ENGLISH)
 
+    async def test_pydantic_validator_respects_language(self, client):
+        """The request's *other* execution context. A `field_validator` raises
+        while the body is still being parsed — before an endpoint exists to run
+        at all, and on the event loop rather than in the worker thread the test
+        above covers. Same ContextVar, a different moment in the request, and
+        the only one of the three shapes whose message reaches the client
+        through Pydantic rather than through our own response.
+
+        Asserted whole, not with `in`: `"Value error, "` is Pydantic's prefix
+        and part of the 422 contract this ticket promises not to move
+        (`TestErrorsInBothLanguages::test_the_422_body_keeps_its_shape`), so
+        the equality is what would catch us translating it away by accident.
+        The both-languages form of this — the ticket's proof of execution — is
+        `TestErrorsInBothLanguages::test_validation_error_follows_the_header`.
+        """
+        payload = {**VALID_PAYLOAD, "phone": "050-12ab-xyz"}
+        r = await client.post(
+            f"{BASE}/register", json=payload, headers={"Accept-Language": "en"}
+        )
+        assert r.status_code == 422
+        expected = _msg("validation.phone_digits_only", ENGLISH)
+        assert r.json()["detail"][0]["msg"] == f"Value error, {expected}"
+
     async def test_concurrent_requests_do_not_share_a_language(self, client):
         """The reason this is a ContextVar and not a module-level global: two
         requests in flight at once must not read each other's header."""
@@ -208,6 +233,11 @@ class TestErrorsInBothLanguages:
     One case per pattern the ticket mapped, each asserted in both languages:
     a Pydantic validator (422), an HTTPException raised in a service (409),
     an HTTPException raised by a dependency (401), and a success dict (200).
+
+    Organised by the *requirement*, where TestMiddleware above is organised by
+    the *mechanism* — so the validator case is proved in both places on purpose:
+    here as the ticket's worked example, there as one of the three moments in a
+    request at which the ContextVar is read.
     """
 
     async def test_validation_error_follows_the_header(self, client):
@@ -288,6 +318,80 @@ class TestErrorsInBothLanguages:
             f"{BASE}/register", json=VALID_PAYLOAD, headers={"Accept-Language": "en"}
         )
         assert not any("֐" <= ch <= "׿" for ch in r.text)
+
+
+# ---------------------------------------------------------------------------
+# where the ticket stops
+# ---------------------------------------------------------------------------
+
+
+class TestWhatDoesNotFollowTheHeader:
+    """
+    The boundary of ABF-137, pinned rather than left to be rediscovered.
+
+    This ticket translates the messages *we* write. A field that fails one of
+    Pydantic's own constraints — `min_length`, `EmailStr`, an enum member, an
+    absent key — never reaches a validator of ours, so its `msg` is Pydantic's
+    English for every caller, a Hebrew reader included. `main` already answered
+    that way; this ticket neither causes it nor closes it.
+
+    Closing it is a ticket of its own, and a bigger one than it looks. It means
+    a `RequestValidationError` handler keyed on the machine-readable `type`
+    (`string_too_short`, `enum`, `missing`) — not on `msg`, which is the
+    prose-parsing that i18n.py's docstring rejects — plus a catalogue entry per
+    type and a `ctx` mapping for the numbers inside them. It would also rewrite
+    `detail[].msg` for every endpoint in the API, and *this* ticket's contract
+    is that the 422 body does not move.
+
+    So the gap is written down as a test instead of a comment: this fails the
+    day someone does translate them, and asks them to delete it on the way.
+    """
+
+    @pytest.mark.parametrize(
+        ("payload", "error_type"),
+        [
+            ({**VALID_PAYLOAD, "phone": "abc"}, "string_too_short"),
+            ({**VALID_PAYLOAD, "email": "not-an-email"}, "value_error"),
+            ({**VALID_PAYLOAD, "user_type": "wizard"}, "enum"),
+            ({k: v for k, v in VALID_PAYLOAD.items() if k != "phone"}, "missing"),
+        ],
+        ids=["too short", "not an email", "outside the enum", "absent"],
+    )
+    async def test_a_constraint_pydantic_owns_answers_the_same_either_way(
+        self, client, payload, error_type
+    ):
+        english = await client.post(
+            f"{BASE}/register", json=payload, headers={"Accept-Language": "en"}
+        )
+        hebrew = await client.post(
+            f"{BASE}/register", json=payload, headers={"Accept-Language": "he"}
+        )
+
+        assert english.status_code == hebrew.status_code == 422
+        english_error = english.json()["detail"][0]
+        assert english_error["type"] == error_type
+        # The claim, in two halves: the header changes nothing here, and the
+        # text is not one of ours to have changed.
+        assert english_error["msg"] == hebrew.json()["detail"][0]["msg"]
+        assert english_error["msg"] not in {
+            text for translations in MESSAGES.values() for text in translations.values()
+        }
+
+    async def test_a_constraint_we_own_still_follows_the_header(self, client):
+        """The other side of the same 422, so the boundary reads as a boundary
+        and not as "validation errors are untranslated". `min_length` on
+        `phone` is Pydantic's; `phone_digits_only` on the same field is ours,
+        and only the second one changes language."""
+        payload = {**VALID_PAYLOAD, "phone": "050-12ab-xyz"}
+        english = await client.post(
+            f"{BASE}/register", json=payload, headers={"Accept-Language": "en"}
+        )
+        hebrew = await client.post(
+            f"{BASE}/register", json=payload, headers={"Accept-Language": "he"}
+        )
+
+        assert english.json()["detail"][0]["type"] == "value_error"
+        assert english.json()["detail"][0]["msg"] != hebrew.json()["detail"][0]["msg"]
 
 
 class TestHebrewIsUnchanged:

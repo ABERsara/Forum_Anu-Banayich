@@ -29,6 +29,19 @@ a human-readable string out of another library's error format to get a key back.
 `translate()` at the `raise` keeps the key from ever becoming prose in the first
 place, and leaves the 422 body byte-identical to what it was before.
 
+What this does not cover
+------------------------
+Only the messages we write. A field that fails one of Pydantic's own
+constraints — `min_length`, `EmailStr`, an enum member, an absent key — never
+reaches a validator of ours, and its `msg` comes back in Pydantic's English for
+every caller, Hebrew readers included. That is what `main` already answered, and
+it stays that way here on purpose: translating it means a
+`RequestValidationError` handler keyed on the machine-readable `type`, which
+rewrites `detail[].msg` for every endpoint in the API, while this ticket's
+contract is that the 422 body does not move. The limit is pinned, with the shape
+such a handler would have to take, by
+`test_i18n.py::TestWhatDoesNotFollowTheHeader`.
+
 Why a raw ASGI middleware and not `@app.middleware("http")`
 -----------------------------------------------------------
 Starlette's `BaseHTTPMiddleware` — what the decorator builds — runs the rest of
