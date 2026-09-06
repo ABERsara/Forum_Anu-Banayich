@@ -11,8 +11,9 @@ import { Observable } from 'rxjs';
 
 import {
   ConversationList,
-  DirectMessage,
+  ConversationMessagesPage,
   DirectMessageCreate,
+  DirectMessageSendResult,
   ForumPost,
   ForumPostCreate,
   ForumPostList,
@@ -77,18 +78,34 @@ export class ForumService {
     return this.api.get<ConversationList>(`/messages?page=${page}&page_size=${pageSize}`);
   }
 
-  sendMessage(data: DirectMessageCreate): Observable<DirectMessage> {
-    return this.api.post<DirectMessage>('/messages', data);
+  sendMessage(data: DirectMessageCreate): Observable<DirectMessageSendResult> {
+    return this.api.post<DirectMessageSendResult>('/messages', data);
   }
 
   /**
-   * Full history of the conversation with `otherUserId` (no pagination —
-   * out of scope for ABF-118). `conversation_key` is a deterministic,
-   * non-secret pairing of the two user ids — see buildConversationKey().
+   * One page of the conversation with `otherUserId`, oldest first within the
+   * page. `conversation_key` is a deterministic, non-secret pairing of the two
+   * user ids — see buildConversationKey().
+   *
+   * Call it with no `before` for the newest page, which is what the screen
+   * opens on, then pass each response's `next_cursor` back as `before` to walk
+   * backwards. That first, cursor-less request is also the one that marks the
+   * conversation read on the server, so scrolling back through history stays a
+   * pure read.
    */
-  getConversation(myUserId: string, otherUserId: string): Observable<DirectMessage[]> {
+  getConversation(
+    myUserId: string,
+    otherUserId: string,
+    options: { limit?: number; before?: string | null } = {},
+  ): Observable<ConversationMessagesPage> {
     const key = buildConversationKey(myUserId, otherUserId);
-    return this.api.get<DirectMessage[]>(`/conversations/${key}/messages`);
+    const params = new URLSearchParams();
+    if (options.limit !== undefined) params.set('limit', String(options.limit));
+    if (options.before) params.set('before', options.before);
+    const query = params.toString();
+    return this.api.get<ConversationMessagesPage>(
+      `/conversations/${key}/messages${query ? `?${query}` : ''}`,
+    );
   }
 
   /** Other ACTIVE members of the current user's own cell (group+sector). */
