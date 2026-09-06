@@ -31,15 +31,13 @@ def get_visible_domains(db: Session, user: User) -> list[AgentDomain]:
 
     user_type/sector are Optional on User (other roles don't have them). The
     only caller, GET /agents, is gated by require_role(UserRole.USER), so they
-    are always set here; assert it rather than let a non-USER caller hit a
+    are always set here; check it rather than let a non-USER caller hit a
     confusing AttributeError inside the filter.
     """
-    assert user.user_type is not None, (
-        "get_visible_domains() requires a user with user_type set"
-    )
-    assert user.sector is not None, (
-        "get_visible_domains() requires a user with sector set"
-    )
+    if user.user_type is None:
+        raise ValueError("get_visible_domains() requires a user with user_type set")
+    if user.sector is None:
+        raise ValueError("get_visible_domains() requires a user with sector set")
     group_visibility = GroupVisibility(user.user_type.value)
     sector_visibility = SectorVisibility(user.sector.value)
     return (

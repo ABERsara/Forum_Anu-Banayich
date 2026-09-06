@@ -313,7 +313,7 @@ class TestFullGroupMatrix:
 
 
 class TestPrecondition:
-    def test_asserts_when_user_has_no_group_or_sector(
+    def test_raises_when_user_has_no_group_or_sector(
         self, db_session: Session
     ) -> None:
         # get_visible_domains relies on the endpoint's require_role(USER) gate;
@@ -326,5 +326,5 @@ class TestPrecondition:
             role=UserRole.ADMIN,
         )
 
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             agent_service.get_visible_domains(db_session, admin)

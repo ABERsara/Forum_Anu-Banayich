@@ -152,7 +152,7 @@ class AgentMessage(Base):
     )
 
     # Server-side encrypted (AES-256-GCM), same mechanism as
-    # DirectMessage.content (app/core/encryption.py). Until ABF-121 wires
+    # DirectMessage.content (app/core/encryption.py). Until ABF-122 wires
     # encrypt_message() this holds plain text; key_version is the
     # MESSAGE_ENCRYPTION_KEY epoch, only version 1 exists.
     content: Mapped[str] = mapped_column(Text, nullable=False)
