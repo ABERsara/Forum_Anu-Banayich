@@ -19,17 +19,15 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # PostgreSQL: extend the native `auditaction` enum type. `ALTER TYPE ... ADD
-    # VALUE` cannot run inside a transaction block on PostgreSQL < 12, so it goes
-    # in an autocommit_block (a no-op wrapper on 12+); IF NOT EXISTS keeps it
-    # idempotent. On SQLite the enum column is plain VARCHAR with no CHECK, so
-    # there is nothing to alter.
+    # PostgreSQL: extend the native `auditaction` enum type. PostgreSQL 12+
+    # allows `ALTER TYPE ... ADD VALUE` inside a transaction as long as the new
+    # value is not *used* in the same transaction (it is not here), so this runs
+    # in the migration's own transaction and stays atomic with the rest of the
+    # `alembic upgrade` run. IF NOT EXISTS keeps it idempotent on re-run. On
+    # SQLite the enum column is plain VARCHAR with no CHECK, so nothing to alter.
     if op.get_bind().dialect.name != "postgresql":
         return
-    with op.get_context().autocommit_block():
-        op.execute(
-            "ALTER TYPE auditaction ADD VALUE IF NOT EXISTS 'AGENT_CONVERSATION'"
-        )
+    op.execute("ALTER TYPE auditaction ADD VALUE IF NOT EXISTS 'AGENT_CONVERSATION'")
 
 
 def downgrade() -> None:

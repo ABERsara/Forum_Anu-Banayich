@@ -6,6 +6,10 @@ A DB enum type's members come from two places in the migrations:
   * the sa.Enum(...) / postgresql.ENUM(...) call that first creates it, and
   * any later `ALTER TYPE <name> ADD VALUE '<MEMBER>'` migration that extends it.
 
+The two are matched only by enum type name — this test does not verify that
+the ALTER TYPE migration is actually a descendant of the creating one (that
+ordering is covered by test_migration.py running `alembic upgrade head`).
+
 SQLite doesn't enforce enum membership (see test_migration.py — the column is
 just VARCHAR with no CHECK constraint), so a real Postgres instance is the
 only way to observe the resulting constraint-violation crash at runtime. This
@@ -30,9 +34,15 @@ ENUM_NAME_TO_CLASS: dict[str, type[enum.Enum]] = {
     if isinstance(cls, type) and issubclass(cls, enum.Enum)
 }
 
-# `ALTER TYPE auditaction ADD VALUE [IF NOT EXISTS] 'AGENT_CONVERSATION'`
+# `ALTER TYPE [schema.]auditaction ADD VALUE [IF NOT EXISTS] 'AGENT_CONVERSATION'`
+# — tolerant of whitespace/newlines, an optional schema qualifier, and quoted
+# identifiers. The label group is compared against the Python enum's member
+# NAMES, so a value like 'agent_conversation' is still captured and then flagged
+# as an `extra=` mismatch rather than silently ignored.
 _ALTER_ADD_VALUE = re.compile(
-    r"ALTER TYPE\s+(\w+)\s+ADD VALUE\s+(?:IF NOT EXISTS\s+)?'([A-Z_]+)'"
+    r"ALTER\s+TYPE\s+(?:\"?\w+\"?\.)?\"?(\w+)\"?\s+ADD\s+VALUE\s+"
+    r"(?:IF\s+NOT\s+EXISTS\s+)?'(\w+)'",
+    re.IGNORECASE,
 )
 
 
@@ -70,8 +80,37 @@ def _find_enum_calls(path: Path) -> list[tuple[str, list[str]]]:
 
 
 def _find_alter_type_additions(path: Path) -> list[tuple[str, str]]:
-    """Return (enum_name, member_name) for every ALTER TYPE ... ADD VALUE."""
-    return _ALTER_ADD_VALUE.findall(path.read_text(encoding="utf-8"))
+    """Return (enum_name, member_name) for every `ALTER TYPE ... ADD VALUE`
+    actually executed by a migration's upgrade().
+
+    Only string literals passed to an ``.execute(...)`` call inside the
+    ``upgrade`` function body count — a commented-out or relocated statement, or
+    SQL that is built into a variable but never executed, does not, matching the
+    AST rigor of _find_enum_calls().
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    upgrade = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "upgrade"
+        ),
+        None,
+    )
+    if upgrade is None:
+        return []
+    results: list[tuple[str, str]] = []
+    for node in ast.walk(upgrade):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "execute"
+        ):
+            continue
+        for arg in node.args:
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                results.extend(_ALTER_ADD_VALUE.findall(arg.value))
+    return results
 
 
 def test_all_migration_enums_match_python_source() -> None:
