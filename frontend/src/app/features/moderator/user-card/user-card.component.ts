@@ -8,6 +8,10 @@
  * Reached from a row of the reports queue, and scoped server-side: a
  * moderator only ever opens the card of a user in a cell they oversee.
  *
+ * The copy lives under `moderator.user_card.*` in he.json/en.json, alongside
+ * the reports board ABF-134 migrated — a screen added to a module that has
+ * already moved does not bring hardcoded Hebrew back in (CONTRIBUTING §6).
+ *
  * Important:
  *   - No contact details. The moderator sees counts and a cell, not the
  *     person's email, phone or ID number.
@@ -25,16 +29,19 @@ import {
   signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { UserModerationCard } from '../../../core/models';
 import {
   ACCOUNT_STATUS_LABELS,
   AccountStatus,
+  LabelKey,
   SECTOR_LABELS,
   USER_TYPE_LABELS,
 } from '../../../core/constants';
+import { LabelService } from '../../../core/i18n/label.service';
+import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { ReportService } from '../../../core/services/report.service';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
@@ -44,7 +51,12 @@ import {
   SuspendDialogResult,
 } from '../../../shared/components/suspend-dialog/suspend-dialog.component';
 
-/** Shown wherever a user carries no group or sector yet. */
+/**
+ * Shown wherever a user carries no group or sector yet.
+ *
+ * An em dash is a glyph, not copy — it reads the same in both languages and
+ * is Bidi-neutral, so it stays out of the translation files (ABF-132).
+ */
 const NO_CELL = '—';
 
 @Component({
@@ -53,6 +65,7 @@ const NO_CELL = '—';
   imports: [
     DatePipe,
     RouterLink,
+    TranslocoPipe,
     ButtonComponent,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,
@@ -67,6 +80,7 @@ export class ModeratorUserCardComponent implements OnInit {
   readonly userId = input.required<string>();
 
   private readonly reportService = inject(ReportService);
+  private readonly labels = inject(LabelService);
 
   readonly card = signal<UserModerationCard | null>(null);
   readonly isLoading = signal(false);
@@ -74,23 +88,33 @@ export class ModeratorUserCardComponent implements OnInit {
 
   readonly isSuspendDialogOpen = signal(false);
   readonly isSuspending = signal(false);
-  readonly actionError = signal<string | null>(null);
+  /** Held as a key or a server sentence, never as translated text (ABF-132). */
+  readonly actionError = signal<ScreenError>(NO_ERROR);
 
   readonly fullName = computed(() => {
     const card = this.card();
     return card ? `${card.first_name} ${card.last_name}` : '';
   });
 
-  /** The user's cell — the group and sector this moderator is responsible for. */
+  /**
+   * The user's cell — the group and sector this moderator is responsible for.
+   *
+   * Two shared labels joined into one string, which is the case the pipe
+   * cannot reach: `LabelService.label()` reads the active language, so the
+   * line still follows a language switch (CONTRIBUTING §6).
+   */
   readonly cellLabel = computed(() => {
     const card = this.card();
     if (!card?.user_type || !card.sector) {
       return NO_CELL;
     }
-    return `${USER_TYPE_LABELS[card.user_type]} · ${SECTOR_LABELS[card.sector]}`;
+    return `${this.labels.label(USER_TYPE_LABELS[card.user_type])} · ${this.labels.label(
+      SECTOR_LABELS[card.sector],
+    )}`;
   });
 
-  readonly statusLabel = computed(() => {
+  /** A shared label *key* — the template pipes it (ABF-127). */
+  readonly statusLabelKey = computed<LabelKey>(() => {
     const card = this.card();
     return card ? ACCOUNT_STATUS_LABELS[card.account_status] : '';
   });
@@ -125,7 +149,7 @@ export class ModeratorUserCardComponent implements OnInit {
   // ---------------------------------------------------------------------------
 
   openSuspendDialog(): void {
-    this.actionError.set(null);
+    this.actionError.set(NO_ERROR);
     this.isSuspendDialogOpen.set(true);
   }
 
@@ -143,16 +167,11 @@ export class ModeratorUserCardComponent implements OnInit {
         this.isSuspendDialogOpen.set(false);
         this.isSuspending.set(false);
       },
-      error: (err: HttpErrorResponse) => {
-        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בהשעיית המשתמש. נסי שוב.'));
+      error: (err: unknown) => {
+        this.actionError.set(screenErrorFrom(err, 'moderator.errors.suspend_failed'));
         this.isSuspendDialogOpen.set(false);
         this.isSuspending.set(false);
       },
     });
-  }
-
-  private messageFrom(err: HttpErrorResponse, fallback: string): string {
-    const detail: unknown = err.error?.detail;
-    return typeof detail === 'string' ? detail : fallback;
   }
 }

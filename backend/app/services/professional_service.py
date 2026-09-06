@@ -6,28 +6,31 @@ Handles professional queries (questions and answers).
 TODO list for junior developer:
   [x] implement create_query()
   [x] implement answer_query()
-  [ ] implement get_public_qa()
+  [x] implement get_public_qa()
   [x] implement get_my_questions() (for the asker)
   [x] implement get_pending_questions() (for the professional)
 """
 
 import enum
+import logging
 from datetime import UTC, datetime
 from typing import TypeVar
 
 from fastapi import HTTPException
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Query, Session, contains_eager, joinedload
 
 from app.core.constants import (
     SECTOR_LABELS,
     USER_TYPE_LABELS,
+    LikeTargetType,
     ProfessionalDomain,
     QueryStatus,
     Sector,
     UserRole,
     UserType,
 )
+from app.models.like import Like
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import (
@@ -38,6 +41,8 @@ from app.schemas.professional import (
 )
 from app.schemas.user import ProfessionalProfile, UserPublic
 from app.services import email_service
+
+logger = logging.getLogger(__name__)
 
 
 def _build_alias(user: User) -> str:
@@ -131,10 +136,18 @@ def _professional_may_answer(query: ProfessionalQuery, professional: User) -> bo
     )
 
 
-def _to_response(query: ProfessionalQuery) -> ProfessionalQueryResponse:
+def _to_response(
+    query: ProfessionalQuery, like_count: int, liked_by_me: bool
+) -> ProfessionalQueryResponse:
     """
     Build the client-facing response for a query, enforcing the privacy rule:
     the asker's real identity is only included if they chose to reveal it.
+
+    like_count/liked_by_me are passed in rather than computed here: only
+    get_my_questions() needs the real values (aggregated for the whole list in
+    one query, see its docstring) – callers for a question that cannot yet
+    have a like (just created, just answered, still pending) pass 0/False,
+    which ABF-139 guarantees is correct since liking requires ANSWERED.
     """
     return ProfessionalQueryResponse(
         id=query.id,
@@ -151,6 +164,8 @@ def _to_response(query: ProfessionalQuery) -> ProfessionalQueryResponse:
         asker=UserPublic.model_validate(query.asker) if query.show_real_name else None,
         created_at=query.created_at,
         answered_at=query.answered_at,
+        like_count=like_count,
+        liked_by_me=liked_by_me,
     )
 
 
@@ -236,6 +251,11 @@ def create_query(
         content=data.content,
         is_public=data.is_public,
         show_real_name=data.show_real_name,
+        # Frozen at creation time — see ProfessionalQuery.asker_user_type's
+        # docstring. Never updated afterwards, even if the asker's own
+        # profile later changes.
+        asker_user_type=asker.user_type,
+        asker_sector=asker.sector,
     )
     db.add(query)
     db.commit()
@@ -247,7 +267,7 @@ def create_query(
 
     _notify_professionals(db, professional, data.domain, asker, query.id)
 
-    return _to_response(query)
+    return _to_response(query, like_count=0, liked_by_me=False)
 
 
 def answer_query(
@@ -299,7 +319,7 @@ def answer_query(
     # Read both while the instance is still loaded: commit() expires it, and
     # touching asker/professional afterwards would re-SELECT them one lazy
     # load at a time (the same concern create_query() notes).
-    response = _to_response(query)
+    response = _to_response(query, like_count=0, liked_by_me=False)
     asker_email = query.asker.email
 
     db.commit()
@@ -314,41 +334,153 @@ def answer_query(
 def get_public_qa(
     db: Session,
     current_user: User,
-    domain: str | None = None,
+    domain: ProfessionalDomain | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> list[PublicQAResponse]:
     """
     Return public answered questions visible to the current user.
 
-    Visibility: same as forum posts – group+sector filter applies.
+    Visibility uses the asker's cell as frozen onto the query at creation
+    time (ProfessionalQuery.asker_user_type/asker_sector) rather than a live
+    join to the asker's current profile – see _may_view_professional_query()
+    in like_service.py, which applies the same frozen-field rule for likes.
+    ADMIN sees every cell (management view, same principle as forum
+    moderation); USER sees only their own cell.
 
-    TODO:
-      1. Query ProfessionalQuery where is_public=True AND status=ANSWERED
-      2. Apply group+sector filter based on the asker's profile
-      3. Optionally filter by domain
-      4. Return paginated list
+    like_count/liked_by_me are aggregated in this same query via subqueries
+    rather than per-row, to avoid an N+1 query per item in the list.
     """
-    # TODO: implement this function
-    raise NotImplementedError("get_public_qa() is not yet implemented")
+    query = (
+        db.query(ProfessionalQuery)
+        .options(
+            joinedload(ProfessionalQuery.professional),
+            joinedload(ProfessionalQuery.asker),
+        )
+        .filter(
+            ProfessionalQuery.is_public.is_(True),
+            ProfessionalQuery.status == QueryStatus.ANSWERED,
+        )
+    )
+
+    if current_user.role != UserRole.ADMIN:
+        query = query.filter(
+            ProfessionalQuery.asker_user_type == current_user.user_type,
+            ProfessionalQuery.asker_sector == current_user.sector,
+        )
+
+    if domain is not None:
+        query = query.filter(ProfessionalQuery.domain == domain)
+
+    like_counts = (
+        db.query(Like.target_id, func.count(Like.user_id).label("like_count"))
+        .filter(Like.target_type == LikeTargetType.PROFESSIONAL_QUERY)
+        .group_by(Like.target_id)
+        .subquery()
+    )
+    my_likes = (
+        db.query(Like.target_id)
+        .filter(
+            Like.target_type == LikeTargetType.PROFESSIONAL_QUERY,
+            Like.user_id == current_user.id,
+        )
+        .subquery()
+    )
+
+    rows = (
+        query.add_columns(
+            func.coalesce(like_counts.c.like_count, 0).label("like_count"),
+            my_likes.c.target_id.isnot(None).label("liked_by_me"),
+        )
+        .outerjoin(like_counts, like_counts.c.target_id == ProfessionalQuery.id)
+        .outerjoin(my_likes, my_likes.c.target_id == ProfessionalQuery.id)
+        .order_by(ProfessionalQuery.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    results = []
+    for item, like_count, liked_by_me in rows:
+        # The status == ANSWERED filter above guarantees this is set; skip
+        # instead of crashing the whole page if that invariant is ever
+        # violated (e.g. by a manual DB edit) — a single malformed row
+        # should not 500 the entire feed for everyone.
+        if item.answer is None:
+            logger.error(
+                f"get_public_qa(): query {item.id} is ANSWERED but has no "
+                "answer text, skipping"
+            )
+            continue
+        results.append(
+            PublicQAResponse(
+                id=item.id,
+                content=item.content,
+                answer=item.answer,
+                domain=item.domain,
+                is_featured=item.is_featured,
+                answered_at=item.answered_at,
+                like_count=like_count,
+                liked_by_me=liked_by_me,
+                professional=ProfessionalProfile.model_validate(item.professional)
+                if item.professional is not None
+                else None,
+                asker_alias=_build_alias(item.asker),
+                asker=UserPublic.model_validate(item.asker)
+                if item.show_real_name
+                else None,
+            )
+        )
+    return results
 
 
 def get_my_questions(db: Session, asker: User) -> list[ProfessionalQueryResponse]:
     """
     Return all questions asked by the current user (both public and private),
     ordered by created_at DESC.
+
+    like_count/liked_by_me are aggregated in this same query via subqueries,
+    the same pattern get_public_qa() uses, rather than per-row – one query for
+    the whole list instead of two extra queries per question (N+1). Private
+    questions never carry likes (ABF-142 scope), but computing 0/False for
+    them here is free – the frontend decides what to show based on
+    is_public.
     """
-    queries = (
+    like_counts = (
+        db.query(Like.target_id, func.count(Like.user_id).label("like_count"))
+        .filter(Like.target_type == LikeTargetType.PROFESSIONAL_QUERY)
+        .group_by(Like.target_id)
+        .subquery()
+    )
+    my_likes = (
+        db.query(Like.target_id)
+        .filter(
+            Like.target_type == LikeTargetType.PROFESSIONAL_QUERY,
+            Like.user_id == asker.id,
+        )
+        .subquery()
+    )
+
+    rows = (
         db.query(ProfessionalQuery)
         .options(
             joinedload(ProfessionalQuery.professional),
             joinedload(ProfessionalQuery.asker),
         )
         .filter(ProfessionalQuery.asker_id == asker.id)
+        .add_columns(
+            func.coalesce(like_counts.c.like_count, 0).label("like_count"),
+            my_likes.c.target_id.isnot(None).label("liked_by_me"),
+        )
+        .outerjoin(like_counts, like_counts.c.target_id == ProfessionalQuery.id)
+        .outerjoin(my_likes, my_likes.c.target_id == ProfessionalQuery.id)
         .order_by(ProfessionalQuery.created_at.desc())
         .all()
     )
-    return [_to_response(query) for query in queries]
+    return [
+        _to_response(query, like_count=like_count, liked_by_me=liked_by_me)
+        for query, like_count, liked_by_me in rows
+    ]
 
 
 def get_pending_questions(
@@ -394,4 +526,4 @@ def get_pending_questions(
         .order_by(ProfessionalQuery.created_at.asc())
         .all()
     )
-    return [_to_response(query) for query in queries]
+    return [_to_response(query, like_count=0, liked_by_me=False) for query in queries]

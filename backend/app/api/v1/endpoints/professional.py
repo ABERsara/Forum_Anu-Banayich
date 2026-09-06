@@ -7,14 +7,16 @@ POST /advice/questions           – ask a question
 GET  /advice/questions/public    – public answered Q&A feed
 GET  /advice/questions/pending   – questions waiting for me (professional only)
 PUT  /advice/questions/{id}/answer – submit answer (professional only)
+PATCH /advice/questions/{id}/like  – toggle a like (user/admin only)
 """
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.constants import ProfessionalDomain, UserRole
+from app.core.constants import LikeTargetType, ProfessionalDomain, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
+from app.schemas.like import LikeResponse
 from app.schemas.professional import (
     ProfessionalAnswerRequest,
     ProfessionalQueryCreate,
@@ -22,7 +24,7 @@ from app.schemas.professional import (
     PublicQAResponse,
 )
 from app.schemas.user import ProfessionalProfile
-from app.services import professional_service, user_service
+from app.services import like_service, professional_service, user_service
 
 router = APIRouter(prefix="/advice", tags=["Professional Advisory"])
 
@@ -69,19 +71,22 @@ def ask_question(
     return professional_service.create_query(db, data, current_user)
 
 
-@router.get("/questions/public", response_model=list[PublicQAResponse])
+@router.get(
+    "/questions/public",
+    response_model=list[PublicQAResponse],
+    dependencies=[Depends(require_role(UserRole.USER, UserRole.ADMIN))],
+)
 def public_qa_feed(
     domain: ProfessionalDomain | None = Query(None),
     page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> list[PublicQAResponse]:
     """
     Public Q&A knowledge base – answered questions visible to the user's group/sector.
-
-    TODO: call professional_service.get_public_qa(db, current_user, domain, page)
     """
-    return []
+    return professional_service.get_public_qa(db, current_user, domain, page, page_size)
 
 
 @router.get(
@@ -110,3 +115,19 @@ def answer_question(
 ) -> ProfessionalQueryResponse:
     """Professional submits an answer to a question."""
     return professional_service.answer_query(db, query_id, data, current_user)
+
+
+@router.patch(
+    "/questions/{query_id}/like",
+    response_model=LikeResponse,
+    dependencies=[Depends(require_role(UserRole.USER, UserRole.ADMIN))],
+)
+def like_question(
+    query_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> LikeResponse:
+    """Toggle a like on a professional query."""
+    return like_service.toggle_like(
+        db, LikeTargetType.PROFESSIONAL_QUERY, query_id, current_user
+    )

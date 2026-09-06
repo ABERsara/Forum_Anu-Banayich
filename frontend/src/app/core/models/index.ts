@@ -324,8 +324,43 @@ export interface DirectMessage {
   sender: UserPublic;
   recipient: UserPublic;
   content: string;
-  is_read: boolean;
+  /**
+   * When the *recipient* opened the conversation; null until then. A
+   * timestamp rather than a flag, because it is what the sender's own bubble
+   * shows as a receipt — and a flag cannot say when.
+   */
+  read_at: string | null; // ISO datetime
   created_at: string;
+}
+
+/**
+ * One page of a conversation, oldest first *within the page*.
+ *
+ * Paging runs backwards: the first request (no cursor) returns the newest
+ * messages, and `next_cursor` walks towards the oldest. Feed it back as the
+ * `before` option to get the page before this one; it is null exactly when
+ * `has_more` is false.
+ */
+export interface ConversationMessagesPage {
+  items: DirectMessage[];
+  has_more: boolean;
+  next_cursor: string | null;
+}
+
+/**
+ * What a send comes back with: the stored message, and what enforcing the
+ * conversation's storage cap (SPEC §5.3) cost.
+ *
+ * `pruned_message_ids` is normally empty, and names the deleted messages
+ * rather than counting them: the cap skips anything under an open report, so
+ * the oldest message on screen is not necessarily one of the ones that went.
+ * `conversation_limit` is the server's current cap, so the notice can name
+ * the real number instead of hardcoding a copy of a setting.
+ */
+export interface DirectMessageSendResult {
+  message: DirectMessage;
+  pruned_message_ids: string[];
+  conversation_limit: number;
 }
 
 export interface ConversationSummary {
@@ -333,6 +368,13 @@ export interface ConversationSummary {
   last_message_preview: string;
   last_message_at: string;
   unread_count: number;
+}
+
+export interface ConversationList {
+  items: ConversationSummary[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +402,8 @@ export interface ProfessionalQuery {
   asker: UserPublic | null;
   created_at: string;
   answered_at: string | null;
+  like_count: number;
+  liked_by_me: boolean;
 }
 
 export interface PublicQA {
@@ -369,6 +413,20 @@ export interface PublicQA {
   domain: ProfessionalDomain | null;
   is_featured: boolean;
   answered_at: string | null;
+  like_count: number;
+  liked_by_me: boolean;
+  professional: ProfessionalProfile | null;
+  asker_alias: string;
+  asker: UserPublic | null;
+}
+
+// ---------------------------------------------------------------------------
+// Likes
+// ---------------------------------------------------------------------------
+
+export interface LikeResponse {
+  liked: boolean;
+  like_count: number;
 }
 
 // ---------------------------------------------------------------------------

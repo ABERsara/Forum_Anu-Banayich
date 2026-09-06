@@ -1,17 +1,25 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { PROFESSIONAL_DOMAIN_LABELS, ProfessionalDomain } from '../../../core/constants';
 import { ProfessionalQueryCreate } from '../../../core/models';
 import { ProfessionalService } from '../../../core/services/professional.service';
+import { AdviceError, NO_ERROR, adviceErrorFrom } from '../advice-error';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-ask-question',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    TranslocoPipe,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './ask-question.component.html',
   styleUrl: './ask-question.component.scss',
 })
@@ -26,7 +34,8 @@ export class AskQuestionComponent implements OnInit {
   readonly domainLabels = PROFESSIONAL_DOMAIN_LABELS;
 
   isLoading = signal(false);
-  errorMessage = signal('');
+  /** What went wrong on submit, as a key of ours or a sentence the API sent. */
+  error = signal<AdviceError>(NO_ERROR);
 
   form = this.fb.group({
     content: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(2000)]],
@@ -55,7 +64,7 @@ export class AskQuestionComponent implements OnInit {
     }
 
     this.isLoading.set(true);
-    this.errorMessage.set('');
+    this.error.set(NO_ERROR);
 
     const { content, is_public, show_real_name, domain } = this.form.getRawValue();
     const data: ProfessionalQueryCreate = {
@@ -73,7 +82,7 @@ export class AskQuestionComponent implements OnInit {
         this.router.navigate(['/advice']);
       },
       error: (err) => {
-        this.errorMessage.set(err.error?.detail ?? 'שגיאה בשליחת השאלה.');
+        this.error.set(adviceErrorFrom(err, 'advice.errors.ask_failed'));
         this.isLoading.set(false);
       },
     });

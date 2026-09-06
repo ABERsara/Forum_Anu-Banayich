@@ -17,10 +17,12 @@ import {
   Validators,
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import {
   GROUP_VISIBILITY_LABELS,
   GroupVisibility,
+  LabelKey,
   SECTOR_LABELS,
   Sector,
   UserType,
@@ -31,7 +33,10 @@ import {
   ModeratorCreateRequest,
   ModeratorUpdateRequest,
 } from '../../../core/models';
+import { LabelService } from '../../../core/i18n/label.service';
+import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { AdminService } from '../../../core/services/admin.service';
+import { ActionMessage } from '../action-message';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -48,6 +53,7 @@ function atLeastOneCell(control: AbstractControl): ValidationErrors | null {
   imports: [
     ReactiveFormsModule,
     RouterLink,
+    TranslocoPipe,
     ConfirmDialogComponent,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,
@@ -58,13 +64,16 @@ function atLeastOneCell(control: AbstractControl): ValidationErrors | null {
 })
 export class ManageModeratorsComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
+  private readonly labels = inject(LabelService);
   private readonly adminService = inject(AdminService);
 
   readonly moderators = signal<ModeratorAdminView[]>([]);
   readonly isLoading = signal(false);
   readonly hasError = signal(false);
-  readonly actionError = signal('');
-  readonly successMessage = signal('');
+  /** What went wrong on save or remove, as a key of ours or the API's own sentence. */
+  readonly actionError = signal<ScreenError>(NO_ERROR);
+  /** Our own confirmation, held as a key and a name so it follows a language switch. */
+  readonly successMessage = signal<ActionMessage | null>(null);
   readonly isSaving = signal(false);
   readonly isFormOpen = signal(false);
   /** The moderator being edited; null while the form is appointing a new one. */
@@ -88,7 +97,7 @@ export class ManageModeratorsComponent implements OnInit {
    * UserType value is also a GroupVisibility value, which is what lets the
    * labels be derived here instead of spelled out a third time.
    */
-  readonly groupLabels: Record<UserType, string> = {
+  readonly groupLabels: Record<UserType, LabelKey> = {
     [UserType.WIDOWER]: GROUP_VISIBILITY_LABELS[GroupVisibility.WIDOWERS],
     [UserType.WIDOW]: GROUP_VISIBILITY_LABELS[GroupVisibility.WIDOWS],
     [UserType.ORPHAN_MALE]: GROUP_VISIBILITY_LABELS[GroupVisibility.ORPHANS_MALE],
@@ -137,9 +146,15 @@ export class ManageModeratorsComponent implements OnInit {
     return `${moderator.first_name} ${moderator.last_name}`;
   }
 
-  /** "אלמנות – ספרדי", the cell as it reads in the roster. */
+  /**
+   * "אלמנות – ספרדי", the cell as it reads in the roster. Two labels joined
+   * into one string, which is why it translates here rather than in the
+   * template: there is no single key for the pair.
+   */
   cellLabel(cell: ModeratorCell): string {
-    return `${this.groupLabels[cell.group]} – ${this.sectorLabels[cell.sector]}`;
+    const group = this.labels.label(this.groupLabels[cell.group]);
+    const sector = this.labels.label(this.sectorLabels[cell.sector]);
+    return `${group} – ${sector}`;
   }
 
   /** Where this moderator's report alerts land. */
@@ -220,16 +235,22 @@ export class ManageModeratorsComponent implements OnInit {
       next: (saved) => {
         if (editing) {
           this.replaceRow(saved);
-          this.successMessage.set(`ההצאות של ${this.fullName(saved)} עודכנו.`);
+          this.successMessage.set({
+            key: 'admin.manage_moderators.assignments_updated',
+            name: this.fullName(saved),
+          });
         } else {
           this.insertRow(saved);
-          this.successMessage.set(`${this.fullName(saved)} מונה לממונה.`);
+          this.successMessage.set({
+            key: 'admin.manage_moderators.appointed',
+            name: this.fullName(saved),
+          });
         }
         this.isSaving.set(false);
         this.closeForm();
       },
       error: (err: HttpErrorResponse) => {
-        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בשמירת הממונה. נסה שוב.'));
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.save_moderator_failed'));
         this.isSaving.set(false);
       },
     });
@@ -258,7 +279,10 @@ export class ManageModeratorsComponent implements OnInit {
     this.adminService.removeModerator(moderator.id).subscribe({
       next: () => {
         this.moderators.update((rows) => rows.filter((row) => row.id !== moderator.id));
-        this.successMessage.set(`${this.fullName(moderator)} הוסר מרשימת הממונים.`);
+        this.successMessage.set({
+          key: 'admin.manage_moderators.removed',
+          name: this.fullName(moderator),
+        });
         // The form cannot stay open on a row that is no longer on the roster.
         if (this.editing()?.id === moderator.id) {
           this.closeForm();
@@ -267,7 +291,7 @@ export class ManageModeratorsComponent implements OnInit {
         this.pendingRemoval.set(null);
       },
       error: (err: HttpErrorResponse) => {
-        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בהסרת הממונה. נסה שוב.'));
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.remove_moderator_failed'));
         this.isRemoving.set(false);
         this.pendingRemoval.set(null);
       },
@@ -342,13 +366,8 @@ export class ManageModeratorsComponent implements OnInit {
     );
   }
 
-  private messageFrom(err: HttpErrorResponse, fallback: string): string {
-    const detail: unknown = err.error?.detail;
-    return typeof detail === 'string' ? detail : fallback;
-  }
-
   private clearMessages(): void {
-    this.actionError.set('');
-    this.successMessage.set('');
+    this.actionError.set(NO_ERROR);
+    this.successMessage.set(null);
   }
 }

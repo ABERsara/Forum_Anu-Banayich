@@ -9,9 +9,10 @@ DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
 POST   /forum/broadcast       – admin-only post visible to all users
 
-GET    /messages              – inbox (list of conversations)
-POST   /messages              – send a direct message
-GET    /messages/{user_id}    – conversation with a specific user
+GET    /messages                          – inbox (list of conversations, paginated)
+POST   /messages                          – send a direct message (own cell only)
+GET    /conversations/{key}/messages      – one page of a conversation, newest first
+GET    /cells/me/members                  – other ACTIVE users in your own cell
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -22,15 +23,17 @@ from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
-    ConversationSummary,
+    ConversationListResponse,
+    ConversationMessagesPage,
     DirectMessageCreate,
-    DirectMessageResponse,
+    DirectMessageSendResponse,
     ForumPostCreate,
     ForumPostListResponse,
     ForumPostResponse,
     ForumPostUpdate,
 )
 from app.schemas.report import ReportCreate, ReportResponse
+from app.schemas.user import UserPublic
 from app.services import forum_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
@@ -155,46 +158,87 @@ def report_post(
 # ──────────────────────────────────────────────────────────
 
 
-@router.get("/messages", response_model=list[ConversationSummary])
+@router.get("/messages", response_model=ConversationListResponse)
 def get_inbox(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> list[ConversationSummary]:
+) -> ConversationListResponse:
     """
-    Return a list of conversations (inbox view).
-
-    TODO: implement – group messages by conversation partner, show latest message
+    Return the current user's conversations (inbox view), most recent first.
     """
-    # TODO: implement
-    return []
+    return forum_service.get_inbox(db, current_user, page, page_size)
 
 
-@router.post("/messages", response_model=DirectMessageResponse, status_code=201)
+@router.post("/messages", response_model=DirectMessageSendResponse, status_code=201)
 def send_message(
     data: DirectMessageCreate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> DirectMessageResponse:
+) -> DirectMessageSendResponse:
     """
-    Send a private message.
+    Send a private message to another member of your own cell.
 
-    TODO: call forum_service.send_direct_message(db, data, current_user)
+    The response carries the stored message plus `pruned_message_ids` — which
+    of the conversation's oldest messages spec §5.3's 1,000 cap cost this send
+    — and `conversation_limit`, the cap itself. Ids rather than a count
+    because the messages that go are the oldest *prunable* ones: anything
+    under an open report is skipped, so a client trimming the top of its list
+    by count would drop the wrong ones and keep showing a deleted message.
     """
-    # TODO: implement
-    raise NotImplementedError
+    result = forum_service.send_direct_message(db, data, current_user)
+    return DirectMessageSendResponse.model_validate(result)
 
 
-@router.get("/messages/{user_id}", response_model=list[DirectMessageResponse])
-def get_conversation(
-    user_id: str,
-    page: int = Query(1, ge=1),
+@router.get(
+    "/conversations/{conversation_key}/messages",
+    response_model=ConversationMessagesPage,
+)
+def get_conversation_messages(
+    conversation_key: str,
+    limit: int = Query(
+        forum_service.CONVERSATION_PAGE_SIZE,
+        ge=1,
+        le=forum_service.CONVERSATION_MAX_PAGE_SIZE,
+    ),
+    before: str | None = Query(
+        None,
+        description="A next_cursor from an earlier page; omit for the newest messages.",
+    ),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> list[DirectMessageResponse]:
+) -> ConversationMessagesPage:
     """
-    Return the conversation with a specific user.
+    Return one page of a conversation, oldest first within the page.
 
-    TODO: call forum_service.get_conversation(db, current_user, user_id, page)
+    Omit `before` for the newest page — the one a chat screen opens on — then
+    feed each response's `next_cursor` back as `before` to walk backwards
+    through the history.
+
+    Marking read (ABF-119) happens only on that first request. Opening a
+    conversation is what says "I have seen this"; scrolling back through
+    history is a read of content the user has already been shown, and issuing
+    a write on every scroll page would be both pointless and, on a long
+    scroll, expensive. The two calls stay separate because
+    get_conversation_messages() is a pure read.
     """
-    # TODO: implement
-    return []
+    if before is None:
+        forum_service.mark_conversation_read(db, current_user, conversation_key)
+    page = forum_service.get_conversation_messages(
+        db, current_user, conversation_key, limit=limit, before=before
+    )
+    return ConversationMessagesPage.model_validate(page)
+
+
+@router.get("/cells/me/members", response_model=list[UserPublic])
+def get_my_cell_members(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> list[UserPublic]:
+    """
+    List other ACTIVE users in the current user's own cell (group+sector) —
+    the entry point for starting a private conversation.
+    """
+    members = forum_service.get_cell_members(db, current_user)
+    return [UserPublic.model_validate(member) for member in members]

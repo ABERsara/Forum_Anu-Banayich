@@ -1,67 +1,88 @@
+<!--
+  No direction here: the page inherits it from <html dir>, which LocaleService
+  sets from the active language (CONTRIBUTING §6).
+-->
 <div class="page">
-  <a class="page__back" routerLink="/moderator/reports">← חזרה ללוח הבקרה</a>
-  <h1>כרטיס משתמש</h1>
-  <p class="page__hint">
-    ההיסטוריה שלהלן היא הבסיס להחלטה על השעיה. המספרים מתייחסים למשתמש/ת עצמו/ה — גם לדיווחים שהוגשו
-    בתאים אחרים.
-  </p>
+  <a class="page__back" routerLink="/moderator/reports"
+    >← {{ 'moderator.user_card.back_to_reports' | transloco }}</a
+  >
+  <h1>{{ 'moderator.user_card.title' | transloco }}</h1>
+  <p class="page__hint">{{ 'moderator.user_card.hint' | transloco }}</p>
 
-  <app-error-display [message]="actionError() ?? ''" />
+  <!--
+    Either a sentence the server wrote, shown as it came, or a key of ours,
+    piped here so it follows a language switch while it is still on screen
+    (core/i18n/screen-error.ts).
+  -->
+  @if (actionError().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (actionError().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
 
   @if (isLoading()) {
-    <app-loading-spinner message="טוען כרטיס משתמש..." />
+    <app-loading-spinner [message]="'moderator.user_card.loading' | transloco" />
   } @else if (hasError()) {
-    <app-error-display message="אירעה שגיאה בטעינת כרטיס המשתמש. נסי לרענן את הדף." />
+    <app-error-display [message]="'moderator.errors.load_user_card_failed' | transloco" />
   } @else if (card(); as card) {
     <article class="card">
       <header class="card__head">
+        <!-- The person's own name: content, not copy (ABF-130). -->
         <h2 class="card__name">{{ fullName() }}</h2>
         <span class="badge">{{ cellLabel() }}</span>
-        <span class="badge" [class.badge--alert]="card.is_suspended">{{ statusLabel() }}</span>
+        <span class="badge" [class.badge--alert]="card.is_suspended">{{
+          statusLabelKey() | transloco
+        }}</span>
       </header>
 
       <!--
         role="status" so the change is announced after a suspension: the
         button that caused it is gone by then, and this line is the only
         thing on the page that says what happened.
+
+        The date is a parameter of the sentence, not a second text node —
+        it sits in a different place in each language (ABF-131).
       -->
       <p class="card__suspension" role="status">
         @if (card.is_suspended) {
-          מושעה/ית עד {{ card.suspended_until | date: 'dd/MM/yyyy HH:mm' }}
+          {{
+            'moderator.user_card.suspended_until'
+              | transloco: { date: card.suspended_until | date: 'dd/MM/yyyy HH:mm' }
+          }}
         } @else {
-          החשבון אינו מושעה כרגע.
+          {{ 'moderator.user_card.not_suspended' | transloco }}
         }
       </p>
 
-      <h3 class="card__section">היסטוריית דיווחים</h3>
+      <h3 class="card__section">{{ 'moderator.user_card.reports_section' | transloco }}</h3>
       <dl class="stats">
         <div class="stats__item">
-          <dt>דיווחים נגד המשתמש/ת</dt>
+          <dt>{{ 'moderator.user_card.reports_against_total' | transloco }}</dt>
           <dd>{{ card.reports_against_total }}</dd>
         </div>
         <div class="stats__item">
-          <dt>מהם נמצאו מוצדקים</dt>
+          <dt>{{ 'moderator.user_card.reports_against_valid' | transloco }}</dt>
           <dd>{{ card.reports_against_valid }}</dd>
         </div>
         <div class="stats__item">
-          <dt>מהם נמצאו שגויים</dt>
+          <dt>{{ 'moderator.user_card.reports_against_invalid' | transloco }}</dt>
           <dd>{{ card.reports_against_invalid }}</dd>
         </div>
         <div class="stats__item">
-          <dt>דיווחים שהגיש/ה</dt>
+          <dt>{{ 'moderator.user_card.reports_filed_total' | transloco }}</dt>
           <dd>{{ card.reports_filed_total }}</dd>
         </div>
         <div class="stats__item stats__item--alert">
-          <dt>מהם נמצאו כוזבים</dt>
+          <dt>{{ 'moderator.user_card.false_reports_filed' | transloco }}</dt>
           <dd>{{ card.false_reports_filed }}</dd>
         </div>
       </dl>
 
       @if (canSuspend()) {
-        <h3 class="card__section">פעולות</h3>
+        <h3 class="card__section">{{ 'moderator.user_card.actions_section' | transloco }}</h3>
         <div class="card__actions">
           <app-button variant="danger" [loading]="isSuspending()" (clicked)="openSuspendDialog()">
-            השעיית המשתמש/ת
+            {{ 'moderator.user_card.suspend' | transloco }}
           </app-button>
         </div>
       }
@@ -70,12 +91,8 @@
 
   @if (isSuspendDialogOpen()) {
     <app-suspend-dialog
-      [message]="
-        'השעיית ' +
-        fullName() +
-        ' למשך מספר השעות שייקבע. תישלח הודעה עם הסיבה, והפעולה תירשם ביומן הביקורת.'
-      "
-      confirmText="השעיה"
+      [message]="'moderator.user_card.suspend_message' | transloco: { name: fullName() }"
+      [confirmText]="'moderator.user_card.suspend_confirm' | transloco"
       (confirmed)="confirmSuspend($event)"
       (cancelled)="cancelSuspend()"
     />

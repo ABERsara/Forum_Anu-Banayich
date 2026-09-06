@@ -121,6 +121,13 @@ class ReportTargetType(enum.StrEnum):
     PROFESSIONAL_QUERY = "professional_query"  # שאלה מקצועית
 
 
+class LikeTargetType(enum.StrEnum):
+    """What type of content a like applies to."""
+
+    FORUM_POST = "forum_post"  # הודעת פורום
+    PROFESSIONAL_QUERY = "professional_query"  # שאלה מקצועית
+
+
 class ReportDecision(enum.StrEnum):
     """Moderator's decision on a report."""
 
@@ -136,6 +143,25 @@ class DocumentType(enum.StrEnum):
     SELFIE = "selfie"  # תמונת פנים (selfie)
     ID_CARD = "id_card"  # ת"ז
     PASSPORT = "passport"  # דרכון
+
+
+class AgentDomain(enum.StrEnum):
+    """Knowledge domain of an AI agent – one dedicated knowledge base each.
+
+    The agent answers only from the knowledge base of its own domain
+    (SPEC §12), so this value scopes both the retrieval query and the
+    conversation it belongs to. Agent #1 is the only one in sprint 5;
+    the rest of §12 stays in the backlog.
+    """
+
+    SINGLE_PARENT_RIGHTS = "single_parent_rights"  # זכויות משפחות חד-הוריות
+
+
+class AgentMessageRole(enum.StrEnum):
+    """Who wrote a message inside an agent conversation."""
+
+    USER = "user"  # המשתמש/ת
+    AGENT = "agent"  # הסוכן
 
 
 class AuditAction(enum.StrEnum):
@@ -157,6 +183,10 @@ class AuditAction(enum.StrEnum):
     DATA_EXPORTED = "data_exported"
     USER_LOGIN = "user_login"
     USER_LOGOUT = "user_logout"
+    DIRECT_MESSAGE_ACCESS_DENIED = "direct_message_access_denied"
+    DIRECT_MESSAGE_PRUNED = "direct_message_pruned"
+    AGENT_CONVERSATION = "agent_conversation"
+    AGENT_CONVERSATION_ACCESS_DENIED = "agent_conversation_access_denied"
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +216,10 @@ PROFESSIONAL_DOMAIN_LABELS: dict[ProfessionalDomain, str] = {
     ProfessionalDomain.MEDICINE: "רפואה",
     ProfessionalDomain.SOCIAL_WORKER: "סוציאל וורקר",
     ProfessionalDomain.OTHER: "אחר",
+}
+
+AGENT_DOMAIN_LABELS: dict[AgentDomain, str] = {
+    AgentDomain.SINGLE_PARENT_RIGHTS: "זכויות משפחות חד-הוריות",
 }
 
 ACCOUNT_STATUS_LABELS: dict[AccountStatus, str] = {

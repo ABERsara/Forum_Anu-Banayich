@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { AuthService } from '../../core/services/auth.service';
 import { CardComponent } from '../../shared/components/card/card.component';
@@ -7,7 +8,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 
 @Component({
   selector: 'app-home',
-  imports: [CardComponent, RouterLink, LoadingSpinnerComponent],
+  imports: [CardComponent, RouterLink, LoadingSpinnerComponent, TranslocoPipe],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
 })

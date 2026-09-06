@@ -123,6 +123,13 @@ export const routes: Routes = [
           import('./features/messages/inbox/inbox.component').then((m) => m.InboxComponent),
       },
       {
+        path: 'new',
+        loadComponent: () =>
+          import('./features/messages/new-message/new-message.component').then(
+            (m) => m.NewMessageComponent,
+          ),
+      },
+      {
         path: ':userId',
         loadComponent: () =>
           import('./features/messages/chat/chat.component').then((m) => m.ChatComponent),

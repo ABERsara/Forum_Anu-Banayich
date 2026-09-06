@@ -33,6 +33,33 @@ KNOWN_INSECURE_SECRET_KEYS = frozenset({DEFAULT_SECRET_KEY, ENV_EXAMPLE_SECRET_K
 # 32 characters is the shortest key still worth signing HS256 tokens with.
 MIN_SECRET_KEY_LENGTH = 32
 
+# ----------------------------------------------------------------------
+# MESSAGE_ENCRYPTION_KEY guard rails (ABF-118, same template as ABF-96)
+#
+# MESSAGE_ENCRYPTION_KEY encrypts every private message at rest. A key that
+# is public knowledge means anyone with DB access can read private messages,
+# so outside development the application refuses to start rather than boot
+# insecure — identical reasoning to SECRET_KEY above.
+# ----------------------------------------------------------------------
+
+# The convenience default assigned to Settings.MESSAGE_ENCRYPTION_KEY below.
+DEFAULT_MESSAGE_ENCRYPTION_KEY = "dev-message-key-change-in-production-0000"
+
+# The placeholder shipped in backend/.env.example.
+ENV_EXAMPLE_MESSAGE_ENCRYPTION_KEY = "change-me-in-production-use-openssl-rand-hex-32"
+
+# Every key value that is public because it lives in this repository.
+KNOWN_INSECURE_MESSAGE_ENCRYPTION_KEYS = frozenset(
+    {DEFAULT_MESSAGE_ENCRYPTION_KEY, ENV_EXAMPLE_MESSAGE_ENCRYPTION_KEY}
+)
+
+# Same threshold as SECRET_KEY: 32 characters is the shortest secret still
+# worth deriving an AES-256 key from. app/core/encryption.py hashes this
+# string (SHA-256) to get the actual 32 raw key bytes, so this does not need
+# to be hex — "openssl rand -hex 32" is just a convenient way to generate a
+# long random string, same as the SECRET_KEY guidance above.
+MIN_MESSAGE_ENCRYPTION_KEY_LENGTH = 32
+
 # Environments allowed to keep the default key. Everything else is treated
 # as production — deployments must set ENVIRONMENT explicitly.
 DEVELOPMENT_ENVIRONMENTS = frozenset({"development", "dev", "local", "test"})
@@ -57,6 +84,10 @@ class Settings(BaseSettings):
     # Run: openssl rand -hex 32
     # ------------------------------------------------------------------
     SECRET_KEY: str = "dev-secret-change-in-production"
+
+    # Private-message encryption (AES-256-GCM) — SHA-256-hashed into the
+    # actual 32-byte key by app/core/encryption.py. Run: openssl rand -hex 32
+    MESSAGE_ENCRYPTION_KEY: str = "dev-message-key-change-in-production-0000"
 
     # JWT access token: 15 minutes (spec section 9.2)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
@@ -111,6 +142,52 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
 
     # ------------------------------------------------------------------
+    # AI agent – LLM provider (ABF-121 embeddings, ABF-122 generation)
+    #
+    # GEMINI_API_KEY is required for POST /agents/{domain_id}/chat to answer a
+    # question its knowledge base covers: without it that request is a 503,
+    # deliberately, rather than a quiet fallback to "I have no information" —
+    # a missing key must look like a fault, not like an answer. A question the
+    # knowledge base does *not* cover still works with no key at all, because
+    # no provider is called for it.
+    # ------------------------------------------------------------------
+    GEMINI_API_KEY: str = ""
+
+    # Which llm_service provider serves generation. Swapping this to another
+    # registered name (see llm_service.register_provider) is the whole change
+    # needed to move off Gemini – no caller touches a provider class.
+    LLM_PROVIDER: str = "gemini"
+
+    # Gemini model used for generation. Configurable so a model deprecation
+    # is an environment change, not a deploy.
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
+    # Hard ceiling on one generation call. A chat request holds a worker for
+    # its whole duration, so this is what stops a slow provider from taking
+    # the API down with it.
+    LLM_TIMEOUT_SECONDS: float = 20.0
+
+    # ------------------------------------------------------------------
+    # AI agent – conversation limits (can be tuned without code changes)
+    # ------------------------------------------------------------------
+    # Messages one user may send to the agents in a rolling 24 hours,
+    # counted across every domain rather than per agent: the cost being
+    # capped is the provider bill, and that is one bill.
+    AGENT_RATE_LIMIT_PER_DAY: int = 30
+
+    # Longest question accepted, in characters. Enforced by the Pydantic
+    # schema (422), not by the provider's token limit.
+    AGENT_MAX_MESSAGE_LENGTH: int = 1000
+
+    # How many of the conversation's most recent *turns* – a question and the
+    # answer it got – are replayed into the prompt, so "ומה לגבי הילדים שלי"
+    # resolves against what came before it. 3 turns is at most 6 messages.
+    # Costs tokens on every request, which is why it is tunable without a
+    # deploy: raise it if follow-ups lose the thread, lower it if the bill
+    # grows faster than usage.
+    AGENT_HISTORY_TURNS: int = 3
+
+    # ------------------------------------------------------------------
     # Moderation thresholds (can be tuned without code changes)
     # ------------------------------------------------------------------
     AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide
@@ -120,6 +197,17 @@ class Settings(BaseSettings):
     FALSE_REPORT_LIMIT: int = 5  # False reports in 30 days → restrict
     FALSE_REPORT_DAYS_WINDOW: int = 30
     DM_BLOCK_AFTER_REPORTS: int = 3  # DM reports before auto-block
+
+    # ------------------------------------------------------------------
+    # Private messaging storage cap (spec section 5.3)
+    # ------------------------------------------------------------------
+    # "up to 1,000 messages per conversation". Enforced on every send by
+    # forum_service._enforce_conversation_limit(): oldest-first (FIFO), and
+    # never a message that still carries an open report. Read through
+    # `settings` rather than inlined at the call site, so tuning it here
+    # actually changes behaviour (the mistake FINDINGS M-01 records for
+    # AUTO_HIDE_REPORT_COUNT).
+    MAX_MESSAGES_PER_CONVERSATION: int = 1000
 
     # ------------------------------------------------------------------
     # Validation
@@ -154,6 +242,42 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"SECRET_KEY is too short: {len(key)} characters, but at least "
                 f"{MIN_SECRET_KEY_LENGTH} are required while ENVIRONMENT={env!r}."
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def _validate_message_encryption_key(self) -> Self:
+        """Reject a forgeable private-message encryption key outside development.
+
+        Never include the key itself in an error message — these messages
+        land in deployment logs. Report its length instead.
+        """
+        if self.ENVIRONMENT.strip().lower() in DEVELOPMENT_ENVIRONMENTS:
+            return self
+
+        env = self.ENVIRONMENT
+        key = self.MESSAGE_ENCRYPTION_KEY.strip()
+
+        if not key:
+            raise ValueError(
+                f"MESSAGE_ENCRYPTION_KEY is missing or empty while "
+                f"ENVIRONMENT={env!r}. The API cannot encrypt private messages "
+                "without it."
+            )
+
+        if key in KNOWN_INSECURE_MESSAGE_ENCRYPTION_KEYS:
+            raise ValueError(
+                f"MESSAGE_ENCRYPTION_KEY is still a placeholder committed to "
+                f"this repository, while ENVIRONMENT={env!r}. Its value is "
+                "public, so anyone with DB access could read private messages."
+            )
+
+        if len(key) < MIN_MESSAGE_ENCRYPTION_KEY_LENGTH:
+            raise ValueError(
+                f"MESSAGE_ENCRYPTION_KEY is too short: {len(key)} characters, "
+                f"but at least {MIN_MESSAGE_ENCRYPTION_KEY_LENGTH} are required "
+                f"while ENVIRONMENT={env!r}."
             )
 
         return self

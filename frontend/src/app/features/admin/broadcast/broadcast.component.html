@@ -1,47 +1,62 @@
-<div class="broadcast-page" dir="rtl">
-  <a routerLink="/admin">← חזרה ללוח הבקרה</a>
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="broadcast-page">
+  <a routerLink="/admin">← {{ 'admin.back_to_dashboard' | transloco }}</a>
 
   <div class="broadcast-card">
-    <h1 class="broadcast-title">שידור לכלל המשתמשים</h1>
-    <p class="broadcast-hint">
-      הפוסט יופיע ברשימת הפורום של כל המשתמשים הפעילים, ללא קשר לקבוצה או מגזר.
-    </p>
+    <h1 class="broadcast-title">{{ 'admin.broadcast.title' | transloco }}</h1>
+    <p class="broadcast-hint">{{ 'admin.broadcast.hint' | transloco }}</p>
 
+    <!-- The two fields below are the only text on this screen that is not ours:
+         what the admin types becomes a forum post, and a post is content, shown
+         in the language it was written in (CONTRIBUTING §6, ABF-130). Every
+         label, placeholder and message around them is UI, and is a key. -->
     <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
       <div class="form-field">
-        <label for="title">כותרת</label>
-        <input id="title" type="text" formControlName="title" placeholder="כותרת השידור" />
+        <label for="title">{{ 'admin.broadcast.title_label' | transloco }}</label>
+        <input
+          id="title"
+          type="text"
+          formControlName="title"
+          [placeholder]="'admin.broadcast.title_placeholder' | transloco"
+        />
         @if (form.controls.title.invalid && form.controls.title.touched) {
-          <span class="field-error">נא להזין כותרת (2 עד 256 תווים)</span>
+          <span class="field-error">{{ 'admin.broadcast.title_error' | transloco }}</span>
         }
       </div>
 
       <div class="form-field">
-        <label for="content">תוכן</label>
+        <label for="content">{{ 'admin.broadcast.content_label' | transloco }}</label>
         <textarea
           id="content"
           rows="8"
           formControlName="content"
-          placeholder="תוכן ההודעה"
+          [placeholder]="'admin.broadcast.content_placeholder' | transloco"
         ></textarea>
         <span class="char-counter">{{ contentLength }} / 5000</span>
         @if (form.controls.content.invalid && form.controls.content.touched) {
-          <span class="field-error">נא להזין תוכן (עד 5000 תווים)</span>
+          <span class="field-error">{{ 'admin.broadcast.content_error' | transloco }}</span>
         }
       </div>
 
-      <app-error-display [message]="errorMessage()" />
+      <!-- The API's own `detail` is a finished sentence and is shown as it came;
+           our fallback is a key, so it follows a language switch. -->
+      @if (error().text; as text) {
+        <app-error-display [message]="text" />
+      } @else if (error().key; as key) {
+        <app-error-display [message]="key | transloco" />
+      }
 
-      @if (successMessage()) {
-        <p class="success-message">{{ successMessage() }}</p>
+      @if (successKey(); as key) {
+        <p class="success-message">{{ key | transloco }}</p>
       }
 
       @if (isLoading()) {
-        <app-loading-spinner message="שולח שידור..." />
+        <app-loading-spinner [message]="'admin.broadcast.sending' | transloco" />
       }
 
       <button type="submit" class="btn-submit" [disabled]="form.invalid || isLoading()">
-        שלח שידור
+        {{ 'admin.broadcast.submit' | transloco }}
       </button>
     </form>
   </div>

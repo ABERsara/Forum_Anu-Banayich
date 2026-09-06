@@ -1,10 +1,15 @@
 @use '../../../../styles/variables' as *;
 @use '../../../../styles/mixins' as *;
 
+// No `direction` here: the page inherits it from <html dir>, which
+// LocaleService sets from the active language (CONTRIBUTING §6). Everything
+// below is direction-neutral — no text-align, no margin-left/right — so the
+// layout mirrors on its own when the language flips. `align-self: flex-end` on
+// the counter is already logical: inside `flex-direction: column` it leans on
+// the inline axis and turns around by itself.
 :host {
   display: block;
   padding: $spacing-lg;
-  direction: rtl;
 }
 
 .pending-questions {

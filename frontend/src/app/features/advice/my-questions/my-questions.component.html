@@ -1,24 +1,63 @@
-<div class="my-questions-page" dir="rtl">
-  <a routerLink="/advice">← חזרה לרשימת אנשי מקצוע</a>
-  <h1>השאלות שלי</h1>
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="my-questions-page">
+  <a routerLink="/advice">← {{ 'advice.back_to_professionals' | transloco }}</a>
+  <h1>{{ 'advice.my_questions.title' | transloco }}</h1>
 
-  <app-error-display [message]="errorMessage()" />
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch. -->
+  @if (error().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (error().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
 
   @if (isLoading()) {
-    <app-loading-spinner message="טוען שאלות..." />
-  } @else if (questions.length === 0) {
-    <p class="empty-state">עדיין לא שאלת שאלות.</p>
+    <app-loading-spinner [message]="'advice.my_questions.loading' | transloco" />
+  } @else if (questions().length === 0) {
+    <p class="empty-state">{{ 'advice.my_questions.empty' | transloco }}</p>
   } @else {
-    @for (question of questions; track question.id) {
+    @for (question of questions(); track question.id) {
       <div class="question-card">
+        <!-- The question and its answer are what a person wrote, not UI: shown
+             as they came, in either interface language. -->
         <p class="question-content">{{ question.content }}</p>
         <div class="question-meta">
           <span>{{ target(question) }}</span>
           <span>{{ question.created_at | date: 'dd/MM/yyyy' }}</span>
           <span class="question-status" [class]="'status--' + question.status">
-            {{ statusLabels[question.status] }}
+            {{ statusLabels[question.status] | transloco }}
           </span>
         </div>
+        @if (question.status === queryStatus.ANSWERED) {
+          @if (question.answer) {
+            <p class="question-answer">{{ question.answer }}</p>
+          }
+          <!-- Gated on status alone, not on question.answer: ANSWERED always
+               carries an answer (answer_query() sets both together), so the
+               like button shouldn't disappear if that invariant is ever
+               violated. -->
+          @if (question.is_public) {
+            <button
+              type="button"
+              class="like-button"
+              [class.liked]="question.liked_by_me"
+              [attr.aria-label]="
+                (question.liked_by_me
+                  ? 'advice.my_questions.unlike_aria'
+                  : 'advice.my_questions.like_aria'
+                ) | transloco: { count: question.like_count }
+              "
+              (click)="toggleLike(question)"
+            >
+              <span aria-hidden="true">👍</span>
+              <span>{{ question.like_count }}</span>
+            </button>
+            @if (likeErrorId() === question.id) {
+              <app-error-display [message]="'advice.my_questions.like_error' | transloco" />
+            }
+          }
+        }
       </div>
     }
   }
