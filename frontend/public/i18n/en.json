@@ -200,7 +200,10 @@
     "my_questions": {
       "title": "My questions",
       "loading": "Loading questions...",
-      "empty": "You have not asked any questions yet."
+      "empty": "You have not asked any questions yet.",
+      "like_error": "Couldn't save the like. Please try again.",
+      "like_aria": "Like — {{count}}",
+      "unlike_aria": "Unlike — {{count}}"
     },
     "qa_feed": {
       "back_link": "← Back to professional advice",
@@ -452,7 +455,7 @@
       "next_page": "Next",
       "page_of": "Page {{page}} of {{total}}"
     },
-    "newMessage": {
+    "new_message": {
       "title": "My cell members",
       "loading": "Loading cell members...",
       "empty": "There are no other members in your cell yet."

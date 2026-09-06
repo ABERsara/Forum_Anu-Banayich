@@ -200,7 +200,10 @@
     "my_questions": {
       "title": "השאלות שלי",
       "loading": "טוען שאלות...",
-      "empty": "עדיין לא שאלת שאלות."
+      "empty": "עדיין לא שאלת שאלות.",
+      "like_error": "הלייק לא נשמר. נסה שוב.",
+      "like_aria": "לייק — {{count}}",
+      "unlike_aria": "ביטול לייק — {{count}}"
     },
     "qa_feed": {
       "back_link": "→ חזרה לייעוץ מקצועי",
@@ -452,7 +455,7 @@
       "next_page": "הבא",
       "page_of": "עמוד {{page}} מתוך {{total}}"
     },
-    "newMessage": {
+    "new_message": {
       "title": "חברי התא שלי",
       "loading": "טוען חברי תא...",
       "empty": "אין חברים נוספים בתא שלך כרגע."
