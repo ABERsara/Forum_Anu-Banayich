@@ -1404,6 +1404,26 @@ class TestSearchUsersForDM:
         assert [r.id for r in by_first] == [same_cell.id]
         assert [r.id for r in by_last] == [same_cell.id]
 
+    def test_percent_and_underscore_are_treated_as_literal_characters(self, db_session):
+        """
+        '%'/'_' are LIKE wildcards — unescaped, searching for either would
+        match every same-cell row instead of nobody, turning "search by
+        name" into "browse everyone". Neither test user's name actually
+        contains these characters, so a correct implementation returns [].
+        """
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _make_user(
+            db_session,
+            "same@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            first_name="Rivka",
+            last_name="Levi",
+        )
+
+        assert forum_service.search_users_for_dm(db_session, me, "%") == []
+        assert forum_service.search_users_for_dm(db_session, me, "_") == []
+
     def test_cross_cell_name_match_returns_same_empty_result_as_nonexistent_name(
         self, db_session
     ):
@@ -1956,6 +1976,12 @@ class TestSearchRecipientsEndpoint:
         r = await client.get(RECIPIENTS_URL, params={"q": "Rivka"})
 
         assert r.status_code == 403
+
+    async def test_unauthenticated_returns_401(self, client, db_session):
+        """§3.2 negative permission check: no session at all, not just the wrong role."""
+        r = await client.get(RECIPIENTS_URL, params={"q": "Rivka"})
+
+        assert r.status_code == 401
 
     async def test_result_cap_enforced_via_http(self, client, db_session):
         me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)

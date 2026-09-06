@@ -1034,7 +1034,13 @@ def search_users_for_dm(db: Session, current_user: User, name: str) -> list[User
         )
         raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
 
-    pattern = f"%{name}%"
+    # Escape LIKE's own wildcards in the user-supplied name — otherwise
+    # searching for e.g. "%" or "_" would match everyone in the cell rather
+    # than literally nobody, silently turning "search by name" into "browse
+    # everyone". No cross-cell leak either way (the cell filter still
+    # applies), but the search semantics would be broken.
+    escaped_name = name.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    pattern = f"%{escaped_name}%"
     return (
         db.query(User)
         .filter(
@@ -1043,7 +1049,10 @@ def search_users_for_dm(db: Session, current_user: User, name: str) -> list[User
             User.account_status == AccountStatus.ACTIVE,
             User.user_type == current_user.user_type,
             User.sector == current_user.sector,
-            or_(User.first_name.ilike(pattern), User.last_name.ilike(pattern)),
+            or_(
+                User.first_name.ilike(pattern, escape="\\"),
+                User.last_name.ilike(pattern, escape="\\"),
+            ),
         )
         .order_by(User.first_name, User.last_name)
         .limit(_RECIPIENT_SEARCH_LIMIT)
