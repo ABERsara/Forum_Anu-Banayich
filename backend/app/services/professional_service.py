@@ -434,19 +434,8 @@ def get_my_questions(db: Session, asker: User) -> list[ProfessionalQueryResponse
     them here is free – the frontend decides what to show based on
     is_public.
     """
-    like_counts = (
-        db.query(Like.target_id, func.count(Like.user_id).label("like_count"))
-        .filter(Like.target_type == LikeTargetType.PROFESSIONAL_QUERY)
-        .group_by(Like.target_id)
-        .subquery()
-    )
-    my_likes = (
-        db.query(Like.target_id)
-        .filter(
-            Like.target_type == LikeTargetType.PROFESSIONAL_QUERY,
-            Like.user_id == asker.id,
-        )
-        .subquery()
+    like_counts, my_likes = like_service.like_annotations(
+        db, LikeTargetType.PROFESSIONAL_QUERY, asker
     )
 
     rows = (
