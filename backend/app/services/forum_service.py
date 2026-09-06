@@ -47,7 +47,7 @@ from app.schemas.forum import (
     ForumPostUpdate,
 )
 from app.schemas.user import UserPublic
-from app.services.audit_service import log_action
+from app.services.audit_service import build_entry, log_action
 from app.services.user_service import get_user_by_id
 
 #: Generic 403 for anything DM-permission-related — never distinguishes
@@ -584,12 +584,19 @@ def _enforce_conversation_limit(
     1,000 instead of deleting them, and shrinks back once they are decided.
 
     Normally deletes exactly one row — the cap is checked on every send, so a
-    conversation can only ever be one over. The loop is for a conversation
-    that arrived over the cap another way (a restored backup, a lowered cap).
+    conversation can only ever be one over. Deleting a set rather than a
+    single row is for a conversation that arrived over the cap another way (a
+    restored backup, a lowered cap).
 
     Deletion is permanent and it is the user's own content, so each removed
     message gets its own audit entry (§9.3) — never with the content in it,
     which is exactly what an audit log must not carry.
+
+    The deletes and every one of those entries go in **one** transaction.
+    log_action() commits on each call, so pairing a delete with a log_action()
+    row by row would make an N-message prune N transactions: a failure after
+    the first would leave the conversation half-pruned, with an audit trail
+    that no longer says which messages the conversation actually lost.
     """
     limit = settings.MAX_MESSAGES_PER_CONVERSATION
     total = (
@@ -610,8 +617,12 @@ def _enforce_conversation_limit(
         )
         .scalar_subquery()
     )
-    doomed = (
-        db.query(DirectMessage)
+    # Ids only, never the rows: nothing here reads a message, and a prune of
+    # a long conversation should not pull its encrypted content into memory
+    # to throw it away.
+    pruned_ids = [
+        row[0]
+        for row in db.query(DirectMessage.id)
         .filter(
             DirectMessage.conversation_key == conversation_key,
             DirectMessage.id != keep_message_id,
@@ -620,21 +631,28 @@ def _enforce_conversation_limit(
         .order_by(DirectMessage.created_at.asc(), DirectMessage.id.asc())
         .limit(overflow)
         .all()
-    )
+    ]
+    if not pruned_ids:
+        return []
 
-    pruned_ids = []
-    for message in doomed:
-        message_id = message.id
-        db.delete(message)
-        log_action(
-            db,
+    entries = [
+        build_entry(
             actor=actor,
             action=AuditAction.DIRECT_MESSAGE_PRUNED,
             entity_type="DirectMessage",
             entity_id=message_id,
             details={"conversation_key": conversation_key, "reason": "storage_cap"},
         )
-        pruned_ids.append(message_id)
+        for message_id in pruned_ids
+    ]
+    # synchronize_session=False because the ids are already in hand and no
+    # code after this point touches those rows again — the commit below
+    # expires the session anyway.
+    db.query(DirectMessage).filter(DirectMessage.id.in_(pruned_ids)).delete(
+        synchronize_session=False
+    )
+    db.add_all(entries)
+    db.commit()
 
     return pruned_ids
 

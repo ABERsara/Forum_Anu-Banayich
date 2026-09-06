@@ -165,6 +165,12 @@ await audit_service.log_action(
 )
 ```
 
+`log_action()` עושה `db.commit()` בעצמה. לכן **אסור לקרוא לה בלולאה**: פעולה שמוחקת
+או משנה N שורות תתפצל ל-N טרנזקציות, וכשל אחרי הראשונה משאיר חלק מהשינוי מיושם ו-audit
+שכבר לא מתאר את הנתונים. פעולה כזאת בונה את הרשומות עם `audit_service.build_entry()`,
+מוסיפה אותן ב-`db.add_all(...)` יחד עם הכתיבות שלה, ועושה `commit` אחד בסוף —
+ראי `forum_service._enforce_conversation_limit()`.
+
 ### Content Visibility — חוק ברזל
 
 **כל שאילתה שמחזירה תוכן פורום / DM / Q&A** חייבת לכלול WHERE מפורש:

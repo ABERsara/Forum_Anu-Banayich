@@ -29,7 +29,7 @@ from app.core.constants import (
     UserType,
 )
 from app.core.dependencies import get_current_active_user, get_current_user
-from app.core.encryption import decrypt_message
+from app.core.encryption import decrypt_message, encrypt_message
 from app.main import app
 from app.models.audit import AuditLog
 from app.models.forum import DirectMessage
@@ -90,8 +90,6 @@ def _seed_conversation(db_session, sender: User, recipient: User, count: int) ->
     would also run. Content is stored encrypted here too, so anything that
     reads it back goes through the same decrypt path as production.
     """
-    from app.core.encryption import encrypt_message
-
     base = datetime(2026, 8, 1, 12, 0, 0)
     key = forum_service.build_conversation_key(sender.id, recipient.id)
     for index in range(count):
@@ -1161,6 +1159,65 @@ class TestConversationLimit:
             "reason": "storage_cap",
         }
         assert "message-0000" not in str(entry.details)
+
+    def test_a_multi_message_prune_is_a_single_transaction(
+        self, db_session, monkeypatch
+    ):
+        """
+        A prune of N messages is one change, not N of them.
+
+        Lower the cap in configuration and the next send has to remove several
+        messages at once, each one paired with an audit entry. Committing per
+        pair would let a failure part-way through leave the conversation
+        half-pruned, with an audit trail that no longer names the messages it
+        actually lost — so the deletes and all the entries land together or
+        not at all.
+
+        Calls the private function directly on purpose: send_direct_message()
+        commits the new message before enforcement runs, and that commit would
+        hide the one this test is counting.
+        """
+        monkeypatch.setattr(settings, "MAX_MESSAGES_PER_CONVERSATION", 2)
+        a = _make_user(db_session, "a@example.com", UserType.WIDOW, Sector.HASIDIC)
+        b = _make_user(db_session, "b@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _seed_conversation(db_session, a, b, 5)
+        key = forum_service.build_conversation_key(a.id, b.id)
+        ordered_ids = [
+            m.id
+            for m in db_session.query(DirectMessage)
+            .filter(DirectMessage.conversation_key == key)
+            .order_by(DirectMessage.created_at.asc(), DirectMessage.id.asc())
+            .all()
+        ]
+
+        commits = 0
+
+        def _listener(_session):
+            nonlocal commits
+            commits += 1
+
+        event.listen(db_session, "after_commit", _listener)
+        try:
+            pruned_ids = forum_service._enforce_conversation_limit(
+                db_session, a, key, keep_message_id=ordered_ids[-1]
+            )
+        finally:
+            event.remove(db_session, "after_commit", _listener)
+
+        assert commits == 1
+        assert pruned_ids == ordered_ids[:3]
+        assert (
+            db_session.query(DirectMessage)
+            .filter(DirectMessage.conversation_key == key)
+            .count()
+            == 2
+        )
+        entries = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == AuditAction.DIRECT_MESSAGE_PRUNED)
+            .all()
+        )
+        assert sorted(e.entity_id for e in entries) == sorted(pruned_ids)
 
     def test_the_cap_counts_one_conversation_not_the_whole_table(
         self, db_session, monkeypatch
