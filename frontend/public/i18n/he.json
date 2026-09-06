@@ -408,6 +408,14 @@
       "load_reports_failed": "שגיאה בטעינת הדיווחים."
     }
   },
+  "profile": {
+    "title": "הפרופיל שלי",
+    "name_label": "שם:",
+    "email_label": "מייל:",
+    "group_label": "קבוצה:",
+    "sector_label": "מגזר:",
+    "status_label": "סטטוס:"
+  },
   "shared": {
     "confirm_dialog": {
       "title": "האם לאשר?",
