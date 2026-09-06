@@ -14,6 +14,7 @@ GET    /messages                          – inbox (list of conversations, pagi
 POST   /messages                          – send a direct message (own cell only)
 GET    /conversations/{key}/messages      – one page of a conversation, newest first
 GET    /cells/me/members                  – other ACTIVE users in your own cell
+GET    /messages/recipients               – search own-cell members by name (autocomplete)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -260,3 +261,23 @@ def get_my_cell_members(
     """
     members = forum_service.get_cell_members(db, current_user)
     return [UserPublic.model_validate(member) for member in members]
+
+
+@router.get("/messages/recipients", response_model=list[UserPublic])
+def search_recipients(
+    q: str = Query(..., min_length=2),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> list[UserPublic]:
+    """
+    Search the current user's own cell (group+sector) by name, to start a
+    new conversation. Name + id only (UserPublic) — no email/phone
+    (spec §3.1). A name matching nobody and a name matching someone in a
+    different cell return the identical empty list — see
+    forum_service.search_users_for_dm()'s docstring.
+
+    q must be at least 2 characters (422 otherwise) — defense in depth;
+    the primary "don't fire below 2 chars" gate is the frontend debounce.
+    """
+    results = forum_service.search_users_for_dm(db, current_user, q)
+    return [UserPublic.model_validate(r) for r in results]

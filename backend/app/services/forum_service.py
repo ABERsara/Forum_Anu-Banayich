@@ -8,7 +8,6 @@ Forum service.
 TODO list for junior developer:
   [ ] implement get_posts() – with content filter + pagination
   [ ] implement get_post_by_id() – verify user can see it
-  [ ] implement search_users_for_dm() – name search within same group/sector
 """
 
 import base64
@@ -977,9 +976,8 @@ def get_cell_members(db: Session, current_user: User) -> list[User]:
 
     Name only (UserPublic drops everything else) — same "no PII beyond name"
     rule as the rest of this file. This is a plain list, not the spec's
-    by-name search (§5.3) — search is explicitly out of scope for this
-    ticket; that's a separate, still-unimplemented feature
-    (search_users_for_dm / GET /users/search).
+    by-name search (§5.3) — for that, see search_users_for_dm() /
+    GET /messages/recipients.
     """
     if current_user.role != UserRole.USER:
         log_action(
@@ -1006,19 +1004,57 @@ def get_cell_members(db: Session, current_user: User) -> list[User]:
     )
 
 
+_RECIPIENT_SEARCH_LIMIT = 20
+
+
 def search_users_for_dm(db: Session, current_user: User, name: str) -> list[User]:
     """
-    Search for users to send a DM to.
+    Search current_user's own cell (group+sector) by name, to start a DM.
 
-    Rules:
-      - Only users in the SAME group as current_user
-      - Search by first_name or last_name (case-insensitive)
-      - Never expose contact details (phone/email) – name only
+    Same four-axis filter as get_cell_members() (role/status/user_type/
+    sector), plus a case-insensitive name predicate. A name matching a user
+    outside the caller's cell is filtered out by the user_type/sector
+    predicates before the name predicate is ever evaluated — it is never a
+    candidate row, exactly like a name matching nobody at all. Both cases
+    fall out of the same WHERE as an empty result, with no special-casing
+    needed (same mechanism can_message()/send_direct_message() already use
+    to fold "no such user" and "wrong cell" into one 403 branch).
 
-    TODO:
-      1. Query users where user_type == current_user.user_type AND account_status == ACTIVE
-      2. Filter by name ILIKE
-      3. Return list (no PII beyond name)
+    Capped at _RECIPIENT_SEARCH_LIMIT rows — an autocomplete list, not a
+    paged listing.
     """
-    # TODO: implement this function
-    raise NotImplementedError("search_users_for_dm() is not yet implemented")
+    if current_user.role != UserRole.USER:
+        log_action(
+            db,
+            actor=current_user,
+            action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
+            entity_type="DirectMessage",
+            entity_id=current_user.id,
+            details={"reason": "recipient_search_role_blocked"},
+        )
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+
+    # Escape LIKE's own wildcards in the user-supplied name — otherwise
+    # searching for e.g. "%" or "_" would match everyone in the cell rather
+    # than literally nobody, silently turning "search by name" into "browse
+    # everyone". No cross-cell leak either way (the cell filter still
+    # applies), but the search semantics would be broken.
+    escaped_name = name.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    pattern = f"%{escaped_name}%"
+    return (
+        db.query(User)
+        .filter(
+            User.id != current_user.id,
+            User.role == UserRole.USER,
+            User.account_status == AccountStatus.ACTIVE,
+            User.user_type == current_user.user_type,
+            User.sector == current_user.sector,
+            or_(
+                User.first_name.ilike(pattern, escape="\\"),
+                User.last_name.ilike(pattern, escape="\\"),
+            ),
+        )
+        .order_by(User.first_name, User.last_name)
+        .limit(_RECIPIENT_SEARCH_LIMIT)
+        .all()
+    )

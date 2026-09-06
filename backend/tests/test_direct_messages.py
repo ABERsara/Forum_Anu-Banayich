@@ -1,16 +1,19 @@
 """
-Tests for private messaging between cell members (ABF-118), the conversations
-inbox built on top of it (ABF-119), and the full conversation screen's server
-half — cursor paging, read_at receipts and the §5.3 storage cap (ABF-114).
+Tests for private messaging between cell members (ABF-118), the
+conversations inbox built on top of it (ABF-119), cell-mate name search
+for starting a new conversation (ABF-115), and the full conversation
+screen's server half — cursor paging, read_at receipts and the §5.3
+storage cap (ABF-114).
 
 Two layers, matching test_forum_service.py / test_forum_endpoints.py:
   - TestCanMessage / TestSend* / TestGetConversationMessages /
-    TestConversationLimit / TestGetCellMembers / TestGetInbox exercise
-    forum_service functions directly.
+    TestConversationLimit / TestGetCellMembers / TestSearchUsersForDM /
+    TestGetInbox exercise forum_service functions directly.
   - TestSendMessageEndpoint / TestGetConversationMessagesEndpoint /
-    TestGetCellMembersEndpoint / TestGetInboxEndpoint go through the real HTTP
-    routes, hitting the API directly rather than through any UI — required by
-    §4.2's positive AND negative permission checks.
+    TestGetCellMembersEndpoint / TestSearchRecipientsEndpoint /
+    TestGetInboxEndpoint go through the real HTTP routes, hitting the API
+    directly rather than through any UI — required by §4.2's positive AND
+    negative permission checks.
 """
 
 from datetime import datetime, timedelta
@@ -41,6 +44,7 @@ from app.services import forum_service
 MESSAGES_BASE = "/api/v1/messages"
 CONVERSATIONS_BASE = "/api/v1/conversations"
 CELL_MEMBERS_URL = "/api/v1/cells/me/members"
+RECIPIENTS_URL = "/api/v1/messages/recipients"
 
 
 def _make_user(
@@ -50,12 +54,14 @@ def _make_user(
     sector: Sector | None = None,
     role: UserRole = UserRole.USER,
     account_status: AccountStatus = AccountStatus.ACTIVE,
+    first_name: str = "Test",
+    last_name: str = "User",
 ) -> User:
     user = User(
         email=email,
         password_hash="hashed",
-        first_name="Test",
-        last_name="User",
+        first_name=first_name,
+        last_name=last_name,
         role=role,
         user_type=user_type,
         sector=sector,
@@ -1329,6 +1335,180 @@ class TestGetCellMembers:
 
 
 # ---------------------------------------------------------------------------
+# search_users_for_dm()
+# ---------------------------------------------------------------------------
+
+
+class TestSearchUsersForDM:
+    def test_returns_same_cell_name_matches_excluding_self(self, db_session):
+        me = _make_user(
+            db_session,
+            "me@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            first_name="Rivka",
+            last_name="Cohen",
+        )
+        same_cell = _make_user(
+            db_session,
+            "same@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            first_name="Rivka",
+            last_name="Levi",
+        )
+        _make_user(
+            db_session,
+            "other-group@example.com",
+            UserType.WIDOWER,
+            Sector.HASIDIC,
+            first_name="Rivka",
+            last_name="Katz",
+        )
+        _make_user(
+            db_session,
+            "other-sector@example.com",
+            UserType.WIDOW,
+            Sector.LITVISH,
+            first_name="Rivka",
+            last_name="Gold",
+        )
+        _make_user(
+            db_session,
+            "suspended@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            account_status=AccountStatus.SUSPENDED,
+            first_name="Rivka",
+            last_name="Stern",
+        )
+
+        results = forum_service.search_users_for_dm(db_session, me, "Rivka")
+
+        assert [r.id for r in results] == [same_cell.id]
+
+    def test_matches_first_name_or_last_name_case_insensitively(self, db_session):
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        same_cell = _make_user(
+            db_session,
+            "same@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            first_name="Yosef",
+            last_name="Applebaum",
+        )
+
+        by_first = forum_service.search_users_for_dm(db_session, me, "yosef")
+        by_last = forum_service.search_users_for_dm(db_session, me, "APPLE")
+
+        assert [r.id for r in by_first] == [same_cell.id]
+        assert [r.id for r in by_last] == [same_cell.id]
+
+    def test_percent_and_underscore_are_treated_as_literal_characters(self, db_session):
+        """
+        '%'/'_' are LIKE wildcards — unescaped, searching for either would
+        match every same-cell row instead of nobody, turning "search by
+        name" into "browse everyone". Neither test user's name actually
+        contains these characters, so a correct implementation returns [].
+        """
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _make_user(
+            db_session,
+            "same@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            first_name="Rivka",
+            last_name="Levi",
+        )
+
+        assert forum_service.search_users_for_dm(db_session, me, "%") == []
+        assert forum_service.search_users_for_dm(db_session, me, "_") == []
+
+    def test_cross_cell_name_match_returns_same_empty_result_as_nonexistent_name(
+        self, db_session
+    ):
+        """Doesn't leak whether a name exists elsewhere — identical empty result."""
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _make_user(
+            db_session,
+            "other@example.com",
+            UserType.WIDOWER,
+            Sector.SEPHARDIC,
+            first_name="Ploni",
+            last_name="Almoni",
+        )
+
+        real_but_wrong_cell = forum_service.search_users_for_dm(db_session, me, "Ploni")
+        totally_made_up = forum_service.search_users_for_dm(
+            db_session, me, "Zzqxnonexistent"
+        )
+
+        assert real_but_wrong_cell == [] == totally_made_up
+
+    def test_result_capped_at_limit(self, db_session):
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        for i in range(forum_service._RECIPIENT_SEARCH_LIMIT + 5):
+            _make_user(
+                db_session,
+                f"member{i}@example.com",
+                UserType.WIDOW,
+                Sector.HASIDIC,
+                first_name="Capped",
+                last_name=f"Member{i}",
+            )
+
+        results = forum_service.search_users_for_dm(db_session, me, "Capped")
+
+        assert len(results) == forum_service._RECIPIENT_SEARCH_LIMIT
+
+    def test_moderator_cannot_search(self, db_session):
+        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+
+        try:
+            forum_service.search_users_for_dm(db_session, moderator, "Rivka")
+            raise AssertionError("expected HTTPException")
+        except Exception as exc:
+            assert exc.status_code == 403
+
+    def test_admin_cannot_search(self, db_session):
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+
+        try:
+            forum_service.search_users_for_dm(db_session, admin, "Rivka")
+            raise AssertionError("expected HTTPException")
+        except Exception as exc:
+            assert exc.status_code == 403
+
+    def test_professional_cannot_search(self, db_session):
+        professional = _make_user(
+            db_session, "prof@example.com", role=UserRole.PROFESSIONAL
+        )
+
+        try:
+            forum_service.search_users_for_dm(db_session, professional, "Rivka")
+            raise AssertionError("expected HTTPException")
+        except Exception as exc:
+            assert exc.status_code == 403
+
+    def test_role_blocked_search_logs_audit(self, db_session):
+        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+
+        try:
+            forum_service.search_users_for_dm(db_session, moderator, "Rivka")
+            raise AssertionError("expected HTTPException")
+        except Exception:
+            pass
+
+        entry = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == AuditAction.DIRECT_MESSAGE_ACCESS_DENIED)
+            .one()
+        )
+        assert entry.actor_id == moderator.id
+        assert entry.details["reason"] == "recipient_search_role_blocked"
+
+
+# ---------------------------------------------------------------------------
 # Endpoint-level tests — direct API calls, per §4.2
 # ---------------------------------------------------------------------------
 
@@ -1702,6 +1882,124 @@ class TestGetCellMembersEndpoint:
         r = await client.get(CELL_MEMBERS_URL)
 
         assert r.status_code == 403
+
+
+class TestSearchRecipientsEndpoint:
+    async def test_returns_only_same_cell_matches_with_name_and_id_only(
+        self, client, db_session
+    ):
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        same_cell = _make_user(
+            db_session,
+            "same@example.com",
+            UserType.WIDOW,
+            Sector.HASIDIC,
+            first_name="Rivka",
+            last_name="Levi",
+        )
+        _make_user(
+            db_session,
+            "other@example.com",
+            UserType.WIDOWER,
+            Sector.HASIDIC,
+            first_name="Rivka",
+            last_name="Katz",
+        )
+        _login_as(me)
+
+        r = await client.get(RECIPIENTS_URL, params={"q": "Rivka"})
+
+        assert r.status_code == 200
+        body = r.json()
+        assert [m["id"] for m in body] == [same_cell.id]
+        assert "email" not in body[0]
+        assert "phone" not in body[0]
+
+    async def test_query_below_two_chars_returns_422(self, client, db_session):
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _login_as(me)
+
+        r = await client.get(RECIPIENTS_URL, params={"q": "a"})
+
+        assert r.status_code == 422
+
+    async def test_missing_query_param_returns_422(self, client, db_session):
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _login_as(me)
+
+        r = await client.get(RECIPIENTS_URL)
+
+        assert r.status_code == 422
+
+    async def test_cross_cell_name_returns_same_empty_body_as_nonexistent_name(
+        self, client, db_session
+    ):
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        _make_user(
+            db_session,
+            "other@example.com",
+            UserType.WIDOWER,
+            Sector.SEPHARDIC,
+            first_name="Ploni",
+            last_name="Almoni",
+        )
+        _login_as(me)
+
+        r1 = await client.get(RECIPIENTS_URL, params={"q": "Ploni"})
+        r2 = await client.get(RECIPIENTS_URL, params={"q": "Zzqxnonexistent"})
+
+        assert r1.status_code == r2.status_code == 200
+        assert r1.json() == r2.json() == []
+
+    async def test_moderator_returns_403(self, client, db_session):
+        moderator = _make_user(db_session, "mod@example.com", role=UserRole.MODERATOR)
+        _login_as(moderator)
+
+        r = await client.get(RECIPIENTS_URL, params={"q": "Rivka"})
+
+        assert r.status_code == 403
+
+    async def test_professional_returns_403(self, client, db_session):
+        professional = _make_user(
+            db_session, "prof@example.com", role=UserRole.PROFESSIONAL
+        )
+        _login_as(professional)
+
+        r = await client.get(RECIPIENTS_URL, params={"q": "Rivka"})
+
+        assert r.status_code == 403
+
+    async def test_admin_returns_403(self, client, db_session):
+        admin = _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        _login_as(admin)
+
+        r = await client.get(RECIPIENTS_URL, params={"q": "Rivka"})
+
+        assert r.status_code == 403
+
+    async def test_unauthenticated_returns_401(self, client, db_session):
+        """§3.2 negative permission check: no session at all, not just the wrong role."""
+        r = await client.get(RECIPIENTS_URL, params={"q": "Rivka"})
+
+        assert r.status_code == 401
+
+    async def test_result_cap_enforced_via_http(self, client, db_session):
+        me = _make_user(db_session, "me@example.com", UserType.WIDOW, Sector.HASIDIC)
+        for i in range(forum_service._RECIPIENT_SEARCH_LIMIT + 5):
+            _make_user(
+                db_session,
+                f"member{i}@example.com",
+                UserType.WIDOW,
+                Sector.HASIDIC,
+                first_name="Capped",
+                last_name=f"Member{i}",
+            )
+        _login_as(me)
+
+        r = await client.get(RECIPIENTS_URL, params={"q": "Capped"})
+
+        assert r.status_code == 200
+        assert len(r.json()) == forum_service._RECIPIENT_SEARCH_LIMIT
 
 
 class TestGetInboxEndpoint:

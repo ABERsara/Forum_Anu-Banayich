@@ -462,7 +462,12 @@
     "newMessage": {
       "title": "My cell members",
       "loading": "Loading cell members...",
-      "empty": "There are no other members in your cell yet."
+      "empty": "There are no other members in your cell yet.",
+      "search_label": "Search by name",
+      "search_placeholder": "Type a name...",
+      "search_min_chars_hint": "Type at least 2 characters to search",
+      "search_loading": "Searching...",
+      "search_no_results": "No matching members found in your cell."
     },
     "chat": {
       "back_to_inbox": "← Back to inbox",
