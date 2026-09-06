@@ -323,7 +323,10 @@
     "post": {
       "attachment": "Attachment",
       "edit": "Edit",
-      "delete": "Delete"
+      "delete": "Delete",
+      "like_error": "Couldn't save the like. Please try again.",
+      "like_aria": "Like — {{count}}",
+      "unlike_aria": "Unlike — {{count}}"
     },
     "delete_post": {
       "title": "Delete post",

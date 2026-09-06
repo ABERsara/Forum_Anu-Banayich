@@ -323,7 +323,10 @@
     "post": {
       "attachment": "קובץ מצורף",
       "edit": "עריכה",
-      "delete": "מחיקה"
+      "delete": "מחיקה",
+      "like_error": "אירעה שגיאה בסימון לייק. נסה שוב.",
+      "like_aria": "לייק — {{count}}",
+      "unlike_aria": "ביטול לייק — {{count}}"
     },
     "delete_post": {
       "title": "מחיקת הודעה",

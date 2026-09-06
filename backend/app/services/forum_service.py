@@ -26,6 +26,7 @@ from app.core.constants import (
     AccountStatus,
     AuditAction,
     GroupVisibility,
+    LikeTargetType,
     PostStatus,
     ReportDecision,
     ReportTargetType,
@@ -34,6 +35,7 @@ from app.core.constants import (
 )
 from app.core.encryption import decrypt_message, encrypt_message
 from app.models.forum import DirectMessage, ForumPost
+from app.models.like import Like
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.forum import (
@@ -168,32 +170,58 @@ def get_posts(
 
     total = query.count()
 
-    posts = (
-        query.order_by(ForumPost.created_at.desc())
+    # like_count/liked_by_me are aggregated here via subqueries rather than
+    # per-row, to avoid an N+1 query per post in the page. Imported locally
+    # (not at module level) to avoid a circular import: like_service already
+    # imports forum_service for matches_content_filter(). The real fix is
+    # moving the visibility-filter functions to a shared module (e.g.
+    # app.core.content_filter) so neither service depends on the other —
+    # deferred to a future sprint, out of scope for this change.
+    from app.services import like_service
+
+    like_counts, my_likes = like_service.like_annotations(
+        db, LikeTargetType.FORUM_POST, current_user
+    )
+
+    rows = (
+        query.add_columns(
+            func.coalesce(like_counts.c.like_count, 0).label("like_count"),
+            my_likes.c.target_id.isnot(None).label("liked_by_me"),
+        )
+        .outerjoin(like_counts, like_counts.c.target_id == ForumPost.id)
+        .outerjoin(my_likes, my_likes.c.target_id == ForumPost.id)
+        .order_by(ForumPost.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
     )
 
+    items = [
+        ForumPostResponse.model_validate(post).model_copy(
+            update={"like_count": like_count, "liked_by_me": liked_by_me}
+        )
+        for post, like_count, liked_by_me in rows
+    ]
+
     return ForumPostListResponse(
-        items=[ForumPostResponse.model_validate(post) for post in posts],
+        items=items,
         total=total,
         page=page,
         page_size=page_size,
     )
 
 
-def _matches_content_filter(post: ForumPost, current_user: User) -> bool:
+def matches_content_filter(post: ForumPost, current_user: User) -> bool:
     """
     Python-side equivalent of _content_filter(), for checking a single
     already-loaded post instead of querying again. Keep the two in sync —
     same group/sector OR-logic, just evaluated in memory vs. compiled to SQL.
     """
     assert current_user.user_type is not None, (
-        "_matches_content_filter() requires a user with user_type set"
+        "matches_content_filter() requires a user with user_type set"
     )
     assert current_user.sector is not None, (
-        "_matches_content_filter() requires a user with sector set"
+        "matches_content_filter() requires a user with sector set"
     )
     group_visibility = GroupVisibility(current_user.user_type.value)
     sector_visibility = SectorVisibility(current_user.sector.value)
@@ -231,15 +259,40 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     if current_user.role in (UserRole.ADMIN, UserRole.MODERATOR):
         if post.status == PostStatus.DELETED and current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
-        return post
+        return _attach_like_fields(db, post, current_user)
 
     # הגענו לכאן רק אם role == USER (ADMIN/MODERATOR תמיד יוצאים למעלה, עם return או raise)
     if post.status != PostStatus.VISIBLE:
         raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
 
-    if not _matches_content_filter(post, current_user):
+    if not matches_content_filter(post, current_user):
         raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
 
+    return _attach_like_fields(db, post, current_user)
+
+
+def _attach_like_fields(db: Session, post: ForumPost, current_user: User) -> ForumPost:
+    """
+    Set like_count/liked_by_me as plain (unmapped) attributes on an
+    already-fetched post, for get_post_by_id() to return a single post
+    outside get_posts()'s paginated-subquery path. ForumPostResponse picks
+    these up via getattr (from_attributes=True) same as any mapped column.
+
+    One query with conditional aggregation, not two separate COUNTs — same
+    row set scanned once for both numbers.
+    """
+    like_count, liked_by_me = (
+        db.query(
+            func.count(Like.user_id),
+            func.max(case((Like.user_id == current_user.id, 1), else_=0)),
+        )
+        .filter(
+            Like.target_type == LikeTargetType.FORUM_POST, Like.target_id == post.id
+        )
+        .one()
+    )
+    post.like_count = like_count  # type: ignore[attr-defined]
+    post.liked_by_me = bool(liked_by_me)  # type: ignore[attr-defined]
     return post
 
 

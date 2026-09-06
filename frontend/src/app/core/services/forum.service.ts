@@ -18,6 +18,7 @@ import {
   ForumPostCreate,
   ForumPostList,
   ForumPostUpdate,
+  LikeResponse,
   ReportCreate,
   UserPublic,
 } from '../models';
@@ -58,6 +59,10 @@ export class ForumService {
 
   updatePost(id: string, data: ForumPostUpdate): Observable<ForumPost> {
     return this.api.patch<ForumPost>(`/forum/posts/${id}`, data);
+  }
+
+  toggleLike(id: string): Observable<LikeResponse> {
+    return this.api.patch<LikeResponse>(`/forum/posts/${id}/like`, {});
   }
 
   reportPost(postId: string, data: ReportCreate): Observable<unknown> {

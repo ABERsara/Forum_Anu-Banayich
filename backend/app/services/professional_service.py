@@ -30,7 +30,6 @@ from app.core.constants import (
     UserRole,
     UserType,
 )
-from app.models.like import Like
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import (
@@ -40,7 +39,7 @@ from app.schemas.professional import (
     PublicQAResponse,
 )
 from app.schemas.user import ProfessionalProfile, UserPublic
-from app.services import email_service
+from app.services import email_service, like_service
 
 logger = logging.getLogger(__name__)
 
@@ -372,19 +371,8 @@ def get_public_qa(
     if domain is not None:
         query = query.filter(ProfessionalQuery.domain == domain)
 
-    like_counts = (
-        db.query(Like.target_id, func.count(Like.user_id).label("like_count"))
-        .filter(Like.target_type == LikeTargetType.PROFESSIONAL_QUERY)
-        .group_by(Like.target_id)
-        .subquery()
-    )
-    my_likes = (
-        db.query(Like.target_id)
-        .filter(
-            Like.target_type == LikeTargetType.PROFESSIONAL_QUERY,
-            Like.user_id == current_user.id,
-        )
-        .subquery()
+    like_counts, my_likes = like_service.like_annotations(
+        db, LikeTargetType.PROFESSIONAL_QUERY, current_user
     )
 
     rows = (
@@ -446,19 +434,8 @@ def get_my_questions(db: Session, asker: User) -> list[ProfessionalQueryResponse
     them here is free – the frontend decides what to show based on
     is_public.
     """
-    like_counts = (
-        db.query(Like.target_id, func.count(Like.user_id).label("like_count"))
-        .filter(Like.target_type == LikeTargetType.PROFESSIONAL_QUERY)
-        .group_by(Like.target_id)
-        .subquery()
-    )
-    my_likes = (
-        db.query(Like.target_id)
-        .filter(
-            Like.target_type == LikeTargetType.PROFESSIONAL_QUERY,
-            Like.user_id == asker.id,
-        )
-        .subquery()
+    like_counts, my_likes = like_service.like_annotations(
+        db, LikeTargetType.PROFESSIONAL_QUERY, asker
     )
 
     rows = (
