@@ -59,14 +59,14 @@ def _may_view_forum_post(post: ForumPost, user: User) -> bool:
     content filter rather than duplicating its group/sector OR-logic here.
 
     ADMIN sees everything, same as get_post_by_id()'s admin branch. Every
-    other role needs a VISIBLE post and a matching cell — _matches_content_filter()
+    other role needs a VISIBLE post and a matching cell — matches_content_filter()
     requires user_type/sector to be set, which is true for USER but not for
     MODERATOR, so this is only ever called for roles that have them (the
     endpoint's require_role restricts callers to USER/ADMIN).
     """
     if user.role == UserRole.ADMIN:
         return True
-    return post.status == PostStatus.VISIBLE and forum_service._matches_content_filter(
+    return post.status == PostStatus.VISIBLE and forum_service.matches_content_filter(
         post, user
     )
 

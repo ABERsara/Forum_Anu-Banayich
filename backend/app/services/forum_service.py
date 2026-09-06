@@ -134,7 +134,10 @@ def get_posts(
     # like_count/liked_by_me are aggregated here via subqueries rather than
     # per-row, to avoid an N+1 query per post in the page. Imported locally
     # (not at module level) to avoid a circular import: like_service already
-    # imports forum_service for _matches_content_filter().
+    # imports forum_service for matches_content_filter(). The real fix is
+    # moving the visibility-filter functions to a shared module (e.g.
+    # app.core.content_filter) so neither service depends on the other —
+    # deferred to a future sprint, out of scope for this change.
     from app.services import like_service
 
     like_counts, my_likes = like_service.like_annotations(
@@ -169,17 +172,17 @@ def get_posts(
     )
 
 
-def _matches_content_filter(post: ForumPost, current_user: User) -> bool:
+def matches_content_filter(post: ForumPost, current_user: User) -> bool:
     """
     Python-side equivalent of _content_filter(), for checking a single
     already-loaded post instead of querying again. Keep the two in sync —
     same group/sector OR-logic, just evaluated in memory vs. compiled to SQL.
     """
     assert current_user.user_type is not None, (
-        "_matches_content_filter() requires a user with user_type set"
+        "matches_content_filter() requires a user with user_type set"
     )
     assert current_user.sector is not None, (
-        "_matches_content_filter() requires a user with sector set"
+        "matches_content_filter() requires a user with sector set"
     )
     group_visibility = GroupVisibility(current_user.user_type.value)
     sector_visibility = SectorVisibility(current_user.sector.value)
@@ -223,7 +226,7 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     if post.status != PostStatus.VISIBLE:
         raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
 
-    if not _matches_content_filter(post, current_user):
+    if not matches_content_filter(post, current_user):
         raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
 
     return _attach_like_fields(db, post, current_user)
