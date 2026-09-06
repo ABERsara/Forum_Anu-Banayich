@@ -1,15 +1,20 @@
-<div class="forum-list" dir="rtl">
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="forum-list">
   <div class="forum-list__header">
-    <h1>פורום הקהילה</h1>
-    <a routerLink="/forum/new">+ פרסום הודעה חדשה</a>
+    <h1>{{ 'forum.list.title' | transloco }}</h1>
+    <!-- The link is named after the page it opens, so it shares that page's
+         key rather than carrying a second copy of the same phrase. The "+" is
+         a glyph, not copy. -->
+    <a routerLink="/forum/new">+ {{ 'forum.new_post.title' | transloco }}</a>
   </div>
 
   @if (isLoading()) {
     <app-loading-spinner size="md" />
   } @else if (hasError()) {
-    <app-error-display message="אירעה שגיאה בטעינת הפוסטים. נסה לרענן את הדף." />
+    <app-error-display [message]="'forum.errors.load_posts_failed' | transloco" />
   } @else if (posts().length === 0) {
-    <p>אין הודעות עדיין. היה הראשון לפרסם!</p>
+    <p>{{ 'forum.list.empty' | transloco }}</p>
   } @else {
     @for (post of posts(); track post.id) {
       <div class="post-card">
@@ -29,9 +34,13 @@
     }
 
     <div class="pagination">
-      <button (click)="previousPage()" [disabled]="page() <= 1">הקודם</button>
-      <span>עמוד {{ page() }} מתוך {{ totalPages() }}</span>
-      <button (click)="nextPage()" [disabled]="page() >= totalPages()">הבא</button>
+      <button (click)="previousPage()" [disabled]="page() <= 1">
+        {{ 'forum.list.previous' | transloco }}
+      </button>
+      <span>{{ 'forum.list.page' | transloco: { current: page(), total: totalPages() } }}</span>
+      <button (click)="nextPage()" [disabled]="page() >= totalPages()">
+        {{ 'forum.list.next' | transloco }}
+      </button>
     </div>
   }
 </div>

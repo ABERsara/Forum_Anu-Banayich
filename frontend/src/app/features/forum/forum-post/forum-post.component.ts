@@ -6,6 +6,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ReportTargetType } from '../../../core/constants';
 import { ForumPost } from '../../../core/models';
@@ -22,6 +23,7 @@ import { ReportButtonComponent } from '../../../shared/components/report-button/
   imports: [
     RouterLink,
     DatePipe,
+    TranslocoPipe,
     LoadingSpinnerComponent,
     ErrorDisplayComponent,
     ConfirmDialogComponent,
@@ -40,9 +42,14 @@ export class ForumPostComponent implements OnInit {
 
   post = signal<ForumPost | null>(null);
   isLoading = signal(false);
-  errorMessage = signal<string | null>(null);
+  /**
+   * Why these hold a *key* and not the sentence: a failure already on screen
+   * has to follow a language switch instead of freezing in the language it was
+   * raised in, so the `transloco` pipe runs in the template (CONTRIBUTING §6).
+   */
+  errorKey = signal<string | null>(null);
   showDeleteConfirm = signal(false);
-  deleteError = signal<string | null>(null);
+  deleteErrorKey = signal<string | null>(null);
 
   canDelete = computed(() => {
     const post = this.post();
@@ -71,7 +78,7 @@ export class ForumPostComponent implements OnInit {
   }
 
   onDeleteClick(): void {
-    this.deleteError.set(null);
+    this.deleteErrorKey.set(null);
     this.showDeleteConfirm.set(true);
   }
 
@@ -85,28 +92,28 @@ export class ForumPostComponent implements OnInit {
     this.showDeleteConfirm.set(false);
     this.forumService.deletePost(post.id).subscribe({
       next: () => this.router.navigate(['/forum']),
-      error: () => this.deleteError.set('אירעה שגיאה במחיקת ההודעה. נסה שוב.'),
+      error: () => this.deleteErrorKey.set('forum.errors.delete_failed'),
     });
   }
 
   private loadPost(id: string): void {
     this.isLoading.set(true);
-    this.errorMessage.set(null);
+    this.errorKey.set(null);
     this.forumService.getPost(id).subscribe({
       next: (post) => {
         this.post.set(post);
         this.isLoading.set(false);
       },
       error: (err: HttpErrorResponse) => {
-        this.errorMessage.set(this.messageForError(err));
+        this.errorKey.set(this.errorKeyForStatus(err));
         this.isLoading.set(false);
       },
     });
   }
 
-  private messageForError(err: HttpErrorResponse): string {
-    if (err.status === 404) return 'ההודעה לא נמצאה.';
-    if (err.status === 403) return 'אין לך הרשאה לצפות בהודעה זו.';
-    return 'אירעה שגיאה בטעינת ההודעה. נסה לרענן את הדף.';
+  private errorKeyForStatus(err: HttpErrorResponse): string {
+    if (err.status === 404) return 'forum.errors.not_found';
+    if (err.status === 403) return 'forum.errors.view_forbidden';
+    return 'forum.errors.load_post_failed';
   }
 }

@@ -11,15 +11,21 @@
 
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-audit-log',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   template: `
-    <div style="padding: 1rem; direction: rtl">
-      <a routerLink="/admin">← חזרה ללוח הבקרה</a>
-      <h1>יומן פעולות (Audit Log)</h1>
+    <!-- No direction here: the page inherits it from <html dir>, which
+         LocaleService sets from the active language (CONTRIBUTING §6). -->
+    <div style="padding: 1rem">
+      <a routerLink="/admin">← {{ 'admin.back_to_dashboard' | transloco }}</a>
+      <h1>{{ 'admin.audit_log.title' | transloco }}</h1>
+      <!-- TODO: the table, the action filter and the pagination are all still
+           to be written, and their copy needs keys of its own under
+           admin.audit_log.* when they are. -->
       <p>TODO: implement audit log viewer</p>
     </div>
   `,

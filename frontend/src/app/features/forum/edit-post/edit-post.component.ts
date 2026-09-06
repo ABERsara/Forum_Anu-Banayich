@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ForumPost } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
@@ -12,7 +13,13 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 @Component({
   selector: 'app-edit-post',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    TranslocoPipe,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './edit-post.component.html',
   styleUrl: './edit-post.component.scss',
 })
@@ -28,8 +35,13 @@ export class EditPostComponent implements OnInit {
   post = signal<ForumPost | null>(null);
   isLoading = signal(false);
   isSaving = signal(false);
-  loadError = signal('');
-  saveError = signal('');
+  /**
+   * Why these hold a *key* and not the sentence: a failure already on screen
+   * has to follow a language switch instead of freezing in the language it was
+   * raised in, so the `transloco` pipe runs in the template (CONTRIBUTING §6).
+   */
+  loadErrorKey = signal('');
+  saveErrorKey = signal('');
 
   // Author-only, unlike delete which also allows moderator/admin — the
   // backend already enforces this; this is just so the form doesn't render
@@ -63,7 +75,7 @@ export class EditPostComponent implements OnInit {
     }
 
     this.isSaving.set(true);
-    this.saveError.set('');
+    this.saveErrorKey.set('');
 
     const { title, content } = this.form.getRawValue();
     this.forumService
@@ -74,7 +86,7 @@ export class EditPostComponent implements OnInit {
           this.router.navigate(['/forum', this.postId]);
         },
         error: (err: HttpErrorResponse) => {
-          this.saveError.set(this.messageForError(err));
+          this.saveErrorKey.set(this.errorKeyForStatus(err));
           this.isSaving.set(false);
         },
       });
@@ -82,7 +94,7 @@ export class EditPostComponent implements OnInit {
 
   private loadPost(id: string): void {
     this.isLoading.set(true);
-    this.loadError.set('');
+    this.loadErrorKey.set('');
     this.forumService.getPost(id).subscribe({
       next: (post) => {
         this.post.set(post);
@@ -90,15 +102,15 @@ export class EditPostComponent implements OnInit {
         this.isLoading.set(false);
       },
       error: (err: HttpErrorResponse) => {
-        this.loadError.set(this.messageForError(err));
+        this.loadErrorKey.set(this.errorKeyForStatus(err));
         this.isLoading.set(false);
       },
     });
   }
 
-  private messageForError(err: HttpErrorResponse): string {
-    if (err.status === 404) return 'ההודעה לא נמצאה.';
-    if (err.status === 403) return 'אין לך הרשאה לערוך הודעה זו.';
-    return 'אירעה שגיאה. נסה שוב.';
+  private errorKeyForStatus(err: HttpErrorResponse): string {
+    if (err.status === 404) return 'forum.errors.not_found';
+    if (err.status === 403) return 'forum.errors.edit_forbidden';
+    return 'forum.errors.save_failed';
   }
 }

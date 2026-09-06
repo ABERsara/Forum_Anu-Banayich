@@ -20,6 +20,16 @@ import { TranslocoTestingModule, TranslocoTestingOptions } from '@jsverse/transl
 import en from '../../public/i18n/en.json';
 import he from '../../public/i18n/he.json';
 
+/**
+ * Any Hebrew letter.
+ *
+ * `expect(text).not.toMatch(HEBREW)` on a fixture switched to English is the
+ * cheapest guard there is against a string nobody migrated: unlike an
+ * assertion on one expected phrase, it fails on the text the spec's author
+ * never thought to look for.
+ */
+export const HEBREW = /[\u0590-\u05FF]/;
+
 /** The translation files themselves, for specs that assert against them. */
 export const TRANSLATIONS = { he, en };
 

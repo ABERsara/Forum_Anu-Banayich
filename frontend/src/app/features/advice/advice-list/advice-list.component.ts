@@ -16,20 +16,24 @@ import { ProfessionalService } from '../../../core/services/professional.service
   imports: [RouterLink, TranslocoPipe],
   styleUrl: './advice-list.component.scss',
   template: `
+    <!-- No dir here: text direction follows <html dir>, which LocaleService
+         sets from the active language (CONTRIBUTING §6). -->
     <div class="page">
-      <h1>ייעוץ מקצועי</h1>
+      <h1>{{ 'advice.list.title' | transloco }}</h1>
       <div class="top-links">
-        <a routerLink="/advice/qa">לשאלות ותשובות ציבוריות</a>
+        <a routerLink="/advice/qa">{{ 'advice.list.public_qa_link' | transloco }}</a>
         <span class="separator" aria-hidden="true">|</span>
-        <a routerLink="/advice/my-questions">השאלות שלי</a>
+        <!-- The link names the page it opens, so it shares that page's key
+             rather than holding a second copy of the same words. -->
+        <a routerLink="/advice/my-questions">{{ 'advice.my_questions.title' | transloco }}</a>
       </div>
 
       @if (professionals().length > 0) {
         <div class="filter-bar">
           <label>
-            סינון לפי תחום:
+            {{ 'advice.list.filter_label' | transloco }}
             <select (change)="onDomainChange($event)">
-              <option value="">הכל</option>
+              <option value="">{{ 'advice.list.filter_all' | transloco }}</option>
               @for (domain of domains; track domain) {
                 <option [value]="domain">{{ domainLabels[domain] | transloco }}</option>
               }
@@ -39,19 +43,21 @@ import { ProfessionalService } from '../../../core/services/professional.service
       }
 
       @if (isLoading()) {
-        <p>טוען...</p>
+        <p>{{ 'common.loading' | transloco }}</p>
       } @else if (isError()) {
-        <p>אירעה שגיאה בטעינת רשימת אנשי המקצוע. נסה שוב מאוחר יותר.</p>
+        <p>{{ 'advice.errors.load_professionals_failed' | transloco }}</p>
       } @else if (filteredProfessionals().length === 0) {
-        <p>לא נמצאו אנשי מקצוע זמינים.</p>
+        <p>{{ 'advice.list.empty' | transloco }}</p>
       } @else {
         @for (pro of filteredProfessionals(); track pro.id) {
           <div class="professional-card">
+            <!-- The professional's name and their own description are content
+                 they wrote, not UI: shown as they came, in either language. -->
             <strong>{{ pro.first_name }} {{ pro.last_name }}</strong>
             <p>{{ domainLabels[pro.professional_domain] | transloco }}</p>
             <p>{{ pro.professional_description }}</p>
             <a [routerLink]="['/advice/ask']" [queryParams]="{ professionalId: pro.id }">
-              שאל/י שאלה
+              {{ 'advice.list.ask_link' | transloco }}
             </a>
           </div>
         }

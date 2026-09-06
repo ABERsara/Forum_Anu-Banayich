@@ -1,42 +1,46 @@
-<div class="edit-post-page" dir="rtl">
-  <a routerLink="/forum">← חזרה לפורום</a>
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="edit-post-page">
+  <a routerLink="/forum">← {{ 'forum.back_to_list' | transloco }}</a>
 
   @if (isLoading()) {
     <app-loading-spinner size="md" />
-  } @else if (loadError(); as err) {
-    <app-error-display [message]="err" />
+  } @else if (loadErrorKey(); as key) {
+    <app-error-display [message]="key | transloco" />
   } @else if (!isAuthor()) {
-    <app-error-display message="אין לך הרשאה לערוך הודעה זו." />
+    <app-error-display [message]="'forum.errors.edit_forbidden' | transloco" />
   } @else {
     <div class="edit-post-card">
-      <h1 class="edit-post-title">עריכת הודעה</h1>
+      <h1 class="edit-post-title">{{ 'forum.edit_post.title' | transloco }}</h1>
 
       <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
         <div class="form-field">
-          <label for="title">כותרת</label>
+          <label for="title">{{ 'forum.post_form.title_label' | transloco }}</label>
           <input id="title" type="text" formControlName="title" />
           @if (form.controls.title.invalid && form.controls.title.touched) {
-            <span class="field-error">נא להזין כותרת (2 עד 256 תווים)</span>
+            <span class="field-error">{{ 'forum.post_form.title_error' | transloco }}</span>
           }
         </div>
 
         <div class="form-field">
-          <label for="content">תוכן</label>
+          <label for="content">{{ 'forum.post_form.content_label' | transloco }}</label>
           <textarea id="content" rows="8" formControlName="content"></textarea>
           <span class="char-counter">{{ contentLength }} / 5000</span>
           @if (form.controls.content.invalid && form.controls.content.touched) {
-            <span class="field-error">נא להזין תוכן (עד 5000 תווים)</span>
+            <span class="field-error">{{ 'forum.post_form.content_error' | transloco }}</span>
           }
         </div>
 
-        <app-error-display [message]="saveError()" />
+        @if (saveErrorKey(); as key) {
+          <app-error-display [message]="key | transloco" />
+        }
 
         @if (isSaving()) {
-          <app-loading-spinner message="שומר..." />
+          <app-loading-spinner [message]="'forum.edit_post.saving' | transloco" />
         }
 
         <button type="submit" class="btn-submit" [disabled]="form.invalid || isSaving()">
-          שמירה
+          {{ 'forum.edit_post.submit' | transloco }}
         </button>
       </form>
     </div>

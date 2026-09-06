@@ -1,16 +1,38 @@
 @use '../../../../styles/variables' as *;
 
-.cell-members {
+.inbox {
   padding: $spacing-md;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-md;
+  }
+
+  &__new-link {
+    color: $color-primary;
+    text-decoration: none;
+
+    &:focus-visible {
+      outline: 2px solid $color-primary;
+      outline-offset: 2px;
+    }
+  }
 
   &__list {
     list-style: none;
-    margin: 0;
+    margin: $spacing-md 0 0;
     padding: 0;
   }
 
   &__item {
-    display: block;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'name date'
+      'preview badge';
+    gap: $spacing-xs $spacing-sm;
     padding: $spacing-md;
     border: 1px solid $color-border;
     border-radius: $radius-md;
@@ -26,5 +48,45 @@
       outline: 2px solid $color-primary;
       outline-offset: 2px;
     }
+  }
+
+  &__name {
+    grid-area: name;
+    font-weight: 600;
+  }
+
+  &__date {
+    grid-area: date;
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+  }
+
+  &__preview {
+    grid-area: preview;
+    color: $color-text-muted;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__badge {
+    grid-area: badge;
+    justify-self: end;
+    align-self: center;
+    min-width: $spacing-lg;
+    padding: $spacing-xs $spacing-sm;
+    border-radius: $radius-full;
+    background: $color-primary;
+    color: $color-bg;
+    font-size: $font-size-xs;
+    text-align: center;
+  }
+
+  &__pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-md;
+    margin-top: $spacing-md;
   }
 }

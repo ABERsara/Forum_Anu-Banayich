@@ -1,5 +1,7 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
 <div>
-  <h1>לוח בקרה – מנהל</h1>
+  <h1>{{ 'admin.dashboard.title' | transloco }}</h1>
 
   <a routerLink="/admin/registrations" class="stats-card">
     <div class="stats-card__body">
@@ -9,22 +11,34 @@
         @if (!hasError()) {
           <span class="stats-card__value">{{ pendingCount() }}</span>
         }
-        <span class="stats-card__label">הרשמות ממתינות לאישור</span>
+        <span class="stats-card__label">{{
+          'admin.dashboard.pending_card_label' | transloco
+        }}</span>
       }
     </div>
+    <!-- A chevron, not copy: U+2039 is Bidi_Mirrored, so the browser turns it
+         with the paragraph. It keeps its bearing in either language on its own. -->
     <span class="stats-card__arrow" aria-hidden="true">‹</span>
   </a>
   @if (hasError()) {
-    <app-error-display message="שגיאה בטעינת מספר ההרשמות הממתינות" />
+    <app-error-display [message]="'admin.errors.load_pending_count_failed' | transloco" />
   }
 
+  <!-- Every link here names the page it opens. The ones whose text is that
+       page's own heading share its title key rather than holding a second copy
+       of the same words — but only where this ticket migrates the page itself,
+       which is active-users and broadcast. Registrations, the audit log and
+       reports read differently from the heading they lead to, and the two
+       management links point at screens ABF-133 migrates: both kinds keep a key
+       of their own here, so that no ticket owns copy for a screen it does not
+       touch, and no rename over there silently rewrites this menu. -->
   <nav>
-    <a routerLink="/admin/registrations">הרשמות ממתינות</a> |
-    <a routerLink="/admin/active-users">משתמשים פעילים</a> |
-    <a routerLink="/admin/professionals">ניהול אנשי מקצוע</a> |
-    <a routerLink="/admin/moderators">ניהול ממונים</a> |
-    <a routerLink="/admin/audit-log">יומן פעולות</a> |
-    <a routerLink="/admin/broadcast">שידור לכלל המשתמשים</a> |
-    <a routerLink="/moderator/reports">דיווחים</a>
+    <a routerLink="/admin/registrations">{{ 'admin.dashboard.nav_registrations' | transloco }}</a> |
+    <a routerLink="/admin/active-users">{{ 'admin.active_users.title' | transloco }}</a> |
+    <a routerLink="/admin/professionals">{{ 'admin.dashboard.nav_professionals' | transloco }}</a> |
+    <a routerLink="/admin/moderators">{{ 'admin.dashboard.nav_moderators' | transloco }}</a> |
+    <a routerLink="/admin/audit-log">{{ 'admin.dashboard.nav_audit_log' | transloco }}</a> |
+    <a routerLink="/admin/broadcast">{{ 'admin.broadcast.title' | transloco }}</a> |
+    <a routerLink="/moderator/reports">{{ 'admin.dashboard.nav_reports' | transloco }}</a>
   </nav>
 </div>

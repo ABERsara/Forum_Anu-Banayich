@@ -1,0 +1,23 @@
+<div class="cell-members">
+  <h1>{{ 'messages.newMessage.title' | transloco }}</h1>
+
+  <div aria-live="polite" [attr.aria-busy]="isLoading()">
+    @if (isLoading()) {
+      <app-loading-spinner size="md" [message]="'messages.newMessage.loading' | transloco" />
+    } @else if (hasError()) {
+      <app-error-display [message]="loadErrorKey() | transloco" />
+    } @else if (members().length === 0) {
+      <p>{{ 'messages.newMessage.empty' | transloco }}</p>
+    } @else {
+      <ul class="cell-members__list">
+        @for (member of members(); track member.id) {
+          <li>
+            <a [routerLink]="['/messages', member.id]" class="cell-members__item">
+              {{ member.first_name }} {{ member.last_name }}
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+</div>

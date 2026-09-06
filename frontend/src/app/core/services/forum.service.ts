@@ -3,7 +3,6 @@
  *
  * TODO list for junior developer:
  *   [ ] implement reportPost() – POST /forum/posts/:id/report
- *   [ ] implement getInbox() – GET /messages
  *   [ ] implement searchUsers() – GET /users/search?name=...
  */
 
@@ -11,7 +10,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import {
-  ConversationSummary,
+  ConversationList,
   DirectMessage,
   DirectMessageCreate,
   ForumPost,
@@ -74,12 +73,8 @@ export class ForumService {
   // Direct messages
   // ──────────────────────────────────────────────────────────
 
-  getInbox(): Observable<ConversationSummary[]> {
-    /**
-     * TODO:
-     *   return this.api.get<ConversationSummary[]>('/messages');
-     */
-    throw new Error('getInbox() not yet implemented');
+  getInbox(page = 1, pageSize = 20): Observable<ConversationList> {
+    return this.api.get<ConversationList>(`/messages?page=${page}&page_size=${pageSize}`);
   }
 
   sendMessage(data: DirectMessageCreate): Observable<DirectMessage> {

@@ -5,6 +5,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 
 import { UserAdminView } from '../../../core/models';
 import { SECTOR_LABELS, USER_TYPE_LABELS } from '../../../core/constants';
+import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { AdminService } from '../../../core/services/admin.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
@@ -32,7 +33,8 @@ export class ActiveUsersComponent implements OnInit {
   users = signal<UserAdminView[]>([]);
   isLoading = signal(false);
   hasError = signal(false);
-  actionError = signal<string | null>(null);
+  /** What went wrong on suspend, as a key of ours or a sentence the API sent. */
+  actionError = signal<ScreenError>(NO_ERROR);
   suspendingId = signal<string | null>(null);
   readonly userTypeLabels = USER_TYPE_LABELS;
   readonly sectorLabels = SECTOR_LABELS;
@@ -53,7 +55,7 @@ export class ActiveUsersComponent implements OnInit {
   }
 
   suspend(userId: string): void {
-    this.actionError.set(null);
+    this.actionError.set(NO_ERROR);
     this.suspendingId.set(userId);
   }
 
@@ -72,7 +74,7 @@ export class ActiveUsersComponent implements OnInit {
         this.suspendingId.set(null);
       },
       error: (err: HttpErrorResponse) =>
-        this.actionError.set(err.error?.detail ?? 'אירעה שגיאה בהשעיית המשתמש. נסה שוב.'),
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.suspend_failed')),
     });
   }
 }

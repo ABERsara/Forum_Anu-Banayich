@@ -307,6 +307,13 @@ export interface ConversationSummary {
   unread_count: number;
 }
 
+export interface ConversationList {
+  items: ConversationSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 // ---------------------------------------------------------------------------
 // Professional queries
 // ---------------------------------------------------------------------------
