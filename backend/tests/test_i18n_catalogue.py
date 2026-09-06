@@ -25,17 +25,18 @@ APP = Path(__file__).resolve().parent.parent / "app"
 HEBREW_CHARACTER = re.compile("[֐-׿]")
 PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
-#: Modules whose Hebrew is deliberately not translated. Each is either machinery
-#: the reader never sees or a decision the ticket explicitly deferred; the
-#: reasoning is written out in app/core/messages.py's module docstring.
-EXEMPT = {
-    "services/email_service.py",  # email templates — deferred by ABF-137
-    "services/llm_service.py",  # agent prompts and the answer's own disclaimer
-    "services/rag_service.py",  # Hebrew stop-words used by retrieval
-    "core/config.py",  # the organisation's name, not UI copy
-    "core/constants.py",  # label maps; only _build_alias and the LLM prompt read them
-    "core/messages.py",  # the catalogue itself
-}
+# There is deliberately no per-file exemption list here.
+#
+# The modules whose Hebrew ABF-137 leaves alone — email templates, the agent's
+# prompts and disclaimer, the retrieval stop-words, the organisation's name, the
+# label maps (the reasoning for each is in app/core/messages.py's docstring) —
+# do not need one, because this check is scoped by *shape* rather than by file:
+# it only ever looks inside `HTTPException(detail=…)`, `ValueError(…)` and a
+# `{"message"/"detail": …}` dict. None of that deferred Hebrew is in any of
+# those, so exempting the files bought nothing and cost the one thing the check
+# is for — a Hebrew `HTTPException` added to email_service.py or llm_service.py
+# tomorrow would have passed in silence.
+# `test_a_formerly_exempt_module_is_not_a_blind_spot` pins that it no longer does.
 
 
 def _sources():
@@ -57,6 +58,26 @@ def _module_string_constants(tree):
     }
 
 
+def _is_translate_call(node):
+    """
+    `translate(...)` or `i18n.translate(...)` — the two ways this module gets
+    imported.
+
+    Deliberately not *any* `.translate(`: `str.translate` is a builtin, and
+    mistaking one for a catalogue lookup would fail the suite on code that has
+    nothing to do with i18n.
+    """
+    func = node.func
+    if isinstance(func, ast.Name):
+        return func.id == "translate"
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr == "translate"
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "i18n"
+    )
+
+
 def _translate_keys():
     """Every key passed to translate(), resolving the constants indirection."""
     keys = []
@@ -66,7 +87,7 @@ def _translate_keys():
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
-            if getattr(node.func, "id", None) != "translate" or not node.args:
+            if not _is_translate_call(node) or not node.args:
                 continue
             argument = node.args[0]
             if isinstance(argument, ast.Constant):
@@ -191,11 +212,17 @@ class TestNoHardcodedMessages:
     Accept-Language, wherever in the backend it was added.
     """
 
-    def _offenders(self):
+    def _offenders(self, sources=None):
+        """
+        `sources` is `(module path, source)` pairs, defaulting to real `app/`.
+
+        Passing them in is what lets the guard be run against a *known*
+        violation — including one placed in a module the check used to exempt.
+        """
+        if sources is None:
+            sources = [(rel, source) for _, rel, source in _sources()]
         found = []
-        for _, rel, source in _sources():
-            if rel in EXEMPT:
-                continue
+        for rel, source in sources:
             tree = ast.parse(source)
             for node in ast.walk(tree):
                 for label, value in self._message_expressions(node):
@@ -220,21 +247,42 @@ class TestNoHardcodedMessages:
                 for argument in node.args[:1]:
                     yield "ValueError(...)", argument
         elif isinstance(node, ast.Dict):
-            for key, value in zip(node.keys, node.values):
+            for key, value in zip(node.keys, node.values, strict=True):
                 if isinstance(key, ast.Constant) and key.value in ("message", "detail"):
                     yield f'{{"{key.value}": ...}}', value
 
     def test_no_message_is_raised_in_hebrew(self):
         assert self._offenders() == []
 
-    def test_the_check_can_actually_see_a_violation(self):
-        """A guard nobody has watched fail is a guard nobody should trust."""
-        tree = ast.parse('raise HTTPException(status_code=404, detail="לא נמצא")')
-        found = [
-            label
-            for node in ast.walk(tree)
-            for label, value in self._message_expressions(node)
-            for child in ast.walk(value)
-            if isinstance(child, ast.Constant) and HEBREW_CHARACTER.search(child.value)
+    @pytest.mark.parametrize(
+        ("shape", "source"),
+        [
+            (
+                "HTTPException(detail=...)",
+                'raise HTTPException(status_code=404, detail="לא נמצא")',
+            ),
+            (
+                "ValueError(...)",
+                'raise ValueError("מספר הטלפון חייב להכיל ספרות בלבד")',
+            ),
+            ('{"message": ...}', '{"message": "נרשמת בהצלחה."}'),
+        ],
+    )
+    def test_the_check_can_actually_see_a_violation(self, shape, source):
+        """A guard nobody has watched fail is a guard nobody should trust — so
+        watch it fail, once for each of the three shapes ABF-137 mapped."""
+        assert self._offenders([("services/some_service.py", source)]) == [
+            f"services/some_service.py:1 ({shape})"
         ]
-        assert found == ["HTTPException(detail=...)"]
+
+    def test_a_formerly_exempt_module_is_not_a_blind_spot(self):
+        """
+        ABF-137 first shipped this check with a per-file exemption list, which
+        included llm_service.py for its Hebrew prompts. A Hebrew HTTPException
+        added there would have passed in silence. Scoping by shape instead of
+        by file is what closed that, and this is the test that says so.
+        """
+        violation = 'raise HTTPException(status_code=503, detail="הסוכן אינו זמין")'
+        assert self._offenders([("services/llm_service.py", violation)]) == [
+            "services/llm_service.py:1 (HTTPException(detail=...))"
+        ]
