@@ -452,7 +452,7 @@
       "next_page": "הבא",
       "page_of": "עמוד {{page}} מתוך {{total}}"
     },
-    "newMessage": {
+    "new_message": {
       "title": "חברי התא שלי",
       "loading": "טוען חברי תא...",
       "empty": "אין חברים נוספים בתא שלך כרגע."

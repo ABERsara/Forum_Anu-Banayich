@@ -1,13 +1,13 @@
 <div class="cell-members">
-  <h1>{{ 'messages.newMessage.title' | transloco }}</h1>
+  <h1>{{ 'messages.new_message.title' | transloco }}</h1>
 
   <div aria-live="polite" [attr.aria-busy]="isLoading()">
     @if (isLoading()) {
-      <app-loading-spinner size="md" [message]="'messages.newMessage.loading' | transloco" />
+      <app-loading-spinner size="md" [message]="'messages.new_message.loading' | transloco" />
     } @else if (hasError()) {
       <app-error-display [message]="loadErrorKey() | transloco" />
     } @else if (members().length === 0) {
-      <p>{{ 'messages.newMessage.empty' | transloco }}</p>
+      <p>{{ 'messages.new_message.empty' | transloco }}</p>
     } @else {
       <ul class="cell-members__list">
         @for (member of members(); track member.id) {
