@@ -890,9 +890,33 @@ raise HTTPException(status_code=404, detail=translate("users.not_found"))
 
 **ובצד הלקוח:** `errors.dm_forbidden` ו-`errors.invalid_cursor` ממשיכים לחזור כ**מפתחות**
 ש-`core/utils/error-key.util.ts` פותר בעצמו (ABF-114) — לתרגם אותם בשרת היה מחליף מפתח
-שהלקוח מזהה בטקסט שאינו מזהה, ומוריד את מסך הצ'אט להודעה גנרית. הלקוח גם עדיין **אינו
-שולח** `Accept-Language`, ולכן בפועל הוא מקבל עברית כמו קודם; לחבר אותו ל-`LocaleService`
-זה טיקט frontend נפרד, ואיתו אפשר יהיה לאחד את שני המנגנונים.
+שהלקוח מזהה בטקסט שאינו מזהה, ומוריד את מסך הצ'אט להודעה גנרית.
+
+### הכותרת נשלחת מ-`LocaleService`, לא מהדפדפן (ABF-137)
+
+**הדפדפן מוסיף `Accept-Language` לכל בקשת XHR בעצמו**, בלי שאיש ביקש. הערך שלו הוא הלוקאל
+שבו Chrome הותקן — **לא** השפה שנבחרה באתר. בלי התערבות, מי שקורא/ת את האתר בעברית מדפדפן
+באנגלית (`en-US,en;q=0.9`) הייתה מקבלת משפטים באנגלית בתוך מסך עברי RTL, כי `screenErrorFrom`
+מציג את `detail` כטקסט גמור ולא דרך Transloco.
+
+לכן `core/interceptors/language.interceptor.ts` **דורס** את הכותרת בשפה של `LocaleService`:
+
+```ts
+if (!req.url.startsWith(environment.apiUrl)) return next(req);
+const locale = inject(LocaleService);
+return next(req.clone({ setHeaders: { 'Accept-Language': locale.lang() } }));
+```
+
+- **בדיקת ה-URL לפני ה-`inject()`** — Transloco מושך את `/i18n/*.json` דרך `HttpClient`;
+  interceptor שהיה מזריק `LocaleService` ללא תנאי היה עלול לבקש אותו בזמן שהוא עצמו עוד
+  בבנייה, כלומר תלות מעגלית בטעינה הראשונה.
+- **`languageInterceptor` ראשון ברשימה** — ה-retry של `authInterceptor` על 401 משכפל את
+  הבקשה שהוא קיבל, ולכן השפה חייבת כבר לשבת עליה.
+- `Accept-Language` אינו forbidden header name (מותר ל-script להציב אותו) והוא
+  CORS-safelisted, ולכן הדריסה לא מוסיפה preflight.
+
+שני מנגנוני התרגום עדיין חיים זה לצד זה — `detail` כמפתח בשלוש ההודעות של ABF-114,
+ו-`detail` כפרוזה בכל השאר. לאחד אותם זה טיקט נפרד.
 
 ---
 
