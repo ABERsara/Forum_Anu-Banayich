@@ -17,6 +17,9 @@ EXPECTED_TABLES = {
     "reports",
     "documents",
     "audit_logs",
+    "agent_conversations",
+    "agent_messages",
+    "agent_knowledge_chunks",
 }
 
 
