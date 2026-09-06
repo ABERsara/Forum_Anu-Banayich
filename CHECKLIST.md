@@ -5,7 +5,9 @@ Copy this checklist into every pull request description.
 ---
 
 ## General
-- [ ] Branch name follows pattern: `feat/`, `fix/`, `chore/`, `docs/`
+- [ ] Branch name follows pattern: `feat/`, `fix/`, `chore/`, `docs/` —
+      or the bare `ABF-NNN-slug` form, approved for the i18n migration
+      series (ABF-127…ABF-134). See CONTRIBUTING §8.
 - [ ] Commit messages are clear and descriptive
 - [ ] No console.log / print debug statements left in code
 - [ ] No hardcoded secrets, tokens, or API keys

@@ -21,6 +21,9 @@ EXPECTED_TABLES = {
     "reports",
     "documents",
     "audit_logs",
+    "agent_conversations",
+    "agent_messages",
+    "agent_knowledge_chunks",
 }
 
 
@@ -109,7 +112,11 @@ def test_read_at_migration_goes_down_and_up_again_cleanly(monkeypatch) -> None:
         assert "is_read" not in _direct_message_columns(db_url)
         assert _unread_index_columns(db_url) == ["recipient_id", "read_at"]
 
-        command.downgrade(alembic_cfg, "-1")
+        # Not "-1": ABF-122's agent tables branched off the same parent, so the
+        # single head is now a merge revision and one step back off it is an
+        # ambiguous walk. Naming the revision read_at sits on says what this
+        # actually undoes, and stays right however many branches join above it.
+        command.downgrade(alembic_cfg, REVISION_BEFORE_READ_AT)
         assert "is_read" in _direct_message_columns(db_url)
         assert "read_at" not in _direct_message_columns(db_url)
         assert _unread_index_columns(db_url) == ["recipient_id", "is_read"]

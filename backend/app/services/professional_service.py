@@ -136,10 +136,18 @@ def _professional_may_answer(query: ProfessionalQuery, professional: User) -> bo
     )
 
 
-def _to_response(query: ProfessionalQuery) -> ProfessionalQueryResponse:
+def _to_response(
+    query: ProfessionalQuery, like_count: int, liked_by_me: bool
+) -> ProfessionalQueryResponse:
     """
     Build the client-facing response for a query, enforcing the privacy rule:
     the asker's real identity is only included if they chose to reveal it.
+
+    like_count/liked_by_me are passed in rather than computed here: only
+    get_my_questions() needs the real values (aggregated for the whole list in
+    one query, see its docstring) – callers for a question that cannot yet
+    have a like (just created, just answered, still pending) pass 0/False,
+    which ABF-139 guarantees is correct since liking requires ANSWERED.
     """
     return ProfessionalQueryResponse(
         id=query.id,
@@ -156,6 +164,8 @@ def _to_response(query: ProfessionalQuery) -> ProfessionalQueryResponse:
         asker=UserPublic.model_validate(query.asker) if query.show_real_name else None,
         created_at=query.created_at,
         answered_at=query.answered_at,
+        like_count=like_count,
+        liked_by_me=liked_by_me,
     )
 
 
@@ -257,7 +267,7 @@ def create_query(
 
     _notify_professionals(db, professional, data.domain, asker, query.id)
 
-    return _to_response(query)
+    return _to_response(query, like_count=0, liked_by_me=False)
 
 
 def answer_query(
@@ -309,7 +319,7 @@ def answer_query(
     # Read both while the instance is still loaded: commit() expires it, and
     # touching asker/professional afterwards would re-SELECT them one lazy
     # load at a time (the same concern create_query() notes).
-    response = _to_response(query)
+    response = _to_response(query, like_count=0, liked_by_me=False)
     asker_email = query.asker.email
 
     db.commit()
@@ -428,18 +438,49 @@ def get_my_questions(db: Session, asker: User) -> list[ProfessionalQueryResponse
     """
     Return all questions asked by the current user (both public and private),
     ordered by created_at DESC.
+
+    like_count/liked_by_me are aggregated in this same query via subqueries,
+    the same pattern get_public_qa() uses, rather than per-row – one query for
+    the whole list instead of two extra queries per question (N+1). Private
+    questions never carry likes (ABF-142 scope), but computing 0/False for
+    them here is free – the frontend decides what to show based on
+    is_public.
     """
-    queries = (
+    like_counts = (
+        db.query(Like.target_id, func.count(Like.user_id).label("like_count"))
+        .filter(Like.target_type == LikeTargetType.PROFESSIONAL_QUERY)
+        .group_by(Like.target_id)
+        .subquery()
+    )
+    my_likes = (
+        db.query(Like.target_id)
+        .filter(
+            Like.target_type == LikeTargetType.PROFESSIONAL_QUERY,
+            Like.user_id == asker.id,
+        )
+        .subquery()
+    )
+
+    rows = (
         db.query(ProfessionalQuery)
         .options(
             joinedload(ProfessionalQuery.professional),
             joinedload(ProfessionalQuery.asker),
         )
         .filter(ProfessionalQuery.asker_id == asker.id)
+        .add_columns(
+            func.coalesce(like_counts.c.like_count, 0).label("like_count"),
+            my_likes.c.target_id.isnot(None).label("liked_by_me"),
+        )
+        .outerjoin(like_counts, like_counts.c.target_id == ProfessionalQuery.id)
+        .outerjoin(my_likes, my_likes.c.target_id == ProfessionalQuery.id)
         .order_by(ProfessionalQuery.created_at.desc())
         .all()
     )
-    return [_to_response(query) for query in queries]
+    return [
+        _to_response(query, like_count=like_count, liked_by_me=liked_by_me)
+        for query, like_count, liked_by_me in rows
+    ]
 
 
 def get_pending_questions(
@@ -485,4 +526,4 @@ def get_pending_questions(
         .order_by(ProfessionalQuery.created_at.asc())
         .all()
     )
-    return [_to_response(query) for query in queries]
+    return [_to_response(query, like_count=0, liked_by_me=False) for query in queries]
