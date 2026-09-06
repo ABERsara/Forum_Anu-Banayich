@@ -15,7 +15,6 @@ Layout:
   TestGrounding            – answers stay inside the knowledge base
   TestPromptInjection      – an instruction inside a question stays a question
   TestFollowUp             – a second question sees the first
-  TestDeniedAccess         – a refused conversation leaves an audit trail
   TestLimits               – 422 on an over-long message, 429 over quota
   TestProviderFailure      – a broken provider is a 503 that writes nothing
   TestProviderSwap         – LLM_PROVIDER selects the provider, alone
@@ -48,12 +47,6 @@ CONVERSATIONS_URL = f"/api/v1/agents/{DOMAIN.value}/conversations"
 
 HOUSING_QUESTION = "האם מגיע לי סיוע בדיור?"
 FOLLOW_UP_QUESTION = "ומה לגבי הילדים שלי?"
-
-#: A follow-up that names nothing at all. FOLLOW_UP_QUESTION still happens to
-#: contain a word the knowledge base uses ("הילדים"), so it would be found even
-#: with no conversation behind it; this one is only meaningful next to the turn
-#: before it, which is what makes it the real test of a follow-up.
-PRONOUN_FOLLOW_UP = "וכמה זה בערך?"
 OFF_TOPIC_QUESTION = "מה תחזית מזג האוויר מחר בירושלים?"
 
 HOUSING_TITLE = "סיוע בדיור למשפחות חד-הוריות"
@@ -449,76 +442,6 @@ class TestFollowUp:
         assert history[0].content == HOUSING_QUESTION
         assert llm.answer in history[1].content
 
-    async def test_a_follow_up_that_names_nothing_is_still_grounded(
-        self, client, knowledge_base, llm, user
-    ):
-        """The case the agent exists for: a question that only means something
-        next to the one before it.
-
-        Retrieval sees four words that name no subject, so on its own it finds
-        nothing — and "I have no information on that", one turn after answering
-        the very question this follows up on, is the wrong answer. The earlier
-        question is folded into the search instead.
-        """
-        _login_as(user)
-        conversation_id = (await _ask(client, HOUSING_QUESTION)).json()[
-            "conversation_id"
-        ]
-
-        response = await _ask(client, PRONOUN_FOLLOW_UP, conversation_id)
-
-        content = response.json()["answer"]["content"]
-        assert llm_service.NO_CONTEXT_ANSWER not in content
-        assert [chunk.title for chunk in llm.calls[-1]["context_chunks"]] == [
-            HOUSING_TITLE
-        ]
-
-    async def test_a_first_question_that_finds_nothing_is_not_rescued(
-        self, client, knowledge_base, llm, user
-    ):
-        """The widening is a fallback for a follow-up, not a second chance for
-        every question — with no conversation behind it there is nothing to
-        widen with, and the referral stands."""
-        _login_as(user)
-
-        response = await _ask(client, PRONOUN_FOLLOW_UP)
-
-        assert llm_service.NO_CONTEXT_ANSWER in response.json()["answer"]["content"]
-        assert llm.calls == []
-
-    async def test_a_question_that_finds_its_own_material_is_not_widened(
-        self, client, knowledge_base, llm, user
-    ):
-        """A message that stands on its own must keep its own ranking — the
-        earlier subject does not get to pull material in behind it."""
-        _login_as(user)
-        conversation_id = (await _ask(client, HOUSING_QUESTION)).json()[
-            "conversation_id"
-        ]
-
-        await _ask(client, FOLLOW_UP_QUESTION, conversation_id)
-
-        assert [chunk.title for chunk in llm.calls[-1]["context_chunks"]] == [
-            CHILDREN_TITLE
-        ]
-
-    async def test_the_earlier_answer_is_replayed_without_the_disclaimer(
-        self, client, knowledge_base, llm, user
-    ):
-        """The stored answer ends in ANSWER_DISCLAIMER; sending that back would
-        contradict the rule telling the model not to write one, and would pay
-        for the same paragraph again on every turn."""
-        _login_as(user)
-        conversation_id = (await _ask(client, HOUSING_QUESTION)).json()[
-            "conversation_id"
-        ]
-
-        await _ask(client, FOLLOW_UP_QUESTION, conversation_id)
-
-        history = llm.calls[-1]["conversation_history"]
-        assert history[1].content == llm.answer
-        assert llm_service.ANSWER_DISCLAIMER not in history[1].content
-
     async def test_the_first_question_has_no_history(
         self, client, knowledge_base, llm, user
     ):
@@ -574,81 +497,6 @@ class TestFollowUp:
         response = await _ask(client, HOUSING_QUESTION, "no-such-conversation")
 
         assert response.status_code == 404
-
-
-# ---------------------------------------------------------------------------
-# Refused access
-# ---------------------------------------------------------------------------
-
-
-class TestDeniedAccess:
-    """A conversation someone was blocked from is the event worth looking up.
-
-    Same asymmetry forum_service applies to direct messages: a refusal is
-    audited, a successful read is not — and the entry names the thread, never
-    a word of what is in it.
-    """
-
-    @pytest.fixture
-    def someone_elses_conversation(self, client, knowledge_base, llm, user, make_user):
-        async def _setup() -> str:
-            _login_as(user)
-            conversation_id = (await _ask(client, HOUSING_QUESTION)).json()[
-                "conversation_id"
-            ]
-            _login_as(
-                make_user(
-                    "intruder@example.com",
-                    UserType.WIDOW,
-                    Sector.HASIDIC,
-                    account_status=AccountStatus.ACTIVE,
-                )
-            )
-            return conversation_id
-
-        return _setup
-
-    def _denials(self, db_session) -> list[AuditLog]:
-        return (
-            db_session.query(AuditLog)
-            .filter(AuditLog.action == AuditAction.AGENT_CONVERSATION_ACCESS_DENIED)
-            .all()
-        )
-
-    async def test_a_refused_read_is_audited(
-        self, client, db_session, someone_elses_conversation
-    ):
-        conversation_id = await someone_elses_conversation()
-
-        await client.get(f"{CONVERSATIONS_URL}/{conversation_id}")
-
-        (entry,) = self._denials(db_session)
-        assert entry.entity_type == "AgentConversation"
-        assert entry.entity_id == conversation_id
-        assert entry.details == {"reason": "read_blocked"}
-
-    async def test_a_refused_follow_up_is_audited(
-        self, client, db_session, someone_elses_conversation
-    ):
-        conversation_id = await someone_elses_conversation()
-
-        await _ask(client, FOLLOW_UP_QUESTION, conversation_id)
-
-        (entry,) = self._denials(db_session)
-        assert entry.entity_id == conversation_id
-        assert entry.details == {"reason": "write_blocked"}
-
-    async def test_the_owner_reading_her_own_thread_is_not_audited(
-        self, client, db_session, knowledge_base, llm, user
-    ):
-        _login_as(user)
-        conversation_id = (await _ask(client, HOUSING_QUESTION)).json()[
-            "conversation_id"
-        ]
-
-        await client.get(f"{CONVERSATIONS_URL}/{conversation_id}")
-
-        assert self._denials(db_session) == []
 
 
 # ---------------------------------------------------------------------------

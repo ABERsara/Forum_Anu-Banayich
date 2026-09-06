@@ -203,7 +203,7 @@ class TestGeminiPayload:
 
     def test_rules_and_material_go_in_the_system_channel(self, gemini):
         seen = self._capture(gemini, system_prompt="RULES")
-        parts = seen["body"]["systemInstruction"]["parts"]
+        parts = seen["body"]["system_instruction"]["parts"]
 
         assert parts[0]["text"] == "RULES"
         assert "סיוע בדיור למשפחות חד-הוריות" in parts[1]["text"]
@@ -219,7 +219,7 @@ class TestGeminiPayload:
             "parts": [{"text": INJECTION_MESSAGE}],
         }
         system_text = " ".join(
-            part["text"] for part in body["systemInstruction"]["parts"]
+            part["text"] for part in body["system_instruction"]["parts"]
         )
         assert INJECTION_MESSAGE not in system_text
 

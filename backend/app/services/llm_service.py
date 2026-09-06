@@ -305,7 +305,7 @@ class GeminiProvider:
         The split between channels is the structural half of the injection
         defence, and the reason this is not one big string:
 
-        * ``systemInstruction`` carries the rules *and* the retrieved
+        * ``system_instruction`` carries the rules *and* the retrieved
           material. Both are ours; neither can be edited by a user.
         * ``contents`` carries only things people said — the earlier turns of
           this conversation and the new question. Whatever a user typed
@@ -322,7 +322,7 @@ class GeminiProvider:
         contents.append({"role": "user", "parts": [{"text": user_message}]})
 
         return {
-            "systemInstruction": {
+            "system_instruction": {
                 "parts": [
                     {"text": system_prompt},
                     {"text": render_context_block(context_chunks)},
