@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.constants import UserRole
+from app.core.i18n import translate
 from app.core.security import decode_access_token
 from app.db.session import SessionLocal
 from app.services import agent_service
@@ -58,7 +59,7 @@ def get_current_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="לא ניתן לאמת את הזהות. יש להתחבר מחדש.",
+        detail=translate("errors.unauthenticated"),
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -93,7 +94,7 @@ def require_role(*roles: UserRole) -> Callable[..., "User"]:
         if current_user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="אין לך הרשאה לבצע פעולה זו.",
+                detail=translate("errors.forbidden"),
             )
         return current_user
 
@@ -124,10 +125,8 @@ def rate_limit_chat(
     if agent_service.messages_left_today(db, current_user) <= 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                f"הגעת למכסת {settings.AGENT_RATE_LIMIT_PER_DAY} ההודעות היומית "
-                "לסוכן. אפשר לנסות שוב מאוחר יותר, או לפנות לייעוץ מקצועי אנושי "
-                "דרך מודול הייעוץ באתר."
+            detail=translate(
+                "agent.rate_limited", limit=settings.AGENT_RATE_LIMIT_PER_DAY
             ),
         )
     return current_user

@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.constants import AgentDomain, AgentMessageRole, AuditAction, UserRole
+from app.core.i18n import translate
 from app.models.agent import AgentConversation, AgentMessage
 from app.models.agent_knowledge import AgentKnowledgeChunk
 from app.models.user import User
@@ -60,9 +61,12 @@ RATE_LIMIT_WINDOW = timedelta(hours=24)
 #: drift apart and leave the disclaimer stuck in the history.
 DISCLAIMER_SEPARATOR = "\n\n"
 
-_CONVERSATION_NOT_FOUND = "השיחה לא נמצאה."
-_CONVERSATION_FORBIDDEN = "אין לך הרשאה לצפות בשיחה זו."
-_AGENT_UNAVAILABLE = "הסוכן אינו זמין כרגע. אפשר לנסות שוב בעוד מספר רגעים."
+#: Catalogue keys, not display text — each is resolved by translate() at the
+#: point it is raised, in the language the request asked for. Named once
+#: because each is raised from more than one place and the three must not drift.
+_CONVERSATION_NOT_FOUND = "agent.conversation_not_found"
+_CONVERSATION_FORBIDDEN = "agent.conversation_forbidden"
+_AGENT_UNAVAILABLE = "agent.unavailable"
 
 
 def _utc_now() -> datetime:
@@ -219,7 +223,7 @@ def _deny(db: Session, user: User, conversation_id: str, reason: str) -> NoRetur
         details={"reason": reason},
     )
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail=_CONVERSATION_FORBIDDEN
+        status_code=status.HTTP_403_FORBIDDEN, detail=translate(_CONVERSATION_FORBIDDEN)
     )
 
 
@@ -242,7 +246,8 @@ def _get_conversation_in_domain(
     )
     if conversation is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=_CONVERSATION_NOT_FOUND
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=translate(_CONVERSATION_NOT_FOUND),
         )
     return conversation
 
@@ -391,12 +396,14 @@ def _answer_body(
             "No usable LLM provider for LLM_PROVIDER=%r", settings.LLM_PROVIDER
         )
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=_AGENT_UNAVAILABLE
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=translate(_AGENT_UNAVAILABLE),
         ) from None
     except llm_service.LLMError as exc:
         # The message is deliberately generic and the same for a timeout and
         # for a refusal: which one it was is in the log, not on the screen.
         logger.warning("Agent generation failed: %s", type(exc).__name__)
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=_AGENT_UNAVAILABLE
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=translate(_AGENT_UNAVAILABLE),
         ) from None
