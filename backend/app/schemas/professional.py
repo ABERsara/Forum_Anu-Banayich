@@ -32,7 +32,6 @@ class ProfessionalQueryResponse(BaseModel):
     answer: str | None = None
     is_public: bool
     status: QueryStatus
-    is_featured: bool
     domain: ProfessionalDomain | None = None
     professional: ProfessionalProfile | None = None
     # Asker info: only shown if show_real_name=True, otherwise alias
@@ -59,7 +58,6 @@ class PublicQAResponse(BaseModel):
     content: str
     answer: str
     domain: ProfessionalDomain | None = None
-    is_featured: bool
     answered_at: datetime | None = None
     like_count: int
     liked_by_me: bool

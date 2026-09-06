@@ -154,7 +154,6 @@ def _to_response(
         answer=query.answer,
         is_public=query.is_public,
         status=query.status,
-        is_featured=query.is_featured,
         domain=query.domain,
         professional=ProfessionalProfile.model_validate(query.professional)
         if query.professional is not None
@@ -406,7 +405,6 @@ def get_public_qa(
                 content=item.content,
                 answer=item.answer,
                 domain=item.domain,
-                is_featured=item.is_featured,
                 answered_at=item.answered_at,
                 like_count=like_count,
                 liked_by_me=liked_by_me,
