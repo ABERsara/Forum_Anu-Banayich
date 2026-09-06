@@ -1,23 +1,65 @@
 <div class="cell-members">
   <h1>{{ 'messages.newMessage.title' | transloco }}</h1>
 
-  <div aria-live="polite" [attr.aria-busy]="isLoading()">
-    @if (isLoading()) {
-      <app-loading-spinner size="md" [message]="'messages.newMessage.loading' | transloco" />
-    } @else if (hasError()) {
-      <app-error-display [message]="loadErrorKey() | transloco" />
-    } @else if (members().length === 0) {
-      <p>{{ 'messages.newMessage.empty' | transloco }}</p>
-    } @else {
-      <ul class="cell-members__list">
-        @for (member of members(); track member.id) {
-          <li>
-            <a [routerLink]="['/messages', member.id]" class="cell-members__item">
-              {{ member.first_name }} {{ member.last_name }}
-            </a>
-          </li>
-        }
-      </ul>
+  <div class="cell-search">
+    <label for="recipient-search">{{ 'messages.newMessage.search_label' | transloco }}</label>
+    <input
+      id="recipient-search"
+      type="search"
+      class="cell-search__input"
+      [formControl]="searchControl"
+      [attr.placeholder]="'messages.newMessage.search_placeholder' | transloco"
+      [attr.aria-describedby]="showMinCharsHint() ? 'recipient-search-hint' : null"
+    />
+    @if (showMinCharsHint()) {
+      <p id="recipient-search-hint" class="cell-search__hint">
+        {{ 'messages.newMessage.search_min_chars_hint' | transloco }}
+      </p>
     }
+
+    <div class="cell-search__results" aria-live="polite" [attr.aria-busy]="isSearching()">
+      @if (isSearching()) {
+        <app-loading-spinner
+          size="sm"
+          [message]="'messages.newMessage.search_loading' | transloco"
+        />
+      } @else if (searchError()) {
+        <app-error-display [message]="searchErrorKey() | transloco" />
+      } @else if (hasSearched() && searchResults().length === 0) {
+        <p>{{ 'messages.newMessage.search_no_results' | transloco }}</p>
+      } @else if (searchResults().length > 0) {
+        <ul class="cell-members__list">
+          @for (member of searchResults(); track member.id) {
+            <li>
+              <a [routerLink]="['/messages', member.id]" class="cell-members__item">
+                {{ member.first_name }} {{ member.last_name }}
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </div>
   </div>
+
+  @if (!isSearchActive()) {
+    <div aria-live="polite" [attr.aria-busy]="isLoading()">
+      @if (isLoading()) {
+        <app-loading-spinner size="md" [message]="'messages.newMessage.loading' | transloco" />
+      } @else if (hasError()) {
+        <app-error-display [message]="loadErrorKey() | transloco" />
+      } @else if (members().length === 0) {
+        <p>{{ 'messages.newMessage.empty' | transloco }}</p>
+      } @else {
+        <ul class="cell-members__list">
+          @for (member of members(); track member.id) {
+            <li>
+              <a [routerLink]="['/messages', member.id]" class="cell-members__item">
+                {{ member.first_name }} {{ member.last_name }}
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
 </div>

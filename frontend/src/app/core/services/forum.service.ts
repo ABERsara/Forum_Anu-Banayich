@@ -3,7 +3,6 @@
  *
  * TODO list for junior developer:
  *   [ ] implement reportPost() – POST /forum/posts/:id/report
- *   [ ] implement searchUsers() – GET /users/search?name=...
  */
 
 import { Injectable, inject } from '@angular/core';
@@ -96,14 +95,13 @@ export class ForumService {
     return this.api.get<UserPublic[]>('/cells/me/members');
   }
 
+  /**
+   * Search the current user's own cell (group+sector) by name, to start a
+   * new conversation. Backend enforces the same-cell filter and the 2-char
+   * minimum (422 otherwise) — the caller should debounce and gate on length
+   * itself rather than relying on that as the primary mechanism.
+   */
   searchUsers(name: string): Observable<UserPublic[]> {
-    void name;
-    /**
-     * TODO:
-     *   return this.api.get<UserPublic[]>(`/users/search?name=${encodeURIComponent(name)}`);
-     *
-     * Only users in the same group are returned (backend enforced).
-     */
-    throw new Error('searchUsers() not yet implemented');
+    return this.api.get<UserPublic[]>(`/messages/recipients?q=${encodeURIComponent(name)}`);
   }
 }

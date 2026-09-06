@@ -439,7 +439,12 @@
     "newMessage": {
       "title": "חברי התא שלי",
       "loading": "טוען חברי תא...",
-      "empty": "אין חברים נוספים בתא שלך כרגע."
+      "empty": "אין חברים נוספים בתא שלך כרגע.",
+      "search_label": "חיפוש לפי שם",
+      "search_placeholder": "הקלד שם...",
+      "search_min_chars_hint": "יש להקליד לפחות 2 תווים לחיפוש",
+      "search_loading": "מחפש...",
+      "search_no_results": "לא נמצאו חברים תואמים בתא שלך."
     },
     "chat": {
       "back_to_inbox": "→ חזרה לתיבה",
