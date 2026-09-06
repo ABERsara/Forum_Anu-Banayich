@@ -67,6 +67,19 @@ class TestNegotiateLanguage:
     def test_tag_is_case_insensitive(self):
         assert negotiate_language("EN-us") is Language.EN
 
+    def test_a_browsers_own_header_is_understood(self):
+        """
+        The shape a browser attaches to every XHR on its own, unprompted.
+
+        The Angular client overwrites it with the member's chosen UI language
+        (`core/interceptors/language.interceptor.ts`) precisely because this
+        value reports the locale the *browser* was installed in. A direct API
+        caller, though, reaches us with exactly this.
+        """
+        assert negotiate_language("en-US,en;q=0.9,he;q=0.8") is Language.EN
+        assert negotiate_language("he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7") is Language.HE
+        assert negotiate_language("ru-RU,ru;q=0.9,en;q=0.8") is Language.EN
+
     def test_unsupported_language_falls_back(self):
         assert negotiate_language("fr") is DEFAULT_LANGUAGE
         assert negotiate_language("de-AT,fr-FR") is DEFAULT_LANGUAGE
@@ -87,11 +100,28 @@ class TestNegotiateLanguage:
         assert negotiate_language("en;q=0") is DEFAULT_LANGUAGE
         assert negotiate_language("en;q=0, he") is Language.HE
 
+    def test_refusing_the_default_is_honoured_rather_than_ignored(self):
+        """`he;q=0` says *not Hebrew*. Skipping it and then falling back to the
+        default hands back the one language the caller ruled out."""
+        assert negotiate_language("he;q=0") is Language.EN
+        assert negotiate_language("he-IL;q=0") is Language.EN
+
+    def test_refusing_everything_still_gets_an_answer(self):
+        """We never answer 406 — out of acceptable options, the default stands
+        rather than the request failing over a header."""
+        assert negotiate_language("he;q=0, en;q=0") is DEFAULT_LANGUAGE
+        assert negotiate_language("*;q=0") is DEFAULT_LANGUAGE
+
     def test_wildcard_takes_the_default(self):
         assert negotiate_language("*") is DEFAULT_LANGUAGE
 
     def test_wildcard_after_a_real_preference_does_not_override_it(self):
         assert negotiate_language("en, *") is Language.EN
+
+    def test_wildcard_does_not_reinstate_a_refused_language(self):
+        """`he;q=0, *` is "anything but Hebrew" — and `*` sorts ahead of the
+        refusal, so the refusal has to be known before the wildcard is read."""
+        assert negotiate_language("he;q=0, *") is Language.EN
 
     def test_malformed_weight_does_not_break_the_request(self):
         """A header we cannot parse costs a preference, never a response."""

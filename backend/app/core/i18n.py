@@ -105,30 +105,54 @@ def _parse_accept_language(header: str) -> list[tuple[str, float]]:
     return [(tag, quality) for _, tag, quality in parsed]
 
 
+def _fallback_language(refused: set[str]) -> Language:
+    """
+    What to answer when the header named nothing we have.
+
+    Normally that is the default. The exception is a header that refused the
+    default outright (`he;q=0`): handing back Hebrew is then the one answer the
+    caller explicitly told us not to give, so any other language we have and
+    they did not refuse is a better one. If they refused everything, we are out
+    of honest options and the default stands — this API never answers 406.
+    """
+    if DEFAULT_LANGUAGE.value not in refused:
+        return DEFAULT_LANGUAGE
+    for language in Language:
+        if language is not DEFAULT_LANGUAGE and language.value not in refused:
+            return language
+    return DEFAULT_LANGUAGE
+
+
 def negotiate_language(header: str | None) -> Language:
     """
     Pick the best language this API supports out of an Accept-Language header.
 
     Matches a full tag (`en`) and the primary subtag of a regional one
     (`en-GB` → `en`), so a browser sending its own locale still gets English.
-    `q=0` means "not acceptable" and is skipped, and `*` means "anything you
-    have", which is the default. Anything unrecognised falls through to the
-    default rather than erroring.
+    `q=0` means "not acceptable", and `*` means "anything you have" — both hand
+    off to `_fallback_language`, which is what keeps a refusal honoured rather
+    than merely skipped. Anything unrecognised falls through to the default
+    rather than erroring.
     """
     if not header:
         return DEFAULT_LANGUAGE
 
     supported = {language.value: language for language in Language}
-    for tag, quality in _parse_accept_language(header):
+    parsed = _parse_accept_language(header)
+    # Collected up front, not as we go: `*` can sort ahead of the tag that was
+    # refused (`he;q=0, *`), and by then the refusal has to be known already.
+    refused = {tag.partition("-")[0] for tag, quality in parsed if quality <= 0}
+
+    for tag, quality in parsed:
         if quality <= 0:
             continue
         if tag == "*":
-            return DEFAULT_LANGUAGE
+            return _fallback_language(refused)
         primary = tag.partition("-")[0]
         if primary in supported:
             return supported[primary]
 
-    return DEFAULT_LANGUAGE
+    return _fallback_language(refused)
 
 
 def get_language() -> Language:
