@@ -42,9 +42,13 @@ Not in here, on purpose
   worse than leaving it alone. Same architectural decision as the email
   templates the ticket already deferred.
 - `rag_service`'s Hebrew stop-word list. Retrieval machinery, never displayed.
-- `core/constants.py`. Its Hebrew is all in trailing comments; the enum values
-  themselves are English slugs the client renders through its own label maps
-  (ABF-127).
+- `core/constants.py`. Its enum *values* are English slugs, which the client
+  renders through its own label maps (ABF-127) — nothing there reaches a member
+  through this API. The Hebrew in the file is real string data, not comments:
+  `USER_TYPE_LABELS`, `SECTOR_LABELS` and `AGENT_DOMAIN_LABELS`. Those have
+  exactly two readers, and ABF-137 defers both — `professional_service.
+  _build_alias()` and the agent's prompt in `llm_service`. They move when those
+  two do, not before, or the alias would render half in each language.
 """
 
 from typing import Final
