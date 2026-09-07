@@ -433,6 +433,10 @@
       "submitted": "Your report was sent, thank you.",
       "dialog_title": "Report content",
       "reason_label": "Reason for the report",
+      "reason_placeholder": "Choose a reason",
+      "reason_required": "Choose a reason to send the report.",
+      "sending": "Sending report...",
+      "disclosure_direct_message": "Note: confirming will reveal this message alone to the responsible moderator. The rest of the conversation stays private.",
       "description_label": "Details (optional)",
       "submit": "Send report",
       "error_duplicate": "You have already reported this content.",
@@ -453,6 +457,13 @@
     "dm_forbidden": "You don't have permission to send or view this message.",
     "invalid_cursor": "The request for older messages was not valid. Please refresh the page.",
     "internal_server_error": "Internal server error. Please try again later.",
+    "report_duplicate": "You have already reported this content.",
+    "report_target_not_found": "The content you are reporting was not found.",
+    "report_target_mismatch": "The report details do not match the requested content.",
+    "report_unsupported_target": "This type of content cannot be reported.",
+    "report_not_found": "The report was not found.",
+    "reported_content_not_found": "The reported content is no longer available.",
+    "report_forbidden": "You don't have permission to view this report.",
     "generic": "Something went wrong. Please try again."
   },
   "messages": {
@@ -500,7 +511,8 @@
       "send": "Send",
       "send_failed": "The message was not sent. Please try again.",
       "pruned_notice": "This conversation reached its {{limit}}-message limit, so the oldest message was deleted to make room.",
-      "pruned_notice_many": "This conversation reached its {{limit}}-message limit, so the {{count}} oldest messages were deleted to make room."
+      "pruned_notice_many": "This conversation reached its {{limit}}-message limit, so the {{count}} oldest messages were deleted to make room.",
+      "report_message": "Report the message from {{name}} at {{time}}"
     }
   },
   "constants": {
