@@ -206,7 +206,7 @@
       "unlike_aria": "ביטול לייק — {{count}}"
     },
     "qa_feed": {
-      "back_link": "→ חזרה לייעוץ מקצועי",
+      "back_link": "חזרה לייעוץ מקצועי",
       "title": "שאלות ותשובות קהילתיות",
       "domain_filter_label": "סינון לפי תחום:",
       "domain_filter_all": "הכל",
@@ -478,7 +478,7 @@
       "search_no_results": "לא נמצאו חברים תואמים בתא שלך."
     },
     "chat": {
-      "back_to_inbox": "→ חזרה לתיבה",
+      "back_to_inbox": "חזרה לתיבה",
       "title_fallback": "שיחה",
       "loading": "טוען הודעות...",
       "empty": "עדיין אין הודעות. כתבו הודעה כדי להתחיל.",

@@ -206,7 +206,7 @@
       "unlike_aria": "Unlike — {{count}}"
     },
     "qa_feed": {
-      "back_link": "← Back to professional advice",
+      "back_link": "Back to professional advice",
       "title": "Community Q&A",
       "domain_filter_label": "Filter by domain:",
       "domain_filter_all": "All",
@@ -478,7 +478,7 @@
       "search_no_results": "No matching members found in your cell."
     },
     "chat": {
-      "back_to_inbox": "← Back to inbox",
+      "back_to_inbox": "Back to inbox",
       "title_fallback": "Conversation",
       "loading": "Loading messages...",
       "empty": "No messages yet. Write a message to get started.",
