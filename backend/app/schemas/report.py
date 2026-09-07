@@ -27,7 +27,10 @@ class ReportResponse(BaseModel):
     """A single report as seen by a moderator."""
 
     id: str
-    reporter_id: str
+    #: Null once the reporter's account is closed and the report is anonymized
+    #: (§9.4 keeps reports for five years, without the person). Nothing in
+    #: ABF-112 writes null; the deletion flow is task 8's.
+    reporter_id: str | None
     reported_user_id: str
     target_type: ReportTargetType
     target_id: str
