@@ -153,6 +153,17 @@ class Settings(BaseSettings):
     DM_BLOCK_AFTER_REPORTS: int = 3  # DM reports before auto-block
 
     # ------------------------------------------------------------------
+    # Private messaging storage cap (spec section 5.3)
+    # ------------------------------------------------------------------
+    # "up to 1,000 messages per conversation". Enforced on every send by
+    # forum_service._enforce_conversation_limit(): oldest-first (FIFO), and
+    # never a message that still carries an open report. Read through
+    # `settings` rather than inlined at the call site, so tuning it here
+    # actually changes behaviour (the mistake FINDINGS M-01 records for
+    # AUTO_HIDE_REPORT_COUNT).
+    MAX_MESSAGES_PER_CONVERSATION: int = 1000
+
+    # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------
     @model_validator(mode="after")

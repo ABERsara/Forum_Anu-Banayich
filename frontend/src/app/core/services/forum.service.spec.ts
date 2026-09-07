@@ -5,7 +5,15 @@ import { TestBed } from '@angular/core/testing';
 import { ForumService, buildConversationKey } from './forum.service';
 import { environment } from '../../../environments/environment';
 import { GroupVisibility, PostStatus, SectorVisibility } from '../constants';
-import type { DirectMessage, ForumPost, ForumPostList, UserPublic } from '../models';
+import type {
+  ConversationMessagesPage,
+  DirectMessage,
+  DirectMessageSendResult,
+  ForumPost,
+  ForumPostList,
+  LikeResponse,
+  UserPublic,
+} from '../models';
 
 const MOCK_POST: ForumPost = {
   id: 'post-1',
@@ -17,6 +25,8 @@ const MOCK_POST: ForumPost = {
   report_count: 0,
   author: { id: 'user-1', first_name: 'שרה', last_name: 'לוי' },
   attachment_url: null,
+  like_count: 0,
+  liked_by_me: false,
   created_at: '2026-07-14T00:00:00',
   updated_at: '2026-07-14T00:00:00',
 };
@@ -108,6 +118,18 @@ describe('ForumService', () => {
     expect(result).toEqual(updatedPost);
   });
 
+  it('toggleLike PATCHes the like endpoint for the given post', () => {
+    let result: LikeResponse | undefined;
+    service.toggleLike('post-1').subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/forum/posts/post-1/like`);
+    expect(req.request.method).toBe('PATCH');
+
+    const response: LikeResponse = { liked: true, like_count: 1 };
+    req.flush(response);
+    expect(result).toEqual(response);
+  });
+
   describe('buildConversationKey', () => {
     it('is order-independent', () => {
       expect(buildConversationKey('id-a', 'id-b')).toBe(buildConversationKey('id-b', 'id-a'));
@@ -124,30 +146,58 @@ describe('ForumService', () => {
       sender: { id: 'me-1', first_name: 'שרה', last_name: 'לוי' },
       recipient: { id: 'other-1', first_name: 'רבקה', last_name: 'כהן' },
       content: 'שלום',
-      is_read: false,
+      read_at: null,
       created_at: '2026-08-01T10:00:00',
     };
 
+    const MOCK_SEND_RESULT: DirectMessageSendResult = {
+      message: MOCK_MESSAGE,
+      pruned_message_ids: [],
+      conversation_limit: 1000,
+    };
+
     it('sendMessage POSTs to /messages with the given data', () => {
-      let result: DirectMessage | undefined;
+      let result: DirectMessageSendResult | undefined;
       const data = { recipient_id: 'other-1', content: 'שלום' };
       service.sendMessage(data).subscribe((res) => (result = res));
 
       const req = httpMock.expectOne(`${environment.apiUrl}/messages`);
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual(data);
-      req.flush(MOCK_MESSAGE);
-      expect(result).toEqual(MOCK_MESSAGE);
+      req.flush(MOCK_SEND_RESULT);
+      expect(result).toEqual(MOCK_SEND_RESULT);
     });
 
     it('getConversation GETs /conversations/{key}/messages using the sorted key', () => {
-      let result: DirectMessage[] | undefined;
+      let result: ConversationMessagesPage | undefined;
       service.getConversation('me-1', 'other-1').subscribe((res) => (result = res));
 
       const req = httpMock.expectOne(`${environment.apiUrl}/conversations/me-1:other-1/messages`);
       expect(req.request.method).toBe('GET');
-      req.flush([MOCK_MESSAGE]);
-      expect(result).toEqual([MOCK_MESSAGE]);
+      const page: ConversationMessagesPage = {
+        items: [MOCK_MESSAGE],
+        has_more: false,
+        next_cursor: null,
+      };
+      req.flush(page);
+      expect(result).toEqual(page);
+    });
+
+    it('getConversation asks for a page size and a cursor when it is given them', () => {
+      service.getConversation('me-1', 'other-1', { limit: 50, before: 'cursor-1' }).subscribe();
+
+      httpMock.expectOne(
+        `${environment.apiUrl}/conversations/me-1:other-1/messages?limit=50&before=cursor-1`,
+      );
+    });
+
+    it('getConversation leaves the cursor out entirely when there is none', () => {
+      // Not `before=null` or `before=`: the cursor-less request is the one the
+      // server also treats as "the conversation was opened", and a stray empty
+      // parameter is a different request.
+      service.getConversation('me-1', 'other-1', { limit: 50, before: null }).subscribe();
+
+      httpMock.expectOne(`${environment.apiUrl}/conversations/me-1:other-1/messages?limit=50`);
     });
 
     it('getCellMembers GETs /cells/me/members', () => {
