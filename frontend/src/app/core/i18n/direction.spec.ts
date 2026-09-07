@@ -124,12 +124,18 @@ const PINS_DIRECTION = /^direction$/;
 
 /**
  * The same pin spelled as an attribute: either quote, and through a binding —
- * `dir="rtl"`, `dir='rtl'`, and the `[attr.dir]="'rtl'"` form. What is looked
- * for is a screen naming `rtl` for itself; `dir="auto"` and the `dir="ltr"`
- * the two email fields carry name something else and do not match.
+ * `dir="rtl"`, `dir='rtl'`, `[dir]="'rtl'"` and the `[attr.dir]="'rtl'"` form.
+ * What is looked for is a screen naming `rtl` for itself; `dir="auto"` and the
+ * `dir="ltr"` the two email fields carry name something else and do not match.
+ *
+ * The word boundary sits inside the alternation rather than in front of it. A
+ * bare `dir` needs one, so that `redirect="…"` is not read as a pin; a bracketed
+ * binding must not have one, because the character before `[` is the space that
+ * separates it from the previous attribute and two non-word characters have no
+ * boundary between them. Hoisted out front, `\b` let both bracket forms through.
  */
 const PINS_RTL_ATTRIBUTE =
-  /\b(?:\[attr\.dir\]|dir)\s*=\s*(["'])(?:(?!\1).)*?\brtl\b(?:(?!\1).)*?\1/g;
+  /(?:\[(?:attr\.)?dir\]|\bdir)\s*=\s*(["'])(?:(?!\1).)*?\brtl\b(?:(?!\1).)*?\1/g;
 
 // ---------------------------------------------------------------------------
 // Reading declarations out of text
@@ -370,5 +376,80 @@ describe('direction', () => {
       [...inStylesheets, ...inTemplates, ...inTranslations].sort(),
       'use ‹ (U+2039), which carries Bidi_Mirrored and turns with the page',
     ).toEqual([]);
+  });
+
+  /**
+   * The four checks above pass on a clean tree, which is also what a guard that
+   * reads nothing does. These hold the reading itself to violations written out
+   * by hand, so that a hole shows up here rather than as a screen that shipped
+   * facing the wrong way. `[attr.dir]="'rtl'"` is in the list because it went
+   * through green once: the `\b` had been hoisted in front of the alternation,
+   * where a bracket can never satisfy it.
+   */
+  describe('reads a violation as one', () => {
+    const physical = (css: string) => declarationsIn(css).filter(isPhysical).length > 0;
+    const pins = (markup: string) => markup.match(PINS_RTL_ATTRIBUTE) !== null;
+
+    it.each([
+      ['margin-left: 1rem', true],
+      ['text-align: right !important', true],
+      ['margin: 0 0 0 8px', true],
+      ['border-radius: 4px 0 0 4px', true],
+      ['float: left', true],
+      ['margin-inline-start: 1rem', false],
+      ['margin: 0 auto', false],
+      ['margin: 1px 2px 1px 2px', false],
+      ['text-align: center', false],
+      ['flex-direction: row', false],
+    ])('%s → physical: %s', (css, physicalSide) => {
+      expect(physical(css)).toBe(physicalSide);
+    });
+
+    it.each([
+      ['<div dir="rtl"></div>', true],
+      ["<div dir='rtl'></div>", true],
+      [`<div [attr.dir]="'rtl'"></div>`, true],
+      [`<div [dir]="'rtl'"></div>`, true],
+      [`<div [attr.dir]="he ? 'rtl' : 'ltr'"></div>`, true],
+      ['<div dir="auto"></div>', false],
+      ['<input dir="ltr" />', false],
+      ['<div class="rtl-column"></div>', false],
+      ['<a [routerLink]="redirect"></a>', false],
+    ])('%s → pins a direction: %s', (markup, pinned) => {
+      expect(pins(markup)).toBe(pinned);
+    });
+
+    it.each([
+      ['←', true],
+      ['&larr;', true],
+      ['&#8592;', true],
+      ['&#x2190;', true],
+      ['▶', true],
+      ['‹', false],
+      ['»', false],
+      ['&#65;', false],
+    ])('%s → a glyph that will not turn: %s', (text, frozen) => {
+      expect(frozenGlyphsIn(text).length > 0).toBe(frozen);
+    });
+
+    it('reads a physical side out of a style attribute, and out of an inline template', () => {
+      const styles = inlineStylesIn('<p style="margin-left: 4px">x</p>');
+
+      expect(styles.map(({ css }) => physical(css))).toEqual([true]);
+      expect(markupOf('x.component.ts', 'const a = `→`;\ntemplate: `<p dir="rtl"></p>`')).toContain(
+        'dir="rtl"',
+      );
+    });
+
+    /**
+     * A `/*` inside a line comment used to pair with the next block close and
+     * blank the declaration lying between the two.
+     */
+    it('keeps code that a comment mentions in passing', () => {
+      const scss = ['// no /* left */ here', 'margin-left: 1rem;', '/* a note */'].join('\n');
+
+      expect(physical(withoutComments(scss))).toBe(true);
+      expect(physical(withoutComments('/* margin-left: 1rem; */'))).toBe(false);
+    });
   });
 });
