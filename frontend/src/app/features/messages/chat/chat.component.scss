@@ -147,6 +147,16 @@
     // takes white down to 4.2:1, under the 4.5:1 required.
   }
 
+  // The report control on a received bubble. Only ever rendered inside
+  // .chat__message--theirs, whose bubble is $color-bg-subtle with
+  // $color-text on it, so the control keeps the page's ordinary text colour
+  // and its own focus ring rather than inheriting anything from the blue
+  // bubble it is never drawn on.
+  &__report {
+    margin-top: $spacing-xs;
+    font-size: $font-size-xs;
+  }
+
   &__notice,
   &__limit {
     margin: 0 0 $spacing-sm;

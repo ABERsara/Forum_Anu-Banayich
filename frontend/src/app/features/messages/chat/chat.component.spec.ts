@@ -15,6 +15,7 @@ import type {
 } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
+import { ReportService } from '../../../core/services/report.service';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 const ME: UserProfile = {
@@ -41,6 +42,7 @@ function makeMessage(overrides: Partial<DirectMessage> = {}): DirectMessage {
     content: 'שלום',
     read_at: null,
     created_at: '2026-08-01T10:00:00',
+    reported_by_me: false,
     ...overrides,
   };
 }
@@ -98,12 +100,14 @@ describe('ChatComponent', () => {
     sendMessage: ReturnType<typeof vi.fn>;
     getCellMembers: ReturnType<typeof vi.fn>;
   };
+  let reportServiceMock: { fileReport: ReturnType<typeof vi.fn> };
 
   function setup(): void {
     TestBed.configureTestingModule({
       imports: [ChatComponent, translocoTesting()],
       providers: [
         { provide: ForumService, useValue: forumServiceMock },
+        { provide: ReportService, useValue: reportServiceMock },
         { provide: AuthService, useValue: { currentUser: () => ME } },
         {
           provide: ActivatedRoute,
@@ -179,6 +183,7 @@ describe('ChatComponent', () => {
       sendMessage: vi.fn().mockReturnValue(of(makeSendResult())),
       getCellMembers: vi.fn().mockReturnValue(of([OTHER])),
     };
+    reportServiceMock = { fileReport: vi.fn().mockReturnValue(of({ id: 'report-1' })) };
   });
 
   // -------------------------------------------------------------------------
@@ -912,6 +917,190 @@ describe('ChatComponent', () => {
 
       expect(text()).toContain('This conversation reached its 1,000-message limit');
       expect(text()).toContain('0 of 2,000 characters');
+      expect(text()).not.toMatch(HEBREW);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Reporting a message (ABF-112)
+  // -------------------------------------------------------------------------
+
+  describe('reporting a received message', () => {
+    /** The received / sent pair every test in here works from. */
+    function conversation(overrides: Partial<DirectMessage> = {}): DirectMessage[] {
+      return [
+        makeMessage({
+          id: 'theirs-1',
+          content: 'משהו פוגעני',
+          sender: OTHER,
+          recipient: ME_PUBLIC,
+          ...overrides,
+        }),
+        makeMessage({ id: 'mine-1', content: 'התשובה שלי' }),
+      ];
+    }
+
+    function reportTriggers(): HTMLElement[] {
+      return queryAll('.chat__report button');
+    }
+
+    function openReportDialog(): void {
+      reportTriggers()[0].click();
+      fixture.detectChanges();
+    }
+
+    function chooseReason(value: string): void {
+      const select = query<HTMLSelectElement>('.dialog__select')!;
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+    }
+
+    function confirm(): void {
+      query<HTMLButtonElement>('.btn--primary')!.click();
+      fixture.detectChanges();
+    }
+
+    it('offers a report control on a received message and not on a sent one', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+
+      const bubbles = queryAll('.chat__message');
+      expect(bubbles[0].querySelector('.chat__report')).toBeTruthy();
+      expect(bubbles[1].querySelector('.chat__report')).toBeFalsy();
+    });
+
+    /**
+     * An optimistic bubble has a local id, not a server one. Offering to
+     * report it would file a report against an id the server never issued.
+     */
+    it('offers nothing on a message still in flight', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage([])));
+      forumServiceMock.sendMessage.mockReturnValue(deferred<DirectMessageSendResult>().hold);
+      setup();
+
+      component.draft.set('שלום');
+      component.send();
+      fixture.detectChanges();
+
+      expect(reportTriggers()).toHaveLength(0);
+    });
+
+    it('names the message in the control, not just "report"', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+
+      const label = reportTriggers()[0].getAttribute('aria-label');
+      expect(label).toContain('רבקה כהן');
+      expect(label).toContain('דיווח על ההודעה');
+    });
+
+    it('shows what a report exposes before it is confirmed', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+
+      openReportDialog();
+
+      expect(text()).toContain('יחשוף את ההודעה הזו בלבד למבקר האחראי');
+    });
+
+    it('files the report against that one message', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+      openReportDialog();
+
+      chooseReason('offensive');
+      confirm();
+
+      expect(reportServiceMock.fileReport).toHaveBeenCalledWith({
+        target_type: 'direct_message',
+        target_id: 'theirs-1',
+        reason: 'offensive',
+        description: undefined,
+      });
+    });
+
+    it('sends nothing until a reason is chosen', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+      openReportDialog();
+
+      expect(query<HTMLButtonElement>('.btn--primary')!.disabled).toBe(true);
+
+      confirm();
+
+      expect(reportServiceMock.fileReport).not.toHaveBeenCalled();
+    });
+
+    it('marks the message once the report is stored', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+      openReportDialog();
+      chooseReason('spam');
+
+      confirm();
+
+      expect(component.messages().find((m) => m.id === 'theirs-1')?.reported).toBe(true);
+      expect(text()).toContain('הדיווח נשלח, תודה.');
+    });
+
+    it('leaves the message unmarked when the report fails', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      reportServiceMock.fileReport.mockReturnValue(throwError(() => ({ status: 500 })));
+      setup();
+      openReportDialog();
+      chooseReason('spam');
+
+      confirm();
+
+      expect(component.messages().find((m) => m.id === 'theirs-1')?.reported).toBe(false);
+    });
+
+    /**
+     * The mark comes from the server, so it is still there after a reload —
+     * and the control is not offered a second time for the same message.
+     */
+    it('shows a message the server says was already reported as reported', () => {
+      forumServiceMock.getConversation.mockReturnValue(
+        of(makePage(conversation({ reported_by_me: true }))),
+      );
+      setup();
+
+      expect(component.messages()[0].reported).toBe(true);
+      expect(reportTriggers()).toHaveLength(0);
+      expect(text()).toContain('הדיווח נשלח, תודה.');
+    });
+
+    it('keeps the mark when an older page is loaded above it', () => {
+      forumServiceMock.getConversation
+        .mockReturnValueOnce(
+          of(
+            makePage(conversation({ reported_by_me: true }), { has_more: true, next_cursor: 'c1' }),
+          ),
+        )
+        .mockReturnValueOnce(of(makePage(manyMessages(2))));
+      setup();
+
+      component.loadOlder();
+      fixture.detectChanges();
+
+      expect(component.messages().find((m) => m.id === 'theirs-1')?.reported).toBe(true);
+    });
+
+    it('translates the control and its dialog', () => {
+      forumServiceMock.getConversation.mockReturnValue(
+        of(makePage([makeLatinMessage({ id: 'theirs-1', sender: OTHER, recipient: ME_PUBLIC })])),
+      );
+      forumServiceMock.getCellMembers.mockReturnValue(
+        of([{ id: 'other-1', first_name: 'Rivka', last_name: 'Cohen' }]),
+      );
+      setup();
+      openReportDialog();
+
+      switchToEnglish();
+
+      expect(text()).toContain('Report content');
+      expect(reportTriggers()[0]?.getAttribute('aria-label') ?? text()).not.toMatch(HEBREW);
       expect(text()).not.toMatch(HEBREW);
     });
   });

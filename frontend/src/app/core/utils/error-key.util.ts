@@ -5,10 +5,20 @@
  * failure, an unrecognized key) falls back to a message of ours rather than
  * showing the raw backend value.
  */
-const KNOWN_ERROR_KEYS = [
+export const KNOWN_ERROR_KEYS = [
   'errors.dm_forbidden',
   'errors.invalid_cursor',
   'errors.internal_server_error',
+  // Reporting (ABF-112). A key added here must also exist in he.json and
+  // en.json — an unlisted or untranslated one falls back silently, which is
+  // safe but says less than the server knew.
+  'errors.report_duplicate',
+  'errors.report_target_not_found',
+  'errors.report_target_mismatch',
+  'errors.report_unsupported_target',
+  'errors.report_not_found',
+  'errors.reported_content_not_found',
+  'errors.report_forbidden',
 ];
 
 /**

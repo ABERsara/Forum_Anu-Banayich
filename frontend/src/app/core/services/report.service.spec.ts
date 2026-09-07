@@ -53,10 +53,45 @@ describe('ReportService', () => {
     expect(result).toEqual(MOCK_REPORT);
   });
 
-  it('fileReport returns an error observable for target types without a wired endpoint yet', () => {
+  it('fileReport POSTs a private-message report to the messages endpoint', () => {
     const data: ReportCreate = {
       target_type: ReportTargetType.DIRECT_MESSAGE,
       target_id: 'msg-1',
+      reason: ReportReason.SPAM,
+    };
+    let result: Report | undefined;
+    service.fileReport(data).subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/messages/msg-1/report`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(data);
+
+    req.flush({ ...MOCK_REPORT, target_type: ReportTargetType.DIRECT_MESSAGE });
+    expect(result?.target_type).toBe(ReportTargetType.DIRECT_MESSAGE);
+  });
+
+  /**
+   * A private message is never reported through the forum route: that route
+   * would look a post up by a message id, and the answer would say something
+   * about forum posts in reply to a question about a private message.
+   */
+  it('never aims a private-message report at the forum route', () => {
+    service
+      .fileReport({
+        target_type: ReportTargetType.DIRECT_MESSAGE,
+        target_id: 'msg-1',
+        reason: ReportReason.SPAM,
+      })
+      .subscribe();
+
+    httpMock.expectNone(`${environment.apiUrl}/forum/posts/msg-1/report`);
+    httpMock.expectOne(`${environment.apiUrl}/messages/msg-1/report`).flush(MOCK_REPORT);
+  });
+
+  it('fileReport returns an error observable for target types without a wired endpoint yet', () => {
+    const data: ReportCreate = {
+      target_type: ReportTargetType.PROFESSIONAL_QUERY,
+      target_id: 'query-1',
       reason: ReportReason.SPAM,
     };
 
