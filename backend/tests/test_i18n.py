@@ -149,13 +149,34 @@ class TestTranslate:
         error path. test_i18n_catalogue.py is what keeps this unreachable."""
         assert translate("nothing.like.this") == "nothing.like.this"
 
-    def test_placeholders_are_filled(self):
-        rendered = translate("agent.rate_limited", limit=25)
-        assert "25" in rendered
-        assert "{limit}" not in rendered
+    @pytest.fixture
+    def parameterised(self, monkeypatch):
+        """
+        A catalogue entry with a placeholder, supplied by the test.
 
-    def test_a_missing_placeholder_leaves_the_template_rather_than_raising(self):
-        assert "{limit}" in translate("agent.rate_limited")
+        `agent.rate_limited` was the only real one, and it left the catalogue
+        with `main`'s revert of ABF-122. `translate()` still fills placeholders,
+        and the next message that needs one will rely on it, so the coverage
+        stays and brings its own entry instead of pointing at a key that is
+        gone. `test_i18n_catalogue.py::test_placeholders_match_across_languages`
+        is the half of this that guards the *catalogue*; it currently has
+        nothing to look at, and holds the line for whatever arrives next.
+        """
+        key = "test.placeholder"
+        monkeypatch.setitem(
+            MESSAGES, key, {HEBREW: "נותרו {count}", ENGLISH: "{count} left"}
+        )
+        return key
+
+    def test_placeholders_are_filled(self, parameterised):
+        rendered = translate(parameterised, count=25)
+        assert rendered == "נותרו 25"
+        assert "{count}" not in rendered
+
+    def test_a_missing_placeholder_leaves_the_template_rather_than_raising(
+        self, parameterised
+    ):
+        assert "{count}" in translate(parameterised)
 
 
 # ---------------------------------------------------------------------------

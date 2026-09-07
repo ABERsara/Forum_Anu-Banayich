@@ -36,19 +36,32 @@ Not in here, on purpose
   quietly drop from a specific message to its generic fallback. They stay as
   they are; unifying the two mechanisms needs a frontend change and is a ticket
   of its own.
-- `llm_service.ANSWER_DISCLAIMER` / `NO_CONTEXT_ANSWER` and the agent's system
-  prompts. These are the *body* of an answer the model composes in Hebrew from a
-  Hebrew knowledge base — an English disclaimer stapled to a Hebrew answer reads
-  worse than leaving it alone. Same architectural decision as the email
-  templates the ticket already deferred.
-- `rag_service`'s Hebrew stop-word list. Retrieval machinery, never displayed.
+- Email templates (`email_service`), which the ticket defers whole.
 - `core/constants.py`. Its enum *values* are English slugs, which the client
   renders through its own label maps (ABF-127) — nothing there reaches a member
   through this API. The Hebrew in the file is real string data, not comments:
-  `USER_TYPE_LABELS`, `SECTOR_LABELS` and `AGENT_DOMAIN_LABELS`. Those have
-  exactly two readers, and ABF-137 defers both — `professional_service.
-  _build_alias()` and the agent's prompt in `llm_service`. They move when those
-  two do, not before, or the alias would render half in each language.
+  `USER_TYPE_LABELS` and `SECTOR_LABELS`. Their one reader is
+  `professional_service._build_alias()`, which ABF-137 defers — the alias is a
+  single string built from both maps, so moving one would render it half in
+  each language.
+
+Was in here, and is not any more
+--------------------------------
+The `agent.*` keys — the AI agent's "conversation not found", "forbidden",
+"unavailable" and rate-limit messages — lived here until `main` reverted
+ABF-122 (the agent conversation schema collided). Their only two callers,
+`services/agent_service.py` and `dependencies.rate_limit_chat`, went with it,
+and `test_i18n_catalogue.py::test_every_key_in_the_catalogue_is_used` is what
+made leaving them behind impossible. When ABF-122 lands again the agent's
+messages come back as keys, not as the Hebrew literals they were before —
+`test_no_message_is_raised_in_hebrew` walks the whole of `app/`, so the
+returning module is held to this rule the day it arrives.
+
+`agent.rate_limited` was also the catalogue's only entry with a `{placeholder}`.
+`TestCatalogue::test_placeholders_match_across_languages` now passes over an
+empty set and stays for the next one; the rendering itself is still exercised,
+against a catalogue entry the test defines, by
+`test_i18n.py::TestTranslate::test_placeholders_are_filled`.
 """
 
 from typing import Final
@@ -255,32 +268,6 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
     "likes.answered_only": {
         HEBREW: "ניתן לסמן לייק רק לשאלה שנענתה.",
         ENGLISH: "Only a question that has been answered can be liked.",
-    },
-    # -- AI agent ---------------------------------------------------------
-    "agent.conversation_not_found": {
-        HEBREW: "השיחה לא נמצאה.",
-        ENGLISH: "The conversation was not found.",
-    },
-    "agent.conversation_forbidden": {
-        HEBREW: "אין לך הרשאה לצפות בשיחה זו.",
-        ENGLISH: "You do not have permission to view this conversation.",
-    },
-    "agent.unavailable": {
-        HEBREW: "הסוכן אינו זמין כרגע. אפשר לנסות שוב בעוד מספר רגעים.",
-        ENGLISH: "The assistant is unavailable right now. Please try again in a few moments.",
-    },
-    #: `{limit}` is settings.AGENT_RATE_LIMIT_PER_DAY. Both languages must keep
-    #: the placeholder — test_i18n_catalogue.py compares the two sides' braces.
-    "agent.rate_limited": {
-        HEBREW: (
-            "הגעת למכסת {limit} ההודעות היומית לסוכן. אפשר לנסות שוב מאוחר "
-            "יותר, או לפנות לייעוץ מקצועי אנושי דרך מודול הייעוץ באתר."
-        ),
-        ENGLISH: (
-            "You have reached the daily limit of {limit} messages to the "
-            "assistant. You can try again later, or reach a human professional "
-            "through the consultation section of the site."
-        ),
     },
     # -- Cross-cutting ----------------------------------------------------
     "errors.unauthenticated": {

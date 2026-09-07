@@ -408,6 +408,14 @@
       "load_reports_failed": "Something went wrong loading the reports."
     }
   },
+  "profile": {
+    "title": "My profile",
+    "name_label": "Name:",
+    "email_label": "Email:",
+    "group_label": "Group:",
+    "sector_label": "Sector:",
+    "status_label": "Status:"
+  },
   "shared": {
     "confirm_dialog": {
       "title": "Are you sure?",

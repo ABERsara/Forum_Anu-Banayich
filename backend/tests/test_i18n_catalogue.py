@@ -27,16 +27,19 @@ PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 # There is deliberately no per-file exemption list here.
 #
-# The modules whose Hebrew ABF-137 leaves alone — email templates, the agent's
-# prompts and disclaimer, the retrieval stop-words, the organisation's name, the
-# label maps (the reasoning for each is in app/core/messages.py's docstring) —
-# do not need one, because this check is scoped by *shape* rather than by file:
-# it only ever looks inside `HTTPException(detail=…)`, `ValueError(…)` and a
-# `{"message"/"detail": …}` dict. None of that deferred Hebrew is in any of
-# those, so exempting the files bought nothing and cost the one thing the check
-# is for — a Hebrew `HTTPException` added to email_service.py or llm_service.py
-# tomorrow would have passed in silence.
-# `test_a_formerly_exempt_module_is_not_a_blind_spot` pins that it no longer does.
+# The modules whose Hebrew ABF-137 leaves alone — email templates, the
+# organisation's name, the label maps (the reasoning for each is in
+# app/core/messages.py's docstring) — do not need one, because this check is
+# scoped by *shape* rather than by file: it only ever looks inside
+# `HTTPException(detail=…)`, `ValueError(…)` and a `{"message"/"detail": …}`
+# dict. None of that deferred Hebrew is in any of those, so exempting the files
+# bought nothing and cost the one thing the check is for — a Hebrew
+# `HTTPException` added to email_service.py tomorrow would have passed in
+# silence.
+# `test_a_formerly_exempt_module_is_not_a_blind_spot` pins that it no longer
+# does. Being scoped by shape is also what lets a module arrive without anyone
+# remembering to list it here: when ABF-122 lands again, agent_service.py and
+# llm_service.py are held to this rule on the day they reappear.
 
 
 def _sources():
@@ -47,8 +50,8 @@ def _sources():
 
 
 def _module_string_constants(tree):
-    """Module-level `NAME = "..."` — how agent_service and forum_service hold
-    a key that is raised from several places."""
+    """Module-level `NAME = "..."` — how forum_service holds a key that is
+    raised from several places."""
     return {
         target.id: node.value.value
         for node in tree.body
@@ -145,8 +148,17 @@ class TestCatalogue:
         assert untranslated == []
 
     def test_placeholders_match_across_languages(self):
-        """A translator dropping `{limit}` would silently ship a message with
-        the number missing — `translate()` fills what the template asks for."""
+        """
+        A translator dropping a `{placeholder}` would silently ship a message
+        with the number missing — `translate()` fills what the template asks
+        for, and fills it per language.
+
+        No entry carries a placeholder today: `agent.rate_limited` was the only
+        one and it left with `main`'s revert of ABF-122. The check stays because
+        the cost of keeping it is nothing and the failure it catches is silent;
+        `test_i18n.py::TestTranslate` covers the rendering itself against an
+        entry it supplies.
+        """
         mismatched = {
             key: (
                 sorted(PLACEHOLDER.findall(translations[HEBREW])),
@@ -278,11 +290,17 @@ class TestNoHardcodedMessages:
     def test_a_formerly_exempt_module_is_not_a_blind_spot(self):
         """
         ABF-137 first shipped this check with a per-file exemption list, which
-        included llm_service.py for its Hebrew prompts. A Hebrew HTTPException
-        added there would have passed in silence. Scoping by shape instead of
-        by file is what closed that, and this is the test that says so.
+        included email_service.py for the Hebrew in its templates. A Hebrew
+        HTTPException added there would have passed in silence. Scoping by shape
+        instead of by file is what closed that, and this is the test that says
+        so.
+
+        The source is passed in rather than read off disk on purpose: what is
+        being asserted is that the *module's name* buys it nothing, which is
+        exactly what a real file could not demonstrate — it has no violation in
+        it, and the check would pass either way.
         """
-        violation = 'raise HTTPException(status_code=503, detail="הסוכן אינו זמין")'
-        assert self._offenders([("services/llm_service.py", violation)]) == [
-            "services/llm_service.py:1 (HTTPException(detail=...))"
+        violation = 'raise HTTPException(status_code=503, detail="השירות אינו זמין")'
+        assert self._offenders([("services/email_service.py", violation)]) == [
+            "services/email_service.py:1 (HTTPException(detail=...))"
         ]
