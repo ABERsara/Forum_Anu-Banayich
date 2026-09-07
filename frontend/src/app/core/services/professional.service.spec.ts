@@ -14,13 +14,14 @@ function makeQuery(overrides: Partial<ProfessionalQuery> = {}): ProfessionalQuer
     answer: null,
     is_public: false,
     status: QueryStatus.OPEN,
-    is_featured: false,
     domain: ProfessionalDomain.LAWYER,
     professional: null,
     asker_alias: 'אלמנה – ספרדי',
     asker: null,
     created_at: '2026-07-14T10:00:00',
     answered_at: null,
+    like_count: 0,
+    liked_by_me: false,
     ...overrides,
   };
 }
@@ -107,7 +108,6 @@ describe('ProfessionalService', () => {
         content: 'שאלה ציבורית',
         answer: 'תשובה ציבורית',
         domain: ProfessionalDomain.LAWYER,
-        is_featured: false,
         answered_at: '2026-07-14T10:00:00',
         like_count: 2,
         liked_by_me: false,

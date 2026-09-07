@@ -17,13 +17,14 @@ function makeQuestion(overrides: Partial<ProfessionalQuery> = {}): ProfessionalQ
     answer: null,
     is_public: false,
     status: QueryStatus.OPEN,
-    is_featured: false,
     domain: ProfessionalDomain.LAWYER,
     professional: null,
     asker_alias: 'אלמנה – ספרדי',
     asker: null,
     created_at: '2026-07-14T10:00:00',
     answered_at: null,
+    like_count: 0,
+    liked_by_me: false,
     ...overrides,
   };
 }

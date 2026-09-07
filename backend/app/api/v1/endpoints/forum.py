@@ -5,35 +5,39 @@ GET    /forum/posts           – list posts (auto-filtered by group+sector)
 POST   /forum/posts           – create a new post
 GET    /forum/posts/{id}      – single post
 PATCH  /forum/posts/{id}      – edit a post (author only)
+PATCH  /forum/posts/{id}/like – toggle a like (user/admin only)
 DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
 POST   /forum/broadcast       – admin-only post visible to all users
 
 GET    /messages                          – inbox (list of conversations, paginated)
 POST   /messages                          – send a direct message (own cell only)
-GET    /conversations/{key}/messages      – full history of one conversation
+GET    /conversations/{key}/messages      – one page of a conversation, newest first
 GET    /cells/me/members                  – other ACTIVE users in your own cell
+GET    /messages/recipients               – search own-cell members by name (autocomplete)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.constants import UserRole
+from app.core.constants import LikeTargetType, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
     ConversationListResponse,
+    ConversationMessagesPage,
     DirectMessageCreate,
-    DirectMessageResponse,
+    DirectMessageSendResponse,
     ForumPostCreate,
     ForumPostListResponse,
     ForumPostResponse,
     ForumPostUpdate,
 )
+from app.schemas.like import LikeResponse
 from app.schemas.report import ReportCreate, ReportResponse
 from app.schemas.user import UserPublic
-from app.services import forum_service, report_service
+from app.services import forum_service, like_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
 
@@ -81,6 +85,22 @@ def get_post(
     """
     post = forum_service.get_post_by_id(db, post_id, current_user)
     return ForumPostResponse.model_validate(post)
+
+
+@router.patch(
+    "/forum/posts/{post_id}/like",
+    response_model=LikeResponse,
+    dependencies=[Depends(require_role(UserRole.USER, UserRole.ADMIN))],
+)
+def like_post(
+    post_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> LikeResponse:
+    """Toggle a like on a forum post."""
+    return like_service.toggle_like(
+        db, LikeTargetType.FORUM_POST, post_id, current_user
+    )
 
 
 @router.patch("/forum/posts/{post_id}", response_model=ForumPostResponse)
@@ -170,42 +190,64 @@ def get_inbox(
     return forum_service.get_inbox(db, current_user, page, page_size)
 
 
-@router.post("/messages", response_model=DirectMessageResponse, status_code=201)
+@router.post("/messages", response_model=DirectMessageSendResponse, status_code=201)
 def send_message(
     data: DirectMessageCreate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> DirectMessageResponse:
+) -> DirectMessageSendResponse:
     """
     Send a private message to another member of your own cell.
+
+    The response carries the stored message plus `pruned_message_ids` — which
+    of the conversation's oldest messages spec §5.3's 1,000 cap cost this send
+    — and `conversation_limit`, the cap itself. Ids rather than a count
+    because the messages that go are the oldest *prunable* ones: anything
+    under an open report is skipped, so a client trimming the top of its list
+    by count would drop the wrong ones and keep showing a deleted message.
     """
     result = forum_service.send_direct_message(db, data, current_user)
-    return DirectMessageResponse.model_validate(result)
+    return DirectMessageSendResponse.model_validate(result)
 
 
 @router.get(
     "/conversations/{conversation_key}/messages",
-    response_model=list[DirectMessageResponse],
+    response_model=ConversationMessagesPage,
 )
 def get_conversation_messages(
     conversation_key: str,
+    limit: int = Query(
+        forum_service.CONVERSATION_PAGE_SIZE,
+        ge=1,
+        le=forum_service.CONVERSATION_MAX_PAGE_SIZE,
+    ),
+    before: str | None = Query(
+        None,
+        description="A next_cursor from an earlier page; omit for the newest messages.",
+    ),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> list[DirectMessageResponse]:
+) -> ConversationMessagesPage:
     """
-    Return the full history of one conversation, oldest first.
+    Return one page of a conversation, oldest first within the page.
 
-    Marks the messages sent to current_user as read (ABF-119) before
-    fetching — two explicit steps, since get_conversation_messages() itself
-    is a pure read.
+    Omit `before` for the newest page — the one a chat screen opens on — then
+    feed each response's `next_cursor` back as `before` to walk backwards
+    through the history.
 
-    No pagination (out of scope for ABF-118 — see the ticket's "לא נכנס" list).
+    Marking read (ABF-119) happens only on that first request. Opening a
+    conversation is what says "I have seen this"; scrolling back through
+    history is a read of content the user has already been shown, and issuing
+    a write on every scroll page would be both pointless and, on a long
+    scroll, expensive. The two calls stay separate because
+    get_conversation_messages() is a pure read.
     """
-    forum_service.mark_conversation_read(db, current_user, conversation_key)
-    results = forum_service.get_conversation_messages(
-        db, current_user, conversation_key
+    if before is None:
+        forum_service.mark_conversation_read(db, current_user, conversation_key)
+    page = forum_service.get_conversation_messages(
+        db, current_user, conversation_key, limit=limit, before=before
     )
-    return [DirectMessageResponse.model_validate(r) for r in results]
+    return ConversationMessagesPage.model_validate(page)
 
 
 @router.get("/cells/me/members", response_model=list[UserPublic])
@@ -219,3 +261,23 @@ def get_my_cell_members(
     """
     members = forum_service.get_cell_members(db, current_user)
     return [UserPublic.model_validate(member) for member in members]
+
+
+@router.get("/messages/recipients", response_model=list[UserPublic])
+def search_recipients(
+    q: str = Query(..., min_length=2),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> list[UserPublic]:
+    """
+    Search the current user's own cell (group+sector) by name, to start a
+    new conversation. Name + id only (UserPublic) — no email/phone
+    (spec §3.1). A name matching nobody and a name matching someone in a
+    different cell return the identical empty list — see
+    forum_service.search_users_for_dm()'s docstring.
+
+    q must be at least 2 characters (422 otherwise) — defense in depth;
+    the primary "don't fire below 2 chars" gate is the frontend debounce.
+    """
+    results = forum_service.search_users_for_dm(db, current_user, q)
+    return [UserPublic.model_validate(r) for r in results]
