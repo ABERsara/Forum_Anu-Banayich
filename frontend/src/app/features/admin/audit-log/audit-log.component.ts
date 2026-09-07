@@ -21,7 +21,9 @@ import { TranslocoPipe } from '@jsverse/transloco';
     <!-- No direction here: the page inherits it from <html dir>, which
          LocaleService sets from the active language (CONTRIBUTING §6). -->
     <div style="padding: 1rem">
-      <a routerLink="/admin">‹ {{ 'admin.back_to_dashboard' | transloco }}</a>
+      <a routerLink="/admin"
+        ><span aria-hidden="true">‹</span> {{ 'admin.back_to_dashboard' | transloco }}</a
+      >
       <h1>{{ 'admin.audit_log.title' | transloco }}</h1>
       <!-- TODO: the table, the action filter and the pagination are all still
            to be written, and their copy needs keys of its own under

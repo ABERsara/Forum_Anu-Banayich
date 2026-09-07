@@ -1,7 +1,9 @@
 <!-- No dir here: text direction follows <html dir>, which LocaleService sets
      from the active language (CONTRIBUTING §6). -->
 <div class="ask-question-page">
-  <a routerLink="/advice">‹ {{ 'advice.back_to_professionals' | transloco }}</a>
+  <a routerLink="/advice"
+    ><span aria-hidden="true">‹</span> {{ 'advice.back_to_professionals' | transloco }}</a
+  >
 
   <div class="ask-question-card">
     <h1 class="ask-question-title">{{ 'advice.ask.title' | transloco }}</h1>

@@ -1,7 +1,9 @@
 <!-- No dir here: text direction follows <html dir>, which LocaleService sets
      from the active language (CONTRIBUTING §6). -->
 <div class="broadcast-page">
-  <a routerLink="/admin">‹ {{ 'admin.back_to_dashboard' | transloco }}</a>
+  <a routerLink="/admin"
+    ><span aria-hidden="true">‹</span> {{ 'admin.back_to_dashboard' | transloco }}</a
+  >
 
   <div class="broadcast-card">
     <h1 class="broadcast-title">{{ 'admin.broadcast.title' | transloco }}</h1>

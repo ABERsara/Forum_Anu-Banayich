@@ -16,6 +16,9 @@
  *   3. a screen pinning its own direction          — ABF-136 removed the one there was
  *   4. a sideways glyph that does not mirror       — fourteen back links, still open
  *
+ * Check 4 reads the stylesheets as well as the templates and both translation
+ * files: `content: '←'` names a side the same way markup does.
+ *
  * The first three are regression guards over ground already won. The fourth is
  * what was still broken, and what this spec was written for.
  *
@@ -119,6 +122,15 @@ const PHYSICAL_VALUE: Record<string, RegExp> = {
  */
 const PINS_DIRECTION = /^direction$/;
 
+/**
+ * The same pin spelled as an attribute: either quote, and through a binding —
+ * `dir="rtl"`, `dir='rtl'`, and the `[attr.dir]="'rtl'"` form. What is looked
+ * for is a screen naming `rtl` for itself; `dir="auto"` and the `dir="ltr"`
+ * the two email fields carry name something else and do not match.
+ */
+const PINS_RTL_ATTRIBUTE =
+  /\b(?:\[attr\.dir\]|dir)\s*=\s*(["'])(?:(?!\1).)*?\brtl\b(?:(?!\1).)*?\1/g;
+
 // ---------------------------------------------------------------------------
 // Reading declarations out of text
 // ---------------------------------------------------------------------------
@@ -132,15 +144,19 @@ interface Declaration {
 /**
  * Comments out of the way, so that a property named in prose is not read as
  * code — four stylesheets here say "no margin-left/right" in so many words.
- * The `[^:]` guard is what keeps `https://` from opening a line comment.
+ *
+ * One pass over both forms rather than a pass each, so that whichever opens
+ * first is the one that wins. Taking the block form out first would let a `/*`
+ * that is itself inside a line comment pair with the next block close further
+ * down, and blank the real code lying between the two. The `[^:]` guard is
+ * what keeps `https://` from opening a line comment.
  */
 function withoutComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, blanked)
-    .replace(
-      /(^|[^:])(\/\/[^\n]*)/g,
-      (_, before: string, comment: string) => before + blanked(comment),
-    );
+  return source.replace(
+    /\/\*[\s\S]*?\*\/|(^|[^:])(\/\/[^\n]*)/g,
+    (match: string, before: string | undefined, comment: string | undefined) =>
+      comment === undefined ? blanked(match) : (before ?? '') + blanked(comment),
+  );
 }
 
 const lineOf = (source: string, index = 0) => source.slice(0, index).split('\n').length;
@@ -172,9 +188,37 @@ function inlineStylesIn(source: string): { css: string; line: number }[] {
   }));
 }
 
-const isPhysical = ({ property, value }: Declaration): boolean =>
-  PHYSICAL_PROPERTY.some((pattern) => pattern.test(property)) ||
-  PHYSICAL_VALUE[property]?.test(value) === true;
+/**
+ * `right !important` → `right`. The flag decides which rule wins, not which
+ * side it names, so it comes off the value before the value is judged.
+ */
+const withoutImportant = (value: string) => value.replace(/\s*!\s*important\s*$/i, '');
+
+/**
+ * A shorthand names a side only in its four-value form, and only when the two
+ * horizontal values differ: `margin: 0 auto` is the same on both sides and
+ * turns with the page, `margin: 0 0 0 8px` is a left margin spelled long.
+ */
+const BOX_SHORTHAND = /^(margin|padding|inset|scroll-(margin|padding)|border-(width|style|color))$/;
+
+/**
+ * `border-radius`'s four values are corners — top-left, top-right,
+ * bottom-right, bottom-left — and turning the page swaps them in pairs.
+ */
+const CORNER_SHORTHAND = /^border-radius$/;
+
+function namesASideInShorthand({ property, value }: Declaration): boolean {
+  const parts = withoutImportant(value).trim().split(/\s+/);
+  if (parts.length !== 4) return false;
+  if (BOX_SHORTHAND.test(property)) return parts[1] !== parts[3];
+  if (CORNER_SHORTHAND.test(property)) return parts[0] !== parts[1] || parts[2] !== parts[3];
+  return false;
+}
+
+const isPhysical = (declaration: Declaration): boolean =>
+  PHYSICAL_PROPERTY.some((pattern) => pattern.test(declaration.property)) ||
+  PHYSICAL_VALUE[declaration.property]?.test(withoutImportant(declaration.value)) === true ||
+  namesASideInShorthand(declaration);
 
 // ---------------------------------------------------------------------------
 // What counts as a frozen glyph
@@ -192,11 +236,22 @@ const isPhysical = ({ property, value }: Declaration): boolean =>
  */
 const SIDEWAYS = /[←→↔↩↪⇐⇒⇔◀▶◄►◂▸⬅➡‹›«»❮❯]/gu;
 
-/** The same arrows spelled as an entity: `&larr;` renders `←` just as well. */
+/** The same arrows spelled by name: `&larr;` renders `←` just as well. */
 const ARROW_ENTITY = /&[lrh]arr;|&[lrh]Arr;/g;
 
+/**
+ * And spelled by number: `&#8592;` and `&#x2190;` are that arrow again.
+ * Decoding them puts every spelling in front of the one Bidi_Mirrored verdict
+ * below, rather than asking a second list to name them all.
+ */
+const decodedEntities = (source: string) =>
+  source.replace(/&#(\d+|x[\da-f]+);/gi, (entity: string, code: string) => {
+    const point = code[0].toLowerCase() === 'x' ? parseInt(code.slice(1), 16) : Number(code);
+    return point >= 0 && point <= 0x10ffff ? String.fromCodePoint(point) : entity;
+  });
+
 function frozenGlyphsIn(source: string): string[] {
-  const glyphs = [...new Set(source.match(SIDEWAYS) ?? [])].filter(
+  const glyphs = [...new Set(decodedEntities(source).match(SIDEWAYS) ?? [])].filter(
     (glyph) => !/\p{Bidi_Mirrored}/u.test(glyph),
   );
 
@@ -220,15 +275,22 @@ describe('direction', () => {
    * bundler, which hands back an empty string for `.scss`, and check 1 sailed
    * over a stylesheet with `margin-left: 1px` in it. Counting the files did not
    * catch that — they were all found, and all empty — so what is counted here
-   * is the files that came back with something in them.
+   * is the files that came back with something in them, and for a component
+   * that is the template extracted out of it rather than the file it sits in.
    */
   it('has the stylesheets and the templates in front of it', () => {
     const withContent = (files: [string, string][]) =>
       files.filter(([, source]) => source.trim() !== '').length;
 
+    // After `markupOf`, not before it. A `.component.ts` always reads back with
+    // something in it, so counting the source would report all thirty-six
+    // whether or not the extraction still finds a template inside any of them.
+    // Seven carry one today.
+    const inlineMarkup = TEMPLATES.filter(([path]) => path.endsWith('.ts'));
+
     expect(withContent(STYLESHEETS), 'stylesheets read').toBeGreaterThan(30);
     expect(withContent(TEMPLATE_FILES), 'templates read').toBeGreaterThan(20);
-    expect(withContent(INLINE_TEMPLATE_FILES), 'components read').toBeGreaterThan(20);
+    expect(withContent(inlineMarkup), 'inline templates extracted').toBeGreaterThan(5);
   });
 
   it('names no physical side in a stylesheet', () => {
@@ -275,8 +337,8 @@ describe('direction', () => {
           declarationsIn(css).some(({ property }) => PINS_DIRECTION.test(property)),
         )
         .map(({ line }) => `${path} — line ${line}: style="direction: …"`),
-      ...[...markup.matchAll(/\bdir="rtl"/g)].map(
-        (match) => `${path} — line ${lineOf(markup, match.index)}: dir="rtl"`,
+      ...[...markup.matchAll(PINS_RTL_ATTRIBUTE)].map(
+        (match) => `${path} — line ${lineOf(markup, match.index)}: ${match[0]}`,
       ),
     ]);
 
@@ -288,6 +350,12 @@ describe('direction', () => {
    * which way "back" is, and `←` says "left" in a language that runs right.
    */
   it('points sideways only with glyphs that Unicode mirrors', () => {
+    // `content: '←'` on a pseudo-element points as hard as one in markup does.
+    // Comments go first: a note recording which arrow was replaced is prose.
+    const inStylesheets = STYLESHEETS.flatMap(([path, source]) =>
+      frozenGlyphsIn(withoutComments(source)).map((glyph) => `${path}: ${glyph}`),
+    );
+
     const inTemplates = TEMPLATES.flatMap(([path, markup]) =>
       frozenGlyphsIn(markup).map((glyph) => `${path}: ${glyph}`),
     );
@@ -299,7 +367,7 @@ describe('direction', () => {
     );
 
     expect(
-      [...inTemplates, ...inTranslations].sort(),
+      [...inStylesheets, ...inTemplates, ...inTranslations].sort(),
       'use ‹ (U+2039), which carries Bidi_Mirrored and turns with the page',
     ).toEqual([]);
   });

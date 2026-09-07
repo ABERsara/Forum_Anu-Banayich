@@ -1,7 +1,9 @@
 <!-- No dir here: text direction follows <html dir>, which LocaleService sets
      from the active language (CONTRIBUTING §6). -->
 <div class="my-questions-page">
-  <a routerLink="/advice">‹ {{ 'advice.back_to_professionals' | transloco }}</a>
+  <a routerLink="/advice"
+    ><span aria-hidden="true">‹</span> {{ 'advice.back_to_professionals' | transloco }}</a
+  >
   <h1>{{ 'advice.my_questions.title' | transloco }}</h1>
 
   <!-- The API's own `detail` is a finished sentence and is shown as it came;
