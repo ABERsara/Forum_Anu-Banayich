@@ -31,9 +31,9 @@ depends_on: str | Sequence[str] | None = None
 # was created, and they are no longer members of AuditAction.
 #
 # Each statement is written out literally (not built from a loop) because
-# test_migration_enum_consistency statically greps this file's source text
-# for `ALTER TYPE ... ADD VALUE '...'` — a templated value wouldn't be visible
-# to it.
+# test_migration_enum_consistency reads this file via ast.parse() and looks
+# for `ALTER TYPE ... ADD VALUE '...'` in the resolved string constant — a
+# templated value wouldn't be visible to it.
 
 
 def upgrade() -> None:
