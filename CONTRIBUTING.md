@@ -398,6 +398,53 @@ data: { roles: ['admin'] },
 - לא לוגים תוכן הודעות, ת"ז, מייל, טלפון, שמות — ב-backend וב-frontend כאחד.
 - `audit_service.log_action()` רושם **פעולה + entity_id** בלבד.
 
+### סוכן AI — מה נרשם, מי מייצר את התשובה, ומי בכלל מגיע לסוכן (ABF-122)
+
+**חמש מוסכמות שנכנסו עם `agent_service` / `llm_service`, וכל סוכן נוסף (SPEC §12)
+ממשיך אותן:**
+
+**1. ה-Audit רושם ששיחה קרתה, לא מה נאמר.** שורת `AGENT_CONVERSATION` נושאת
+`entity_type="AgentConversation"`, את ה-`conversation_id`, ובתוך `details` רק
+מטא-דאטה: איזה `domain_id`, כמה קטעים נשלפו, האם התשובה נשענה על בסיס הידע,
+ואיזה ספק ענה. **אף מילה מהשאלה או מהתשובה.** תוכן ההודעות חי בשורות
+`agent_messages` בלבד — עותק שני בלוג הוא בדיוק מה ש-SPEC §9.3 אוסר.
+
+**2. סירוב נרשם, הצלחה לא.** קריאה חסומה לשיחה של מישהו אחר כותבת
+`AGENT_CONVERSATION_ACCESS_DENIED` עם `reason` (`read_blocked` / `write_blocked`);
+קריאה מוצלחת של הבעלים לא כותבת כלום. אותה אסימטריה בדיוק שיש ב-`forum_service`
+להודעות פרטיות — האירוע ששווה לחפש אחר כך הוא הסירוב.
+
+**3. תוכן הודעה מוצפן at rest.** `agent_messages.content` עובר
+`encrypt_message()` בכתיבה ו-`decrypt_message()` בקריאה, עם `key_version`,
+בדיוק כמו `DirectMessage.content`. **אין `from_attributes` על `content`** —
+סכימת התשובה נבנית מפורשות ב-`agent_service._to_message()`, אחרת מה שנשלח
+ללקוח הוא base64 של ה-ciphertext. הסיבה: שאלה לסוכן בפלטפורמת שכול נושאת דרך
+קבע חשיפה אישית (מצב כלכלי, משמורת, בריאות, מי נפטר).
+
+**4. `{domain_id}` הוא ניחוש עד שנפתר.** מאז ABF-120 סוכן הוא שורת טבלה מגודרת
+`group/sector`, אז **כל endpoint שמקבל `{domain_id}` קורא ל-
+`agent_service.get_visible_domain()` בשורה הראשונה.** ארבע דרכים להיכשל —
+מזהה שלא קיים, סוכן של קבוצה אחרת, של מגזר אחר, או מושבת — מחזירות **404 זהה**;
+הבחנה ביניהן היא בעצמה מידע על קהילה אחרת. **403 שמור לציר ההרשאה, לא לציר
+הקיום:** שיחה שקיימת אצל סוכן שהקורא כן רשאי להשתמש בו, ופשוט שייכת למישהו
+אחר. זו החלוקה של `forum_service.get_post_by_id`.
+
+**5. החלפת ספק LLM היא הגדרה, לא קוד.** אף קורא לא מזכיר מחלקת ספק: קוראים
+`llm_service.get_provider()`, שמחפש את `settings.LLM_PROVIDER` ב-registry. ספק
+חדש = מחלקה עם `generate()` + שורת `register_provider()` אחת בתחתית
+`llm_service.py`. **לא מוסיפים `if provider == ...` בשירות או ב-endpoint** —
+הרגע שזה קורה, הקריטריון נשבר. ספק חדש חייב גם לשמור על הפרדת הערוצים: כללים
+וחומר שנשלף ב-system channel, הודעת המשתמש/ת וההיסטוריה ב-user channel. ה-
+`Protocol` לא יכול לאכוף את זה — `TestGeminiPayload` כן, וספק חדש מעתיק אותו.
+
+וכלל שנגזר מהם: **`llm_service.py` לא מייבא FastAPI.** הוא מעלה `LLMError` על
+נגזרותיה, ו-`agent_service` הוא זה שמתרגם ל-503. מה שהסוכן מותר לומר
+(`build_system_prompt`, `ANSWER_DISCLAIMER`, `NO_CONTEXT_ANSWER`) נבדק כטקסט
+ב-`tests/test_llm_service.py` — פרומפט הוא קוד, לא קופי. שימו לב לחריג ה-i18n
+היחיד כאן: הודעות שגיאה של ה-API הן מפתחות תרגום (`errors.agent_*`), אבל
+ה-disclaimer ותשובת "אין לי מידע" נשארות עברית — הן **חלק מהתשובה השמורה**
+בשורת `agent_messages`, לא chrome שהלקוח מרנדר סביבה.
+
 ### Secrets
 
 - הכל דרך `.env` + `core/config.py`. `.env` לא נכנס ל-git.
@@ -956,8 +1003,20 @@ npm test -- --run          # לפני כל PR
 | `SECRET_KEY` | JWT signing key |
 | `SENDGRID_API_KEY` | שליחת מיילים |
 | `API_URL` | כתובת backend (frontend) |
+| `GEMINI_API_KEY` | מפתח לספק ה-LLM של הסוכן — בלעדיו שאלה שיש עליה חומר מקבלת 503 |
+| `LLM_PROVIDER` | איזה ספק מייצר את תשובות הסוכן (ברירת מחדל `gemini`) |
+| `GEMINI_MODEL` | דגם Gemini לייצור טקסט — החלפה בלי deploy כשדגם יוצא משימוש |
+| `LLM_TIMEOUT_SECONDS` | תקרה לקריאה אחת לספק (ברירת מחדל 20) |
+| `AGENT_RATE_LIMIT_PER_DAY` | הודעות למשתמש/ת ל-24 שעות מתגלגלות, על כל הסוכנים יחד |
+| `AGENT_MAX_MESSAGE_LENGTH` | אורך שאלה מרבי בתווים (מעליו 422) |
+| `AGENT_HISTORY_TURNS` | כמה תורות שיחה אחרונים נכנסים לפרומפט |
 
 כל secret חדש → `.env.example` מתעדכן + נוסף ל-GitHub Secrets.
+
+> **NetFree:** `LLM_PROVIDER=gemini` פונה ל-`generativelanguage.googleapis.com`
+> **מהשרת**, לא מהדפדפן — הסינון של המשתמש/ת לא נוגע בה, ואין כאן דומיין חדש
+> לאישור לפי SPEC §9.6. אם אי פעם תיווסף קריאה לספק מה-frontend, היא **כן**
+> טעונה אישור.
 
 #### פריסה ל-Render — שני משתנים, לא אחד
 
