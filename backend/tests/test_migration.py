@@ -12,7 +12,10 @@ import app.core.config as _cfg
 # Imported for its side effect: app.models.__init__ imports every model module,
 # and that is what attaches the tables to Base.metadata. Without it the metadata
 # is empty and test_migration_creates_all_tables has nothing to compare against.
-# migrations/env.py leans on the same import for autogenerate.
+# migrations/env.py does not come through this package — it names the model
+# modules one by one — so adding a model to app/models/__init__.py puts it in
+# front of this test but not in front of autogenerate. That import list has to
+# be extended too.
 import app.models  # noqa: F401
 from app.db.base import Base
 
@@ -125,10 +128,11 @@ def test_read_at_migration_goes_down_and_up_again_cleanly(monkeypatch) -> None:
         assert "is_read" not in _direct_message_columns(db_url)
         assert _unread_index_columns(db_url) == ["recipient_id", "read_at"]
 
-        # Not "-1": ABF-122's agent tables branched off the same parent, so the
-        # single head is now a merge revision and one step back off it is an
-        # ambiguous walk. Naming the revision read_at sits on says what this
-        # actually undoes, and stays right however many branches join above it.
+        # Naming the revision rather than "-1": this says which schema state the
+        # downgrade is meant to land on, and it keeps saying it however the
+        # graph grows. "-1" is read relative to whatever head is at the time —
+        # it walks somewhere else entirely once another migration lands on top,
+        # and stops being a single step at all once a branch joins above here.
         command.downgrade(alembic_cfg, REVISION_BEFORE_READ_AT)
         assert "is_read" in _direct_message_columns(db_url)
         assert "read_at" not in _direct_message_columns(db_url)
