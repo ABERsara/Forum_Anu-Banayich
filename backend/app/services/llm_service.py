@@ -217,6 +217,12 @@ def build_system_prompt(domain: AgentDomain) -> str:
     channel. That is deliberate and safe in a way user text is not: only an
     admin can create a domain, and a domain whose name tried to redefine the
     rules would be visible in the catalog to everyone it is shown to.
+
+    Taking an ORM row here is not the inconsistency with ContextChunk it looks
+    like. This function is called by agent_service, which owns the session; a
+    ContextChunk is handed onward *to a provider*, which must never hold a DB
+    object. The row stops here — only ``.name`` is read, and nothing below
+    this line touches the session.
     """
     return SYSTEM_PROMPT_TEMPLATE.format(
         context_heading=CONTEXT_HEADING,

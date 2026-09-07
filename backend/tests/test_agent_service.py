@@ -22,6 +22,8 @@ shape:
 The DB is real (in-memory), per CONTRIBUTING §9.
 """
 
+import base64
+import os
 from datetime import timedelta
 
 import pytest
@@ -801,3 +803,41 @@ class TestRetrieveFor:
             agent_service._retrieve_for(db_session, other_domain, HOUSING_QUESTION, [])
             == []
         )
+
+
+# ---------------------------------------------------------------------------
+# _plaintext()
+# ---------------------------------------------------------------------------
+
+
+class TestDecryption:
+    def test_a_row_that_fails_authentication_is_a_generic_500(
+        self, db_session: Session, conversation: AgentConversation
+    ) -> None:
+        """AES-GCM authenticates as well as encrypts, so a tampered or
+        corrupted row is caught rather than decoded into garbage. What the
+        caller learns is only that the server failed — not that it failed
+        *decrypting*, which would tell an attacker their edit landed.
+
+        Base64 that decodes cleanly but authenticates as nothing: this is the
+        InvalidTag path, not a malformed-input path.
+        """
+        message = _say(db_session, conversation, AgentMessageRole.AGENT, "answer")
+        message.content = base64.b64encode(os.urandom(48)).decode("ascii")
+        db_session.commit()
+
+        with pytest.raises(HTTPException) as exc:
+            agent_service._plaintext(message)
+
+        assert exc.value.status_code == 500
+        assert exc.value.detail == "errors.internal_server_error"
+        assert "decrypt" not in str(exc.value.detail).lower()
+
+    def test_a_readable_row_round_trips(
+        self, db_session: Session, conversation: AgentConversation
+    ) -> None:
+        message = _say(
+            db_session, conversation, AgentMessageRole.USER, HOUSING_QUESTION
+        )
+
+        assert agent_service._plaintext(message) == HOUSING_QUESTION

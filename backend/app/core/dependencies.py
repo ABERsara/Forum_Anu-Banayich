@@ -114,7 +114,7 @@ def rate_limit_chat(
     leave the limit off. It runs before the endpoint body does, which is what
     keeps an over-quota request from reaching retrieval or the provider.
 
-    The window is rolling - see agent_service.messages_left_today().
+    The window is rolling — see agent_service.messages_left_today().
 
     The detail is a translation key, like forum_service's: the client resolves
     it through Transloco and can put the configured number in the sentence

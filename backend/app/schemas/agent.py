@@ -46,7 +46,14 @@ class AgentChatRequest(BaseModel):
 
     # Omitted on the first question of a thread; supplied on every follow-up,
     # which is what lets the agent see what was already asked.
-    conversation_id: str | None = None
+    #
+    # Bounded at the width of the column it is matched against
+    # (agent_conversations.id, String(36)): the value is only ever a uuid the
+    # server itself issued, and without a ceiling the one unbounded string in
+    # this request would be an id nobody can hold. Over-long is a 422 rather
+    # than the 404 an unknown id gets, which is the honest answer — a
+    # 40,000-character id is a malformed field, not a thread that was deleted.
+    conversation_id: str | None = Field(default=None, max_length=36)
 
     @field_validator("message", mode="before")
     @classmethod

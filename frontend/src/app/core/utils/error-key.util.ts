@@ -9,6 +9,16 @@ const KNOWN_ERROR_KEYS = [
   'errors.dm_forbidden',
   'errors.invalid_cursor',
   'errors.internal_server_error',
+  // AI agent (ABF-122). Registered by the ticket that made the API send these,
+  // not by the screen that will show them (ABF-123): a key missing from this
+  // list fails nowhere — it silently becomes `errors.generic`, so "this agent
+  // is not available" and "you have reached today's limit" would both read
+  // "something went wrong", with no failing test to say why.
+  'errors.agent_domain_not_found',
+  'errors.agent_conversation_not_found',
+  'errors.agent_conversation_forbidden',
+  'errors.agent_rate_limited',
+  'errors.agent_unavailable',
 ];
 
 /**

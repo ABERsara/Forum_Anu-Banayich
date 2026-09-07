@@ -267,6 +267,10 @@ def chat(
     answered_at = _utc_now()
 
     if conversation is None:
+        # Both timestamps are given here rather than left to their
+        # `server_default` and then overwritten: assigning an attribute marks
+        # it dirty whatever its current value, so setting last_message_at
+        # after the INSERT would cost every new thread a pointless UPDATE.
         conversation = AgentConversation(
             user_id=user.id,
             domain_id=domain.id,
@@ -275,17 +279,17 @@ def chat(
         )
         db.add(conversation)
         db.flush()  # assigns conversation.id, needed by both messages below
+    else:
+        # Adding children does not touch the parent row, and ABF-120's column
+        # has no `onupdate` — nothing else would move this. It is what orders
+        # a member's threads by last activity in ABF-123.
+        conversation.last_message_at = answered_at
 
     question_row = _new_message(
         conversation, AgentMessageRole.USER, data.message, asked_at
     )
     answer_row = _new_message(conversation, AgentMessageRole.AGENT, answer, answered_at)
     db.add_all([question_row, answer_row])
-
-    # Adding children does not touch the parent row, and ABF-120's column has
-    # no `onupdate` — this timestamp is what orders a member's threads by last
-    # activity in ABF-123, so it is advanced here explicitly.
-    conversation.last_message_at = answered_at
     db.flush()  # assigns both message ids
 
     # Built before log_action() commits. Afterwards these rows are expired, so
@@ -355,6 +359,14 @@ def get_conversation(
     endpoint that takes {domain_id}"), and it is why ABF-123 should reach
     threads through the domains GET /agents returns rather than from a
     standalone history screen.
+
+    Returned whole, without the cursor paging forum_service gives a direct-
+    message conversation. A DM thread is two people talking for years and is
+    capped at MAX_MESSAGES_PER_CONVERSATION; an agent thread is one sitting,
+    bounded by AGENT_RATE_LIMIT_PER_DAY, and ABF-123 renders it in one go —
+    paging it now would be an API a screen has not asked for. The cost being
+    watched is decryption per request, so if ABF-123 does keep a single thread
+    alive across sessions, this is where a cursor goes.
     """
     domain = get_visible_domain(db, user, domain_id)
     conversation = _get_conversation_in_domain(db, domain, conversation_id)
@@ -413,14 +425,16 @@ def _new_message(
     )
 
 
-def _to_message(message: AgentMessage) -> AgentMessageResponse:
-    """Decrypt one stored row for the API.
+def _plaintext(message: AgentMessage) -> str:
+    """What one stored row actually says.
 
-    Returns a new schema object rather than writing the plaintext back onto
-    the ORM instance: that instance is session-tracked, and a decrypted value
-    assigned to `content` could be flushed back to the DB by some later,
-    unrelated commit — silently replacing the ciphertext. The same reasoning
-    as forum_service._to_response_dict().
+    The single place ciphertext becomes text — used both by the API mapping
+    below and by _recent_turns(), which needs the words and not a response
+    object. The plaintext is never written back onto the ORM instance: that
+    instance is session-tracked, and a decrypted value assigned to `content`
+    could be flushed back to the DB by some later, unrelated commit, silently
+    replacing the ciphertext. The same reasoning as
+    forum_service._to_response_dict().
 
     AES-GCM's InvalidTag means the row failed authentication (DB corruption,
     or content encrypted under a different key). It surfaces as a generic 500,
@@ -428,7 +442,7 @@ def _to_message(message: AgentMessage) -> AgentMessageResponse:
     decryption failure reaches the client.
     """
     try:
-        content = decrypt_message(message.content, message.key_version)
+        return decrypt_message(message.content, message.key_version)
     except InvalidTag as exc:
         logger.error("Failed to decrypt agent message %s", message.id)
         raise HTTPException(
@@ -436,10 +450,13 @@ def _to_message(message: AgentMessage) -> AgentMessageResponse:
             detail=_DECRYPTION_FAILED,
         ) from exc
 
+
+def _to_message(message: AgentMessage) -> AgentMessageResponse:
+    """One stored row as the API returns it, decrypted."""
     return AgentMessageResponse(
         id=message.id,
         role=message.role,
-        content=content,
+        content=_plaintext(message),
         created_at=message.created_at,
     )
 
@@ -540,7 +557,7 @@ def _recent_turns(
     return [
         llm_service.HistoryTurn(
             role=message.role,
-            content=_without_disclaimer(_to_message(message).content),
+            content=_without_disclaimer(_plaintext(message)),
         )
         for message in reversed(recent)
     ]

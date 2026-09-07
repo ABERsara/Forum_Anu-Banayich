@@ -924,6 +924,20 @@ class TestLimits:
 
         assert (await _ask(client, domain, question)).status_code == 201
 
+    async def test_an_over_long_conversation_id_is_rejected_by_the_schema(
+        self, client, db_session, domain, knowledge_base, llm, user
+    ):
+        """The one unbounded string in the request otherwise. Bounded at the
+        width of agent_conversations.id, and a 422 rather than the 404 an
+        unknown id gets — a 40,000-character id is a malformed field, not a
+        thread that was deleted."""
+        _login_as(user)
+
+        response = await _ask(client, domain, HOUSING_QUESTION, "x" * 37)
+
+        assert response.status_code == 422
+        assert db_session.query(AgentMessage).count() == 0
+
     async def test_a_blank_message_is_rejected(
         self, client, domain, knowledge_base, llm, user
     ):
