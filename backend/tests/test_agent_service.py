@@ -268,11 +268,13 @@ class TestVisibilityEnumMapping:
     def test_every_user_type_maps_to_a_group_visibility(
         self, user_type: UserType
     ) -> None:
-        assert GroupVisibility(user_type.value)
+        # constructing must not raise, and the string value must survive the
+        # round-trip (the two enums share their .value strings).
+        assert GroupVisibility(user_type.value).value == user_type.value
 
     @pytest.mark.parametrize("sector", list(Sector))
     def test_every_sector_maps_to_a_sector_visibility(self, sector: Sector) -> None:
-        assert SectorVisibility(sector.value)
+        assert SectorVisibility(sector.value).value == sector.value
 
 
 class TestFullGroupMatrix:
@@ -296,7 +298,7 @@ class TestFullGroupMatrix:
         assert [d.name for d in result] == ["mine"]
 
     @pytest.mark.parametrize("sector", list(Sector))
-    def test_all_all_domain_is_visible_to_every_sector(
+    def test_sector_specific_domain_is_visible_only_to_its_own_sector(
         self, db_session: Session, sector: Sector
     ) -> None:
         user = _make_user(
@@ -305,17 +307,20 @@ class TestFullGroupMatrix:
             user_type=UserType.WIDOWER,
             sector=sector,
         )
-        _make_domain(db_session, "broadcast", GroupVisibility.ALL, SectorVisibility.ALL)
+        own = SectorVisibility(sector.value)
+        other = next(
+            s for s in SectorVisibility if s not in (own, SectorVisibility.ALL)
+        )
+        _make_domain(db_session, "mine", GroupVisibility.ALL, own)
+        _make_domain(db_session, "not-mine", GroupVisibility.ALL, other)
 
         result = agent_service.get_visible_domains(db_session, user)
 
-        assert [d.name for d in result] == ["broadcast"]
+        assert [d.name for d in result] == ["mine"]
 
 
 class TestPrecondition:
-    def test_raises_when_user_has_no_group_or_sector(
-        self, db_session: Session
-    ) -> None:
+    def test_raises_when_user_has_no_group_or_sector(self, db_session: Session) -> None:
         # get_visible_domains relies on the endpoint's require_role(USER) gate;
         # being called with a role that has no user_type/sector is a bug.
         admin = _make_user(
