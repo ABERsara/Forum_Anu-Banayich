@@ -58,9 +58,10 @@ def test_migration_creates_all_tables(monkeypatch) -> None:
     off Base.metadata rather than a list maintained by hand here. The hand-kept
     list is precisely what went stale: ABF-139's `likes` was never added to it,
     so deleting that migration would still have passed, and ABF-120's three
-    agent tables only landed in it because whoever wrote fff7271 remembered to
-    edit two files. Reading the expectation off the metadata instead covers
-    every future migration for free, with nothing to keep in step here.
+    agent tables (reverted since, in #118) only landed in it because whoever
+    wrote fff7271 remembered to edit two files. Reading the expectation off the
+    metadata instead covers every future migration for free, with nothing to
+    keep in step here.
 
     Equality rather than a superset, so the drift is caught in both
     directions — a model whose migration was never written, and a table a
