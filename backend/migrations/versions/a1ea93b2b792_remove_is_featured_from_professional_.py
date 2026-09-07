@@ -1,7 +1,7 @@
 """remove is_featured from professional_queries
 
 Revision ID: a1ea93b2b792
-Revises: d3f0a6b71c58
+Revises: c73690be0286
 Create Date: 2026-09-06 00:00:00.000000
 
 """
@@ -13,7 +13,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a1ea93b2b792"
-down_revision: str | Sequence[str] | None = "d3f0a6b71c58"
+down_revision: str | Sequence[str] | None = "c73690be0286"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

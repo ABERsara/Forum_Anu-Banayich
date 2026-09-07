@@ -453,7 +453,12 @@
     "dm_forbidden": "You don't have permission to send or view this message.",
     "invalid_cursor": "The request for older messages was not valid. Please refresh the page.",
     "internal_server_error": "Internal server error. Please try again later.",
-    "generic": "Something went wrong. Please try again."
+    "generic": "Something went wrong. Please try again.",
+    "agent_domain_not_found": "This agent is not available.",
+    "agent_conversation_not_found": "The conversation was not found.",
+    "agent_conversation_forbidden": "You don't have permission to view this conversation.",
+    "agent_rate_limited": "You have reached the daily message limit for the agent. Please try again later, or reach a human professional through the advice module.",
+    "agent_unavailable": "The agent is unavailable right now. Please try again in a few moments."
   },
   "messages": {
     "inbox": {

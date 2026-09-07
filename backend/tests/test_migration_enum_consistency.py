@@ -47,16 +47,22 @@ _ALTER_ADD_VALUE = re.compile(
 
 
 def _find_enum_calls(path: Path) -> list[tuple[str, list[str]]]:
-    """Return (enum_name, member_names) for every sa.Enum(...) call in a migration file."""
+    """Return (enum_name, member_names) for every Enum(...) call in a migration file.
+
+    Matches both ``sa.Enum`` and ``postgresql.ENUM`` — the latter is used when a
+    migration reuses an enum type another migration already created
+    (create_type=False), which generic sa.Enum silently ignores.
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"))
     results = []
+    _enum_names = {"Enum", "ENUM"}
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
-        is_enum_call = (isinstance(func, ast.Attribute) and func.attr == "Enum") or (
-            isinstance(func, ast.Name) and func.id == "Enum"
-        )
+        is_enum_call = (
+            isinstance(func, ast.Attribute) and func.attr in _enum_names
+        ) or (isinstance(func, ast.Name) and func.id in _enum_names)
         if not is_enum_call:
             continue
         member_names = [

@@ -145,6 +145,13 @@ class DocumentType(enum.StrEnum):
     PASSPORT = "passport"  # דרכון
 
 
+class AgentMessageRole(enum.StrEnum):
+    """Who authored a message in an agent conversation."""
+
+    USER = "user"  # המשתמש ששוחח עם הסוכן
+    AGENT = "agent"  # תשובת סוכן ה-AI
+
+
 class AuditAction(enum.StrEnum):
     """Sensitive admin/moderator actions that must be logged."""
 
@@ -167,6 +174,7 @@ class AuditAction(enum.StrEnum):
     DIRECT_MESSAGE_ACCESS_DENIED = "direct_message_access_denied"
     DIRECT_MESSAGE_PRUNED = "direct_message_pruned"
     AGENT_CONVERSATION = "agent_conversation"
+    AGENT_CONVERSATION_ACCESS_DENIED = "agent_conversation_access_denied"
 
 
 # ---------------------------------------------------------------------------
