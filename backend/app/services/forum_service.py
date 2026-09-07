@@ -85,6 +85,11 @@ class DirectMessageData(TypedDict):
     content: str
     read_at: datetime | None
     created_at: datetime
+    #: Whether the *viewer* has already reported this message (ABF-112).
+    #: Per-viewer rather than a count on the row: a reader is told what she
+    #: herself did, and how many other people reported the same message is a
+    #: moderator's business, not hers.
+    reported_by_me: bool
 
 
 class ConversationPageData(TypedDict):
@@ -519,7 +524,9 @@ def _parse_conversation_key(conversation_key: str) -> tuple[str, str] | None:
     return parts[0], parts[1]
 
 
-def _to_response_dict(message: DirectMessage) -> DirectMessageData:
+def _to_response_dict(
+    message: DirectMessage, *, reported_by_me: bool = False
+) -> DirectMessageData:
     """
     Decrypt one row's content for the API response layer.
 
@@ -548,6 +555,10 @@ def _to_response_dict(message: DirectMessage) -> DirectMessageData:
         "content": content,
         "read_at": message.read_at,
         "created_at": message.created_at,
+        # Defaults to False, which is right for every caller that is looking
+        # at a message the viewer just sent: reporting is only ever open on a
+        # message she received (see get_received_message).
+        "reported_by_me": reported_by_me,
     }
 
 
@@ -863,14 +874,96 @@ def get_conversation_messages(
     has_more = len(rows) > limit
     page = list(reversed(rows[:limit]))
 
+    reported = _messages_reported_by(db, current_user, [message.id for message in page])
+
     return {
-        "items": [_to_response_dict(message) for message in page],
+        "items": [
+            _to_response_dict(message, reported_by_me=message.id in reported)
+            for message in page
+        ],
         "has_more": has_more,
         # The cursor is the page's OLDEST row — the next request asks for what
         # comes before it. Null when nothing older exists, so a client that
         # only looks at the cursor cannot loop forever.
         "next_cursor": _encode_cursor(page[0]) if has_more and page else None,
     }
+
+
+def _messages_reported_by(
+    db: Session, current_user: User, message_ids: list[str]
+) -> set[str]:
+    """
+    Which of `message_ids` this user has already reported (ABF-112).
+
+    One query for the whole page rather than one per message, and ids only —
+    a page of fifty is a single `IN` against the index-backed
+    (reporter_id, target_type, target_id) filter, and none of the report rows
+    themselves (which carry the encrypted snapshot) are read.
+
+    Deliberately not filtered by decision: a report that has been ruled on is
+    still a report this user filed, and un-marking the message once a
+    moderator decides would invite her to file it again.
+    """
+    if not message_ids:
+        return set()
+    rows = (
+        db.query(Report.target_id)
+        .filter(
+            Report.reporter_id == current_user.id,
+            Report.target_type == ReportTargetType.DIRECT_MESSAGE,
+            Report.target_id.in_(message_ids),
+        )
+        .all()
+    )
+    return {row[0] for row in rows}
+
+
+def get_received_message(
+    db: Session, current_user: User, message_id: str
+) -> DirectMessage:
+    """
+    Load the message with this id, provided `current_user` is the one who
+    RECEIVED it. Anything else raises the same generic 403 as the rest of the
+    DM surface.
+
+    Ownership of a private message is a DM rule, so it is answered here rather
+    than in whichever caller needs it — report_service.file_report() is the
+    first, and any later one inherits the same denial instead of writing its
+    own.
+
+    "Received", not "took part in": the sender of a message is not entitled to
+    act on it through this path. It is what makes "report a message you were
+    sent" unable to become "report a message you sent" — and, on the reporting
+    side, what keeps a user from filing a report against herself.
+
+    A message that does not exist and a message belonging to someone else's
+    conversation are indistinguishable to the caller — same status, same key,
+    same audit entry — because a 404 on one and a 403 on the other would
+    answer "does this conversation exist?" to anybody willing to guess ids.
+    The denial is logged for the same reason _authorize_conversation_access()
+    logs its own (§9.3).
+    """
+    message = (
+        db.query(DirectMessage)
+        .options(joinedload(DirectMessage.sender), joinedload(DirectMessage.recipient))
+        .filter(DirectMessage.id == message_id)
+        .first()
+    )
+    if (
+        message is None
+        or current_user.role != UserRole.USER
+        or message.recipient_id != current_user.id
+    ):
+        log_action(
+            db,
+            actor=current_user,
+            action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
+            entity_type="DirectMessage",
+            entity_id=message_id,
+            details={"reason": "not_recipient"},
+        )
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+    return message
 
 
 def get_inbox(

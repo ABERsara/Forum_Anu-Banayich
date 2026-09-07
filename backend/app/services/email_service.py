@@ -206,6 +206,22 @@ def send_moderator_alert(
     # TODO: send real email
 
 
+def send_direct_message_report_alert(moderator_email: str, report_id: str) -> None:
+    """
+    Notify a moderator that a private message was reported to her (ABF-112).
+
+    Deliberately no content_preview parameter, unlike send_moderator_alert():
+    a reported private message is readable only through the moderator view,
+    and a signature that cannot accept the text is what stops a future caller
+    from putting it in an email. The report id is enough to find it there.
+    """
+    logger.info(
+        f"[EMAIL] Direct-message report alert for report {report_id} "
+        f"→ {moderator_email}"
+    )
+    # TODO: send real email
+
+
 def send_urgent_moderator_alert(moderator_email: str, report_id: str) -> None:
     """Urgent notification – content auto-hidden after 2nd report."""
     logger.info(

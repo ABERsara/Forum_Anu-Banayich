@@ -15,12 +15,13 @@ POST   /messages                          – send a direct message (own cell on
 GET    /conversations/{key}/messages      – one page of a conversation, newest first
 GET    /cells/me/members                  – other ACTIVE users in your own cell
 GET    /messages/recipients               – search own-cell members by name (autocomplete)
+POST   /messages/{id}/report               – report one received private message
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.constants import LikeTargetType, UserRole
+from app.core.constants import LikeTargetType, ReportTargetType, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
 from app.schemas.forum import (
@@ -40,6 +41,12 @@ from app.schemas.user import UserPublic
 from app.services import forum_service, like_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
+
+#: The report body names one target and the route names another. A client
+#: bug, not a permission decision — so it is refused before any lookup, and
+#: refused identically whichever content type it is. A translation key, like
+#: every other error this API returns.
+_TARGET_MISMATCH_MESSAGE = "errors.report_target_mismatch"
 
 
 # ──────────────────────────────────────────────────────────
@@ -165,9 +172,7 @@ def report_post(
     is validated by report_service.file_report() itself.
     """
     if data.target_id != post_id:
-        raise HTTPException(
-            status_code=400, detail="נתוני הדיווח אינם תואמים את ההודעה המבוקשת."
-        )
+        raise HTTPException(status_code=400, detail=_TARGET_MISMATCH_MESSAGE)
     report = report_service.file_report(db, data, current_user)
     return ReportResponse.model_validate(report)
 
@@ -281,3 +286,40 @@ def search_recipients(
     """
     results = forum_service.search_users_for_dm(db, current_user, q)
     return [UserPublic.model_validate(r) for r in results]
+
+
+@router.post(
+    "/messages/{message_id}/report", response_model=ReportResponse, status_code=201
+)
+def report_direct_message(
+    message_id: str,
+    data: ReportCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> ReportResponse:
+    """
+    Report one private message you received (§7.1).
+
+    Only the recipient of that exact message may file this, and the report
+    stores that one message — encrypted — and nothing around it. Every
+    refusal on this route is the same generic 403 the rest of the DM surface
+    uses: a message that does not exist, one from a conversation the caller
+    is not in, and one the caller sent herself are indistinguishable in the
+    reply, so no reply confirms an id.
+
+    `reason` is required by ReportCreate, so a body without one is rejected
+    (422) before any of this runs — the API, not just the dialog, is what
+    makes "no report without a reason" true.
+    """
+    if (
+        data.target_id != message_id
+        or data.target_type != ReportTargetType.DIRECT_MESSAGE
+    ):
+        # target_type is checked here, not left to file_report(): a body
+        # claiming FORUM_POST on this route would otherwise be dispatched to
+        # the forum path, which would look up a post by a message id and
+        # answer 404 — telling the caller something about forum posts in
+        # reply to a question about a private message.
+        raise HTTPException(status_code=400, detail=_TARGET_MISMATCH_MESSAGE)
+    report = report_service.file_report(db, data, current_user)
+    return ReportResponse.model_validate(report)
