@@ -415,6 +415,12 @@ class TestDeleteMyAccountEndpoint:
 
         assert response.status_code == 400
 
+    async def test_unauthenticated_returns_401(self, client):
+        """§3.2 negative permission check: no session at all, not just the wrong role."""
+        response = await client.delete(DELETE_ACCOUNT_URL)
+
+        assert response.status_code == 401
+
 
 # ---------------------------------------------------------------------------
 # GET /users/me/messages/export
