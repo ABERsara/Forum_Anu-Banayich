@@ -8,20 +8,13 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect, pool, text
 
 import app.core.config as _cfg
+import app.models  # noqa: F401 — registers every model on Base.metadata
+from app.db.base import Base
 
 BACKEND_DIR = Path(__file__).parent.parent  # backend/
 
 # The merge revision that ABF-114's read_at migration sits directly on top of.
 REVISION_BEFORE_READ_AT = "aac7e1fb8f49"
-EXPECTED_TABLES = {
-    "users",
-    "forum_posts",
-    "direct_messages",
-    "professional_queries",
-    "reports",
-    "documents",
-    "audit_logs",
-}
 
 
 def test_migration_creates_all_tables(monkeypatch) -> None:
@@ -42,8 +35,9 @@ def test_migration_creates_all_tables(monkeypatch) -> None:
         actual_tables = set(inspect(engine).get_table_names())
         engine.dispose()  # release file lock before tempdir cleanup (Windows)
 
-    assert actual_tables >= EXPECTED_TABLES, (
-        f"Missing tables: {EXPECTED_TABLES - actual_tables}"
+    expected = set(Base.metadata.tables) | {"alembic_version"}
+    assert actual_tables == expected, (
+        f"model/migration table drift: {actual_tables.symmetric_difference(expected)}"
     )
 
 
