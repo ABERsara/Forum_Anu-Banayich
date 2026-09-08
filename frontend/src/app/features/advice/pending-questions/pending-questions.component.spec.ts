@@ -17,7 +17,6 @@ function makeQuestion(overrides: Partial<ProfessionalQuery> = {}): ProfessionalQ
     answer: null,
     is_public: false,
     status: QueryStatus.OPEN,
-    is_featured: false,
     domain: ProfessionalDomain.LAWYER,
     professional: null,
     asker_alias: 'אלמנה – ספרדי',

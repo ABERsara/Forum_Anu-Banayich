@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.constants import UserRole
+from app.core.i18n import translate
 from app.core.security import decode_access_token
 from app.db.session import SessionLocal
 from app.services.user_service import ensure_account_active, get_user_by_id
@@ -57,7 +58,7 @@ def get_current_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="לא ניתן לאמת את הזהות. יש להתחבר מחדש.",
+        detail=translate("errors.unauthenticated"),
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -92,7 +93,7 @@ def require_role(*roles: UserRole) -> Callable[..., "User"]:
         if current_user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="אין לך הרשאה לבצע פעולה זו.",
+                detail=translate("errors.forbidden"),
             )
         return current_user
 
