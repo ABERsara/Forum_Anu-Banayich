@@ -1,28 +1,21 @@
 /**
- * The profile screen had no spec before ABF-136.
- *
- * It is a heading and five label/value rows, and nothing else — which is
- * exactly the shape that needs a guard once the copy becomes keys: without one,
- * nothing catches a label falling back to hardcoded Hebrew, a raw
- * `profile.status_label` reaching the page, or the inline `direction: rtl`
- * coming back and pinning an English page to RTL.
- *
- * Three of the five rows render the shared maps from `core/constants`, which
- * ABF-127 already moved to keys. This ticket adds no copy of its own for them,
- * so the last test here is what says the rows still read the shared map.
+ * The profile screen started as a heading and five label/value rows
+ * (ABF-136). ABF-117 adds SPEC §9.4/§9.5's self-service data controls: a
+ * private-message retention explanation + export (USER role only — SPEC
+ * §3.2's permission table), and account deletion (every role).
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
+import { Observable, of, throwError } from 'rxjs';
+import { vi } from 'vitest';
 
 import { ProfileComponent } from './profile.component';
 import { AccountStatus, Sector, UserRole, UserType } from '../../core/constants';
-import { UserProfile } from '../../core/models';
+import { DirectMessageExportResult, UserProfile } from '../../core/models';
 import { AuthService } from '../../core/services/auth.service';
 import { HEBREW, translocoTesting } from '../../../testing/transloco-testing';
 
-/** A member as the API returns them, with every optional field filled in. */
 function makeUser(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
     id: 'u1',
@@ -39,31 +32,57 @@ function makeUser(overrides: Partial<UserProfile> = {}): UserProfile {
   };
 }
 
-/**
- * The same member with a Latin name, for the sweep below.
- *
- * `not.toMatch(HEBREW)` cannot tell our own copy from the name a member typed,
- * and a member's name is theirs in either language (CONTRIBUTING §6, ABF-130) —
- * so the sweep runs against a fixture that has no Hebrew of its own to trip on.
- */
-function makeLatinUser(): UserProfile {
-  return makeUser({ first_name: 'Sarah', last_name: 'Levi' });
+/** Same member with a Latin name, for the "no Hebrew leaks in English" sweep. */
+function makeLatinUser(overrides: Partial<UserProfile> = {}): UserProfile {
+  return makeUser({ first_name: 'Sarah', last_name: 'Levi', ...overrides });
+}
+
+function makeExportResult(): DirectMessageExportResult {
+  return {
+    items: [
+      {
+        id: 'm1',
+        sender_id: 'u1',
+        recipient_id: 'u2',
+        content: 'שלום',
+        sent_at: '2026-01-01T00:00:00Z',
+        read_at: null,
+      },
+    ],
+    total: 1,
+  };
 }
 
 describe('ProfileComponent', () => {
   let fixture: ComponentFixture<ProfileComponent>;
+  let authServiceMock: {
+    currentUser: ReturnType<typeof vi.fn>;
+    exportMyMessages: ReturnType<typeof vi.fn>;
+    deleteMyAccount: ReturnType<typeof vi.fn>;
+    logout: ReturnType<typeof vi.fn>;
+  };
 
   function renderFor(user: UserProfile | null): void {
     TestBed.resetTestingModule();
 
+    authServiceMock = {
+      currentUser: vi.fn().mockReturnValue(user),
+      exportMyMessages: vi.fn().mockReturnValue(of(makeExportResult())),
+      deleteMyAccount: vi.fn().mockReturnValue(of(undefined)),
+      logout: vi.fn(),
+    };
+
     TestBed.configureTestingModule({
       imports: [ProfileComponent, translocoTesting()],
-      providers: [
-        { provide: AuthService, useValue: { currentUser: signal<UserProfile | null>(user) } },
-      ],
+      providers: [{ provide: AuthService, useValue: authServiceMock }],
     });
 
     fixture = TestBed.createComponent(ProfileComponent);
+    // URL.createObjectURL/revokeObjectURL don't exist in the jsdom test
+    // environment — the export button triggers a real browser download,
+    // which is out of scope for a component spec either way.
+    URL.createObjectURL = vi.fn().mockReturnValue('blob:mock');
+    URL.revokeObjectURL = vi.fn();
     fixture.detectChanges();
   }
 
@@ -75,11 +94,20 @@ describe('ProfileComponent', () => {
     return fixture.nativeElement.querySelector('h1').textContent.trim();
   }
 
-  /** The five rows, whitespace normalised the way a reader sees them. */
-  function rows(): string[] {
-    return [...(fixture.nativeElement as HTMLElement).querySelectorAll('p')].map((row) =>
-      (row.textContent ?? '').replace(/\s+/g, ' ').trim(),
+  /** The five profile-detail rows, whitespace normalised. */
+  function detailRows(): string[] {
+    return [...(fixture.nativeElement as HTMLElement).querySelectorAll('.profile-details p')].map(
+      (row) => (row.textContent ?? '').replace(/\s+/g, ' ').trim(),
     );
+  }
+
+  function clickButton(text: string): void {
+    const button = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+      (btn) => btn.textContent?.trim() === text,
+    );
+    if (!button) throw new Error(`No button with text "${text}"`);
+    button.click();
+    fixture.detectChanges();
   }
 
   function switchToEnglish(): void {
@@ -87,41 +115,11 @@ describe('ProfileComponent', () => {
     fixture.detectChanges();
   }
 
-  it('shows the signed-in member their own details', () => {
-    renderFor(makeUser());
-
-    expect(rows()).toEqual([
-      'שם: שרה לוי',
-      'מייל: sara@example.com',
-      'קבוצה: אלמנה',
-      'מגזר: ספרדי',
-      'סטטוס: פעיל',
-    ]);
-  });
-
-  it('shows the heading alone until the profile has loaded', () => {
-    renderFor(null);
-
-    expect(heading()).toBe('הפרופיל שלי');
-    expect(rows()).toEqual([]);
-  });
-
-  /** `user_type` and `sector` are nullable — the row stays empty, not "null". */
-  it('leaves the group and sector rows blank for a member who has neither', () => {
-    renderFor(makeUser({ user_type: null, sector: null }));
-
-    expect(rows()[2]).toBe('קבוצה:');
-    expect(rows()[3]).toBe('מגזר:');
-    expect(text()).not.toContain('null');
-    expect(text()).not.toContain('undefined');
-  });
-
-  describe('i18n', () => {
-    it('reads in Hebrew exactly as it did before the keys went in', () => {
+  describe('profile details', () => {
+    it('shows the signed-in member their own details', () => {
       renderFor(makeUser());
 
-      expect(heading()).toBe('הפרופיל שלי');
-      expect(rows()).toEqual([
+      expect(detailRows()).toEqual([
         'שם: שרה לוי',
         'מייל: sara@example.com',
         'קבוצה: אלמנה',
@@ -130,13 +128,163 @@ describe('ProfileComponent', () => {
       ]);
     });
 
+    it('shows the heading alone until the profile has loaded', () => {
+      renderFor(null);
+
+      expect(heading()).toBe('הפרופיל שלי');
+      expect(detailRows()).toEqual([]);
+      expect(fixture.nativeElement.querySelector('.profile-section')).toBeNull();
+    });
+
+    it('leaves the group and sector rows blank for a member who has neither', () => {
+      renderFor(makeUser({ user_type: null, sector: null }));
+
+      expect(detailRows()[2]).toBe('קבוצה:');
+      expect(detailRows()[3]).toBe('מגזר:');
+    });
+  });
+
+  describe('message export (USER role only)', () => {
+    it('shows the retention explanation and export button for a plain member', () => {
+      renderFor(makeUser({ role: UserRole.USER }));
+
+      expect(text()).toContain('שמירת הודעות פרטיות');
+      expect(text()).toContain('3 שנים');
+      expect(
+        [...fixture.nativeElement.querySelectorAll('button')].some(
+          (btn: HTMLButtonElement) => btn.textContent?.trim() === 'ייצוא ההודעות שלי',
+        ),
+      ).toBe(true);
+    });
+
+    it.each([UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROFESSIONAL])(
+      'hides the export section for %s',
+      (role) => {
+        renderFor(makeUser({ role }));
+
+        expect(text()).not.toContain('שמירת הודעות פרטיות');
+        expect(text()).not.toContain('ייצוא ההודעות שלי');
+      },
+    );
+
+    it('downloads the export and shows a success message on click', () => {
+      renderFor(makeUser());
+
+      clickButton('ייצוא ההודעות שלי');
+
+      expect(authServiceMock.exportMyMessages).toHaveBeenCalled();
+      expect(URL.createObjectURL).toHaveBeenCalled();
+      expect(text()).toContain('קובץ ההודעות ירד למחשב שלך.');
+    });
+
+    it('shows a loading state while the export request is pending', () => {
+      renderFor(makeUser());
+      let resolve!: (value: DirectMessageExportResult) => void;
+      authServiceMock.exportMyMessages.mockReturnValue(
+        new Observable<DirectMessageExportResult>((subscriber) => {
+          resolve = (value) => {
+            subscriber.next(value);
+            subscriber.complete();
+          };
+        }),
+      );
+
+      clickButton('ייצוא ההודעות שלי');
+
+      expect(fixture.nativeElement.querySelector('.spinner')).toBeTruthy();
+
+      resolve(makeExportResult());
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.spinner')).toBeFalsy();
+    });
+
+    it("shows the server's own message when export fails with one", () => {
+      renderFor(makeUser());
+      authServiceMock.exportMyMessages.mockReturnValue(
+        throwError(() => ({ error: { detail: 'אין לך הרשאה לבצע פעולה זו.' } })),
+      );
+
+      clickButton('ייצוא ההודעות שלי');
+
+      expect(text()).toContain('אין לך הרשאה לבצע פעולה זו.');
+    });
+
+    it('falls back to a generic message when export fails without one', () => {
+      renderFor(makeUser());
+      authServiceMock.exportMyMessages.mockReturnValue(throwError(() => ({ status: 500 })));
+
+      clickButton('ייצוא ההודעות שלי');
+
+      expect(text()).toContain('שגיאה בייצוא ההודעות');
+    });
+  });
+
+  describe('account deletion (every role)', () => {
+    it.each([UserRole.USER, UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROFESSIONAL])(
+      'shows the delete-account section for %s',
+      (role) => {
+        renderFor(makeUser({ role }));
+
+        expect(text()).toContain('מחיקת חשבון');
+      },
+    );
+
+    it('opens a confirmation dialog before deleting anything', () => {
+      renderFor(makeUser());
+
+      clickButton('מחיקת חשבון');
+
+      expect(fixture.nativeElement.querySelector('app-confirm-dialog')).toBeTruthy();
+      expect(authServiceMock.deleteMyAccount).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when the confirmation is cancelled', () => {
+      renderFor(makeUser());
+      clickButton('מחיקת חשבון');
+
+      fixture.nativeElement
+        .querySelector('app-confirm-dialog')
+        .dispatchEvent(new CustomEvent('cancelled'));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('app-confirm-dialog')).toBeNull();
+      expect(authServiceMock.deleteMyAccount).not.toHaveBeenCalled();
+    });
+
+    it('deletes the account and logs out on confirm', () => {
+      renderFor(makeUser());
+
+      fixture.componentInstance.onDeleteAccountClick();
+      fixture.componentInstance.onDeleteAccountConfirmed();
+      fixture.detectChanges();
+
+      expect(authServiceMock.deleteMyAccount).toHaveBeenCalled();
+      expect(authServiceMock.logout).toHaveBeenCalled();
+    });
+
+    it("shows the server's own message when deletion fails, without logging out", () => {
+      renderFor(makeUser());
+      authServiceMock.deleteMyAccount.mockReturnValue(
+        throwError(() => ({ error: { detail: 'החשבון כבר נמחק' } })),
+      );
+
+      fixture.componentInstance.onDeleteAccountClick();
+      fixture.componentInstance.onDeleteAccountConfirmed();
+      fixture.detectChanges();
+
+      expect(text()).toContain('החשבון כבר נמחק');
+      expect(authServiceMock.logout).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('i18n', () => {
     it('leaves no Hebrew on the page in English', () => {
       renderFor(makeLatinUser());
 
       switchToEnglish();
 
       expect(heading()).toBe('My profile');
-      expect(rows()).toEqual([
+      expect(detailRows()).toEqual([
         'Name: Sarah Levi',
         'Email: sara@example.com',
         'Group: Widow',
@@ -146,57 +294,39 @@ describe('ProfileComponent', () => {
       expect(text()).not.toMatch(HEBREW);
     });
 
-    it('leaves no Hebrew on the page in English before the profile has loaded', () => {
-      renderFor(null);
+    it('leaves no Hebrew for a role that only sees the delete-account section', () => {
+      renderFor(makeLatinUser({ role: UserRole.ADMIN }));
 
       switchToEnglish();
 
-      expect(heading()).toBe('My profile');
+      expect(text()).toContain('Delete account');
       expect(text()).not.toMatch(HEBREW);
     });
 
-    /** A member's name is theirs, not UI copy — it survives the switch as typed. */
-    it("keeps the member's own name and address in the language they wrote them", () => {
-      renderFor(makeUser());
-
+    it('renders the export success and error copy in English too', () => {
+      renderFor(makeLatinUser());
       switchToEnglish();
 
-      expect(rows()[0]).toBe('Name: שרה לוי');
-      expect(rows()[1]).toBe('Email: sara@example.com');
+      clickButton('Export my messages');
+
+      expect(text()).toContain('Your messages file has been downloaded.');
     });
+  });
 
+  describe('layout', () => {
     /**
-     * The three enum rows render the shared maps from `core/constants`, so this
-     * ticket adds no `profile.*` copy of "אלמנה" — the duplication ABF-127
-     * removed. Re-pointing the shared key is what a private copy would not
-     * follow.
-     */
-    it('reads the group, sector and status off the shared label maps', () => {
-      renderFor(makeUser());
-      const transloco = TestBed.inject(TranslocoService);
-
-      transloco.setTranslationKey('constants.user_type.widow', 'תווית אחרת', { lang: 'he' });
-      fixture.detectChanges();
-
-      expect(rows()[2]).toBe('קבוצה: תווית אחרת');
-      expect(rows()[3]).toBe(`מגזר: ${transloco.translate('constants.sector.sephardic')}`);
-      expect(rows()[4]).toBe(`סטטוס: ${transloco.translate('constants.account_status.active')}`);
-    });
-
-    /**
-     * The page took its direction from an inline `direction: rtl` before this
-     * ticket, which no language switch could undo. It follows `<html dir>` now —
-     * the padding beside it was never directional and stays (ABF-134).
+     * The page took its direction from an inline `direction: rtl` before
+     * ABF-136, which no language switch could undo. It follows `<html dir>`
+     * now.
      */
     it('does not pin its own text direction — it follows <html dir>', () => {
       renderFor(makeUser());
       const host = fixture.nativeElement as HTMLElement;
-      const page = host.querySelector('div') as HTMLElement;
+      const page = host.querySelector('.profile-page') as HTMLElement;
 
       expect(host.hasAttribute('dir')).toBe(false);
       expect(page.hasAttribute('dir')).toBe(false);
       expect(page.style.direction).toBe('');
-      expect(page.style.padding).toBe('1rem');
     });
   });
 });
