@@ -16,7 +16,6 @@ import { Router } from '@angular/router';
 import { Observable, tap, throwError } from 'rxjs';
 
 import {
-  DirectMessageExportResult,
   GoogleAuthRequest,
   LoginRequest,
   OtpVerifyRequest,
@@ -140,24 +139,5 @@ export class AuthService {
 
   loadCurrentUser(): Observable<UserProfile> {
     return this.api.get<UserProfile>('/users/me').pipe(tap((user) => this._currentUser.set(user)));
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // Self-service data retention (SPEC §9.4/§9.5, ABF-117)
-  // ──────────────────────────────────────────────────────────
-
-  /** Every private message the caller sent or received, decrypted (SPEC §9.5). */
-  exportMyMessages(): Observable<DirectMessageExportResult> {
-    return this.api.get<DirectMessageExportResult>('/users/me/messages/export');
-  }
-
-  /**
-   * Delete the caller's own account (SPEC §9.4/UC-08): personal data is
-   * scrubbed and private messages are deleted outright. Immediate — no OTP
-   * step, no admin-approval queue. Does not clear local session state; the
-   * caller is expected to follow a successful call with logout().
-   */
-  deleteMyAccount(): Observable<void> {
-    return this.api.delete<void>('/users/me');
   }
 }

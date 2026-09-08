@@ -22,6 +22,7 @@ import {
 } from '../../core/constants';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../core/i18n/screen-error';
 import { DirectMessageExportResult } from '../../core/models';
+import { AccountService } from '../../core/services/account.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../shared/components/error-display/error-display.component';
@@ -36,6 +37,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 })
 export class ProfileComponent {
   readonly auth = inject(AuthService);
+  private readonly account = inject(AccountService);
   readonly userTypeLabels = USER_TYPE_LABELS;
   readonly sectorLabels = SECTOR_LABELS;
   readonly statusLabels = ACCOUNT_STATUS_LABELS;
@@ -53,7 +55,7 @@ export class ProfileComponent {
     this.isExporting.set(true);
     this.exportError.set(NO_ERROR);
     this.exportSuccess.set(false);
-    this.auth.exportMyMessages().subscribe({
+    this.account.exportMyMessages().subscribe({
       next: (result) => {
         this.downloadExport(result);
         this.isExporting.set(false);
@@ -79,7 +81,7 @@ export class ProfileComponent {
     this.showDeleteConfirm.set(false);
     this.isDeleting.set(true);
     this.deleteError.set(NO_ERROR);
-    this.auth.deleteMyAccount().subscribe({
+    this.account.deleteMyAccount().subscribe({
       next: () => this.auth.logout(),
       error: (err: HttpErrorResponse) => {
         this.deleteError.set(screenErrorFrom(err, 'profile.errors.delete_account_failed'));

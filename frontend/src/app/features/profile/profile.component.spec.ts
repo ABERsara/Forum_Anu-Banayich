@@ -13,6 +13,7 @@ import { vi } from 'vitest';
 import { ProfileComponent } from './profile.component';
 import { AccountStatus, Sector, UserRole, UserType } from '../../core/constants';
 import { DirectMessageExportResult, UserProfile } from '../../core/models';
+import { AccountService } from '../../core/services/account.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HEBREW, translocoTesting } from '../../../testing/transloco-testing';
 
@@ -57,9 +58,11 @@ describe('ProfileComponent', () => {
   let fixture: ComponentFixture<ProfileComponent>;
   let authServiceMock: {
     currentUser: ReturnType<typeof vi.fn>;
+    logout: ReturnType<typeof vi.fn>;
+  };
+  let accountServiceMock: {
     exportMyMessages: ReturnType<typeof vi.fn>;
     deleteMyAccount: ReturnType<typeof vi.fn>;
-    logout: ReturnType<typeof vi.fn>;
   };
 
   function renderFor(user: UserProfile | null): void {
@@ -67,14 +70,19 @@ describe('ProfileComponent', () => {
 
     authServiceMock = {
       currentUser: vi.fn().mockReturnValue(user),
+      logout: vi.fn(),
+    };
+    accountServiceMock = {
       exportMyMessages: vi.fn().mockReturnValue(of(makeExportResult())),
       deleteMyAccount: vi.fn().mockReturnValue(of(undefined)),
-      logout: vi.fn(),
     };
 
     TestBed.configureTestingModule({
       imports: [ProfileComponent, translocoTesting()],
-      providers: [{ provide: AuthService, useValue: authServiceMock }],
+      providers: [
+        { provide: AuthService, useValue: authServiceMock },
+        { provide: AccountService, useValue: accountServiceMock },
+      ],
     });
 
     fixture = TestBed.createComponent(ProfileComponent);
@@ -172,7 +180,7 @@ describe('ProfileComponent', () => {
 
       clickButton('ייצוא ההודעות שלי');
 
-      expect(authServiceMock.exportMyMessages).toHaveBeenCalled();
+      expect(accountServiceMock.exportMyMessages).toHaveBeenCalled();
       expect(URL.createObjectURL).toHaveBeenCalled();
       expect(text()).toContain('קובץ ההודעות ירד למחשב שלך.');
     });
@@ -180,7 +188,7 @@ describe('ProfileComponent', () => {
     it('shows a loading state while the export request is pending', () => {
       renderFor(makeUser());
       let resolve!: (value: DirectMessageExportResult) => void;
-      authServiceMock.exportMyMessages.mockReturnValue(
+      accountServiceMock.exportMyMessages.mockReturnValue(
         new Observable<DirectMessageExportResult>((subscriber) => {
           resolve = (value) => {
             subscriber.next(value);
@@ -200,7 +208,7 @@ describe('ProfileComponent', () => {
 
     it("shows the server's own message when export fails with one", () => {
       renderFor(makeUser());
-      authServiceMock.exportMyMessages.mockReturnValue(
+      accountServiceMock.exportMyMessages.mockReturnValue(
         throwError(() => ({ error: { detail: 'אין לך הרשאה לבצע פעולה זו.' } })),
       );
 
@@ -211,7 +219,7 @@ describe('ProfileComponent', () => {
 
     it('falls back to a generic message when export fails without one', () => {
       renderFor(makeUser());
-      authServiceMock.exportMyMessages.mockReturnValue(throwError(() => ({ status: 500 })));
+      accountServiceMock.exportMyMessages.mockReturnValue(throwError(() => ({ status: 500 })));
 
       clickButton('ייצוא ההודעות שלי');
 
@@ -235,7 +243,7 @@ describe('ProfileComponent', () => {
       clickButton('מחיקת חשבון');
 
       expect(fixture.nativeElement.querySelector('app-confirm-dialog')).toBeTruthy();
-      expect(authServiceMock.deleteMyAccount).not.toHaveBeenCalled();
+      expect(accountServiceMock.deleteMyAccount).not.toHaveBeenCalled();
     });
 
     it('does nothing when the confirmation is cancelled', () => {
@@ -248,7 +256,7 @@ describe('ProfileComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('app-confirm-dialog')).toBeNull();
-      expect(authServiceMock.deleteMyAccount).not.toHaveBeenCalled();
+      expect(accountServiceMock.deleteMyAccount).not.toHaveBeenCalled();
     });
 
     it('deletes the account and logs out on confirm', () => {
@@ -258,13 +266,13 @@ describe('ProfileComponent', () => {
       fixture.componentInstance.onDeleteAccountConfirmed();
       fixture.detectChanges();
 
-      expect(authServiceMock.deleteMyAccount).toHaveBeenCalled();
+      expect(accountServiceMock.deleteMyAccount).toHaveBeenCalled();
       expect(authServiceMock.logout).toHaveBeenCalled();
     });
 
     it("shows the server's own message when deletion fails, without logging out", () => {
       renderFor(makeUser());
-      authServiceMock.deleteMyAccount.mockReturnValue(
+      accountServiceMock.deleteMyAccount.mockReturnValue(
         throwError(() => ({ error: { detail: 'החשבון כבר נמחק' } })),
       );
 
