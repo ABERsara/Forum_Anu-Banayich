@@ -134,6 +134,10 @@ class ReportDecision(enum.StrEnum):
     PENDING = "pending"  # ממתין לטיפול
     INVALID = "invalid"  # שגוי – הודעה הושבה
     VALID = "valid"  # מוצדק – הודעה נמחקה
+    # System-closed, not a moderator's decision: the reported-on user deleted
+    # their account, so the private message the report pointed at was deleted
+    # with it (spec §9.4, ABF-117) — nothing is left to investigate.
+    CLOSED_ACCOUNT_DELETED = "closed_account_deleted"
 
 
 class DocumentType(enum.StrEnum):

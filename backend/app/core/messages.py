@@ -181,6 +181,10 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "הממונה כבר הוסר מהמערכת",
         ENGLISH: "This moderator has already been removed",
     },
+    "users.already_deleted": {
+        HEBREW: "החשבון כבר נמחק",
+        ENGLISH: "This account has already been deleted",
+    },
     # -- Community forum --------------------------------------------------
     "forum.access_forbidden": {
         HEBREW: "אין לך הרשאה לגשת לפורום הקהילתי.",

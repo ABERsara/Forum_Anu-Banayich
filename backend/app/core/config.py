@@ -163,6 +163,11 @@ class Settings(BaseSettings):
     # AUTO_HIDE_REPORT_COUNT).
     MAX_MESSAGES_PER_CONVERSATION: int = 1000
 
+    # How long a private message is kept before the scheduled retention job
+    # deletes it (spec §5.3/§9.4: "ניקוי אוטומטי לשיחה אחר 3 שנים"). See
+    # retention_service.purge_expired_direct_messages() (ABF-117).
+    DIRECT_MESSAGE_RETENTION_DAYS: int = 1095  # 3 years
+
     # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------

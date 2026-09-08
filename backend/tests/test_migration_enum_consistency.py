@@ -12,6 +12,16 @@ SQLite doesn't enforce enum membership (see test_migration.py — the column is
 just VARCHAR with no CHECK constraint), so a real Postgres instance is the
 only way to observe the resulting constraint-violation crash at runtime. This
 test catches the drift statically instead, without needing Postgres.
+
+A shipped migration is never edited in place, not even to add one enum value
+to its own sa.Enum(...) list (see feedback_never_edit_existing_migrations in
+project memory — ABF-118 did that once, and it silently left 6 values missing
+on the deployed database, since Alembic never re-runs a revision that already
+executed there). So a type's *current* member list is never expected to sit
+in any single migration file: it is whatever the sa.Enum(...) that created it
+declared, plus every `ALTER TYPE ... ADD VALUE` a later migration added on
+top (see e.g. b3e9f2a6c1d4_add_closed_account_deleted_to_.py) — the union of
+those, across every migration that has ever touched the type.
 """
 
 import ast

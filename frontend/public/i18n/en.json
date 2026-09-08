@@ -13,7 +13,8 @@
     "logout": "Log out",
     "login": "Log in",
     "register": "Sign up",
-    "messages": "Messages"
+    "messages": "Messages",
+    "profile": "My profile"
   },
   "admin": {
     "back_to_dashboard": "Back to the dashboard",
@@ -414,7 +415,27 @@
     "email_label": "Email:",
     "group_label": "Group:",
     "sector_label": "Sector:",
-    "status_label": "Status:"
+    "status_label": "Status:",
+    "retention": {
+      "title": "Private message retention",
+      "description": "Private messages are kept for up to 3 years and then deleted automatically and permanently. You can download a copy of all your private messages at any time.",
+      "export_button": "Export my messages",
+      "export_loading": "Exporting your messages...",
+      "export_success": "Your messages file has been downloaded."
+    },
+    "delete_account": {
+      "title": "Delete account",
+      "description": "Deleting your account removes your personal details and permanently deletes all your private messages. This action cannot be undone.",
+      "button": "Delete account",
+      "confirm_title": "Permanently delete your account?",
+      "confirm_message": "Your personal details will be removed and all your private messages will be permanently deleted. This cannot be undone.",
+      "confirm_button": "Yes, delete my account",
+      "deleting": "Deleting your account..."
+    },
+    "errors": {
+      "export_failed": "Couldn't export your messages. Please try again later.",
+      "delete_account_failed": "Couldn't delete your account. Please try again later."
+    }
   },
   "shared": {
     "confirm_dialog": {
