@@ -9,6 +9,7 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 
 import { authInterceptor } from './core/interceptors/auth.interceptor';
+import { languageInterceptor } from './core/interceptors/language.interceptor';
 import { TranslocoHttpLoader } from './core/i18n/transloco-loader';
 import { LocaleService } from './core/services/locale.service';
 import { routes } from './app.routes';
@@ -18,7 +19,9 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    // languageInterceptor first: authInterceptor's 401 retry re-clones the
+    // request it was handed, so the language has to already be on it.
+    provideHttpClient(withInterceptors([languageInterceptor, authInterceptor])),
     provideTransloco({
       config: {
         availableLangs: ['he', 'en'],
