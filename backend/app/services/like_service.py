@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.constants import LikeTargetType, PostStatus, QueryStatus, UserRole
+from app.core.i18n import translate
 from app.models.forum import ForumPost
 from app.models.like import Like
 from app.models.professional import ProfessionalQuery
@@ -127,17 +128,27 @@ def toggle_like(
             .first()
         )
         if query is None:
-            raise HTTPException(status_code=404, detail="השאלה לא נמצאה.")
+            raise HTTPException(
+                status_code=404, detail=translate("professionals.query_not_found")
+            )
         if not _may_view_professional_query(query, user):
-            raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בשאלה זו.")
+            raise HTTPException(
+                status_code=403, detail=translate("likes.query_view_forbidden")
+            )
     elif target_type == LikeTargetType.FORUM_POST:
         post = db.query(ForumPost).filter(ForumPost.id == target_id).first()
         if post is None:
-            raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+            raise HTTPException(
+                status_code=404, detail=translate("forum.post_not_found")
+            )
         if not _may_view_forum_post(post, user):
-            raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
+            raise HTTPException(
+                status_code=403, detail=translate("forum.post_view_forbidden")
+            )
     else:
-        raise HTTPException(status_code=400, detail="סוג תוכן זה אינו נתמך ללייק כרגע.")
+        raise HTTPException(
+            status_code=400, detail=translate("likes.target_type_unsupported")
+        )
 
     existing = (
         db.query(Like)
@@ -160,7 +171,7 @@ def toggle_like(
             and query.status != QueryStatus.ANSWERED
         ):
             raise HTTPException(
-                status_code=409, detail="ניתן לסמן לייק רק לשאלה שנענתה."
+                status_code=409, detail=translate("likes.answered_only")
             )
         db.add(Like(user_id=user.id, target_type=target_type, target_id=target_id))
         try:

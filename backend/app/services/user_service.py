@@ -27,6 +27,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.constants import AccountStatus, AuditAction, UserRole
+from app.core.i18n import translate
 from app.core.security import get_password_hash
 from app.models.user import User
 from app.schemas.user import (
@@ -76,7 +77,7 @@ def ensure_account_active(user: User) -> None:
     Raises 403 otherwise (e.g. suspended/pending/cancelled accounts).
     """
     if user.account_status != AccountStatus.ACTIVE:
-        raise HTTPException(status_code=403, detail="החשבון אינו פעיל.")
+        raise HTTPException(status_code=403, detail=translate("users.account_inactive"))
 
 
 #: What every deleted account's identity fields become. A fixed placeholder
@@ -199,9 +200,11 @@ def get_registration(db: Session, user_id: str) -> User:
         .first()
     )
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.account_status not in AWAITING_APPROVAL_STATUSES:
-        raise HTTPException(status_code=403, detail="ההרשמה אינה ממתינה לאישור")
+        raise HTTPException(
+            status_code=403, detail=translate("users.registration_not_pending")
+        )
 
     return user
 
@@ -315,11 +318,13 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.account_status not in AWAITING_APPROVAL_STATUSES:
-        raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
+        raise HTTPException(
+            status_code=400, detail=translate("users.registration_not_pending")
+        )
     if user.first_approver_id == admin.id:
-        raise HTTPException(status_code=400, detail="לא ניתן לאשר את אותה הרשמה פעמיים")
+        raise HTTPException(status_code=400, detail=translate("users.already_approved"))
 
     previous_status = user.account_status
 
@@ -337,9 +342,11 @@ def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> 
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.account_status not in AWAITING_APPROVAL_STATUSES:
-        raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
+        raise HTTPException(
+            status_code=400, detail=translate("users.registration_not_pending")
+        )
 
     previous_status = user.account_status
     user.account_status = AccountStatus.REJECTED
@@ -368,11 +375,15 @@ def suspend_user(
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.role != UserRole.USER:
-        raise HTTPException(status_code=400, detail="ניתן להשעות רק משתמשים רגילים")
+        raise HTTPException(
+            status_code=400, detail=translate("users.suspend_members_only")
+        )
     if user.account_status != AccountStatus.ACTIVE:
-        raise HTTPException(status_code=400, detail="ניתן להשעות רק משתמש פעיל")
+        raise HTTPException(
+            status_code=400, detail=translate("users.suspend_active_only")
+        )
 
     user.is_suspended = True
     user.suspended_until = datetime.now(UTC) + timedelta(hours=hours)
@@ -470,7 +481,7 @@ def create_professional(
     5); until then the account exists in the catalog but cannot be signed into.
     """
     if db.query(User).filter(User.email == data.email).first():
-        raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
+        raise HTTPException(status_code=409, detail=translate("auth.email_taken"))
 
     professional = User(
         email=data.email,
@@ -540,9 +551,11 @@ def update_professional(
     """
     professional = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not professional:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if professional.role != UserRole.PROFESSIONAL:
-        raise HTTPException(status_code=400, detail="ניתן לערוך אנשי מקצוע בלבד")
+        raise HTTPException(
+            status_code=400, detail=translate("users.professionals_only")
+        )
 
     changed = _apply_professional_updates(
         professional, data.model_dump(exclude_unset=True)
@@ -608,11 +621,13 @@ def _load_moderator(db: Session, user_id: str) -> User:
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.role != UserRole.MODERATOR:
-        raise HTTPException(status_code=400, detail="ניתן לערוך ממונים בלבד")
+        raise HTTPException(status_code=400, detail=translate("users.moderators_only"))
     if user.account_status == AccountStatus.CANCELLED:
-        raise HTTPException(status_code=400, detail="הממונה כבר הוסר מהמערכת")
+        raise HTTPException(
+            status_code=400, detail=translate("users.moderator_already_removed")
+        )
     return user
 
 
@@ -654,7 +669,7 @@ def _reinstate_moderator(
         existing.role == UserRole.MODERATOR
         and existing.account_status == AccountStatus.CANCELLED
     ):
-        raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
+        raise HTTPException(status_code=409, detail=translate("auth.email_taken"))
 
     existing.first_name = data.first_name
     existing.last_name = data.last_name

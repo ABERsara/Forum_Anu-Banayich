@@ -388,7 +388,6 @@ export interface ProfessionalQuery {
   answer: string | null;
   is_public: boolean;
   status: QueryStatus;
-  is_featured: boolean;
   domain: ProfessionalDomain | null;
   professional: ProfessionalProfile | null;
   asker_alias: string;
@@ -404,7 +403,6 @@ export interface PublicQA {
   content: string;
   answer: string;
   domain: ProfessionalDomain | null;
-  is_featured: boolean;
   answered_at: string | null;
   like_count: number;
   liked_by_me: boolean;

@@ -30,6 +30,7 @@ from app.core.constants import (
     UserRole,
     UserType,
 )
+from app.core.i18n import translate
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import (
@@ -154,7 +155,6 @@ def _to_response(
         answer=query.answer,
         is_public=query.is_public,
         status=query.status,
-        is_featured=query.is_featured,
         domain=query.domain,
         professional=ProfessionalProfile.model_validate(query.professional)
         if query.professional is not None
@@ -301,13 +301,19 @@ def answer_query(
         .first()
     )
     if query is None:
-        raise HTTPException(status_code=404, detail="השאלה לא נמצאה.")
+        raise HTTPException(
+            status_code=404, detail=translate("professionals.query_not_found")
+        )
 
     if not _professional_may_answer(query, professional):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לענות על שאלה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("professionals.answer_forbidden")
+        )
 
     if query.status != QueryStatus.OPEN:
-        raise HTTPException(status_code=409, detail="השאלה כבר נענתה.")
+        raise HTTPException(
+            status_code=409, detail=translate("professionals.query_already_answered")
+        )
 
     query.answer = data.answer
     query.status = QueryStatus.ANSWERED
@@ -406,7 +412,6 @@ def get_public_qa(
                 content=item.content,
                 answer=item.answer,
                 domain=item.domain,
-                is_featured=item.is_featured,
                 answered_at=item.answered_at,
                 like_count=like_count,
                 liked_by_me=liked_by_me,
