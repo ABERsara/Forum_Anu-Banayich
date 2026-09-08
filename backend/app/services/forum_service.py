@@ -33,6 +33,7 @@ from app.core.constants import (
     UserRole,
 )
 from app.core.encryption import decrypt_message, encrypt_message
+from app.core.i18n import translate
 from app.models.forum import DirectMessage, ForumPost
 from app.models.like import Like
 from app.models.report import Report
@@ -162,7 +163,7 @@ def get_posts(
       6. Return ForumPostListResponse
     """
     if current_user.role not in (UserRole.USER, UserRole.ADMIN):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לגשת לפורום הקהילתי.")
+        raise HTTPException(status_code=403, detail=translate("forum.access_forbidden"))
 
     query = db.query(ForumPost).options(joinedload(ForumPost.author))
 
@@ -249,7 +250,7 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     group/sector don't match (the post exists, they just can't read it).
     """
     if current_user.role not in (UserRole.USER, UserRole.ADMIN, UserRole.MODERATOR):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לגשת לפורום הקהילתי.")
+        raise HTTPException(status_code=403, detail=translate("forum.access_forbidden"))
 
     post = (
         db.query(ForumPost)
@@ -258,19 +259,23 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
         .first()
     )
     if post is None:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     if current_user.role in (UserRole.ADMIN, UserRole.MODERATOR):
         if post.status == PostStatus.DELETED and current_user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+            raise HTTPException(
+                status_code=404, detail=translate("forum.post_not_found")
+            )
         return _attach_like_fields(db, post, current_user)
 
     # הגענו לכאן רק אם role == USER (ADMIN/MODERATOR תמיד יוצאים למעלה, עם return או raise)
     if post.status != PostStatus.VISIBLE:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     if not matches_content_filter(post, current_user):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_view_forbidden")
+        )
 
     return _attach_like_fields(db, post, current_user)
 
@@ -330,12 +335,14 @@ def delete_post(db: Session, post_id: str, current_user: User) -> ForumPost:
         .first()
     )
     if post is None:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     is_author = current_user.id == post.author_id
     is_privileged = current_user.role in (UserRole.MODERATOR, UserRole.ADMIN)
     if not (is_author or is_privileged):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה למחוק הודעה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_delete_forbidden")
+        )
 
     if post.status == PostStatus.DELETED:
         # Already deleted - nothing to do, and nothing new to audit-log.
@@ -372,7 +379,9 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
         (a widow cannot post in the widowers group)
     """
     if author.account_status != AccountStatus.ACTIVE:
-        raise HTTPException(status_code=403, detail="רק משתמש פעיל יכול לפרסם הודעה.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_requires_active_account")
+        )
 
     is_broadcast = (
         data.group_visibility == GroupVisibility.ALL
@@ -380,7 +389,7 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
     )
     if is_broadcast and author.role != UserRole.ADMIN:
         raise HTTPException(
-            status_code=403, detail="רק מנהל יכול לפרסם הודעה לכלל המשתמשים."
+            status_code=403, detail=translate("forum.broadcast_admin_only")
         )
 
     if data.group_visibility != GroupVisibility.ALL and (
@@ -388,7 +397,7 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
         or data.group_visibility != GroupVisibility(author.user_type.value)
     ):
         raise HTTPException(
-            status_code=403, detail="לא ניתן לפרסם הודעה לקבוצה שאינה שלך."
+            status_code=403, detail=translate("forum.post_group_forbidden")
         )
 
     if data.sector_visibility != SectorVisibility.ALL and (
@@ -396,7 +405,7 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
         or data.sector_visibility != SectorVisibility(author.sector.value)
     ):
         raise HTTPException(
-            status_code=403, detail="לא ניתן לפרסם הודעה למגזר שאינו שלך."
+            status_code=403, detail=translate("forum.post_sector_forbidden")
         )
 
     post = ForumPost(
@@ -435,10 +444,12 @@ def update_post(
         .first()
     )
     if post is None or post.status == PostStatus.DELETED:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     if current_user.id != post.author_id:
-        raise HTTPException(status_code=403, detail="רק המחבר יכול לערוך הודעה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_edit_author_only")
+        )
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(post, field, value)

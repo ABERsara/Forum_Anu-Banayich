@@ -2,7 +2,7 @@
 reporter id anonymizable
 
 Revision ID: b8e41c9d7a35
-Revises: a1ea93b2b792
+Revises: 6c92de4f1a37
 Create Date: 2026-09-08 00:00:00.000000
 
 Three changes, all of them the report-schema half of ABF-112. They travel in
@@ -26,7 +26,12 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "b8e41c9d7a35"
-down_revision: str | Sequence[str] | None = "a1ea93b2b792"
+# Re-pointed when main was merged in: ABF-150 landed
+# 6c92de4f1a37 on a1ea93b2b792, which was this migration's parent too.
+# Leaving it here would give alembic two heads off one revision — a
+# failure git reports as a clean merge, because neither side edited the
+# other's file.
+down_revision: str | Sequence[str] | None = "6c92de4f1a37"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

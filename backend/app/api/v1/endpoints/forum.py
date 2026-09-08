@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import LikeTargetType, ReportTargetType, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
+from app.core.i18n import translate
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
@@ -41,12 +42,6 @@ from app.schemas.user import UserPublic
 from app.services import forum_service, like_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
-
-#: The report body names one target and the route names another. A client
-#: bug, not a permission decision — so it is refused before any lookup, and
-#: refused identically whichever content type it is. A translation key, like
-#: every other error this API returns.
-_TARGET_MISMATCH_MESSAGE = "errors.report_target_mismatch"
 
 
 # ──────────────────────────────────────────────────────────
@@ -172,7 +167,9 @@ def report_post(
     is validated by report_service.file_report() itself.
     """
     if data.target_id != post_id:
-        raise HTTPException(status_code=400, detail=_TARGET_MISMATCH_MESSAGE)
+        raise HTTPException(
+            status_code=400, detail=translate("reports.payload_mismatch")
+        )
     report = report_service.file_report(db, data, current_user)
     return ReportResponse.model_validate(report)
 
@@ -320,6 +317,8 @@ def report_direct_message(
         # the forum path, which would look up a post by a message id and
         # answer 404 — telling the caller something about forum posts in
         # reply to a question about a private message.
-        raise HTTPException(status_code=400, detail=_TARGET_MISMATCH_MESSAGE)
+        raise HTTPException(
+            status_code=400, detail=translate("reports.payload_mismatch")
+        )
     report = report_service.file_report(db, data, current_user)
     return ReportResponse.model_validate(report)

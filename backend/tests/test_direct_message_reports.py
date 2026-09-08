@@ -40,6 +40,7 @@ from app.core.constants import (
 )
 from app.core.dependencies import get_current_active_user, get_current_user
 from app.core.encryption import decrypt_message
+from app.core.messages import HEBREW, MESSAGES
 from app.main import app
 from app.models.audit import AuditLog
 from app.models.forum import DirectMessage, ForumPost
@@ -400,7 +401,7 @@ class TestReportEndpointValidation:
         )
 
         assert r.status_code == 400
-        assert r.json()["detail"] == "errors.report_target_mismatch"
+        assert r.json()["detail"] == MESSAGES["reports.payload_mismatch"][HEBREW]
         assert db_session.query(Report).count() == 0
 
     async def test_body_claiming_a_forum_post_is_rejected(
@@ -451,7 +452,7 @@ class TestDuplicateReports:
 
         assert first.status_code == 201
         assert second.status_code == 409
-        assert second.json()["detail"] == "errors.report_duplicate"
+        assert second.json()["detail"] == MESSAGES["reports.already_reported"][HEBREW]
         assert db_session.query(Report).count() == 1
 
     def test_a_second_message_from_the_same_sender_can_still_be_reported(

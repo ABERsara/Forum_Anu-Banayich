@@ -30,17 +30,29 @@ function pythonSources(dir: string): string[] {
   });
 }
 
+/** core/messages.py — the ABF-137 catalogue. Its keys are definitions. */
+const CATALOGUE = join(BACKEND_APP, 'core', 'messages.py');
+
 /**
- * The `errors.*` keys the backend raises, read out of its source.
+ * The `errors.*` keys the backend hands to the *client* to resolve.
  *
- * A string literal is enough to find them: the backend writes these as plain
- * literals, either inline in an HTTPException or as a module constant, and
- * both forms are the text this matches.
+ * Two shapes reach `detail`, and only one of them is a key. `translate("…")`
+ * resolves against the request's Accept-Language and puts a finished sentence
+ * there — nothing for the client to look up, and nothing this list should
+ * carry. A bare literal, the shape forum_service.py still raises the DM errors
+ * in, arrives as the key itself. So translate()'s arguments are blanked before
+ * the scan, and the catalogue that *defines* every key is skipped outright —
+ * otherwise every message in the app would read as one the client resolves.
+ *
+ * A string literal is enough to find what remains: the backend writes those as
+ * plain literals, either inline in an HTTPException or as a module constant,
+ * and both forms are the text this matches.
  */
 function backendErrorKeys(): Set<string> {
   const keys = new Set<string>();
   for (const file of pythonSources(BACKEND_APP)) {
-    const source = readFileSync(file, 'utf8');
+    if (file === CATALOGUE) continue;
+    const source = readFileSync(file, 'utf8').replaceAll(/translate\(\s*"[^"]*"/g, 'translate(');
     for (const match of source.matchAll(/"(errors\.[a-z0-9_]+)"/g)) keys.add(match[1]);
   }
   return keys;
@@ -68,9 +80,9 @@ describe('errorKeyFrom', () => {
   });
 
   it('prefers the server key over the screen fallback', () => {
-    const err = { error: { detail: 'errors.report_duplicate' } };
+    const err = { error: { detail: 'errors.invalid_cursor' } };
 
-    expect(errorKeyFrom(err, 'messages.chat.send_failed')).toBe('errors.report_duplicate');
+    expect(errorKeyFrom(err, 'messages.chat.send_failed')).toBe('errors.invalid_cursor');
   });
 
   it('falls back rather than showing an unrecognised server value', () => {

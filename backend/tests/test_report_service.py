@@ -18,6 +18,7 @@ from app.core.constants import (
     UserRole,
     UserType,
 )
+from app.core.messages import HEBREW, MESSAGES
 from app.models.forum import ForumPost
 from app.models.user import User
 from app.schemas.report import ReportCreate
@@ -131,7 +132,9 @@ class TestFileReportUnsupportedTargetType:
             )
 
         assert exc_info.value.status_code == 400
-        assert exc_info.value.detail == "errors.report_unsupported_target"
+        assert (
+            exc_info.value.detail == MESSAGES["reports.target_type_unsupported"][HEBREW]
+        )
 
 
 class TestFileReportTargetNotFound:

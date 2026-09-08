@@ -457,13 +457,6 @@
     "dm_forbidden": "אין לך הרשאה לשלוח או לצפות בהודעה זו.",
     "invalid_cursor": "הבקשה להודעות קודמות לא הייתה תקינה. רעננו את העמוד.",
     "internal_server_error": "שגיאת שרת פנימית. נסו שוב מאוחר יותר.",
-    "report_duplicate": "כבר דיווחתם על תוכן זה.",
-    "report_target_not_found": "התוכן שאתם מדווחים עליו לא נמצא.",
-    "report_target_mismatch": "פרטי הדיווח אינם תואמים את התוכן המבוקש.",
-    "report_unsupported_target": "לא ניתן לדווח על סוג תוכן זה.",
-    "report_not_found": "הדיווח לא נמצא.",
-    "reported_content_not_found": "התוכן שדווח כבר אינו זמין.",
-    "report_forbidden": "אין לכם הרשאה לצפות בדיווח זה.",
     "generic": "אירעה שגיאה. נסו שוב."
   },
   "messages": {

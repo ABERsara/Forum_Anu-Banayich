@@ -31,6 +31,7 @@ from app.core.constants import (
     ReportTargetType,
     UserRole,
 )
+from app.core.i18n import translate
 from app.models.forum import DirectMessage, ForumPost
 from app.models.report import Report
 from app.models.user import User
@@ -44,27 +45,6 @@ from app.services.email_service import (
 )
 
 logger = logging.getLogger(__name__)
-
-#: A content type nothing wires a report endpoint to yet. Translation keys
-#: rather than display text, per the i18n rule that the server names the
-#: reason and the client renders it in the reader's language.
-_UNSUPPORTED_TARGET_MESSAGE = "errors.report_unsupported_target"
-
-#: The reported content is not there. Only ever raised for a forum post — a
-#: private message that does not exist is answered by the same 403 as one
-#: belonging to somebody else, so that neither reply confirms an id.
-_TARGET_NOT_FOUND_MESSAGE = "errors.report_target_not_found"
-
-#: §7.1 step 4 — one report per user per piece of content.
-_DUPLICATE_MESSAGE = "errors.report_duplicate"
-
-#: Moderator-side keys, replacing the Hebrew literals that stood here before
-#: ABF-112. Same three distinctions as before — no such report, no such
-#: content, not your cell — none of which say anything a moderator does not
-#: already know from her own report list.
-_REPORT_NOT_FOUND_MESSAGE = "errors.report_not_found"
-_REPORTED_CONTENT_NOT_FOUND_MESSAGE = "errors.reported_content_not_found"
-_REPORT_FORBIDDEN_MESSAGE = "errors.report_forbidden"
 
 
 def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
@@ -86,7 +66,9 @@ def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     if data.target_type == ReportTargetType.DIRECT_MESSAGE:
         return _file_direct_message_report(db, data, reporter)
     if data.target_type != ReportTargetType.FORUM_POST:
-        raise HTTPException(status_code=400, detail=_UNSUPPORTED_TARGET_MESSAGE)
+        raise HTTPException(
+            status_code=400, detail=translate("reports.target_type_unsupported")
+        )
 
     # Row-level lock: two reports racing on the same post must not lose an
     # increment. No-op on SQLite (dev), enforced on PostgreSQL (production) –
@@ -98,7 +80,7 @@ def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
         .first()
     )
     if post is None:
-        raise HTTPException(status_code=404, detail=_TARGET_NOT_FOUND_MESSAGE)
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     _ensure_not_duplicate_report(db, reporter, data)
 
@@ -245,7 +227,9 @@ def _ensure_not_duplicate_report(
         .first()
     )
     if existing is not None:
-        raise HTTPException(status_code=409, detail=_DUPLICATE_MESSAGE)
+        raise HTTPException(
+            status_code=409, detail=translate("reports.already_reported")
+        )
 
 
 def _notify_moderators(db: Session, post: ForumPost, report: Report) -> None:
@@ -408,11 +392,13 @@ def get_report_for_moderator(
     """
     report = db.query(Report).filter(Report.id == report_id).first()
     if report is None:
-        raise HTTPException(status_code=404, detail=_REPORT_NOT_FOUND_MESSAGE)
+        raise HTTPException(status_code=404, detail=translate("reports.not_found"))
 
     post = db.query(ForumPost).filter(ForumPost.id == report.target_id).first()
     if post is None:
-        raise HTTPException(status_code=404, detail=_REPORTED_CONTENT_NOT_FOUND_MESSAGE)
+        raise HTTPException(
+            status_code=404, detail=translate("reports.target_not_found")
+        )
 
     if moderator.role == UserRole.MODERATOR:
         cells = moderator.moderator_cells or []
@@ -427,7 +413,9 @@ def get_report_for_moderator(
             is not None
         )
         if not covered:
-            raise HTTPException(status_code=403, detail=_REPORT_FORBIDDEN_MESSAGE)
+            raise HTTPException(
+                status_code=403, detail=translate("reports.view_forbidden")
+            )
 
     return report, post
 

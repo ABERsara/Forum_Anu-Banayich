@@ -457,13 +457,6 @@
     "dm_forbidden": "You don't have permission to send or view this message.",
     "invalid_cursor": "The request for older messages was not valid. Please refresh the page.",
     "internal_server_error": "Internal server error. Please try again later.",
-    "report_duplicate": "You have already reported this content.",
-    "report_target_not_found": "The content you are reporting was not found.",
-    "report_target_mismatch": "The report details do not match the requested content.",
-    "report_unsupported_target": "This type of content cannot be reported.",
-    "report_not_found": "The report was not found.",
-    "reported_content_not_found": "The reported content is no longer available.",
-    "report_forbidden": "You don't have permission to view this report.",
     "generic": "Something went wrong. Please try again."
   },
   "messages": {

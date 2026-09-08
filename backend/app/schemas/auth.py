@@ -12,6 +12,7 @@ from datetime import date
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.constants import Sector, UserType
+from app.core.i18n import translate
 
 
 class RegisterRequest(BaseModel):
@@ -32,7 +33,7 @@ class RegisterRequest(BaseModel):
     def phone_digits_only(cls, v: str) -> str:
         digits = v.replace("-", "").replace(" ", "")
         if not digits.isdigit():
-            raise ValueError("מספר הטלפון חייב להכיל ספרות בלבד")
+            raise ValueError(translate("validation.phone_digits_only"))
         return digits
 
 

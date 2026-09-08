@@ -1,24 +1,21 @@
 /**
- * Server errors come back as a translation key in the response body's
+ * Some server errors come back as a translation key in the response body's
  * `detail` field (see forum_service.py's _DM_FORBIDDEN_MESSAGE /
  * _INVALID_CURSOR_MESSAGE / InvalidTag handling) — any other detail (network
  * failure, an unrecognized key) falls back to a message of ours rather than
  * showing the raw backend value.
+ *
+ * Only *some*: since ABF-137 most of the backend raises through
+ * `translate()`, which resolves the key against the request's Accept-Language
+ * and puts the finished sentence in `detail`. There is nothing for this list
+ * to recognise in those — the reporting errors included, which is why no
+ * `reports.*` name appears below. What is left here is the older shape, where
+ * the server names a key and the client renders it.
  */
 export const KNOWN_ERROR_KEYS = [
   'errors.dm_forbidden',
   'errors.invalid_cursor',
   'errors.internal_server_error',
-  // Reporting (ABF-112). A key added here must also exist in he.json and
-  // en.json — an unlisted or untranslated one falls back silently, which is
-  // safe but says less than the server knew.
-  'errors.report_duplicate',
-  'errors.report_target_not_found',
-  'errors.report_target_mismatch',
-  'errors.report_unsupported_target',
-  'errors.report_not_found',
-  'errors.reported_content_not_found',
-  'errors.report_forbidden',
 ];
 
 /**
