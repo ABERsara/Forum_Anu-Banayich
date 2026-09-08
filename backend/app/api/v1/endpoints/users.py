@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import AuditAction, UserRole
 from app.core.dependencies import get_current_active_user, get_db
+from app.core.i18n import translate
 from app.models.user import User
 from app.schemas.forum import DirectMessageExportItem, DirectMessageExportResponse
 from app.schemas.user import UserProfile
@@ -60,7 +61,7 @@ def export_my_messages(
     if current_user.role != UserRole.USER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="אין לך הרשאה לבצע פעולה זו.",
+            detail=translate("errors.forbidden"),
         )
 
     messages = retention_service.export_user_direct_messages(db, current_user)

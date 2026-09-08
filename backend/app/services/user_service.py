@@ -116,10 +116,10 @@ def delete_own_account(db: Session, user: User) -> None:
     """
     locked_user = db.query(User).filter(User.id == user.id).with_for_update().first()
     if not locked_user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     user = locked_user
     if user.account_status == AccountStatus.CANCELLED:
-        raise HTTPException(status_code=400, detail="החשבון כבר נמחק")
+        raise HTTPException(status_code=400, detail=translate("users.already_deleted"))
 
     message_result, message_entries = retention_service.purge_user_direct_messages(
         db, user
