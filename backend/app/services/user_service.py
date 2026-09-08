@@ -36,7 +36,8 @@ from app.schemas.user import (
     ProfessionalCreateRequest,
     ProfessionalUpdateRequest,
 )
-from app.services.audit_service import log_action
+from app.services import retention_service
+from app.services.audit_service import build_entry, log_action
 from app.services.email_service import (
     send_approval_email,
     send_rejection_email,
@@ -76,6 +77,91 @@ def ensure_account_active(user: User) -> None:
     """
     if user.account_status != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="החשבון אינו פעיל.")
+
+
+#: What every deleted account's identity fields become. A fixed placeholder
+#: rather than blanking to "" — "" would collide on the login form's
+#: first_name display and, for email, would collide with every other
+#: deleted account against the column's UNIQUE constraint.
+DELETED_ACCOUNT_FIRST_NAME = "משתמש/ת"
+DELETED_ACCOUNT_LAST_NAME = "שנמחק/ה"
+
+
+def delete_own_account(db: Session, user: User) -> None:
+    """
+    Self-service account deletion (spec §9.4/UC-08, ABF-117).
+
+    The row is not deleted, for the same reason remove_moderator() keeps its
+    row: audit entries, reports and any content the account touched all
+    reference its id (NOT NULL foreign keys, none of them nullable), and a
+    hard delete would fail on those references or orphan them. Instead the
+    account is anonymised in place — identity fields scrubbed,
+    account_status set to CANCELLED (ensure_account_active then refuses it,
+    same as any other non-ACTIVE status) — and the id survives, so a forum
+    post's author_id or a report's reporter_id keeps pointing at a real,
+    now-anonymous row rather than a dangling one.
+
+    Private messages are the one thing that does not follow that pattern:
+    spec §9.4 has them fully deleted, not anonymised, unlike a forum post.
+    purge_user_direct_messages() does that (and closes out any report it
+    leaves dangling); its entries and this function's own USER_CANCELLED
+    entry are committed together in the one transaction below, so an account
+    can never end up half-deleted with a trail that does not say so.
+
+    No OTP step and no admin-approval queue: UC-08's diagram shows both, but
+    neither exists anywhere in this codebase today (there was nothing for
+    this ticket to "connect to" — DELETE /users/me was an empty stub), and
+    building a full request/approval workflow is out of ABF-117's scope.
+    """
+    locked_user = db.query(User).filter(User.id == user.id).with_for_update().first()
+    if not locked_user:
+        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+    user = locked_user
+    if user.account_status == AccountStatus.CANCELLED:
+        raise HTTPException(status_code=400, detail="החשבון כבר נמחק")
+
+    message_result, message_entries = retention_service.purge_user_direct_messages(
+        db, user
+    )
+
+    user.first_name = DELETED_ACCOUNT_FIRST_NAME
+    user.last_name = DELETED_ACCOUNT_LAST_NAME
+    user.email = f"deleted-{user.id}@deleted.local"
+    user.password_hash = get_password_hash(secrets.token_urlsafe(32))
+    user.google_uid = None
+    user.phone = None
+    user.id_number = None
+    user.face_image_url = None
+    user.birth_date = None
+    user.otp_code = None
+    user.otp_expires_at = None
+    user.account_status = AccountStatus.CANCELLED
+
+    # Role-specific fields that would otherwise keep routing content or
+    # duties to an account nobody controls anymore — same clearing
+    # remove_moderator() does for a removed moderator.
+    if user.role == UserRole.MODERATOR:
+        user.moderator_cells = []
+        user.alert_email = None
+    elif user.role == UserRole.PROFESSIONAL:
+        user.is_active_professional = False
+
+    db.add_all(
+        [
+            *message_entries,
+            build_entry(
+                actor=user,
+                action=AuditAction.USER_CANCELLED,
+                entity_type="User",
+                entity_id=user.id,
+                details={
+                    "deleted_message_count": len(message_result["deleted_message_ids"]),
+                    "closed_report_count": len(message_result["closed_report_ids"]),
+                },
+            ),
+        ]
+    )
+    db.commit()
 
 
 def get_pending_registrations(db: Session) -> list[User]:
