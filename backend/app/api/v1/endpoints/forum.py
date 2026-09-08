@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import LikeTargetType, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
+from app.core.i18n import translate
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
@@ -166,7 +167,7 @@ def report_post(
     """
     if data.target_id != post_id:
         raise HTTPException(
-            status_code=400, detail="נתוני הדיווח אינם תואמים את ההודעה המבוקשת."
+            status_code=400, detail=translate("reports.payload_mismatch")
         )
     report = report_service.file_report(db, data, current_user)
     return ReportResponse.model_validate(report)

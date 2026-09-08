@@ -22,7 +22,6 @@ const RESPONSE: ProfessionalQuery = {
   answer: null,
   is_public: false,
   status: QueryStatus.OPEN,
-  is_featured: false,
   domain: ProfessionalDomain.LAWYER,
   professional: null,
   asker_alias: 'אלמנה – ספרדי',

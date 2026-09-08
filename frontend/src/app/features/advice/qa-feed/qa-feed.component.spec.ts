@@ -15,7 +15,6 @@ function makeItem(overrides: Partial<PublicQA> = {}): PublicQA {
     content: 'שאלה ציבורית לדוגמה',
     answer: 'תשובה ציבורית לדוגמה',
     domain: ProfessionalDomain.LAWYER,
-    is_featured: false,
     answered_at: '2026-07-14T10:00:00',
     like_count: 0,
     liked_by_me: false,
