@@ -351,6 +351,25 @@ export interface ConversationList {
   page_size: number;
 }
 
+/**
+ * One message in a self-service export (SPEC §9.5, ABF-117). Ids, not nested
+ * UserPublic objects: this is a personal-data export, not a conversation view.
+ */
+export interface DirectMessageExportItem {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  sent_at: string; // ISO datetime
+  read_at: string | null; // ISO datetime
+}
+
+/** GET /users/me/messages/export — every message the caller sent or received. */
+export interface DirectMessageExportResult {
+  items: DirectMessageExportItem[];
+  total: number;
+}
+
 // ---------------------------------------------------------------------------
 // Professional queries
 // ---------------------------------------------------------------------------

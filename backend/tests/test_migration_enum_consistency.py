@@ -1,25 +1,34 @@
 """
-Regression test for I-03: the enum members the alembic migrations create must
-match the Python enum classes in app.core.constants exactly.
-
-A DB enum type's members come from two places in the migrations:
-  * the sa.Enum(...) / postgresql.ENUM(...) call that first creates it, and
-  * any later `ALTER TYPE <name> ADD VALUE '<MEMBER>'` migration that extends it.
-
-The two are matched only by enum type name — this test does not verify that
-the ALTER TYPE migration is actually a descendant of the creating one (that
-ordering is covered by test_migration.py running `alembic upgrade head`).
+Regression test for I-03: the auditaction incident (ABF-150) showed a single
+sa.Enum(...) call is not the whole story — a type's members can also arrive
+later via `ALTER TYPE ... ADD VALUE` in a follow-up migration (the only
+correct way to extend an enum that may already be deployed elsewhere; see
+[[feedback_never_edit_existing_migrations]]). So this test unions every value
+contributed to a given DB enum name across the whole migration history —
+whether via sa.Enum(...) or ALTER TYPE ADD VALUE — and compares that combined
+set to the Python enum class in app.core.constants exactly.
 
 SQLite doesn't enforce enum membership (see test_migration.py — the column is
 just VARCHAR with no CHECK constraint), so a real Postgres instance is the
 only way to observe the resulting constraint-violation crash at runtime. This
 test catches the drift statically instead, without needing Postgres.
+
+A shipped migration is never edited in place, not even to add one enum value
+to its own sa.Enum(...) list (see feedback_never_edit_existing_migrations in
+project memory — ABF-118 did that once, and it silently left 6 values missing
+on the deployed database, since Alembic never re-runs a revision that already
+executed there). So a type's *current* member list is never expected to sit
+in any single migration file: it is whatever the sa.Enum(...) that created it
+declared, plus every `ALTER TYPE ... ADD VALUE` a later migration added on
+top (see e.g. b3e9f2a6c1d4_add_closed_account_deleted_to_.py) — the union of
+those, across every migration that has ever touched the type.
 """
 
 import ast
 import enum
 import glob
 import re
+from collections import defaultdict
 from pathlib import Path
 
 from app.core import constants
@@ -27,23 +36,16 @@ from app.core import constants
 BACKEND_DIR = Path(__file__).parent.parent
 MIGRATIONS_DIR = BACKEND_DIR / "migrations" / "versions"
 
+_ADD_VALUE_RE = re.compile(
+    r"ALTER TYPE\s+(\w+)\s+ADD VALUE\s+(?:IF NOT EXISTS\s+)?'([^']+)'", re.IGNORECASE
+)
+
 # Maps the DB enum type name (sa.Enum(..., name=...)) to its Python source of truth.
 ENUM_NAME_TO_CLASS: dict[str, type[enum.Enum]] = {
     cls.__name__.lower(): cls
     for cls in vars(constants).values()
     if isinstance(cls, type) and issubclass(cls, enum.Enum)
 }
-
-# `ALTER TYPE [schema.]auditaction ADD VALUE [IF NOT EXISTS] 'AGENT_CONVERSATION'`
-# — tolerant of whitespace/newlines, an optional schema qualifier, and quoted
-# identifiers. The label group is compared against the Python enum's member
-# NAMES, so a value like 'agent_conversation' is still captured and then flagged
-# as an `extra=` mismatch rather than silently ignored.
-_ALTER_ADD_VALUE = re.compile(
-    r"ALTER\s+TYPE\s+(?:\"?\w+\"?\.)?\"?(\w+)\"?\s+ADD\s+VALUE\s+"
-    r"(?:IF\s+NOT\s+EXISTS\s+)?'(\w+)'",
-    re.IGNORECASE,
-)
 
 
 def _find_enum_calls(path: Path) -> list[tuple[str, list[str]]]:
@@ -79,68 +81,58 @@ def _find_enum_calls(path: Path) -> list[tuple[str, list[str]]]:
     return results
 
 
-def _find_alter_type_additions(path: Path) -> list[tuple[str, str]]:
-    """Return (enum_name, member_name) for every `ALTER TYPE ... ADD VALUE`
-    actually executed by a migration's upgrade().
+def _find_add_value_calls(path: Path) -> list[tuple[str, str]]:
+    """Return (enum_name, value) for every ALTER TYPE ... ADD VALUE inside an op.execute(...) call.
 
-    Only string literals passed to an ``.execute(...)`` call inside the
-    ``upgrade`` function body count — a commented-out or relocated statement, or
-    SQL that is built into a variable but never executed, does not, matching the
-    AST rigor of _find_enum_calls().
+    Reads the argument via ast rather than grepping the raw file text so that
+    a SQL string split across adjacent string literals (to fit the line
+    length limit) is still seen whole — the parser joins those into a single
+    Constant before this ever runs.
     """
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    upgrade = next(
-        (
-            node
-            for node in tree.body
-            if isinstance(node, ast.FunctionDef) and node.name == "upgrade"
-        ),
-        None,
-    )
-    if upgrade is None:
-        return []
-    results: list[tuple[str, str]] = []
-    for node in ast.walk(upgrade):
-        if not (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "execute"
-        ):
+    results = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
             continue
-        for arg in node.args:
-            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                results.extend(_ALTER_ADD_VALUE.findall(arg.value))
+        func = node.func
+        is_execute_call = isinstance(func, ast.Attribute) and func.attr == "execute"
+        if not is_execute_call or not node.args:
+            continue
+        arg = node.args[0]
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            results.extend(_ADD_VALUE_RE.findall(arg.value))
     return results
 
 
 def test_all_migration_enums_match_python_source() -> None:
-    migration_files = [Path(p) for p in sorted(glob.glob(str(MIGRATIONS_DIR / "*.py")))]
+    actual_by_enum: dict[str, set[str]] = defaultdict(set)
+    contributing_files: dict[str, set[str]] = defaultdict(set)
 
-    # Members added to a DB enum type by a later ALTER TYPE ... ADD VALUE, keyed
-    # by the enum type name — folded into every sa.Enum() check for that type.
-    alter_added: dict[str, set[str]] = {}
-    for migration_file in migration_files:
-        for enum_name, member in _find_alter_type_additions(migration_file):
-            alter_added.setdefault(enum_name, set()).add(member)
+    for migration_file in sorted(glob.glob(str(MIGRATIONS_DIR / "*.py"))):
+        name = Path(migration_file).name
+        for enum_name, member_names in _find_enum_calls(Path(migration_file)):
+            actual_by_enum[enum_name].update(member_names)
+            contributing_files[enum_name].add(name)
+        for enum_name, value in _find_add_value_calls(Path(migration_file)):
+            actual_by_enum[enum_name].add(value)
+            contributing_files[enum_name].add(name)
 
     mismatches = []
-    for migration_file in migration_files:
-        for enum_name, migration_values in _find_enum_calls(migration_file):
-            enum_cls = ENUM_NAME_TO_CLASS.get(enum_name)
-            if enum_cls is None:
-                mismatches.append(
-                    f"{migration_file.name}: no constants.py enum class matches "
-                    f"DB enum name '{enum_name}'"
-                )
-                continue
+    for enum_name, actual in actual_by_enum.items():
+        enum_cls = ENUM_NAME_TO_CLASS.get(enum_name)
+        if enum_cls is None:
+            mismatches.append(
+                f"{', '.join(contributing_files[enum_name])}: no constants.py enum "
+                f"class matches DB enum name '{enum_name}'"
+            )
+            continue
 
-            expected = {member.name for member in enum_cls}
-            actual = set(migration_values) | alter_added.get(enum_name, set())
-            if expected != actual:
-                mismatches.append(
-                    f"{migration_file.name}: '{enum_name}' migration values "
-                    f"{sorted(actual)} != {enum_cls.__name__} values {sorted(expected)} "
-                    f"(missing={sorted(expected - actual)}, extra={sorted(actual - expected)})"
-                )
+        expected = {member.name for member in enum_cls}
+        if expected != actual:
+            mismatches.append(
+                f"'{enum_name}' (across {', '.join(contributing_files[enum_name])}) "
+                f"values {sorted(actual)} != {enum_cls.__name__} values {sorted(expected)} "
+                f"(missing={sorted(expected - actual)}, extra={sorted(actual - expected)})"
+            )
 
     assert not mismatches, "\n".join(mismatches)

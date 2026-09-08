@@ -1,7 +1,9 @@
 <!-- No dir here: text direction follows <html dir>, which LocaleService sets
      from the active language (CONTRIBUTING §6). -->
 <div class="pending-questions">
-  <a routerLink="/home">← {{ 'advice.pending.back_to_home' | transloco }}</a>
+  <a routerLink="/home"
+    ><span aria-hidden="true">‹</span> {{ 'advice.pending.back_to_home' | transloco }}</a
+  >
   <h1 class="pending-questions__title">{{ 'advice.pending.title' | transloco }}</h1>
   <p class="pending-questions__intro">{{ 'advice.pending.intro' | transloco }}</p>
 

@@ -238,6 +238,9 @@ export enum ReportDecision {
   PENDING = 'pending',
   INVALID = 'invalid',
   VALID = 'valid',
+  // System-closed (ABF-117): the reported-on user deleted their account, so
+  // the private message the report pointed at was deleted with it.
+  CLOSED_ACCOUNT_DELETED = 'closed_account_deleted',
 }
 
 // ---------------------------------------------------------------------------
