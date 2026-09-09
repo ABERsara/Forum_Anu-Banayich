@@ -42,8 +42,8 @@ def _make_user(
 ) -> User:
     # ACTIVE by default: everyone in these scenarios is a live account, and
     # alerts only go to moderators still on the roster (see
-    # report_service._moderator_emails_for). Overridable, because the user
-    # card has to report a suspended account as suspended.
+    # report_service._moderator_emails_for). Overridable so a scenario can
+    # put an account in another state on purpose.
     user = User(
         email=email,
         password_hash="hashed",

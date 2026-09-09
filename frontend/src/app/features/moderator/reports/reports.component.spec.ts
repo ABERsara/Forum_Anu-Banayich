@@ -16,7 +16,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ModeratorReportsComponent } from './reports.component';
@@ -194,12 +194,28 @@ describe('ModeratorReportsComponent', () => {
       expect(link.getAttribute('aria-label')).toContain('כותרת ההודעה');
     });
 
+    it('shows a spinner instead of the list while the request is in flight', async () => {
+      await render({ pending: NEVER });
+
+      expect(component.isLoading()).toBe(true);
+      expect(root().querySelector('app-loading-spinner')).toBeTruthy();
+      expect(cards()).toEqual([]);
+    });
+
     it('sets hasError when the queue fails to load', async () => {
       await render({ pending: throwError(() => ({})) });
 
       expect(component.hasError()).toBe(true);
       expect(component.isLoading()).toBe(false);
       expect(root().querySelector('app-error-display')).toBeTruthy();
+      expect(text()).not.toContain('אין דיווחים ממתינים');
+    });
+
+    it('says so when there is nothing waiting', async () => {
+      await render({ pending: of({ items: [], total: 0, pending_count: 0 }) });
+
+      expect(cards()).toEqual([]);
+      expect(text()).toContain('אין דיווחים ממתינים. כל הכבוד!');
     });
 
     it('truncates a long post to a preview', () => {
@@ -499,6 +515,17 @@ describe('ModeratorReportsComponent', () => {
       switchToEnglish();
 
       expect(text()).toContain('No pending reports. Nice work!');
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('leaves no Hebrew on the page while the list is still loading', async () => {
+      await render({ pending: NEVER });
+      expect(text()).toContain('טוען דיווחים...');
+
+      switchToEnglish();
+
+      expect(root().querySelector('app-loading-spinner')).toBeTruthy();
+      expect(text()).toContain('Loading reports...');
       expect(text()).not.toMatch(HEBREW);
     });
 

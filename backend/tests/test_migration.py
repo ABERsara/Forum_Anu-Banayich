@@ -4,7 +4,9 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from alembic import command
+from alembic.autogenerate import compare_metadata
 from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine, inspect, pool, text
 
 import app.core.config as _cfg
@@ -178,3 +180,27 @@ def test_read_at_migration_carries_the_read_flag_across_in_both_directions(
 
         command.downgrade(alembic_cfg, REVISION_BEFORE_READ_AT)
         assert _read_state(db_url, "is_read") == {"m-read": 1, "m-unread": 0}
+
+
+def test_no_agent_model_migration_drift(monkeypatch) -> None:
+    """The agent tables' migration (79daa6708dd8) must produce exactly the
+    schema `models/agent.py` describes. Otherwise the next
+    `alembic revision --autogenerate` silently emits DROP/ADD for the drift
+    (e.g. an index created in a migration but never declared on the model).
+
+    Scoped to the agent tables on purpose: this guards ABF-120's own schema.
+    Pre-existing repo-wide drift in unrelated tables is out of scope here (and
+    is reported to the team separately)."""
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        try:
+            with engine.connect() as connection:
+                context = MigrationContext.configure(connection)
+                diff = compare_metadata(context, Base.metadata)
+        finally:
+            engine.dispose()
+
+    agent_drift = [entry for entry in diff if "agent_" in repr(entry)]
+    assert not agent_drift, f"agent model/migration drift detected: {agent_drift}"

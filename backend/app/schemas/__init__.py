@@ -4,6 +4,7 @@ Re-exports all schemas for convenience.
 When you add a new schema file, export its classes here.
 """
 
+from app.schemas.agent import AgentDomainResponse
 from app.schemas.auth import (
     LoginRequest,
     OtpVerifyRequest,
@@ -72,4 +73,5 @@ __all__ = [
     "ReportListResponse",
     "ReportHistoryResponse",
     "ReportWithContent",
+    "AgentDomainResponse",
 ]
