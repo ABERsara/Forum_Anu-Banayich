@@ -3,8 +3,8 @@
  * no entry behind it in one of the languages, and an entry no map points at
  * any more.
  *
- * These ten maps are imported by a dozen feature modules and will be migrated
- * one module at a time, so the drift this catches would otherwise surface as a
+ * These maps are imported by a dozen feature modules and are migrated one
+ * module at a time, so the drift this catches would otherwise surface as a
  * raw `constants.sector.hasidic` on someone's screen, in one language only,
  * long after the commit that caused it.
  */
@@ -17,6 +17,7 @@ import {
   POST_STATUS_LABELS,
   PROFESSIONAL_DOMAIN_LABELS,
   QUERY_STATUS_LABELS,
+  REPORT_DECISION_LABELS,
   REPORT_REASON_LABELS,
   SECTOR_LABELS,
   SECTOR_VISIBILITY_LABELS,
@@ -32,6 +33,7 @@ const LABEL_MAPS: Record<string, Record<string, LabelKey>> = {
   POST_STATUS_LABELS,
   PROFESSIONAL_DOMAIN_LABELS,
   QUERY_STATUS_LABELS,
+  REPORT_DECISION_LABELS,
   REPORT_REASON_LABELS,
   SECTOR_LABELS,
   SECTOR_VISIBILITY_LABELS,

@@ -395,18 +395,41 @@
   },
   "moderator": {
     "reports": {
-      "title": "לוח בקרת מבקר – דיווחים ממתינים",
+      "title": "לוח בקרת מבקר",
+      "hint": "כל החלטה מחייבת הערה בכתב. ההערה נשמרת עם הדיווח ומהווה את התיעוד היחיד לסיבת ההחלטה לאחר שהתוכן עצמו הוסר.",
+      "tabs_aria": "דיווחים",
+      "tab_pending": "דיווחים ממתינים",
+      "tab_history": "היסטוריה",
       "loading": "טוען דיווחים...",
       "empty": "אין דיווחים ממתינים. כל הכבוד!",
       "report_count": "{{count}} דיווחים",
-      "reason_label": "סיבה:",
-      "description_label": "תיאור:",
-      "content_status_label": "סטטוס תוכן:",
+      "reason_label": "סיבת הדיווח",
+      "description_label": "פירוט המדווח/ת",
+      "created_at_label": "תאריך הדיווח",
+      "content_status_label": "מצב ההודעה",
       "decide_valid": "מחיקת ההודעה (מוצדק)",
-      "decide_invalid": "ביטול הדיווח (שגוי)"
+      "decide_invalid": "ביטול הדיווח (שגוי)",
+      "decide_valid_aria": "מחיקת ההודעה ״{{title}}״",
+      "decide_invalid_aria": "ביטול הדיווח על ״{{title}}״",
+      "history_loading": "טוען היסטוריה...",
+      "history_empty": "עדיין לא התקבלו החלטות בתאים שבאחריותך.",
+      "decided_at_label": "תאריך ההחלטה",
+      "note_label": "הערת המבקר/ת",
+      "pager_aria": "ניווט בין עמודי ההיסטוריה",
+      "previous_page": "הקודם",
+      "next_page": "הבא",
+      "page_of": "עמוד {{page}} מתוך {{count}}",
+      "confirm_valid_title": "מחיקת ההודעה",
+      "confirm_valid_message": "הדיווח יסומן כמוצדק, ההודעה תוסר מהפורום, וכותב/ת ההודעה יקבלו על כך הודעת מערכת.",
+      "confirm_invalid_title": "ביטול הדיווח",
+      "confirm_invalid_message": "הדיווח יסומן כשגוי. הודעה שהוסתרה אוטומטית לאחר שני דיווחים תוצג שוב בפורום.",
+      "note_input_label": "הערת המבקר/ת (חובה)",
+      "note_placeholder": "לדוגמה: התוכן כולל התבטאות פוגענית כלפי משתמש אחר"
     },
     "errors": {
-      "load_reports_failed": "שגיאה בטעינת הדיווחים."
+      "load_reports_failed": "אירעה שגיאה בטעינת הדיווחים. נסי לרענן את הדף.",
+      "load_history_failed": "אירעה שגיאה בטעינת ההיסטוריה. נסי לרענן את הדף.",
+      "decide_failed": "אירעה שגיאה בשמירת ההחלטה. נסי שוב."
     }
   },
   "profile": {
@@ -586,6 +609,12 @@
       "offensive": "תוכן פוגעני",
       "spam": "ספאם",
       "other": "אחר"
+    },
+    "report_decision": {
+      "pending": "ממתין לטיפול",
+      "invalid": "הדיווח בוטל",
+      "valid": "הדיווח התקבל",
+      "closed_account_deleted": "נסגר — החשבון נמחק"
     },
     "document_type": {
       "death_certificate": "תעודת פטירה",

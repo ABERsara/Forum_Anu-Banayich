@@ -247,6 +247,10 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "נתוני הדיווח אינם תואמים את ההודעה המבוקשת.",
         ENGLISH: "The report details do not match the requested post.",
     },
+    "reports.already_handled": {
+        HEBREW: "הדיווח כבר טופל.",
+        ENGLISH: "This report has already been handled.",
+    },
     # -- Professional Q&A -------------------------------------------------
     "professionals.query_not_found": {
         HEBREW: "השאלה לא נמצאה.",
@@ -290,5 +294,13 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
     "validation.field_not_clearable": {
         HEBREW: "לא ניתן לרוקן שדה זה. יש להשמיטו כדי להשאירו ללא שינוי.",
         ENGLISH: "This field cannot be cleared. Omit it to leave it unchanged.",
+    },
+    "validation.decision_required": {
+        HEBREW: "יש לבחור החלטה: מוצדק או שגוי",
+        ENGLISH: "Choose a decision: justified or mistaken",
+    },
+    "validation.review_note_too_short": {
+        HEBREW: "הערת המבקר חייבת לכלול לפחות 5 תווים",
+        ENGLISH: "The reviewer's note must be at least 5 characters long",
     },
 }
