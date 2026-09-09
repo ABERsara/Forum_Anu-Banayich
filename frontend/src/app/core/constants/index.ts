@@ -271,6 +271,19 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, LabelKey> = {
 };
 
 // ---------------------------------------------------------------------------
+// AI agent
+// ---------------------------------------------------------------------------
+
+// AgentDomain (backend AgentDomain) has no mirror here: it is a database table
+// with free-form rows (name, description, group/sector visibility), not a fixed
+// enum. The frontend gets the domains a user may see from GET /api/v1/agents.
+
+export enum AgentMessageRole {
+  USER = 'user', // המשתמש ששוחח עם הסוכן
+  AGENT = 'agent', // תשובת סוכן ה-AI
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

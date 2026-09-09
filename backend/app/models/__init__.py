@@ -4,6 +4,12 @@ Import all models here so that SQLAlchemy and Alembic can discover them.
 When you create a new model file, add it to this list.
 """
 
+from app.models.agent import (
+    AgentConversation,
+    AgentDomain,
+    AgentKnowledgeEntry,
+    AgentMessage,
+)
 from app.models.audit import AuditLog
 from app.models.document import Document
 from app.models.forum import DirectMessage, ForumPost
@@ -21,4 +27,8 @@ __all__ = [
     "Like",
     "Document",
     "AuditLog",
+    "AgentDomain",
+    "AgentKnowledgeEntry",
+    "AgentConversation",
+    "AgentMessage",
 ]
