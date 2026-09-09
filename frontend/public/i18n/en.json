@@ -395,18 +395,41 @@
   },
   "moderator": {
     "reports": {
-      "title": "Moderator dashboard – pending reports",
+      "title": "Moderator dashboard",
+      "hint": "Every decision needs a written note. The note is kept with the report, and once the content itself is gone it is the only record of why the decision was made.",
+      "tabs_aria": "Reports",
+      "tab_pending": "Pending reports",
+      "tab_history": "History",
       "loading": "Loading reports...",
       "empty": "No pending reports. Nice work!",
       "report_count": "{{count}} reports",
-      "reason_label": "Reason:",
-      "description_label": "Description:",
-      "content_status_label": "Content status:",
+      "reason_label": "Report reason",
+      "description_label": "What the reporter wrote",
+      "created_at_label": "Report date",
+      "content_status_label": "Message status",
       "decide_valid": "Delete the message (valid)",
-      "decide_invalid": "Dismiss the report (invalid)"
+      "decide_invalid": "Dismiss the report (invalid)",
+      "decide_valid_aria": "Delete the message “{{title}}”",
+      "decide_invalid_aria": "Dismiss the report about “{{title}}”",
+      "history_loading": "Loading history...",
+      "history_empty": "No decisions have been made yet in the cells you oversee.",
+      "decided_at_label": "Decision date",
+      "note_label": "Moderator's note",
+      "pager_aria": "History pagination",
+      "previous_page": "Previous",
+      "next_page": "Next",
+      "page_of": "Page {{page}} of {{count}}",
+      "confirm_valid_title": "Delete the message",
+      "confirm_valid_message": "The report will be marked valid, the message will be removed from the forum, and its author will be notified.",
+      "confirm_invalid_title": "Dismiss the report",
+      "confirm_invalid_message": "The report will be marked invalid. A message hidden automatically after two reports will be shown in the forum again.",
+      "note_input_label": "Moderator's note (required)",
+      "note_placeholder": "For example: the content includes an offensive remark about another user"
     },
     "errors": {
-      "load_reports_failed": "Something went wrong loading the reports."
+      "load_reports_failed": "Something went wrong loading the reports. Try refreshing the page.",
+      "load_history_failed": "Something went wrong loading the history. Try refreshing the page.",
+      "decide_failed": "Something went wrong saving the decision. Please try again."
     }
   },
   "profile": {
@@ -581,6 +604,12 @@
       "offensive": "Offensive content",
       "spam": "Spam",
       "other": "Other"
+    },
+    "report_decision": {
+      "pending": "Pending",
+      "invalid": "Report dismissed",
+      "valid": "Report upheld",
+      "closed_account_deleted": "Closed — account deleted"
     },
     "document_type": {
       "death_certificate": "Death certificate",

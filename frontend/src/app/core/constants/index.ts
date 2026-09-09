@@ -243,6 +243,20 @@ export enum ReportDecision {
   CLOSED_ACCOUNT_DELETED = 'closed_account_deleted',
 }
 
+/**
+ * The eleventh shared label map, and the only one ABF-127 did not migrate —
+ * it did not exist yet. It holds keys like the other ten, for the same reason:
+ * the moderator history renders it, and a hardcoded Hebrew value here would be
+ * a Hebrew word left on an English screen that no module could fix without
+ * editing this file.
+ */
+export const REPORT_DECISION_LABELS: Record<ReportDecision, LabelKey> = {
+  [ReportDecision.PENDING]: 'constants.report_decision.pending',
+  [ReportDecision.INVALID]: 'constants.report_decision.invalid',
+  [ReportDecision.VALID]: 'constants.report_decision.valid',
+  [ReportDecision.CLOSED_ACCOUNT_DELETED]: 'constants.report_decision.closed_account_deleted',
+};
+
 // ---------------------------------------------------------------------------
 // Likes
 // ---------------------------------------------------------------------------

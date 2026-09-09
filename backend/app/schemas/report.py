@@ -4,7 +4,7 @@ Pydantic schemas for content reports.
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.constants import (
     PostStatus,
@@ -12,6 +12,7 @@ from app.core.constants import (
     ReportReason,
     ReportTargetType,
 )
+from app.core.i18n import translate
 
 
 class ReportCreate(BaseModel):
@@ -55,10 +56,46 @@ class ReportDecideRequest(BaseModel):
     """POST /moderator/reports/{id}/decide – moderator makes a decision."""
 
     decision: ReportDecision
-    note: str | None = None
+    # Required, unlike Report.moderator_note being nullable in the DB: rows
+    # predating this endpoint have no note, but no new decision may be made
+    # without one. The note is the moderator's justification for deleting a
+    # bereaved user's post or for dismissing their report (SPEC §7.3,
+    # "הערת מבקר (לתיעוד)"), and it is the only record of *why* once the
+    # content itself is gone.
+    note: str = Field(..., min_length=5, max_length=1000)
+
+    @field_validator("decision")
+    @classmethod
+    def decision_must_resolve_the_report(cls, v: ReportDecision) -> ReportDecision:
+        """PENDING is the state a report starts in, not a decision to submit."""
+        if v == ReportDecision.PENDING:
+            raise ValueError(translate("validation.decision_required"))
+        return v
+
+    @field_validator("note")
+    @classmethod
+    def note_must_not_be_blank(cls, v: str) -> str:
+        """min_length alone would accept a note of five spaces."""
+        note = v.strip()
+        if len(note) < 5:
+            raise ValueError(translate("validation.review_note_too_short"))
+        return note
 
 
 class ReportListResponse(BaseModel):
     items: list[ReportWithContent]
     total: int
     pending_count: int
+
+
+class ReportHistoryResponse(BaseModel):
+    """
+    GET /moderator/reports/history – reports this moderator's cells already
+    processed. Paginated (unlike the pending list, which is a work queue the
+    moderator is meant to empty): history only grows.
+    """
+
+    items: list[ReportWithContent]
+    total: int
+    page: int
+    page_size: int

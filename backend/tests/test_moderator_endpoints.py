@@ -1,11 +1,14 @@
 """
-Integration tests for GET /moderator/reports and GET /moderator/reports/{id}.
+Integration tests for the moderator's report endpoints: the pending queue,
+a single report, the decision, and the history of past decisions.
 """
 
 import pytest
 
 from app.core.constants import (
     GroupVisibility,
+    PostStatus,
+    ReportDecision,
     ReportReason,
     ReportTargetType,
     Sector,
@@ -35,13 +38,16 @@ def as_user():
     app.dependency_overrides.pop(get_current_active_user, None)
 
 
-def _make_post(db_session, author: User) -> ForumPost:
+def _make_post(
+    db_session, author: User, status: PostStatus = PostStatus.VISIBLE
+) -> ForumPost:
     post = ForumPost(
         author_id=author.id,
         title="כותרת",
         content="תוכן ההודעה שדווחה",
         group_visibility=GroupVisibility.ALL,
         sector_visibility=SectorVisibility.ALL,
+        status=status,
     )
     db_session.add(post)
     db_session.commit()
@@ -196,3 +202,273 @@ class TestGetReport:
         response = await client.get(f"{BASE}/reports/nonexistent-id")
 
         assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /moderator/reports/{id}/decide  (ABF-105)
+# ---------------------------------------------------------------------------
+
+
+def _make_moderator(db_session, make_user) -> User:
+    moderator = make_user("mod@example.com", role=UserRole.MODERATOR)
+    moderator.moderator_cells = [WIDOWER_HASIDIC_CELL]
+    db_session.commit()
+    return moderator
+
+
+def _make_reported_post(
+    db_session, make_user, status: PostStatus = PostStatus.VISIBLE
+) -> tuple[ForumPost, Report]:
+    """A post by an author inside WIDOWER_HASIDIC_CELL, with one report on it."""
+    author = make_user(
+        "author@example.com", user_type=UserType.WIDOWER, sector=Sector.HASIDIC
+    )
+    reporter = make_user("reporter@example.com")
+    post = _make_post(db_session, author, status=status)
+    return post, _file_report(db_session, post, reporter)
+
+
+def _decide_body(decision: ReportDecision, note: str = "נבדק מול כללי הקהילה") -> dict:
+    return {"decision": decision.value, "note": note}
+
+
+class TestDecideReport:
+    async def test_valid_decision_deletes_the_post_and_records_the_decision(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        post, report = _make_reported_post(db_session, make_user)
+
+        response = await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID, note="תוכן פוגעני"),
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["decision"] == ReportDecision.VALID.value
+        assert body["moderator_id"] == moderator.id
+        assert body["moderator_note"] == "תוכן פוגעני"
+        assert body["decided_at"] is not None
+        db_session.refresh(post)
+        assert post.status == PostStatus.DELETED
+
+    async def test_invalid_decision_restores_an_auto_hidden_post(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        post, report = _make_reported_post(
+            db_session, make_user, status=PostStatus.HIDDEN
+        )
+
+        response = await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.INVALID),
+        )
+
+        assert response.status_code == 200
+        db_session.refresh(post)
+        assert post.status == PostStatus.VISIBLE
+
+    async def test_decided_report_is_gone_from_the_pending_list(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        _, report = _make_reported_post(db_session, make_user)
+
+        await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
+        )
+        response = await client.get(f"{BASE}/reports")
+
+        assert response.json()["items"] == []
+
+    async def test_note_is_required(self, client, make_user, as_user, db_session):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        _, report = _make_reported_post(db_session, make_user)
+
+        response = await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json={"decision": ReportDecision.VALID.value},
+        )
+
+        assert response.status_code == 422
+
+    async def test_pending_is_not_an_acceptable_decision(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        _, report = _make_reported_post(db_session, make_user)
+
+        response = await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.PENDING),
+        )
+
+        assert response.status_code == 422
+
+    async def test_deciding_twice_conflicts(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        _, report = _make_reported_post(db_session, make_user)
+        await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.INVALID),
+        )
+
+        response = await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
+        )
+
+        assert response.status_code == 409
+
+    async def test_moderator_forbidden_outside_their_cell(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = make_user("mod@example.com", role=UserRole.MODERATOR)
+        moderator.moderator_cells = [
+            {"group": UserType.WIDOW, "sector": Sector.SEPHARDIC}
+        ]
+        db_session.commit()
+        as_user(moderator)
+        post, report = _make_reported_post(db_session, make_user)
+
+        response = await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
+        )
+
+        assert response.status_code == 403
+        db_session.refresh(post)
+        assert post.status == PostStatus.VISIBLE
+
+    async def test_regular_user_forbidden(self, client, make_user, as_user, db_session):
+        _make_moderator(db_session, make_user)
+        _, report = _make_reported_post(db_session, make_user)
+        as_user(make_user("intruder@example.com", role=UserRole.USER))
+
+        response = await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
+        )
+
+        assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# GET /moderator/reports/history  (ABF-105)
+# ---------------------------------------------------------------------------
+
+
+class TestReportHistory:
+    async def test_lists_reports_this_moderators_cells_already_decided(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        post, report = _make_reported_post(db_session, make_user)
+        await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID, note="תוכן פוגעני"),
+        )
+
+        response = await client.get(f"{BASE}/reports/history")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 1
+        assert body["page"] == 1
+        item = body["items"][0]
+        assert item["id"] == report.id
+        assert item["decision"] == ReportDecision.VALID.value
+        assert item["moderator_note"] == "תוכן פוגעני"
+        # The content stays readable in history – it is the record of what
+        # was decided, even once the post itself is deleted.
+        assert item["content_title"] == post.title
+        assert item["content_status"] == PostStatus.DELETED.value
+
+    async def test_pending_reports_are_not_history(
+        self, client, make_user, as_user, db_session
+    ):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        _make_reported_post(db_session, make_user)
+
+        response = await client.get(f"{BASE}/reports/history")
+
+        assert response.json() == {"items": [], "total": 0, "page": 1, "page_size": 20}
+
+    async def test_history_is_scoped_to_the_moderators_cells(
+        self, client, make_user, as_user, db_session
+    ):
+        admin = make_user("admin@example.com", role=UserRole.ADMIN)
+        as_user(admin)
+        other_author = make_user(
+            "other@example.com", user_type=UserType.WIDOW, sector=Sector.SEPHARDIC
+        )
+        reporter = make_user("reporter@example.com")
+        other_report = _file_report(
+            db_session, _make_post(db_session, other_author), reporter
+        )
+        await client.post(
+            f"{BASE}/reports/{other_report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
+        )
+
+        as_user(_make_moderator(db_session, make_user))
+        response = await client.get(f"{BASE}/reports/history")
+
+        assert response.json()["total"] == 0
+
+    async def test_paginates(self, client, make_user, as_user, db_session):
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        author = make_user(
+            "author@example.com", user_type=UserType.WIDOWER, sector=Sector.HASIDIC
+        )
+        for index in range(3):
+            reporter = make_user(f"reporter-{index}@example.com")
+            report = _file_report(db_session, _make_post(db_session, author), reporter)
+            await client.post(
+                f"{BASE}/reports/{report.id}/decide",
+                json=_decide_body(ReportDecision.INVALID),
+            )
+
+        response = await client.get(f"{BASE}/reports/history?page=2&page_size=2")
+
+        body = response.json()
+        assert body["total"] == 3
+        assert body["page"] == 2
+        assert len(body["items"]) == 1
+
+    async def test_history_is_not_mistaken_for_a_report_id(
+        self, client, make_user, as_user, db_session
+    ):
+        """
+        Regression test: /reports/history must be declared before
+        /reports/{report_id}, or FastAPI matches "history" as an id and
+        answers 404 from the wrong route.
+        """
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+
+        response = await client.get(f"{BASE}/reports/history")
+
+        assert response.status_code == 200
+        assert "items" in response.json()
+
+    async def test_regular_user_forbidden(self, client, make_user, as_user):
+        as_user(make_user("user@example.com", role=UserRole.USER))
+
+        response = await client.get(f"{BASE}/reports/history")
+
+        assert response.status_code == 403
