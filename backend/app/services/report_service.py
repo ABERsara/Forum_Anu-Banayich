@@ -30,6 +30,7 @@ from app.core.constants import (
     ReportTargetType,
     UserRole,
 )
+from app.core.i18n import translate
 from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
@@ -48,7 +49,7 @@ def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     """
     if data.target_type != ReportTargetType.FORUM_POST:
         raise HTTPException(
-            status_code=400, detail="סוג תוכן זה אינו נתמך לדיווח כרגע."
+            status_code=400, detail=translate("reports.target_type_unsupported")
         )
 
     # Row-level lock: two reports racing on the same post must not lose an
@@ -61,7 +62,7 @@ def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
         .first()
     )
     if post is None:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     _ensure_not_duplicate_report(db, reporter, data)
 
@@ -111,7 +112,9 @@ def _ensure_not_duplicate_report(
         .first()
     )
     if existing is not None:
-        raise HTTPException(status_code=409, detail="כבר דיווחת על תוכן זה.")
+        raise HTTPException(
+            status_code=409, detail=translate("reports.already_reported")
+        )
 
 
 def _notify_moderators(db: Session, post: ForumPost, report: Report) -> None:
@@ -269,11 +272,13 @@ def get_report_for_moderator(
     """
     report = db.query(Report).filter(Report.id == report_id).first()
     if report is None:
-        raise HTTPException(status_code=404, detail="הדיווח לא נמצא.")
+        raise HTTPException(status_code=404, detail=translate("reports.not_found"))
 
     post = db.query(ForumPost).filter(ForumPost.id == report.target_id).first()
     if post is None:
-        raise HTTPException(status_code=404, detail="התוכן המדווח לא נמצא.")
+        raise HTTPException(
+            status_code=404, detail=translate("reports.target_not_found")
+        )
 
     if moderator.role == UserRole.MODERATOR:
         cells = moderator.moderator_cells or []
@@ -288,7 +293,9 @@ def get_report_for_moderator(
             is not None
         )
         if not covered:
-            raise HTTPException(status_code=403, detail="אין הרשאה לצפות בדיווח זה.")
+            raise HTTPException(
+                status_code=403, detail=translate("reports.view_forbidden")
+            )
 
     return report, post
 
