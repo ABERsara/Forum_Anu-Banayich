@@ -5,6 +5,7 @@ GET    /forum/posts           – list posts (auto-filtered by group+sector)
 POST   /forum/posts           – create a new post
 GET    /forum/posts/{id}      – single post
 PATCH  /forum/posts/{id}      – edit a post (author only)
+PATCH  /forum/posts/{id}/like – toggle a like (user/admin only)
 DELETE /forum/posts/{id}      – delete (soft-delete) a post
 POST   /forum/posts/{id}/report – report a post
 POST   /forum/broadcast       – admin-only post visible to all users
@@ -13,13 +14,15 @@ GET    /messages                          – inbox (list of conversations, pagi
 POST   /messages                          – send a direct message (own cell only)
 GET    /conversations/{key}/messages      – one page of a conversation, newest first
 GET    /cells/me/members                  – other ACTIVE users in your own cell
+GET    /messages/recipients               – search own-cell members by name (autocomplete)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.constants import UserRole
+from app.core.constants import LikeTargetType, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
+from app.core.i18n import translate
 from app.models.user import User
 from app.schemas.forum import (
     BroadcastCreate,
@@ -32,9 +35,10 @@ from app.schemas.forum import (
     ForumPostResponse,
     ForumPostUpdate,
 )
+from app.schemas.like import LikeResponse
 from app.schemas.report import ReportCreate, ReportResponse
 from app.schemas.user import UserPublic
-from app.services import forum_service, report_service
+from app.services import forum_service, like_service, report_service
 
 router = APIRouter(tags=["Forum & Messages"])
 
@@ -82,6 +86,22 @@ def get_post(
     """
     post = forum_service.get_post_by_id(db, post_id, current_user)
     return ForumPostResponse.model_validate(post)
+
+
+@router.patch(
+    "/forum/posts/{post_id}/like",
+    response_model=LikeResponse,
+    dependencies=[Depends(require_role(UserRole.USER, UserRole.ADMIN))],
+)
+def like_post(
+    post_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> LikeResponse:
+    """Toggle a like on a forum post."""
+    return like_service.toggle_like(
+        db, LikeTargetType.FORUM_POST, post_id, current_user
+    )
 
 
 @router.patch("/forum/posts/{post_id}", response_model=ForumPostResponse)
@@ -147,7 +167,7 @@ def report_post(
     """
     if data.target_id != post_id:
         raise HTTPException(
-            status_code=400, detail="נתוני הדיווח אינם תואמים את ההודעה המבוקשת."
+            status_code=400, detail=translate("reports.payload_mismatch")
         )
     report = report_service.file_report(db, data, current_user)
     return ReportResponse.model_validate(report)
@@ -242,3 +262,23 @@ def get_my_cell_members(
     """
     members = forum_service.get_cell_members(db, current_user)
     return [UserPublic.model_validate(member) for member in members]
+
+
+@router.get("/messages/recipients", response_model=list[UserPublic])
+def search_recipients(
+    q: str = Query(..., min_length=2),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> list[UserPublic]:
+    """
+    Search the current user's own cell (group+sector) by name, to start a
+    new conversation. Name + id only (UserPublic) — no email/phone
+    (spec §3.1). A name matching nobody and a name matching someone in a
+    different cell return the identical empty list — see
+    forum_service.search_users_for_dm()'s docstring.
+
+    q must be at least 2 characters (422 otherwise) — defense in depth;
+    the primary "don't fire below 2 chars" gate is the frontend debounce.
+    """
+    results = forum_service.search_users_for_dm(db, current_user, q)
+    return [UserPublic.model_validate(r) for r in results]

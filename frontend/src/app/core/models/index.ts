@@ -299,6 +299,8 @@ export interface ForumPost {
   report_count: number;
   author: UserPublic;
   attachment_url: string | null;
+  like_count: number;
+  liked_by_me: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -377,6 +379,25 @@ export interface ConversationList {
   page_size: number;
 }
 
+/**
+ * One message in a self-service export (SPEC §9.5, ABF-117). Ids, not nested
+ * UserPublic objects: this is a personal-data export, not a conversation view.
+ */
+export interface DirectMessageExportItem {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  sent_at: string; // ISO datetime
+  read_at: string | null; // ISO datetime
+}
+
+/** GET /users/me/messages/export — every message the caller sent or received. */
+export interface DirectMessageExportResult {
+  items: DirectMessageExportItem[];
+  total: number;
+}
+
 // ---------------------------------------------------------------------------
 // Professional queries
 // ---------------------------------------------------------------------------
@@ -395,7 +416,6 @@ export interface ProfessionalQuery {
   answer: string | null;
   is_public: boolean;
   status: QueryStatus;
-  is_featured: boolean;
   domain: ProfessionalDomain | null;
   professional: ProfessionalProfile | null;
   asker_alias: string;
@@ -411,7 +431,6 @@ export interface PublicQA {
   content: string;
   answer: string;
   domain: ProfessionalDomain | null;
-  is_featured: boolean;
   answered_at: string | null;
   like_count: number;
   liked_by_me: boolean;

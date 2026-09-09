@@ -46,6 +46,12 @@ class ForumPostResponse(BaseModel):
     report_count: int
     author: UserPublic
     attachment_url: str | None = None
+    # Not populated by every endpoint that returns a ForumPostResponse —
+    # only get_posts()/get_post_by_id() compute real values via the likes
+    # table; create/update/delete/broadcast fall back to these defaults
+    # since they build the response straight from the ORM object.
+    like_count: int = 0
+    liked_by_me: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -145,3 +151,28 @@ class ConversationListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class DirectMessageExportItem(BaseModel):
+    """
+    One message in a self-service export (spec §9.5, ABF-117).
+
+    Ids, not nested UserPublic objects: this is a personal-data export, not a
+    conversation view — it names both participants by id and leaves display
+    names to whatever reads the export, the same shape
+    retention_service.export_user_direct_messages() already returns.
+    """
+
+    id: str
+    sender_id: str
+    recipient_id: str
+    content: str
+    sent_at: datetime
+    read_at: datetime | None
+
+
+class DirectMessageExportResponse(BaseModel):
+    """GET /users/me/messages/export – every message the caller sent or received."""
+
+    items: list[DirectMessageExportItem]
+    total: int

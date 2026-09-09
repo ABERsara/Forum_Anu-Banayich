@@ -13,7 +13,8 @@
     "logout": "Log out",
     "login": "Log in",
     "register": "Sign up",
-    "messages": "Messages"
+    "messages": "Messages",
+    "profile": "My profile"
   },
   "admin": {
     "back_to_dashboard": "Back to the dashboard",
@@ -206,7 +207,7 @@
       "unlike_aria": "Unlike — {{count}}"
     },
     "qa_feed": {
-      "back_link": "← Back to professional advice",
+      "back_link": "Back to professional advice",
       "title": "Community Q&A",
       "domain_filter_label": "Filter by domain:",
       "domain_filter_all": "All",
@@ -323,7 +324,10 @@
     "post": {
       "attachment": "Attachment",
       "edit": "Edit",
-      "delete": "Delete"
+      "delete": "Delete",
+      "like_error": "Couldn't save the like. Please try again.",
+      "like_aria": "Like — {{count}}",
+      "unlike_aria": "Unlike — {{count}}"
     },
     "delete_post": {
       "title": "Delete post",
@@ -450,6 +454,34 @@
       "suspend_failed": "Something went wrong suspending the user. Please try again."
     }
   },
+  "profile": {
+    "title": "My profile",
+    "name_label": "Name:",
+    "email_label": "Email:",
+    "group_label": "Group:",
+    "sector_label": "Sector:",
+    "status_label": "Status:",
+    "retention": {
+      "title": "Private message retention",
+      "description": "Private messages are kept for up to 3 years and then deleted automatically and permanently. You can download a copy of all your private messages at any time.",
+      "export_button": "Export my messages",
+      "export_loading": "Exporting your messages...",
+      "export_success": "Your messages file has been downloaded."
+    },
+    "delete_account": {
+      "title": "Delete account",
+      "description": "Deleting your account removes your personal details and permanently deletes all your private messages. This action cannot be undone.",
+      "button": "Delete account",
+      "confirm_title": "Permanently delete your account?",
+      "confirm_message": "Your personal details will be removed and all your private messages will be permanently deleted. This cannot be undone.",
+      "confirm_button": "Yes, delete my account",
+      "deleting": "Deleting your account..."
+    },
+    "errors": {
+      "export_failed": "Couldn't export your messages. Please try again later.",
+      "delete_account_failed": "Couldn't delete your account. Please try again later."
+    }
+  },
   "shared": {
     "confirm_dialog": {
       "title": "Are you sure?",
@@ -504,10 +536,15 @@
     "newMessage": {
       "title": "My cell members",
       "loading": "Loading cell members...",
-      "empty": "There are no other members in your cell yet."
+      "empty": "There are no other members in your cell yet.",
+      "search_label": "Search by name",
+      "search_placeholder": "Type a name...",
+      "search_min_chars_hint": "Type at least 2 characters to search",
+      "search_loading": "Searching...",
+      "search_no_results": "No matching members found in your cell."
     },
     "chat": {
-      "back_to_inbox": "← Back to inbox",
+      "back_to_inbox": "Back to inbox",
       "title_fallback": "Conversation",
       "loading": "Loading messages...",
       "empty": "No messages yet. Write a message to get started.",

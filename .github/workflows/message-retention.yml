@@ -1,0 +1,44 @@
+name: Message retention
+
+# Scheduled job for spec §5.3/§9.4's 3-year private-message retention
+# (ABF-117): deletes DirectMessage rows past the retention window (skipping
+# any still under an open report — see retention_service.py).
+#
+# Requires three repository secrets pointing at the production database,
+# none of which exist yet: RENDER_DATABASE_URL (Render's *External* Database
+# URL — this job runs on a GitHub-hosted runner, not on Render, so it must
+# reach the DB from outside), MESSAGE_ENCRYPTION_KEY and SECRET_KEY (the
+# same production values Render's own service uses — required for
+# app.core.config's production validation to pass at all, see that module's
+# docstring). Until those are added under Settings → Secrets and variables →
+# Actions, this workflow will run and fail at startup rather than silently
+# do nothing.
+on:
+  schedule:
+    # Weekly, not daily — a 3-year retention window has no need for daily
+    # precision, and this is the first live cron in the project (ABF-76's
+    # SLA escalation is the same "plain function, no scheduler" shape and
+    # was never wired to one — see scripts/purge_expired_messages.py).
+    - cron: "0 3 * * 0" # Sunday 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  purge-expired-messages:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Purge direct messages past the retention window
+        env:
+          DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+          MESSAGE_ENCRYPTION_KEY: ${{ secrets.MESSAGE_ENCRYPTION_KEY }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ENVIRONMENT: production
+        run: python -m scripts.purge_expired_messages

@@ -238,6 +238,9 @@ export enum ReportDecision {
   PENDING = 'pending',
   INVALID = 'invalid',
   VALID = 'valid',
+  // System-closed (ABF-117): the reported-on user deleted their account, so
+  // the private message the report pointed at was deleted with it.
+  CLOSED_ACCOUNT_DELETED = 'closed_account_deleted',
 }
 
 /**
@@ -279,28 +282,6 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, LabelKey> = {
   [DocumentType.ID_CARD]: 'constants.document_type.id_card',
   [DocumentType.PASSPORT]: 'constants.document_type.passport',
 };
-
-// ---------------------------------------------------------------------------
-// AI agents
-// ---------------------------------------------------------------------------
-
-/**
- * Knowledge domain of an AI agent — the `{domain_id}` segment of
- * `/api/v1/agents/{domain_id}/chat`, and the only value that endpoint accepts.
- *
- * No `*_LABELS` map yet: nothing on screen names an agent until ABF-123 builds
- * the chat UI. The enum is mirrored here now because ABF-122 adds it to
- * `backend/app/core/constants.py`, and these two files are kept in step.
- */
-export enum AgentDomain {
-  SINGLE_PARENT_RIGHTS = 'single_parent_rights',
-}
-
-/** Who wrote a message inside an agent conversation. */
-export enum AgentMessageRole {
-  USER = 'user',
-  AGENT = 'agent',
-}
 
 // ---------------------------------------------------------------------------
 // Helpers

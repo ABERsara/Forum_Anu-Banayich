@@ -27,6 +27,7 @@
             <!-- Unread badge lands here once the inbox task (Sprint 5, task 4) exposes unread counts -->
           </a>
         }
+        <a routerLink="/profile" routerLinkActive="active">{{ 'header.profile' | transloco }}</a>
         <button type="button" class="header__logout" (click)="logout()">
           {{ 'header.logout' | transloco }}
         </button>

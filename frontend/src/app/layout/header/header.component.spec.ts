@@ -144,5 +144,21 @@ describe('HeaderComponent', () => {
 
       expect(fixture.nativeElement.querySelector('.header__messages')).toBeNull();
     });
+
+    /**
+     * The profile screen (ABF-117's settings/export/delete-account home) had
+     * no link into it anywhere in the app until this — unlike messages, it is
+     * not role-gated, since every role can view their own profile.
+     */
+    it('shows the profile link to every signed-in role, in both languages', () => {
+      setup(true, false);
+
+      expect(headerText()).toContain('הפרופיל שלי');
+
+      switchToEnglish();
+
+      expect(headerText()).toContain('My profile');
+      expect(headerText()).not.toMatch(HEBREW);
+    });
   });
 });

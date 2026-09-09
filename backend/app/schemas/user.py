@@ -38,6 +38,7 @@ from app.core.constants import (
     UserRole,
     UserType,
 )
+from app.core.i18n import translate
 
 
 class UserPublic(BaseModel):
@@ -308,7 +309,7 @@ class ProfessionalUpdateRequest(BaseModel):
         its `None` default and is skipped by the partial update.
         """
         if value is None:
-            raise ValueError("לא ניתן לרוקן שדה זה. יש להשמיטו כדי להשאירו ללא שינוי.")
+            raise ValueError(translate("validation.field_not_clearable"))
         return value
 
 
@@ -460,5 +461,5 @@ class ModeratorUpdateRequest(_CanonicalCellsMixin):
         keeps its `None` default and is skipped by the partial update.
         """
         if value is None:
-            raise ValueError("לא ניתן לרוקן שדה זה. יש להשמיטו כדי להשאירו ללא שינוי.")
+            raise ValueError(translate("validation.field_not_clearable"))
         return value

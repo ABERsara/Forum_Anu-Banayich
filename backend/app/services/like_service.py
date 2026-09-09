@@ -7,14 +7,18 @@ serve ForumPost likes too (ABF-143), not just ProfessionalQuery.
 """
 
 from fastapi import HTTPException
+from sqlalchemy import Subquery, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.constants import LikeTargetType, QueryStatus, UserRole
+from app.core.constants import LikeTargetType, PostStatus, QueryStatus, UserRole
+from app.core.i18n import translate
+from app.models.forum import ForumPost
 from app.models.like import Like
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.like import LikeResponse
+from app.services import forum_service
 
 
 def _may_view_professional_query(query: ProfessionalQuery, user: User) -> bool:
@@ -50,6 +54,50 @@ def _may_view_professional_query(query: ProfessionalQuery, user: User) -> bool:
     )
 
 
+def _may_view_forum_post(post: ForumPost, user: User) -> bool:
+    """
+    Visibility check for FORUM_POST, reusing forum_service's own per-post
+    content filter rather than duplicating its group/sector OR-logic here.
+
+    ADMIN sees everything, same as get_post_by_id()'s admin branch. Every
+    other role needs a VISIBLE post and a matching cell — matches_content_filter()
+    requires user_type/sector to be set, which is true for USER but not for
+    MODERATOR, so this is only ever called for roles that have them (the
+    endpoint's require_role restricts callers to USER/ADMIN).
+    """
+    if user.role == UserRole.ADMIN:
+        return True
+    return post.status == PostStatus.VISIBLE and forum_service.matches_content_filter(
+        post, user
+    )
+
+
+def like_annotations(
+    db: Session, target_type: LikeTargetType, current_user: User
+) -> tuple[Subquery, Subquery]:
+    """
+    Grouped like_count subquery and current-user's-likes subquery for
+    `target_type`, meant to be outerjoin'd onto a paginated listing query via
+    add_columns() — one SELECT for the whole page, not one per row.
+
+    Shared between forum_service.get_posts() and
+    professional_service.get_public_qa() so the aggregation logic can't drift
+    apart between the two call sites.
+    """
+    like_counts = (
+        db.query(Like.target_id, func.count(Like.user_id).label("like_count"))
+        .filter(Like.target_type == target_type)
+        .group_by(Like.target_id)
+        .subquery()
+    )
+    my_likes = (
+        db.query(Like.target_id)
+        .filter(Like.target_type == target_type, Like.user_id == current_user.id)
+        .subquery()
+    )
+    return like_counts, my_likes
+
+
 def _like_count(db: Session, target_type: LikeTargetType, target_id: str) -> int:
     return (
         db.query(Like)
@@ -80,11 +128,27 @@ def toggle_like(
             .first()
         )
         if query is None:
-            raise HTTPException(status_code=404, detail="השאלה לא נמצאה.")
+            raise HTTPException(
+                status_code=404, detail=translate("professionals.query_not_found")
+            )
         if not _may_view_professional_query(query, user):
-            raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בשאלה זו.")
+            raise HTTPException(
+                status_code=403, detail=translate("likes.query_view_forbidden")
+            )
+    elif target_type == LikeTargetType.FORUM_POST:
+        post = db.query(ForumPost).filter(ForumPost.id == target_id).first()
+        if post is None:
+            raise HTTPException(
+                status_code=404, detail=translate("forum.post_not_found")
+            )
+        if not _may_view_forum_post(post, user):
+            raise HTTPException(
+                status_code=403, detail=translate("forum.post_view_forbidden")
+            )
     else:
-        raise HTTPException(status_code=400, detail="סוג תוכן זה אינו נתמך ללייק כרגע.")
+        raise HTTPException(
+            status_code=400, detail=translate("likes.target_type_unsupported")
+        )
 
     existing = (
         db.query(Like)
@@ -103,10 +167,11 @@ def toggle_like(
     else:
         if (
             target_type == LikeTargetType.PROFESSIONAL_QUERY
+            and query is not None
             and query.status != QueryStatus.ANSWERED
         ):
             raise HTTPException(
-                status_code=409, detail="ניתן לסמן לייק רק לשאלה שנענתה."
+                status_code=409, detail=translate("likes.answered_only")
             )
         db.add(Like(user_id=user.id, target_type=target_type, target_id=target_id))
         try:

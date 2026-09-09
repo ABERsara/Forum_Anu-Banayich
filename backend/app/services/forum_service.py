@@ -8,7 +8,6 @@ Forum service.
 TODO list for junior developer:
   [ ] implement get_posts() – with content filter + pagination
   [ ] implement get_post_by_id() – verify user can see it
-  [ ] implement search_users_for_dm() – name search within same group/sector
 """
 
 import base64
@@ -26,6 +25,7 @@ from app.core.constants import (
     AccountStatus,
     AuditAction,
     GroupVisibility,
+    LikeTargetType,
     PostStatus,
     ReportDecision,
     ReportTargetType,
@@ -33,7 +33,9 @@ from app.core.constants import (
     UserRole,
 )
 from app.core.encryption import decrypt_message, encrypt_message
+from app.core.i18n import translate
 from app.models.forum import DirectMessage, ForumPost
+from app.models.like import Like
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.forum import (
@@ -156,7 +158,7 @@ def get_posts(
       6. Return ForumPostListResponse
     """
     if current_user.role not in (UserRole.USER, UserRole.ADMIN):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לגשת לפורום הקהילתי.")
+        raise HTTPException(status_code=403, detail=translate("forum.access_forbidden"))
 
     query = db.query(ForumPost).options(joinedload(ForumPost.author))
 
@@ -168,32 +170,58 @@ def get_posts(
 
     total = query.count()
 
-    posts = (
-        query.order_by(ForumPost.created_at.desc())
+    # like_count/liked_by_me are aggregated here via subqueries rather than
+    # per-row, to avoid an N+1 query per post in the page. Imported locally
+    # (not at module level) to avoid a circular import: like_service already
+    # imports forum_service for matches_content_filter(). The real fix is
+    # moving the visibility-filter functions to a shared module (e.g.
+    # app.core.content_filter) so neither service depends on the other —
+    # deferred to a future sprint, out of scope for this change.
+    from app.services import like_service
+
+    like_counts, my_likes = like_service.like_annotations(
+        db, LikeTargetType.FORUM_POST, current_user
+    )
+
+    rows = (
+        query.add_columns(
+            func.coalesce(like_counts.c.like_count, 0).label("like_count"),
+            my_likes.c.target_id.isnot(None).label("liked_by_me"),
+        )
+        .outerjoin(like_counts, like_counts.c.target_id == ForumPost.id)
+        .outerjoin(my_likes, my_likes.c.target_id == ForumPost.id)
+        .order_by(ForumPost.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
     )
 
+    items = [
+        ForumPostResponse.model_validate(post).model_copy(
+            update={"like_count": like_count, "liked_by_me": liked_by_me}
+        )
+        for post, like_count, liked_by_me in rows
+    ]
+
     return ForumPostListResponse(
-        items=[ForumPostResponse.model_validate(post) for post in posts],
+        items=items,
         total=total,
         page=page,
         page_size=page_size,
     )
 
 
-def _matches_content_filter(post: ForumPost, current_user: User) -> bool:
+def matches_content_filter(post: ForumPost, current_user: User) -> bool:
     """
     Python-side equivalent of _content_filter(), for checking a single
     already-loaded post instead of querying again. Keep the two in sync —
     same group/sector OR-logic, just evaluated in memory vs. compiled to SQL.
     """
     assert current_user.user_type is not None, (
-        "_matches_content_filter() requires a user with user_type set"
+        "matches_content_filter() requires a user with user_type set"
     )
     assert current_user.sector is not None, (
-        "_matches_content_filter() requires a user with sector set"
+        "matches_content_filter() requires a user with sector set"
     )
     group_visibility = GroupVisibility(current_user.user_type.value)
     sector_visibility = SectorVisibility(current_user.sector.value)
@@ -217,7 +245,7 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     group/sector don't match (the post exists, they just can't read it).
     """
     if current_user.role not in (UserRole.USER, UserRole.ADMIN, UserRole.MODERATOR):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לגשת לפורום הקהילתי.")
+        raise HTTPException(status_code=403, detail=translate("forum.access_forbidden"))
 
     post = (
         db.query(ForumPost)
@@ -226,20 +254,49 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
         .first()
     )
     if post is None:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     if current_user.role in (UserRole.ADMIN, UserRole.MODERATOR):
         if post.status == PostStatus.DELETED and current_user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
-        return post
+            raise HTTPException(
+                status_code=404, detail=translate("forum.post_not_found")
+            )
+        return _attach_like_fields(db, post, current_user)
 
     # הגענו לכאן רק אם role == USER (ADMIN/MODERATOR תמיד יוצאים למעלה, עם return או raise)
     if post.status != PostStatus.VISIBLE:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
-    if not _matches_content_filter(post, current_user):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
+    if not matches_content_filter(post, current_user):
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_view_forbidden")
+        )
 
+    return _attach_like_fields(db, post, current_user)
+
+
+def _attach_like_fields(db: Session, post: ForumPost, current_user: User) -> ForumPost:
+    """
+    Set like_count/liked_by_me as plain (unmapped) attributes on an
+    already-fetched post, for get_post_by_id() to return a single post
+    outside get_posts()'s paginated-subquery path. ForumPostResponse picks
+    these up via getattr (from_attributes=True) same as any mapped column.
+
+    One query with conditional aggregation, not two separate COUNTs — same
+    row set scanned once for both numbers.
+    """
+    like_count, liked_by_me = (
+        db.query(
+            func.count(Like.user_id),
+            func.max(case((Like.user_id == current_user.id, 1), else_=0)),
+        )
+        .filter(
+            Like.target_type == LikeTargetType.FORUM_POST, Like.target_id == post.id
+        )
+        .one()
+    )
+    post.like_count = like_count  # type: ignore[attr-defined]
+    post.liked_by_me = bool(liked_by_me)  # type: ignore[attr-defined]
     return post
 
 
@@ -273,12 +330,14 @@ def delete_post(db: Session, post_id: str, current_user: User) -> ForumPost:
         .first()
     )
     if post is None:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     is_author = current_user.id == post.author_id
     is_privileged = current_user.role in (UserRole.MODERATOR, UserRole.ADMIN)
     if not (is_author or is_privileged):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה למחוק הודעה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_delete_forbidden")
+        )
 
     if post.status == PostStatus.DELETED:
         # Already deleted - nothing to do, and nothing new to audit-log.
@@ -315,7 +374,9 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
         (a widow cannot post in the widowers group)
     """
     if author.account_status != AccountStatus.ACTIVE:
-        raise HTTPException(status_code=403, detail="רק משתמש פעיל יכול לפרסם הודעה.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_requires_active_account")
+        )
 
     is_broadcast = (
         data.group_visibility == GroupVisibility.ALL
@@ -323,7 +384,7 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
     )
     if is_broadcast and author.role != UserRole.ADMIN:
         raise HTTPException(
-            status_code=403, detail="רק מנהל יכול לפרסם הודעה לכלל המשתמשים."
+            status_code=403, detail=translate("forum.broadcast_admin_only")
         )
 
     if data.group_visibility != GroupVisibility.ALL and (
@@ -331,7 +392,7 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
         or data.group_visibility != GroupVisibility(author.user_type.value)
     ):
         raise HTTPException(
-            status_code=403, detail="לא ניתן לפרסם הודעה לקבוצה שאינה שלך."
+            status_code=403, detail=translate("forum.post_group_forbidden")
         )
 
     if data.sector_visibility != SectorVisibility.ALL and (
@@ -339,7 +400,7 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
         or data.sector_visibility != SectorVisibility(author.sector.value)
     ):
         raise HTTPException(
-            status_code=403, detail="לא ניתן לפרסם הודעה למגזר שאינו שלך."
+            status_code=403, detail=translate("forum.post_sector_forbidden")
         )
 
     post = ForumPost(
@@ -378,10 +439,12 @@ def update_post(
         .first()
     )
     if post is None or post.status == PostStatus.DELETED:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     if current_user.id != post.author_id:
-        raise HTTPException(status_code=403, detail="רק המחבר יכול לערוך הודעה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_edit_author_only")
+        )
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(post, field, value)
@@ -924,9 +987,8 @@ def get_cell_members(db: Session, current_user: User) -> list[User]:
 
     Name only (UserPublic drops everything else) — same "no PII beyond name"
     rule as the rest of this file. This is a plain list, not the spec's
-    by-name search (§5.3) — search is explicitly out of scope for this
-    ticket; that's a separate, still-unimplemented feature
-    (search_users_for_dm / GET /users/search).
+    by-name search (§5.3) — for that, see search_users_for_dm() /
+    GET /messages/recipients.
     """
     if current_user.role != UserRole.USER:
         log_action(
@@ -953,19 +1015,57 @@ def get_cell_members(db: Session, current_user: User) -> list[User]:
     )
 
 
+_RECIPIENT_SEARCH_LIMIT = 20
+
+
 def search_users_for_dm(db: Session, current_user: User, name: str) -> list[User]:
     """
-    Search for users to send a DM to.
+    Search current_user's own cell (group+sector) by name, to start a DM.
 
-    Rules:
-      - Only users in the SAME group as current_user
-      - Search by first_name or last_name (case-insensitive)
-      - Never expose contact details (phone/email) – name only
+    Same four-axis filter as get_cell_members() (role/status/user_type/
+    sector), plus a case-insensitive name predicate. A name matching a user
+    outside the caller's cell is filtered out by the user_type/sector
+    predicates before the name predicate is ever evaluated — it is never a
+    candidate row, exactly like a name matching nobody at all. Both cases
+    fall out of the same WHERE as an empty result, with no special-casing
+    needed (same mechanism can_message()/send_direct_message() already use
+    to fold "no such user" and "wrong cell" into one 403 branch).
 
-    TODO:
-      1. Query users where user_type == current_user.user_type AND account_status == ACTIVE
-      2. Filter by name ILIKE
-      3. Return list (no PII beyond name)
+    Capped at _RECIPIENT_SEARCH_LIMIT rows — an autocomplete list, not a
+    paged listing.
     """
-    # TODO: implement this function
-    raise NotImplementedError("search_users_for_dm() is not yet implemented")
+    if current_user.role != UserRole.USER:
+        log_action(
+            db,
+            actor=current_user,
+            action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
+            entity_type="DirectMessage",
+            entity_id=current_user.id,
+            details={"reason": "recipient_search_role_blocked"},
+        )
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+
+    # Escape LIKE's own wildcards in the user-supplied name — otherwise
+    # searching for e.g. "%" or "_" would match everyone in the cell rather
+    # than literally nobody, silently turning "search by name" into "browse
+    # everyone". No cross-cell leak either way (the cell filter still
+    # applies), but the search semantics would be broken.
+    escaped_name = name.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    pattern = f"%{escaped_name}%"
+    return (
+        db.query(User)
+        .filter(
+            User.id != current_user.id,
+            User.role == UserRole.USER,
+            User.account_status == AccountStatus.ACTIVE,
+            User.user_type == current_user.user_type,
+            User.sector == current_user.sector,
+            or_(
+                User.first_name.ilike(pattern, escape="\\"),
+                User.last_name.ilike(pattern, escape="\\"),
+            ),
+        )
+        .order_by(User.first_name, User.last_name)
+        .limit(_RECIPIENT_SEARCH_LIMIT)
+        .all()
+    )
