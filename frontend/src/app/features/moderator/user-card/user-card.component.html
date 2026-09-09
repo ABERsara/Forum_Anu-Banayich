@@ -3,10 +3,9 @@
   sets from the active language (CONTRIBUTING §6).
 -->
 <div class="page">
-  <!-- The arrow lives in the SCSS, where it can follow the page direction. -->
-  <a class="page__back" routerLink="/moderator/reports">{{
-    'moderator.user_card.back_to_reports' | transloco
-  }}</a>
+  <a class="page__back" routerLink="/moderator/reports"
+    ><span aria-hidden="true">‹</span> {{ 'moderator.user_card.back_to_reports' | transloco }}</a
+  >
   <h1>{{ 'moderator.user_card.title' | transloco }}</h1>
   <p class="page__hint">{{ 'moderator.user_card.hint' | transloco }}</p>
 

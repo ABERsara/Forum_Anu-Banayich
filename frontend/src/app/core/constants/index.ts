@@ -254,6 +254,7 @@ export const REPORT_DECISION_LABELS: Record<ReportDecision, LabelKey> = {
   [ReportDecision.PENDING]: 'constants.report_decision.pending',
   [ReportDecision.INVALID]: 'constants.report_decision.invalid',
   [ReportDecision.VALID]: 'constants.report_decision.valid',
+  [ReportDecision.CLOSED_ACCOUNT_DELETED]: 'constants.report_decision.closed_account_deleted',
 };
 
 // ---------------------------------------------------------------------------

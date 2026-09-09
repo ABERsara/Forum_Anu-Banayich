@@ -254,7 +254,9 @@ def decide_report(
     report, post = get_report_for_moderator(db, report_id, moderator, for_update=True)
 
     if report.decision != ReportDecision.PENDING:
-        raise HTTPException(status_code=409, detail="הדיווח כבר טופל.")
+        raise HTTPException(
+            status_code=409, detail=translate("reports.already_handled")
+        )
 
     report.decision = data.decision
     report.moderator_id = moderator.id
@@ -493,10 +495,12 @@ def _user_in_moderators_cells(db: Session, user_id: str, moderator: User) -> Use
     """
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
 
     if moderator.role == UserRole.MODERATOR and not _moderator_covers(moderator, user):
-        raise HTTPException(status_code=403, detail="המשתמש אינו בתא שבאחריותך.")
+        raise HTTPException(
+            status_code=403, detail=translate("reports.user_outside_your_cells")
+        )
 
     return user
 

@@ -289,14 +289,16 @@ describe('direction', () => {
       files.filter(([, source]) => source.trim() !== '').length;
 
     // After `markupOf`, not before it. A `.component.ts` always reads back with
-    // something in it, so counting the source would report all thirty-six
+    // something in it, so counting the source would report all thirty-seven
     // whether or not the extraction still finds a template inside any of them.
-    // Seven carry one today.
+    // Five carry one today: ABF-105 moved the moderator reports screen's
+    // template out to its own file, which is a floor this check tracks rather
+    // than a rule it enforces — the point is that the extraction found any.
     const inlineMarkup = TEMPLATES.filter(([path]) => path.endsWith('.ts'));
 
     expect(withContent(STYLESHEETS), 'stylesheets read').toBeGreaterThan(30);
     expect(withContent(TEMPLATE_FILES), 'templates read').toBeGreaterThan(20);
-    expect(withContent(inlineMarkup), 'inline templates extracted').toBeGreaterThan(5);
+    expect(withContent(inlineMarkup), 'inline templates extracted').toBeGreaterThan(4);
   });
 
   it('names no physical side in a stylesheet', () => {

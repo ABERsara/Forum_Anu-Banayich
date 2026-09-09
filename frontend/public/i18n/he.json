@@ -630,7 +630,8 @@
     "report_decision": {
       "pending": "ממתין לטיפול",
       "invalid": "הדיווח בוטל",
-      "valid": "הדיווח התקבל"
+      "valid": "הדיווח התקבל",
+      "closed_account_deleted": "נסגר — החשבון נמחק"
     },
     "document_type": {
       "death_certificate": "תעודת פטירה",

@@ -630,7 +630,8 @@
     "report_decision": {
       "pending": "Pending",
       "invalid": "Report dismissed",
-      "valid": "Report upheld"
+      "valid": "Report upheld",
+      "closed_account_deleted": "Closed — account deleted"
     },
     "document_type": {
       "death_certificate": "Death certificate",

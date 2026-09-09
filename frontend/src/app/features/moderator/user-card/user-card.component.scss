@@ -9,24 +9,6 @@
     margin-bottom: $spacing-sm;
     color: $color-primary-dark;
 
-    // "Back" is a direction, not copy — so the arrow is drawn here rather than
-    // typed into the template, and it turns with <html dir>, which LocaleService
-    // flips with the language (CONTRIBUTING §6). Browsers do not mirror U+2190
-    // on their own, so RTL needs the character swapped. LTR is the base rule,
-    // not a [dir='ltr'] one, so the link still gets its arrow before
-    // LocaleService has written the attribute.
-    &::before {
-      content: '←';
-      margin-inline-end: $spacing-xs;
-    }
-
-    // :host-context, not a plain [dir='rtl'] ancestor: emulated encapsulation
-    // stamps the component attribute on every compound it is given, and <html>
-    // never carries it, so the plain form compiles to a rule that cannot match.
-    :host-context([dir='rtl']) &::before {
-      content: '→';
-    }
-
     &:focus-visible {
       @include focus-ring;
     }
