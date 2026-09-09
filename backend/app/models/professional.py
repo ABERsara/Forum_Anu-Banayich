@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.constants import ProfessionalDomain, QueryStatus
+from app.core.constants import ProfessionalDomain, QueryStatus, Sector, UserType
 from app.db.base import Base
 
 
@@ -40,6 +40,19 @@ class ProfessionalQuery(Base):
     )
 
     # ------------------------------------------------------------------
+    # Asker's group/sector cell, frozen at creation time (see create_query()).
+    # Unlike ForumPost's GroupVisibility/SectorVisibility there is no "all"
+    # member here: a professional question always belongs to exactly one
+    # cell. Nullable because historical rows backfilled from a since-cleared
+    # asker profile may have no source value to copy — such a row simply
+    # never appears in the public feed.
+    # ------------------------------------------------------------------
+    asker_user_type: Mapped[UserType | None] = mapped_column(
+        Enum(UserType), nullable=True
+    )
+    asker_sector: Mapped[Sector | None] = mapped_column(Enum(Sector), nullable=True)
+
+    # ------------------------------------------------------------------
     # Content (stored encrypted)
     # ------------------------------------------------------------------
     content: Mapped[str] = mapped_column(Text, nullable=False)  # encrypted
@@ -52,9 +65,6 @@ class ProfessionalQuery(Base):
     status: Mapped[QueryStatus] = mapped_column(
         Enum(QueryStatus), nullable=False, default=QueryStatus.OPEN
     )
-    is_featured: Mapped[bool] = mapped_column(
-        Boolean, default=False
-    )  # "מועדפת" by asker
 
     # ------------------------------------------------------------------
     # Privacy: professional sees only this alias (e.g. "אלמנה – ספרדי")
@@ -78,6 +88,12 @@ class ProfessionalQuery(Base):
     )
     professional: Mapped["User | None"] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "User", foreign_keys=[professional_id]
+    )
+    likes: Mapped[list["Like"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
+        "Like",
+        primaryjoin="and_(Like.target_id == ProfessionalQuery.id, Like.target_type == 'professional_query')",
+        foreign_keys="Like.target_id",
+        viewonly=True,
     )
 
     def __repr__(self) -> str:

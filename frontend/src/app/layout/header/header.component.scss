@@ -47,6 +47,26 @@
     }
   }
 
+  &__messages {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+  }
+
+  &__messages-icon {
+    display: inline-flex;
+
+    // The one direction-aware rule in the app, and the only kind that has to
+    // be: the speech bubble's tail is drawn into the SVG path at the bottom
+    // left, and a path has no start edge to hand to a logical property. The
+    // chevrons elsewhere carry Bidi_Mirrored and turn themselves; this one
+    // has to be told. `:host-context` is what reaches <html dir> from inside
+    // a component's scoped styles (CONTRIBUTING §6).
+    :host-context([dir='rtl']) & {
+      transform: scaleX(-1);
+    }
+  }
+
   &__logout {
     color: $color-text-muted;
     font-weight: $font-weight-medium;

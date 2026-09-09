@@ -32,7 +32,6 @@ class ProfessionalQueryResponse(BaseModel):
     answer: str | None = None
     is_public: bool
     status: QueryStatus
-    is_featured: bool
     domain: ProfessionalDomain | None = None
     professional: ProfessionalProfile | None = None
     # Asker info: only shown if show_real_name=True, otherwise alias
@@ -40,6 +39,8 @@ class ProfessionalQueryResponse(BaseModel):
     asker: UserPublic | None = None  # only if show_real_name=True
     created_at: datetime
     answered_at: datetime | None = None
+    like_count: int
+    liked_by_me: bool
 
     model_config = {"from_attributes": True}
 
@@ -57,7 +58,15 @@ class PublicQAResponse(BaseModel):
     content: str
     answer: str
     domain: ProfessionalDomain | None = None
-    is_featured: bool
     answered_at: datetime | None = None
+    like_count: int
+    liked_by_me: bool
+    # Who answered: always shown, same as ProfessionalQueryResponse — not a
+    # privacy concern, the name is already public in the professional catalog.
+    professional: ProfessionalProfile | None = None
+    # Who asked: real name only if they opted in when asking, otherwise the
+    # same anonymized alias used everywhere else in this module.
+    asker_alias: str  # e.g. "אלמנה – ספרדי"
+    asker: UserPublic | None = None  # only if show_real_name=True
 
     model_config = {"from_attributes": True}

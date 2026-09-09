@@ -7,6 +7,7 @@ When you create a new model file, add it to this list.
 from app.models.audit import AuditLog
 from app.models.document import Document
 from app.models.forum import DirectMessage, ForumPost
+from app.models.like import Like
 from app.models.professional import ProfessionalQuery
 from app.models.report import Report
 from app.models.user import User
@@ -17,6 +18,7 @@ __all__ = [
     "DirectMessage",
     "ProfessionalQuery",
     "Report",
+    "Like",
     "Document",
     "AuditLog",
 ]

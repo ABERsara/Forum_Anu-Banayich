@@ -8,10 +8,12 @@ import {
   Validators,
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
-import { PROFESSIONAL_DOMAIN_LABELS } from '../../../core/constants';
+import { LabelKey, PROFESSIONAL_DOMAIN_LABELS } from '../../../core/constants';
 import { ProfessionalQuery } from '../../../core/models';
 import { ProfessionalService } from '../../../core/services/professional.service';
+import { AdviceError, NO_ERROR, adviceErrorFrom } from '../advice-error';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
@@ -33,6 +35,7 @@ const ANSWER_MAX_LENGTH = 5000;
     ReactiveFormsModule,
     RouterLink,
     DatePipe,
+    TranslocoPipe,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,
   ],
@@ -48,8 +51,13 @@ export class PendingQuestionsComponent implements OnInit {
 
   readonly questions = signal<ProfessionalQuery[]>([]);
   readonly isLoading = signal(false);
-  readonly errorMessage = signal('');
-  readonly successMessage = signal('');
+  /** What went wrong, as a key of ours or a sentence the API sent. */
+  readonly error = signal<AdviceError>(NO_ERROR);
+  /**
+   * The confirmation after an answer went out, held as a *key* and piped in
+   * the template so it follows a language switch (CONTRIBUTING §6).
+   */
+  readonly successKey = signal('');
   /** Id of the question being submitted, so only its own button is disabled. */
   readonly submittingId = signal<string | null>(null);
 
@@ -67,7 +75,7 @@ export class PendingQuestionsComponent implements OnInit {
         this.isLoading.set(false);
       },
       error: (err) => {
-        this.errorMessage.set(err.error?.detail ?? 'שגיאה בטעינת השאלות הממתינות.');
+        this.error.set(adviceErrorFrom(err, 'advice.errors.load_pending_failed'));
         this.isLoading.set(false);
       },
     });
@@ -87,8 +95,12 @@ export class PendingQuestionsComponent implements OnInit {
       : question.asker_alias;
   }
 
-  /** The domain a general question arrived under; empty when asked directly. */
-  topic(question: ProfessionalQuery): string {
+  /**
+   * The label key for the domain a general question arrived under; empty when
+   * it was asked of this professional directly. The template pipes it, so an
+   * empty topic stays empty — Transloco passes a falsy key straight through.
+   */
+  topic(question: ProfessionalQuery): LabelKey {
     return question.domain ? this.domainLabels[question.domain] : '';
   }
 
@@ -100,8 +112,8 @@ export class PendingQuestionsComponent implements OnInit {
     }
 
     this.submittingId.set(question.id);
-    this.errorMessage.set('');
-    this.successMessage.set('');
+    this.error.set(NO_ERROR);
+    this.successKey.set('');
 
     this.professionalService.answerQuestion(question.id, control.value).subscribe({
       next: () => {
@@ -109,11 +121,11 @@ export class PendingQuestionsComponent implements OnInit {
         // release its control instead of leaving a stale one behind.
         this.questions.update((pending) => pending.filter((q) => q.id !== question.id));
         this.answers.removeControl(question.id);
-        this.successMessage.set('התשובה נשלחה, והשואל/ת קיבל/ה על כך התראה במייל.');
+        this.successKey.set('advice.pending.success');
         this.submittingId.set(null);
       },
       error: (err) => {
-        this.errorMessage.set(err.error?.detail ?? 'שגיאה בשליחת התשובה.');
+        this.error.set(adviceErrorFrom(err, 'advice.errors.answer_failed'));
         this.submittingId.set(null);
       },
     });

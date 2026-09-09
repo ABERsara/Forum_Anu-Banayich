@@ -3,27 +3,36 @@
  *
  * TODO list for junior developer:
  *   [ ] implement reportPost() – POST /forum/posts/:id/report
- *   [ ] implement getInbox() – GET /messages
- *   [ ] implement sendMessage() – POST /messages
- *   [ ] implement getConversation() – GET /messages/:userId
- *   [ ] implement searchUsers() – GET /users/search?name=...
  */
 
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import {
-  ConversationSummary,
-  DirectMessage,
+  ConversationList,
+  ConversationMessagesPage,
   DirectMessageCreate,
+  DirectMessageSendResult,
   ForumPost,
   ForumPostCreate,
   ForumPostList,
   ForumPostUpdate,
+  LikeResponse,
   ReportCreate,
   UserPublic,
 } from '../models';
 import { ApiService } from './api.service';
+
+/**
+ * Deterministic conversation key for a pair of user ids — must produce the
+ * exact same string as the backend's forum_service.build_conversation_key()
+ * (Python's sorted() and this both sort ASCII UUID strings lexicographically,
+ * so they agree). Not a secret: both participants already know each other's
+ * id from the cell-members list.
+ */
+export function buildConversationKey(userIdA: string, userIdB: string): string {
+  return [userIdA, userIdB].sort().join(':');
+}
 
 @Injectable({ providedIn: 'root' })
 export class ForumService {
@@ -51,6 +60,10 @@ export class ForumService {
     return this.api.patch<ForumPost>(`/forum/posts/${id}`, data);
   }
 
+  toggleLike(id: string): Observable<LikeResponse> {
+    return this.api.patch<LikeResponse>(`/forum/posts/${id}/like`, {});
+  }
+
   reportPost(postId: string, data: ReportCreate): Observable<unknown> {
     void postId;
     void data;
@@ -65,41 +78,52 @@ export class ForumService {
   // Direct messages
   // ──────────────────────────────────────────────────────────
 
-  getInbox(): Observable<ConversationSummary[]> {
-    /**
-     * TODO:
-     *   return this.api.get<ConversationSummary[]>('/messages');
-     */
-    throw new Error('getInbox() not yet implemented');
+  getInbox(page = 1, pageSize = 20): Observable<ConversationList> {
+    return this.api.get<ConversationList>(`/messages?page=${page}&page_size=${pageSize}`);
   }
 
-  sendMessage(data: DirectMessageCreate): Observable<DirectMessage> {
-    void data;
-    /**
-     * TODO:
-     *   return this.api.post<DirectMessage>('/messages', data);
-     */
-    throw new Error('sendMessage() not yet implemented');
+  sendMessage(data: DirectMessageCreate): Observable<DirectMessageSendResult> {
+    return this.api.post<DirectMessageSendResult>('/messages', data);
   }
 
-  getConversation(userId: string, page = 1): Observable<DirectMessage[]> {
-    void userId;
-    void page;
-    /**
-     * TODO:
-     *   return this.api.get<DirectMessage[]>(`/messages/${userId}?page=${page}`);
-     */
-    throw new Error('getConversation() not yet implemented');
+  /**
+   * One page of the conversation with `otherUserId`, oldest first within the
+   * page. `conversation_key` is a deterministic, non-secret pairing of the two
+   * user ids — see buildConversationKey().
+   *
+   * Call it with no `before` for the newest page, which is what the screen
+   * opens on, then pass each response's `next_cursor` back as `before` to walk
+   * backwards. That first, cursor-less request is also the one that marks the
+   * conversation read on the server, so scrolling back through history stays a
+   * pure read.
+   */
+  getConversation(
+    myUserId: string,
+    otherUserId: string,
+    options: { limit?: number; before?: string | null } = {},
+  ): Observable<ConversationMessagesPage> {
+    const key = buildConversationKey(myUserId, otherUserId);
+    const params = new URLSearchParams();
+    if (options.limit !== undefined) params.set('limit', String(options.limit));
+    if (options.before) params.set('before', options.before);
+    const query = params.toString();
+    return this.api.get<ConversationMessagesPage>(
+      `/conversations/${key}/messages${query ? `?${query}` : ''}`,
+    );
   }
 
+  /** Other ACTIVE members of the current user's own cell (group+sector). */
+  getCellMembers(): Observable<UserPublic[]> {
+    return this.api.get<UserPublic[]>('/cells/me/members');
+  }
+
+  /**
+   * Search the current user's own cell (group+sector) by name, to start a
+   * new conversation. Backend enforces the same-cell filter and the 2-char
+   * minimum (422 otherwise) — the caller should debounce and gate on length
+   * itself rather than relying on that as the primary mechanism.
+   */
   searchUsers(name: string): Observable<UserPublic[]> {
-    void name;
-    /**
-     * TODO:
-     *   return this.api.get<UserPublic[]>(`/users/search?name=${encodeURIComponent(name)}`);
-     *
-     * Only users in the same group are returned (backend enforced).
-     */
-    throw new Error('searchUsers() not yet implemented');
+    return this.api.get<UserPublic[]>(`/messages/recipients?q=${encodeURIComponent(name)}`);
   }
 }

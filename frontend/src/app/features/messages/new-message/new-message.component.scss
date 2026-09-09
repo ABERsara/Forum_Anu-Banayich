@@ -1,0 +1,68 @@
+@use '../../../../styles/variables' as *;
+
+.cell-search {
+  margin-bottom: $spacing-lg;
+
+  label {
+    display: block;
+    margin-bottom: $spacing-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  &__input {
+    display: block;
+    width: 100%;
+    max-width: 24rem;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    font-size: $font-size-base;
+    color: $color-text;
+    background: $color-bg;
+
+    &:focus-visible {
+      outline: 2px solid $color-primary;
+      outline-offset: 2px;
+    }
+  }
+
+  &__hint {
+    margin: $spacing-sm 0;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+
+  &__results {
+    margin-top: $spacing-md;
+  }
+}
+
+.cell-members {
+  padding: $spacing-md;
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__item {
+    display: block;
+    padding: $spacing-md;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    margin-bottom: $spacing-sm;
+    color: $color-text;
+    text-decoration: none;
+
+    &:hover {
+      background: $color-bg-subtle;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $color-primary;
+      outline-offset: 2px;
+    }
+  }
+}

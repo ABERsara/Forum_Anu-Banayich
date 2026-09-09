@@ -5,7 +5,7 @@
  *   [x] implement getProfessionals()
  *   [x] implement askQuestion()
  *   [x] implement getMyQuestions()
- *   [ ] implement getPublicQA()
+ *   [x] implement getPublicQA()
  *   [x] implement getPendingQuestions() (for professional users)
  *   [x] implement answerQuestion() (for professional users)
  */
@@ -14,6 +14,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import {
+  LikeResponse,
   ProfessionalProfile,
   ProfessionalQuery,
   ProfessionalQueryCreate,
@@ -38,15 +39,12 @@ export class ProfessionalService {
     return this.api.get<ProfessionalQuery[]>('/advice/questions');
   }
 
-  getPublicQA(domain?: ProfessionalDomain, page = 1): Observable<PublicQA[]> {
-    void domain;
-    void page;
-    /**
-     * TODO:
-     *   const params = domain ? `?domain=${domain}&page=${page}` : `?page=${page}`;
-     *   return this.api.get<PublicQA[]>(`/advice/questions/public${params}`);
-     */
-    throw new Error('getPublicQA() not yet implemented');
+  getPublicQA(domain?: ProfessionalDomain, page = 1, pageSize = 20): Observable<PublicQA[]> {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    if (domain) {
+      params.set('domain', domain);
+    }
+    return this.api.get<PublicQA[]>(`/advice/questions/public?${params}`);
   }
 
   /** Questions still waiting for the logged-in professional. Professional role only. */
@@ -57,5 +55,10 @@ export class ProfessionalService {
   /** Submit an answer to a pending question. Professional role only. */
   answerQuestion(queryId: string, answer: string): Observable<ProfessionalQuery> {
     return this.api.put<ProfessionalQuery>(`/advice/questions/${queryId}/answer`, { answer });
+  }
+
+  /** Toggle a like on a public professional query. */
+  toggleLike(queryId: string): Observable<LikeResponse> {
+    return this.api.patch<LikeResponse>(`/advice/questions/${queryId}/like`, {});
   }
 }

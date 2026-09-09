@@ -121,12 +121,23 @@ class ReportTargetType(enum.StrEnum):
     PROFESSIONAL_QUERY = "professional_query"  # שאלה מקצועית
 
 
+class LikeTargetType(enum.StrEnum):
+    """What type of content a like applies to."""
+
+    FORUM_POST = "forum_post"  # הודעת פורום
+    PROFESSIONAL_QUERY = "professional_query"  # שאלה מקצועית
+
+
 class ReportDecision(enum.StrEnum):
     """Moderator's decision on a report."""
 
     PENDING = "pending"  # ממתין לטיפול
     INVALID = "invalid"  # שגוי – הודעה הושבה
     VALID = "valid"  # מוצדק – הודעה נמחקה
+    # System-closed, not a moderator's decision: the reported-on user deleted
+    # their account, so the private message the report pointed at was deleted
+    # with it (spec §9.4, ABF-117) — nothing is left to investigate.
+    CLOSED_ACCOUNT_DELETED = "closed_account_deleted"
 
 
 class DocumentType(enum.StrEnum):
@@ -157,6 +168,9 @@ class AuditAction(enum.StrEnum):
     DATA_EXPORTED = "data_exported"
     USER_LOGIN = "user_login"
     USER_LOGOUT = "user_logout"
+    DIRECT_MESSAGE_ACCESS_DENIED = "direct_message_access_denied"
+    DIRECT_MESSAGE_PRUNED = "direct_message_pruned"
+    AGENT_CONVERSATION = "agent_conversation"
 
 
 # ---------------------------------------------------------------------------

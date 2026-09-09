@@ -1,9 +1,12 @@
 @use '../../../../styles/variables' as *;
 
+// No `direction` here: the page inherits it from <html dir>, which
+// LocaleService sets from the active language (CONTRIBUTING §6). Everything
+// below is direction-neutral — no text-align, no margin-left/right — so the
+// layout mirrors on its own when the language flips.
 :host {
   display: block;
   padding: $spacing-lg;
-  direction: rtl;
 }
 
 h1 {
@@ -38,6 +41,13 @@ h1 {
   flex-wrap: wrap;
 }
 
+.question-answer {
+  color: $color-text;
+  margin-top: $spacing-sm;
+  padding-top: $spacing-sm;
+  border-top: 1px solid $color-border;
+}
+
 .question-status {
   font-weight: $font-weight-medium;
 
@@ -51,5 +61,23 @@ h1 {
 
   &.status--closed {
     color: $color-text-muted;
+  }
+}
+
+.like-button {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: transparent;
+  padding: $spacing-xs $spacing-sm;
+  margin-top: $spacing-sm;
+  cursor: pointer;
+  color: $color-text-muted;
+
+  &.liked {
+    color: $color-primary;
+    border-color: $color-primary;
   }
 }

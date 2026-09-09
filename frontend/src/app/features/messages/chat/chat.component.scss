@@ -1,0 +1,212 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  // app-root renders <app-header> (64px, see header.component.scss's
+  // .header__inner) above <router-outlet> in normal document flow, not as
+  // an overlay — so 100dvh here would overflow the viewport by 64px and
+  // push the composer below the fold. 100dvh over 100vh: correct on mobile
+  // when the browser chrome shows/hides.
+  height: calc(100dvh - 64px);
+  padding: $spacing-md;
+
+  &__sr-only {
+    @include visually-hidden;
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    padding-bottom: $spacing-sm;
+    border-bottom: 1px solid $color-border;
+
+    h1 {
+      margin: 0;
+      font-size: $font-size-lg;
+    }
+  }
+
+  &__log {
+    flex: 1;
+    overflow-y: auto;
+    padding: $spacing-md 0;
+
+    // The region is focusable so it can be scrolled from the keyboard; a
+    // focusable thing has to show where the focus is.
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__empty,
+  &__history-start {
+    color: $color-text-muted;
+    text-align: center;
+  }
+
+  &__older {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $spacing-sm;
+    padding-bottom: $spacing-md;
+  }
+
+  &__older-button {
+    padding: $spacing-xs $spacing-md;
+    border: 1px solid $color-border;
+    border-radius: $radius-full;
+    background: $color-bg;
+    color: $color-primary;
+    font-size: $font-size-sm;
+    cursor: pointer;
+
+    &:hover {
+      background: $color-bg-subtle;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__messages {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+  }
+
+  &__message {
+    display: flex;
+
+    // flex-start/flex-end are direction-relative, so this flips correctly
+    // with <html dir> (LocaleService) in both RTL and LTR — own messages
+    // always land on the trailing edge, matching this app's chat convention.
+    &--mine {
+      justify-content: flex-end;
+
+      .chat__bubble {
+        background: $color-primary;
+        color: $color-white;
+      }
+    }
+
+    &--theirs {
+      justify-content: flex-start;
+
+      .chat__bubble {
+        background: $color-bg-subtle;
+        color: $color-text;
+      }
+    }
+  }
+
+  &__bubble {
+    display: flex;
+    flex-direction: column;
+    max-width: 75%;
+    padding: $spacing-sm $spacing-md;
+    border-radius: $radius-lg;
+
+    // A message still in flight is outlined, not dimmed. Fading the bubble
+    // was the obvious choice and the wrong one: opacity blends the background
+    // towards white as well as the text, and white on a 25%-faded
+    // $color-primary lands near 3.3:1 — under the 4.5:1 this screen has to
+    // hold. The dashed edge costs no contrast, and the receipt under the
+    // bubble says "sending" in words for anyone who cannot see either.
+    &--pending {
+      outline: 1px dashed currentcolor;
+      outline-offset: -3px;
+    }
+  }
+
+  &__speaker {
+    @include visually-hidden;
+  }
+
+  &__text {
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  &__meta {
+    display: flex;
+    gap: $spacing-sm;
+    margin-top: $spacing-xs;
+    font-size: $font-size-xs;
+    // Inherits the bubble's own colour, at full strength. This line carries
+    // the read receipt, and both of the quieter options fail the contrast
+    // floor on the blue bubble: $color-text-muted is 1.07:1 against
+    // $color-primary — all but invisible — and dropping the opacity to 0.85
+    // takes white down to 4.2:1, under the 4.5:1 required.
+  }
+
+  &__notice,
+  &__limit {
+    margin: 0 0 $spacing-sm;
+    padding: $spacing-sm $spacing-md;
+    border-radius: $radius-md;
+    background: $color-bg-subtle;
+    color: $color-text;
+    font-size: $font-size-sm;
+  }
+
+  &__composer-row {
+    display: flex;
+    gap: $spacing-sm;
+    padding-top: $spacing-sm;
+    border-top: 1px solid $color-border;
+
+    textarea {
+      flex: 1;
+      padding: $spacing-sm;
+      border: 1px solid $color-border;
+      border-radius: $radius-md;
+      font: inherit;
+      resize: vertical;
+
+      &:focus-visible {
+        @include focus-ring;
+      }
+    }
+
+    button {
+      align-self: flex-end;
+      padding: $spacing-sm $spacing-md;
+      border-radius: $radius-md;
+      border: none;
+      background: $color-primary;
+      color: $color-white;
+      cursor: pointer;
+
+      &:disabled {
+        background: $color-border;
+        color: $color-text-muted;
+        cursor: default;
+      }
+
+      &:focus-visible {
+        @include focus-ring;
+      }
+    }
+  }
+
+  &__counter {
+    margin: $spacing-xs 0 0;
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+    text-align: end;
+  }
+
+  @media (max-width: $bp-sm) {
+    &__bubble {
+      max-width: 90%;
+    }
+  }
+}

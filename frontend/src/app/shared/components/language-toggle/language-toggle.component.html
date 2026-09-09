@@ -1,0 +1,10 @@
+<button
+  type="button"
+  class="language-toggle"
+  (click)="toggled.emit()"
+  [attr.aria-label]="
+    (isHebrew() ? 'header.switch_to_english' : 'header.switch_to_hebrew') | transloco
+  "
+>
+  {{ (isHebrew() ? 'common.lang_en' : 'common.lang_he') | transloco }}
+</button>

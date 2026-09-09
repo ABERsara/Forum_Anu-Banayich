@@ -8,9 +8,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import app.models  # noqa: F401 — registers all models with Base.metadata
 from app.core.config import settings
 from app.db.base import Base
-from app.models import audit, document, forum, professional, report, user  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,8 +18,14 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
+#
+# disable_existing_loggers=False: fileConfig()'s default (True) silently
+# disables every logger already created in this process — harmless for a
+# real `alembic upgrade` CLI run (a fresh process), but when alembic runs
+# in-process (test_migration.py does exactly this), it permanently disables
+# app.* loggers for every test that runs afterward in the same suite.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # add your model's MetaData object here
 # for 'autogenerate' support

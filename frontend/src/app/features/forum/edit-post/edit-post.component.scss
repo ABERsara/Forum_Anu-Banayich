@@ -1,9 +1,12 @@
 @use '../../../../styles/variables' as *;
 
+// No `direction` here: the page inherits it from <html dir>, which
+// LocaleService sets from the active language (CONTRIBUTING §6). Everything
+// below is direction-neutral — no text-align, no margin-left/right — so the
+// layout mirrors on its own when the language flips.
 :host {
   display: block;
   padding: $spacing-lg;
-  direction: rtl;
 }
 
 .edit-post-card {

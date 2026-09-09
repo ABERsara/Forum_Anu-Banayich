@@ -22,4 +22,11 @@ describe('ErrorDisplayComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.error-display')).toBeNull();
   });
+
+  it('does not pin its own text direction — it follows <html dir>', () => {
+    fixture.componentRef.setInput('message', 'שגיאה כלשהי');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.error-display').hasAttribute('dir')).toBe(false);
+  });
 });

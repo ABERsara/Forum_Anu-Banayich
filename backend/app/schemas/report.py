@@ -12,6 +12,7 @@ from app.core.constants import (
     ReportReason,
     ReportTargetType,
 )
+from app.core.i18n import translate
 
 
 class ReportCreate(BaseModel):
@@ -68,7 +69,7 @@ class ReportDecideRequest(BaseModel):
     def decision_must_resolve_the_report(cls, v: ReportDecision) -> ReportDecision:
         """PENDING is the state a report starts in, not a decision to submit."""
         if v == ReportDecision.PENDING:
-            raise ValueError("יש לבחור החלטה: מוצדק או שגוי")
+            raise ValueError(translate("validation.decision_required"))
         return v
 
     @field_validator("note")
@@ -77,7 +78,7 @@ class ReportDecideRequest(BaseModel):
         """min_length alone would accept a note of five spaces."""
         note = v.strip()
         if len(note) < 5:
-            raise ValueError("הערת המבקר חייבת לכלול לפחות 5 תווים")
+            raise ValueError(translate("validation.review_note_too_short"))
         return note
 
 

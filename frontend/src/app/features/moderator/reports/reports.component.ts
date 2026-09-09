@@ -11,6 +11,10 @@
  * moderator's written justification for deleting a bereaved user's post, and
  * once the content is gone it is the only record of why.
  *
+ * All of the copy lives under `moderator.*` in he.json/en.json — the screen
+ * ABF-134 migrated is the screen this one replaces, so the keys it put there
+ * carry on into the tabs, and no hardcoded Hebrew comes back (CONTRIBUTING §6).
+ *
  * Important:
  *   - Moderator can NOT see private messages (no DM content shown)
  *   - Moderator can NOT see reporter's identity – the count only
@@ -25,7 +29,7 @@ import {
   signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ReportWithContent } from '../../../core/models';
 import {
@@ -34,6 +38,7 @@ import {
   REPORT_REASON_LABELS,
   ReportDecision,
 } from '../../../core/constants';
+import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { ReportService } from '../../../core/services/report.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
@@ -43,6 +48,17 @@ const PREVIEW_LENGTH = 200;
 
 /** Matches the note length the backend enforces on ReportDecideRequest. */
 const MIN_NOTE_LENGTH = 5;
+
+/**
+ * Stands in for a field the report carries nothing in — the description the
+ * reporter left empty, or the note on a decision taken before notes were
+ * required.
+ *
+ * A dash is a glyph, not copy: it reads the same in both languages and is
+ * Bidi-neutral, so it stays out of the translation files — the same call the
+ * dashboard chevron got in ABF-132 and the description dash got in ABF-134.
+ */
+const EMPTY_VALUE = '–';
 
 type Tab = 'pending' | 'history';
 
@@ -55,7 +71,13 @@ interface PendingDecision {
 @Component({
   selector: 'app-moderator-reports',
   standalone: true,
-  imports: [DatePipe, ConfirmDialogComponent, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    DatePipe,
+    TranslocoPipe,
+    ConfirmDialogComponent,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './reports.component.html',
   styleUrl: './reports.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -83,12 +105,14 @@ export class ModeratorReportsComponent implements OnInit {
 
   /** The decision the confirmation dialog is asking about; null when closed. */
   readonly pendingDecision = signal<PendingDecision | null>(null);
-  readonly actionError = signal<string | null>(null);
+  /** Held as a key or a server sentence, never as translated text (ABF-132). */
+  readonly actionError = signal<ScreenError>(NO_ERROR);
 
   readonly reasonLabels = REPORT_REASON_LABELS;
   readonly decisionLabels = REPORT_DECISION_LABELS;
   readonly postStatusLabels = POST_STATUS_LABELS;
   readonly minNoteLength = MIN_NOTE_LENGTH;
+  readonly emptyValue = EMPTY_VALUE;
   readonly decisions = ReportDecision;
 
   readonly hasPreviousPage = computed(() => this.historyPage() > 1);
@@ -153,7 +177,7 @@ export class ModeratorReportsComponent implements OnInit {
   // ---------------------------------------------------------------------------
 
   decide(report: ReportWithContent, decision: ReportDecision): void {
-    this.actionError.set(null);
+    this.actionError.set(NO_ERROR);
     this.pendingDecision.set({ report, decision });
   }
 
@@ -179,22 +203,28 @@ export class ModeratorReportsComponent implements OnInit {
           this.isHistoryFresh.set(false);
           this.pendingDecision.set(null);
         },
-        error: (err: HttpErrorResponse) => {
-          this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בשמירת ההחלטה. נסי שוב.'));
+        error: (err: unknown) => {
+          this.actionError.set(screenErrorFrom(err, 'moderator.errors.decide_failed'));
           this.pendingDecision.set(null);
         },
       });
   }
 
-  /** What the confirmation dialog says the decision is about to do. */
-  confirmTitle(decision: ReportDecision): string {
-    return decision === ReportDecision.VALID ? 'מחיקת ההודעה' : 'ביטול הדיווח';
+  /**
+   * What the confirmation dialog says the decision is about to do — the *key*,
+   * piped by the template. The dialog is a shared component and takes finished
+   * text, so the caller is where the pipe belongs (CONTRIBUTING §6, ABF-128).
+   */
+  confirmTitleKey(decision: ReportDecision): string {
+    return decision === ReportDecision.VALID
+      ? 'moderator.reports.confirm_valid_title'
+      : 'moderator.reports.confirm_invalid_title';
   }
 
-  confirmMessage(decision: ReportDecision): string {
+  confirmMessageKey(decision: ReportDecision): string {
     return decision === ReportDecision.VALID
-      ? 'הדיווח יסומן כמוצדק, ההודעה תוסר מהפורום, וכותב/ת ההודעה יקבלו על כך הודעת מערכת.'
-      : 'הדיווח יסומן כשגוי. הודעה שהוסתרה אוטומטית לאחר שני דיווחים תוצג שוב בפורום.';
+      ? 'moderator.reports.confirm_valid_message'
+      : 'moderator.reports.confirm_invalid_message';
   }
 
   // ---------------------------------------------------------------------------
@@ -229,10 +259,5 @@ export class ModeratorReportsComponent implements OnInit {
     if (this.hasNextPage()) {
       this.loadHistory(this.historyPage() + 1);
     }
-  }
-
-  private messageFrom(err: HttpErrorResponse, fallback: string): string {
-    const detail: unknown = err.error?.detail;
-    return typeof detail === 'string' ? detail : fallback;
   }
 }

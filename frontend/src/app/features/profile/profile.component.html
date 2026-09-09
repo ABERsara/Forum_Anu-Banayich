@@ -1,0 +1,101 @@
+<div class="profile-page">
+  <h1>{{ 'profile.title' | transloco }}</h1>
+
+  @if (auth.currentUser(); as user) {
+    <section class="profile-details">
+      <p>
+        <strong>{{ 'profile.name_label' | transloco }}</strong> {{ user.first_name }}
+        {{ user.last_name }}
+      </p>
+      <p>
+        <strong>{{ 'profile.email_label' | transloco }}</strong> {{ user.email }}
+      </p>
+      <p>
+        <strong>{{ 'profile.group_label' | transloco }}</strong>
+        {{ user.user_type ? (userTypeLabels[user.user_type] | transloco) : '' }}
+      </p>
+      <p>
+        <strong>{{ 'profile.sector_label' | transloco }}</strong>
+        {{ user.sector ? (sectorLabels[user.sector] | transloco) : '' }}
+      </p>
+      <p>
+        <strong>{{ 'profile.status_label' | transloco }}</strong>
+        {{ statusLabels[user.account_status] | transloco }}
+      </p>
+    </section>
+
+    @if (user.role === userRole.USER) {
+      <section class="profile-section" aria-labelledby="retention-heading">
+        <h2 id="retention-heading">{{ 'profile.retention.title' | transloco }}</h2>
+        <p>{{ 'profile.retention.description' | transloco }}</p>
+
+        <button
+          type="button"
+          class="btn btn--primary"
+          [disabled]="isExporting()"
+          (click)="exportMessages()"
+        >
+          {{ 'profile.retention.export_button' | transloco }}
+        </button>
+
+        <div class="profile-section__status" aria-live="polite" [attr.aria-busy]="isExporting()">
+          @if (isExporting()) {
+            <app-loading-spinner
+              size="sm"
+              [message]="'profile.retention.export_loading' | transloco"
+            />
+          } @else if (exportError().text; as text) {
+            <app-error-display [message]="text" />
+          } @else if (exportError().key; as key) {
+            <app-error-display [message]="key | transloco" />
+          } @else if (exportSuccess()) {
+            <p class="profile-section__success">
+              {{ 'profile.retention.export_success' | transloco }}
+            </p>
+          }
+        </div>
+      </section>
+    }
+
+    <section
+      class="profile-section profile-section--danger"
+      aria-labelledby="delete-account-heading"
+    >
+      <h2 id="delete-account-heading">{{ 'profile.delete_account.title' | transloco }}</h2>
+      <p>{{ 'profile.delete_account.description' | transloco }}</p>
+
+      <button
+        type="button"
+        class="btn btn--danger"
+        [disabled]="isDeleting()"
+        (click)="onDeleteAccountClick()"
+      >
+        {{ 'profile.delete_account.button' | transloco }}
+      </button>
+
+      <div class="profile-section__status" aria-live="polite" [attr.aria-busy]="isDeleting()">
+        @if (isDeleting()) {
+          <app-loading-spinner
+            size="sm"
+            [message]="'profile.delete_account.deleting' | transloco"
+          />
+        } @else if (deleteError().text; as text) {
+          <app-error-display [message]="text" />
+        } @else if (deleteError().key; as key) {
+          <app-error-display [message]="key | transloco" />
+        }
+      </div>
+    </section>
+
+    @if (showDeleteConfirm()) {
+      <app-confirm-dialog
+        [title]="'profile.delete_account.confirm_title' | transloco"
+        [message]="'profile.delete_account.confirm_message' | transloco"
+        [confirmText]="'profile.delete_account.confirm_button' | transloco"
+        [isDestructive]="true"
+        (confirmed)="onDeleteAccountConfirmed()"
+        (cancelled)="onDeleteAccountCancelled()"
+      />
+    }
+  }
+</div>

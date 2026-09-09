@@ -18,6 +18,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { DocumentAdminView, RegistrationDetail, UserAdminView } from '../../../core/models';
 import {
@@ -27,6 +28,8 @@ import {
   SECTOR_LABELS,
   USER_TYPE_LABELS,
 } from '../../../core/constants';
+import { LabelService } from '../../../core/i18n/label.service';
+import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { AdminService } from '../../../core/services/admin.service';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -34,7 +37,7 @@ import { ErrorDisplayComponent } from '../../../shared/components/error-display/
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 /** Stands in for a detail the applicant did not provide. */
-const NOT_PROVIDED = 'לא צוין';
+const NOT_PROVIDED = 'admin.pending_registrations.not_provided';
 
 @Component({
   selector: 'app-pending-registrations',
@@ -42,6 +45,7 @@ const NOT_PROVIDED = 'לא צוין';
   imports: [
     RouterLink,
     DatePipe,
+    TranslocoPipe,
     ButtonComponent,
     ConfirmDialogComponent,
     ErrorDisplayComponent,
@@ -53,11 +57,13 @@ const NOT_PROVIDED = 'לא צוין';
 })
 export class PendingRegistrationsComponent implements OnInit {
   private readonly adminService = inject(AdminService);
+  private readonly labels = inject(LabelService);
 
   registrations = signal<UserAdminView[]>([]);
   isLoading = signal(false);
   hasError = signal(false);
-  actionError = signal<string | null>(null);
+  /** What went wrong on approve or reject, as a key of ours or the API's own sentence. */
+  actionError = signal<ScreenError>(NO_ERROR);
   rejectingId = signal<string | null>(null);
 
   /** The registration whose details are open; null while every row is collapsed. */
@@ -65,13 +71,12 @@ export class PendingRegistrationsComponent implements OnInit {
   /** The open registration in full. Null while it is still loading, or failed to. */
   readonly detail = signal<RegistrationDetail | null>(null);
   readonly isDetailLoading = signal(false);
-  readonly detailError = signal('');
+  readonly detailError = signal<ScreenError>(NO_ERROR);
 
   readonly userTypeLabels = USER_TYPE_LABELS;
   readonly sectorLabels = SECTOR_LABELS;
   readonly statusLabels = ACCOUNT_STATUS_LABELS;
   readonly documentTypeLabels = DOCUMENT_TYPE_LABELS;
-  readonly notProvided = NOT_PROVIDED;
 
   ngOnInit(): void {
     this.isLoading.set(true);
@@ -112,7 +117,7 @@ export class PendingRegistrationsComponent implements OnInit {
 
     this.openId.set(userId);
     this.detail.set(null);
-    this.detailError.set('');
+    this.detailError.set(NO_ERROR);
     this.isDetailLoading.set(true);
 
     this.adminService.getRegistration(userId).subscribe({
@@ -129,9 +134,7 @@ export class PendingRegistrationsComponent implements OnInit {
         if (!this.isOpen(userId)) {
           return;
         }
-        this.detailError.set(
-          this.messageFrom(err, 'אירעה שגיאה בטעינת פרטי הבקשה. נסי לרענן את הדף.'),
-        );
+        this.detailError.set(screenErrorFrom(err, 'admin.errors.load_registration_failed'));
         this.isDetailLoading.set(false);
       },
     });
@@ -140,7 +143,7 @@ export class PendingRegistrationsComponent implements OnInit {
   closeDetail(): void {
     this.openId.set(null);
     this.detail.set(null);
-    this.detailError.set('');
+    this.detailError.set(NO_ERROR);
     this.isDetailLoading.set(false);
   }
 
@@ -154,7 +157,7 @@ export class PendingRegistrationsComponent implements OnInit {
 
   /** A detail the applicant may have left empty reads as "לא צוין", never blank. */
   orNotProvided(value: string | null): string {
-    return value?.trim() ? value : NOT_PROVIDED;
+    return value?.trim() ? value : this.labels.label(NOT_PROVIDED);
   }
 
   /**
@@ -163,22 +166,30 @@ export class PendingRegistrationsComponent implements OnInit {
    * while reviewing (SPEC §8.1), so a request can reach this screen without one.
    */
   userTypeLabel(registration: UserAdminView): string {
-    return registration.user_type ? this.userTypeLabels[registration.user_type] : NOT_PROVIDED;
+    return registration.user_type
+      ? this.labels.label(this.userTypeLabels[registration.user_type])
+      : this.labels.label(NOT_PROVIDED);
   }
 
   sectorLabel(registration: UserAdminView): string {
-    return registration.sector ? this.sectorLabels[registration.sector] : NOT_PROVIDED;
+    return registration.sector
+      ? this.labels.label(this.sectorLabels[registration.sector])
+      : this.labels.label(NOT_PROVIDED);
   }
 
-  /** Where this request stands in the two-admin approval (SPEC §8.2). */
-  approvalProgress(registration: UserAdminView): string {
+  /**
+   * Where this request stands in the two-admin approval (SPEC §8.2), as a key:
+   * the template pipes it, so the line follows a language switch while the
+   * request is still open on screen.
+   */
+  progressKey(registration: UserAdminView): string {
     return registration.first_approver_id
-      ? 'מנהל אחד כבר אישר — נדרש אישור של מנהל נוסף.'
-      : 'טרם אושרה — נדרשים אישורים של שני מנהלים.';
+      ? 'admin.pending_registrations.progress_partial'
+      : 'admin.pending_registrations.progress_none';
   }
 
   documentLabel(document: DocumentAdminView): string {
-    return this.documentTypeLabels[document.doc_type];
+    return this.labels.label(this.documentTypeLabels[document.doc_type]);
   }
 
   // ---------------------------------------------------------------------------
@@ -186,16 +197,16 @@ export class PendingRegistrationsComponent implements OnInit {
   // ---------------------------------------------------------------------------
 
   approve(userId: string): void {
-    this.actionError.set(null);
+    this.actionError.set(NO_ERROR);
     this.adminService.approveRegistration(userId).subscribe({
       next: (updated) => this.applyUpdate(updated),
       error: (err: HttpErrorResponse) =>
-        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה באישור ההרשמה. נסה שוב.')),
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.approve_failed')),
     });
   }
 
   reject(userId: string): void {
-    this.actionError.set(null);
+    this.actionError.set(NO_ERROR);
     this.rejectingId.set(userId);
   }
 
@@ -214,7 +225,7 @@ export class PendingRegistrationsComponent implements OnInit {
         this.rejectingId.set(null);
       },
       error: (err: HttpErrorResponse) =>
-        this.actionError.set(this.messageFrom(err, 'אירעה שגיאה בדחיית ההרשמה. נסה שוב.')),
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.reject_failed')),
     });
   }
 
@@ -242,10 +253,5 @@ export class PendingRegistrationsComponent implements OnInit {
       // so the panel closes with the row it belonged to.
       this.closeDetail();
     }
-  }
-
-  private messageFrom(err: HttpErrorResponse, fallback: string): string {
-    const detail: unknown = err.error?.detail;
-    return typeof detail === 'string' ? detail : fallback;
   }
 }

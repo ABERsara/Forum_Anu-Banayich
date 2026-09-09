@@ -1,11 +1,21 @@
+<!--
+  No direction here: the page inherits it from <html dir>, which LocaleService
+  sets from the active language (CONTRIBUTING §6).
+-->
 <div class="page">
-  <h1>לוח בקרת מבקר</h1>
-  <p class="page__hint">
-    כל החלטה מחייבת הערה בכתב. ההערה נשמרת עם הדיווח ומהווה את התיעוד היחיד לסיבת ההחלטה לאחר שהתוכן
-    עצמו הוסר.
-  </p>
+  <h1>{{ 'moderator.reports.title' | transloco }}</h1>
+  <p class="page__hint">{{ 'moderator.reports.hint' | transloco }}</p>
 
-  <app-error-display [message]="actionError() ?? ''" />
+  <!--
+    The action failure is either a sentence the server wrote, shown as it came,
+    or a key of ours, piped here so it follows a language switch while it is
+    still on screen (core/i18n/screen-error.ts).
+  -->
+  @if (actionError().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (actionError().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
 
   <!--
     לשוניות — roving tabindex: only the selected tab is in the page's tab
@@ -13,7 +23,7 @@
     Without the arrow-key handler the unselected tab would be unreachable
     by keyboard.
   -->
-  <div class="tabs" role="tablist" aria-label="דיווחים">
+  <div class="tabs" role="tablist" [attr.aria-label]="'moderator.reports.tabs_aria' | transloco">
     <button
       #pendingTab
       type="button"
@@ -27,7 +37,7 @@
       (click)="showTab('pending')"
       (keydown)="moveToTab($event, 'history', historyTab)"
     >
-      דיווחים ממתינים
+      {{ 'moderator.reports.tab_pending' | transloco }}
       @if (pendingReports().length > 0) {
         <span class="badge">{{ pendingReports().length }}</span>
       }
@@ -45,7 +55,7 @@
       (click)="showTab('history')"
       (keydown)="moveToTab($event, 'pending', pendingTab)"
     >
-      היסטוריה
+      {{ 'moderator.reports.tab_history' | transloco }}
     </button>
   </div>
 
@@ -53,38 +63,42 @@
   @if (activeTab() === 'pending') {
     <section id="panel-pending" role="tabpanel" aria-labelledby="tab-pending">
       @if (isLoading()) {
-        <app-loading-spinner message="טוען דיווחים..." />
+        <app-loading-spinner [message]="'moderator.reports.loading' | transloco" />
       } @else if (hasError()) {
-        <app-error-display message="אירעה שגיאה בטעינת הדיווחים. נסי לרענן את הדף." />
+        <app-error-display [message]="'moderator.errors.load_reports_failed' | transloco" />
       } @else if (pendingReports().length === 0) {
-        <p class="panel__empty">אין דיווחים ממתינים. כל הכבוד!</p>
+        <p class="panel__empty">{{ 'moderator.reports.empty' | transloco }}</p>
       } @else {
         <ul class="reports">
           @for (report of pendingReports(); track report.id) {
             <li class="reports__item">
               <div class="reports__head">
+                <!-- The reported post's title and body are what a user wrote:
+                     shown as they were written, in either UI language (ABF-130). -->
                 <h2 class="reports__title">{{ report.content_title }}</h2>
-                <span class="badge badge--alert">{{ report.report_count }} דיווחים</span>
+                <span class="badge badge--alert">{{
+                  'moderator.reports.report_count' | transloco: { count: report.report_count }
+                }}</span>
               </div>
 
               <p class="reports__content">{{ previewOf(report.content_text) }}</p>
 
               <dl class="reports__meta">
                 <div>
-                  <dt>סיבת הדיווח</dt>
-                  <dd>{{ reasonLabels[report.reason] }}</dd>
+                  <dt>{{ 'moderator.reports.reason_label' | transloco }}</dt>
+                  <dd>{{ reasonLabels[report.reason] | transloco }}</dd>
                 </div>
                 <div>
-                  <dt>פירוט המדווח/ת</dt>
-                  <dd>{{ report.description ?? '–' }}</dd>
+                  <dt>{{ 'moderator.reports.description_label' | transloco }}</dt>
+                  <dd>{{ report.description ?? emptyValue }}</dd>
                 </div>
                 <div>
-                  <dt>תאריך הדיווח</dt>
+                  <dt>{{ 'moderator.reports.created_at_label' | transloco }}</dt>
                   <dd>{{ report.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
                 </div>
                 <div>
-                  <dt>מצב ההודעה</dt>
-                  <dd>{{ postStatusLabels[report.content_status] }}</dd>
+                  <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
+                  <dd>{{ postStatusLabels[report.content_status] | transloco }}</dd>
                 </div>
               </dl>
 
@@ -92,18 +106,24 @@
                 <button
                   type="button"
                   class="btn btn--danger"
-                  [attr.aria-label]="'מחיקת ההודעה ״' + report.content_title + '״'"
+                  [attr.aria-label]="
+                    'moderator.reports.decide_valid_aria'
+                      | transloco: { title: report.content_title }
+                  "
                   (click)="decide(report, decisions.VALID)"
                 >
-                  מחיקת ההודעה (מוצדק)
+                  {{ 'moderator.reports.decide_valid' | transloco }}
                 </button>
                 <button
                   type="button"
                   class="btn"
-                  [attr.aria-label]="'ביטול הדיווח על ״' + report.content_title + '״'"
+                  [attr.aria-label]="
+                    'moderator.reports.decide_invalid_aria'
+                      | transloco: { title: report.content_title }
+                  "
                   (click)="decide(report, decisions.INVALID)"
                 >
-                  ביטול הדיווח (שגוי)
+                  {{ 'moderator.reports.decide_invalid' | transloco }}
                 </button>
               </div>
             </li>
@@ -117,38 +137,39 @@
   @if (activeTab() === 'history') {
     <section id="panel-history" role="tabpanel" aria-labelledby="tab-history">
       @if (isHistoryLoading()) {
-        <app-loading-spinner message="טוען היסטוריה..." />
+        <app-loading-spinner [message]="'moderator.reports.history_loading' | transloco" />
       } @else if (historyError()) {
-        <app-error-display message="אירעה שגיאה בטעינת ההיסטוריה. נסי לרענן את הדף." />
+        <app-error-display [message]="'moderator.errors.load_history_failed' | transloco" />
       } @else if (history().length === 0) {
-        <p class="panel__empty">עדיין לא התקבלו החלטות בתאים שבאחריותך.</p>
+        <p class="panel__empty">{{ 'moderator.reports.history_empty' | transloco }}</p>
       } @else {
         <ul class="reports">
           @for (report of history(); track report.id) {
             <li class="reports__item">
               <div class="reports__head">
                 <h2 class="reports__title">{{ report.content_title }}</h2>
-                <span class="badge">{{ decisionLabels[report.decision] }}</span>
+                <span class="badge">{{ decisionLabels[report.decision] | transloco }}</span>
               </div>
 
               <p class="reports__content">{{ previewOf(report.content_text) }}</p>
 
               <dl class="reports__meta">
                 <div>
-                  <dt>סיבת הדיווח</dt>
-                  <dd>{{ reasonLabels[report.reason] }}</dd>
+                  <dt>{{ 'moderator.reports.reason_label' | transloco }}</dt>
+                  <dd>{{ reasonLabels[report.reason] | transloco }}</dd>
                 </div>
                 <div>
-                  <dt>תאריך ההחלטה</dt>
+                  <dt>{{ 'moderator.reports.decided_at_label' | transloco }}</dt>
                   <dd>{{ report.decided_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
                 </div>
                 <div>
-                  <dt>מצב ההודעה</dt>
-                  <dd>{{ postStatusLabels[report.content_status] }}</dd>
+                  <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
+                  <dd>{{ postStatusLabels[report.content_status] | transloco }}</dd>
                 </div>
                 <div class="reports__note">
-                  <dt>הערת המבקר/ת</dt>
-                  <dd>{{ report.moderator_note ?? '–' }}</dd>
+                  <dt>{{ 'moderator.reports.note_label' | transloco }}</dt>
+                  <!-- The moderator's own words: content, not copy (ABF-130). -->
+                  <dd>{{ report.moderator_note ?? emptyValue }}</dd>
                 </div>
               </dl>
             </li>
@@ -156,18 +177,24 @@
         </ul>
 
         @if (historyPageCount() > 1) {
-          <nav class="pager" aria-label="ניווט בין עמודי ההיסטוריה">
+          <nav class="pager" [attr.aria-label]="'moderator.reports.pager_aria' | transloco">
             <button
               type="button"
               class="btn"
               [disabled]="!hasPreviousPage()"
               (click)="goToPreviousPage()"
             >
-              הקודם
+              {{ 'moderator.reports.previous_page' | transloco }}
             </button>
-            <span aria-live="polite">עמוד {{ historyPage() }} מתוך {{ historyPageCount() }}</span>
+            <!-- One key with two parameters: the page number moves inside the
+                 sentence between languages, which two text nodes cannot do
+                 (ABF-131). -->
+            <span aria-live="polite">{{
+              'moderator.reports.page_of'
+                | transloco: { page: historyPage(), count: historyPageCount() }
+            }}</span>
             <button type="button" class="btn" [disabled]="!hasNextPage()" (click)="goToNextPage()">
-              הבא
+              {{ 'moderator.reports.next_page' | transloco }}
             </button>
           </nav>
         }
@@ -178,13 +205,13 @@
   <!-- ───────────── אישור ההחלטה + הערת מבקר (חובה) ───────────── -->
   @if (pendingDecision(); as pending) {
     <app-confirm-dialog
-      [title]="confirmTitle(pending.decision)"
-      [message]="confirmMessage(pending.decision)"
-      [confirmText]="confirmTitle(pending.decision)"
+      [title]="confirmTitleKey(pending.decision) | transloco"
+      [message]="confirmMessageKey(pending.decision) | transloco"
+      [confirmText]="confirmTitleKey(pending.decision) | transloco"
       [isDestructive]="pending.decision === decisions.VALID"
       [requireInput]="true"
-      inputLabel="הערת המבקר/ת (חובה)"
-      inputPlaceholder="לדוגמה: התוכן כולל התבטאות פוגענית כלפי משתמש אחר"
+      [inputLabel]="'moderator.reports.note_input_label' | transloco"
+      [inputPlaceholder]="'moderator.reports.note_placeholder' | transloco"
       [inputMinLength]="minNoteLength"
       (confirmed)="confirmDecision($event)"
       (cancelled)="cancelDecision()"
