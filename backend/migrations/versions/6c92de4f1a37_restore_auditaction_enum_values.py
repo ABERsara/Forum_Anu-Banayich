@@ -25,10 +25,10 @@ depends_on: str | Sequence[str] | None = None
 # way, with IF NOT EXISTS so it is a no-op wherever a value already exists
 # (e.g. databases built fresh from the corrected initial migration).
 #
-# AGENT_CONVERSATION and AGENT_CONVERSATION_ACCESS_DENIED, also missing on
-# production, are deliberately not added here — the agent-conversation
-# feature that used them (ABF-122) was reverted on main after this branch
-# was created, and they are no longer members of AuditAction.
+# AGENT_CONVERSATION_ACCESS_DENIED is deliberately not added here — ABF-122
+# (the feature that introduced it) was reverted and the value was not restored.
+# AGENT_CONVERSATION is handled separately by migration c73690be0286, which
+# re-introduces it as part of ABF-120's agent-conversation feature.
 #
 # Each statement is written out literally (not built from a loop) because
 # test_migration_enum_consistency reads this file via ast.parse() and looks

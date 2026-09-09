@@ -12,6 +12,12 @@
  * checks all three registrations, rather than trusting a list kept by hand.
  */
 
+/// <reference types="node" />
+// Asked for here rather than in tsconfig.spec.json's `types`, so that reaching
+// for the filesystem stays a deliberate act in the one spec that needs it
+// instead of something every spec can quietly do — the same way
+// core/i18n/direction.spec.ts asks for it (ABF-138).
+
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 

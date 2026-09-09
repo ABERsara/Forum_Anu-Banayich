@@ -159,3 +159,28 @@ class ConversationListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class DirectMessageExportItem(BaseModel):
+    """
+    One message in a self-service export (spec §9.5, ABF-117).
+
+    Ids, not nested UserPublic objects: this is a personal-data export, not a
+    conversation view — it names both participants by id and leaves display
+    names to whatever reads the export, the same shape
+    retention_service.export_user_direct_messages() already returns.
+    """
+
+    id: str
+    sender_id: str
+    recipient_id: str
+    content: str
+    sent_at: datetime
+    read_at: datetime | None
+
+
+class DirectMessageExportResponse(BaseModel):
+    """GET /users/me/messages/export – every message the caller sent or received."""
+
+    items: list[DirectMessageExportItem]
+    total: int

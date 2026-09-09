@@ -14,8 +14,11 @@ this sprint build against, frozen early on purpose:
     itself is (app/core/encryption.py).
   * `reporter_id` becomes nullable, so §9.4's "reports are anonymized, not
     deleted, when an account closes" has somewhere to put the absence.
-  * two enum members: `reportdecision.CLOSED_ACCOUNT_DELETED` and
-    `auditaction.DIRECT_MESSAGE_REPORTED`.
+  * one enum member: `auditaction.DIRECT_MESSAGE_REPORTED`, the action this
+    ticket logs. `reportdecision.CLOSED_ACCOUNT_DELETED` was added here too
+    until main was merged in — ABF-117 shipped that member first, and adds
+    it in b3e9f2a6c1d4, so a second ADD VALUE for it here would only be a
+    no-op claiming another ticket's value.
 
 """
 
@@ -47,17 +50,14 @@ def upgrade() -> None:
             "reporter_id", existing_type=sa.String(length=36), nullable=True
         )
 
-    # PostgreSQL: extend the two native enum types. PostgreSQL 12+ allows
-    # `ALTER TYPE ... ADD VALUE` inside a transaction as long as the new value
-    # is not *used* in the same transaction — nothing here writes either
+    # PostgreSQL: extend the native `auditaction` enum type. PostgreSQL 12+
+    # allows `ALTER TYPE ... ADD VALUE` inside a transaction as long as the new
+    # value is not *used* in the same transaction — nothing here writes the
     # member — so this stays atomic with the rest of the upgrade run. On
     # SQLite an enum column is plain VARCHAR with no CHECK, so there is
     # nothing to alter. Same shape as c73690be0286.
     if op.get_bind().dialect.name != "postgresql":
         return
-    op.execute(
-        "ALTER TYPE reportdecision ADD VALUE IF NOT EXISTS 'CLOSED_ACCOUNT_DELETED'"
-    )
     op.execute(
         "ALTER TYPE auditaction ADD VALUE IF NOT EXISTS 'DIRECT_MESSAGE_REPORTED'"
     )
@@ -79,6 +79,6 @@ def downgrade() -> None:
         batch_op.drop_column("reported_content_key_version")
         batch_op.drop_column("reported_content")
 
-    # PostgreSQL cannot remove a value from an enum type, so the two members
-    # added above survive the downgrade. Harmless: an unused enum member
+    # PostgreSQL cannot remove a value from an enum type, so the member added
+    # above survives the downgrade. Harmless: an unused enum member
     # constrains nothing.

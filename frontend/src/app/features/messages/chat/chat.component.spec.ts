@@ -833,7 +833,7 @@ describe('ChatComponent', () => {
     it('reads in Hebrew exactly as the screen did before the rebuild', () => {
       setup();
 
-      expect(text()).toContain('→ חזרה לתיבה');
+      expect(text()).toContain('‹ חזרה לתיבה');
       expect(text()).toContain('רבקה כהן');
       expect(text()).toContain('שלח');
       expect(query('#chat-new-message')!.getAttribute('placeholder')).toBe('כתבו הודעה...');

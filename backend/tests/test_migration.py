@@ -9,55 +9,75 @@ from sqlalchemy import create_engine, inspect, pool, text
 
 import app.core.config as _cfg
 
+# Imported for its side effect: app.models.__init__ imports every model module,
+# and that is what attaches the tables to Base.metadata. Without it the metadata
+# is empty and test_migration_creates_all_tables has nothing to compare against.
+# migrations/env.py does not come through this package — it names the model
+# modules one by one — so adding a model to app/models/__init__.py puts it in
+# front of this test but not in front of autogenerate. That import list has to
+# be extended too.
+import app.models  # noqa: F401
+from app.db.base import Base
+
 BACKEND_DIR = Path(__file__).parent.parent  # backend/
 
 # The merge revision that ABF-114's read_at migration sits directly on top of.
 REVISION_BEFORE_READ_AT = "aac7e1fb8f49"
-EXPECTED_TABLES = {
-    "users",
-    "forum_posts",
-    "direct_messages",
-    "professional_queries",
-    "reports",
-    "documents",
-    "audit_logs",
-}
-
-
-def test_migration_creates_all_tables(monkeypatch) -> None:
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        db_path = os.path.join(tmp_dir, "test_migration.db")
-        db_url = f"sqlite:///{db_path}"
-
-        # env.py overrides sqlalchemy.url from settings.DATABASE_URL — patch it here
-        monkeypatch.setattr(_cfg.settings, "DATABASE_URL", db_url)
-
-        alembic_cfg = Config(str(BACKEND_DIR / "alembic.ini"))
-        alembic_cfg.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
-        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-
-        command.upgrade(alembic_cfg, "head")
-
-        engine = create_engine(db_url, poolclass=pool.NullPool)
-        actual_tables = set(inspect(engine).get_table_names())
-        engine.dispose()  # release file lock before tempdir cleanup (Windows)
-
-    assert actual_tables >= EXPECTED_TABLES, (
-        f"Missing tables: {EXPECTED_TABLES - actual_tables}"
-    )
 
 
 @contextmanager
 def _alembic_on_a_temp_sqlite_db(monkeypatch):
     """An alembic Config pointed at a throwaway SQLite file, plus its URL."""
     with tempfile.TemporaryDirectory() as tmp_dir:
-        db_url = f"sqlite:///{os.path.join(tmp_dir, 'test_roundtrip.db')}"
+        db_url = f"sqlite:///{os.path.join(tmp_dir, 'test_migration.db')}"
+        # env.py overrides sqlalchemy.url from settings.DATABASE_URL — patch it here
         monkeypatch.setattr(_cfg.settings, "DATABASE_URL", db_url)
 
         alembic_cfg = Config(str(BACKEND_DIR / "alembic.ini"))
         alembic_cfg.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
         alembic_cfg.set_main_option("sqlalchemy.url", db_url)
         yield alembic_cfg, db_url
+
+
+def _created_tables(db_url: str) -> set[str]:
+    """
+    Every table `alembic upgrade head` left behind. alembic_version is dropped
+    from the set: the migration runner creates it to record the revision, no
+    model declares it, and its presence is not drift.
+    """
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        return set(inspect(engine).get_table_names()) - {"alembic_version"}
+    finally:
+        engine.dispose()  # release the file lock before tempdir cleanup (Windows)
+
+
+def test_migration_creates_all_tables(monkeypatch) -> None:
+    """
+    What `alembic upgrade head` builds has to be what the models declare, read
+    off Base.metadata rather than a list maintained by hand here. The hand-kept
+    list is precisely what went stale: ABF-139's `likes` was never added to it,
+    so deleting that migration would still have passed, and ABF-120's three
+    agent tables (reverted since, in #118) only landed in it because whoever
+    wrote fff7271 remembered to edit two files. Reading the expectation off the
+    metadata instead covers every future migration for free, with nothing to
+    keep in step here.
+
+    Equality rather than a superset, so the drift is caught in both
+    directions — a model whose migration was never written, and a table a
+    migration still creates for a model that is gone.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        created = _created_tables(db_url)
+
+    declared = set(Base.metadata.tables)
+    missing = declared - created
+    unexpected = created - declared
+    assert not missing and not unexpected, (
+        f"Declared by a model but created by no migration: {sorted(missing)}. "
+        f"Created by a migration but declared by no model: {sorted(unexpected)}."
+    )
 
 
 def _direct_message_columns(db_url: str) -> set[str]:
@@ -109,10 +129,11 @@ def test_read_at_migration_goes_down_and_up_again_cleanly(monkeypatch) -> None:
         assert "is_read" not in _direct_message_columns(db_url)
         assert _unread_index_columns(db_url) == ["recipient_id", "read_at"]
 
-        # Not "-1": ABF-122's agent tables branched off the same parent, so the
-        # single head is now a merge revision and one step back off it is an
-        # ambiguous walk. Naming the revision read_at sits on says what this
-        # actually undoes, and stays right however many branches join above it.
+        # Naming the revision rather than "-1": this says which schema state the
+        # downgrade is meant to land on, and it keeps saying it however the
+        # graph grows. "-1" is read relative to whatever head is at the time —
+        # it walks somewhere else entirely once another migration lands on top,
+        # and stops being a single step at all once a branch joins above here.
         command.downgrade(alembic_cfg, REVISION_BEFORE_READ_AT)
         assert "is_read" in _direct_message_columns(db_url)
         assert "read_at" not in _direct_message_columns(db_url)

@@ -6,13 +6,7 @@
     "outDir": "./out-tsc/spec",
     "composite": true,
     "types": [
-      "vitest/globals",
-      /* For the specs that read project files off disk - see
-         core/utils/error-key.util.spec.ts, which checks the backend's own
-         source for the error keys the frontend has to know about. Spec
-         compilation only; nothing in the app bundle can reach node:fs.
-         @types/node is already installed - vitest depends on it. */
-      "node"
+      "vitest/globals"
     ]
   },
   "include": [

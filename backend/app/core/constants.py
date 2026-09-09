@@ -134,15 +134,10 @@ class ReportDecision(enum.StrEnum):
     PENDING = "pending"  # ממתין לטיפול
     INVALID = "invalid"  # שגוי – הודעה הושבה
     VALID = "valid"  # מוצדק – הודעה נמחקה
-    # Closed without a ruling because the reported account was deleted — there
-    # is no longer anyone for a decision to apply to. Not a verdict: it says
-    # the report was ended, not that it was justified or mistaken, which is
-    # why it is a separate member rather than a reuse of INVALID.
-    #
-    # ABF-112 adds the member only: the reporting ticket freezes the report
-    # schema early because tasks 6, 7 and 8 of this sprint build against it.
-    # The account-deletion flow that actually sets it is task 8's.
-    CLOSED_ACCOUNT_DELETED = "closed_account_deleted"  # נסגר – החשבון נמחק
+    # System-closed, not a moderator's decision: the reported-on user deleted
+    # their account, so the private message the report pointed at was deleted
+    # with it (spec §9.4, ABF-117) — nothing is left to investigate.
+    CLOSED_ACCOUNT_DELETED = "closed_account_deleted"
 
 
 class DocumentType(enum.StrEnum):
@@ -176,6 +171,7 @@ class AuditAction(enum.StrEnum):
     DIRECT_MESSAGE_ACCESS_DENIED = "direct_message_access_denied"
     DIRECT_MESSAGE_PRUNED = "direct_message_pruned"
     DIRECT_MESSAGE_REPORTED = "direct_message_reported"
+    AGENT_CONVERSATION = "agent_conversation"
 
 
 # ---------------------------------------------------------------------------

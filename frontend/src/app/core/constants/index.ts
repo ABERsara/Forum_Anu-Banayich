@@ -238,15 +238,8 @@ export enum ReportDecision {
   PENDING = 'pending',
   INVALID = 'invalid',
   VALID = 'valid',
-  /**
-   * Closed without a ruling because the reported account was deleted — there is
-   * no longer anyone for a decision to apply to. Not a verdict: it says the
-   * report was ended, not that it was justified or mistaken, which is why it is
-   * a separate member rather than a reuse of INVALID.
-   *
-   * ABF-112 adds the member only; the account-deletion flow that sets it is
-   * task 8's.
-   */
+  // System-closed (ABF-117): the reported-on user deleted their account, so
+  // the private message the report pointed at was deleted with it.
   CLOSED_ACCOUNT_DELETED = 'closed_account_deleted',
 }
 
