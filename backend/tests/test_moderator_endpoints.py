@@ -525,6 +525,34 @@ class TestGetUserCard:
         assert body["is_suspended"] is False
         assert body["suspended_until"] is None
 
+    async def test_a_user_with_no_reports_at_all_reads_as_five_zeros(
+        self, client, make_user, as_user, db_session
+    ):
+        """
+        The five counts come from one aggregate query filtered to the rows that
+        touch this user, so a user nobody reported and who reported nobody
+        leaves that filter matching nothing. count() over an empty set is 0 and
+        .one() still returns its single row, so the card is five zeros rather
+        than a 500 — the case a rewrite into per-count queries would break
+        silently.
+        """
+        moderator = _make_moderator(db_session, make_user)
+        as_user(moderator)
+        member = _make_member(db_session, make_user)
+
+        response = await client.get(f"{BASE}/users/{member.id}/card")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["id"] == member.id
+        assert body["reports_against_total"] == 0
+        assert body["reports_against_valid"] == 0
+        assert body["reports_against_invalid"] == 0
+        assert body["reports_filed_total"] == 0
+        assert body["false_reports_filed"] == 0
+        assert body["is_suspended"] is False
+        assert body["suspended_until"] is None
+
     async def test_the_card_carries_no_contact_details(
         self, client, make_user, as_user, db_session
     ):

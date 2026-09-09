@@ -243,7 +243,8 @@ describe('ModeratorUserCardComponent', () => {
   describe('i18n', () => {
     it('reads in Hebrew exactly as the screen was written', () => {
       expect(root().querySelector('h1')!.textContent!.trim()).toBe('כרטיס משתמש');
-      expect(root().querySelector('.page__back')!.textContent!.trim()).toBe('← חזרה ללוח הבקרה');
+      // The arrow is a ::before in the SCSS now, so it is not part of the text.
+      expect(root().querySelector('.page__back')!.textContent!.trim()).toBe('חזרה ללוח הבקרה');
       expect(statLabels()).toEqual([
         'דיווחים נגד המשתמש/ת',
         'מהם נמצאו מוצדקים',
