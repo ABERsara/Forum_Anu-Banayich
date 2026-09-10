@@ -251,6 +251,10 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "הדיווח כבר טופל.",
         ENGLISH: "This report has already been handled.",
     },
+    "reports.user_outside_your_cells": {
+        HEBREW: "המשתמש אינו בתא שבאחריותך.",
+        ENGLISH: "This member is not in a cell you are responsible for.",
+    },
     # -- Professional Q&A -------------------------------------------------
     "professionals.query_not_found": {
         HEBREW: "השאלה לא נמצאה.",

@@ -289,7 +289,7 @@ describe('direction', () => {
       files.filter(([, source]) => source.trim() !== '').length;
 
     // After `markupOf`, not before it. A `.component.ts` always reads back with
-    // something in it, so counting the source would report all thirty-six
+    // something in it, so counting the source would report all thirty-seven
     // whether or not the extraction still finds a template inside any of them.
     // Five carry one today: ABF-105 moved the moderator reports screen's
     // template out to its own file, which is a floor this check tracks rather
