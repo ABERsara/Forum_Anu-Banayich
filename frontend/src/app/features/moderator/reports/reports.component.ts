@@ -47,6 +47,7 @@ import {
 } from '../../../core/constants';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { ReportService } from '../../../core/services/report.service';
+import { utcIso } from '../../../core/utils/utc-date.util';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -346,5 +347,26 @@ export class ModeratorReportsComponent implements OnInit {
    */
   reasonKey(restriction: RestrictionWithMember): string {
     return RESTRICTION_REASON_KEYS[restriction.restriction_type];
+  }
+
+  /**
+   * When the restriction lifts, as an *instant*.
+   *
+   * `expires_at` arrives as naive UTC — `2026-07-18T09:30:00`, no offset —
+   * and the date pipe reads a string without one as a *local* wall clock, so
+   * a moderator in Israel is shown 09:30 for a restriction that in fact runs
+   * until 12:30 (see utc-date.util.ts). She is reading this column to know
+   * when a member gets her messaging back; three hours out is the difference
+   * between answering that question and answering a different one. The chat
+   * screen states the same timestamp to the restricted member and converts it
+   * the same way, in `restrictionEndsAt()`.
+   */
+  endsAt(restriction: RestrictionWithMember): string {
+    return utcIso(restriction.expires_at);
+  }
+
+  /** When it was applied, converted for the same reason as `endsAt()`. */
+  appliedAt(restriction: RestrictionWithMember): string {
+    return utcIso(restriction.created_at);
   }
 }

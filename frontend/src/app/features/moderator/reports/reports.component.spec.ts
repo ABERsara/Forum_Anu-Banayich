@@ -108,6 +108,25 @@ function makeReportingRestrictions(): RestrictionList {
   });
 }
 
+/**
+ * A naive-UTC timestamp as this runner's clock renders it, in the screen's
+ * `dd/MM/yyyy HH:mm`.
+ *
+ * Derived rather than hardcoded: the dates on a restriction row arrive as
+ * naive UTC and the column shows them in the moderator's own zone, so the
+ * digits differ between CI (UTC) and a machine in Israel (UTC+3). A literal
+ * here would pin one of the two and fail on the other — the same reason
+ * chat.component.spec.ts derives its `formattedEnd`.
+ */
+function wallClock(naiveUtc: string): string {
+  const at = new Date(`${naiveUtc}Z`);
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return (
+    `${pad(at.getDate())}/${pad(at.getMonth() + 1)}/${at.getFullYear()} ` +
+    `${pad(at.getHours())}:${pad(at.getMinutes())}`
+  );
+}
+
 function makeHistoryPage(overrides: Partial<ReportHistoryList> = {}): ReportHistoryList {
   return {
     items: [
@@ -527,10 +546,35 @@ describe('ModeratorReportsComponent', () => {
       component.showTab('restrictions');
       fixture.detectChanges();
       const card = cards()[0];
+      const row = makeRestrictions().items[0];
 
       expect(card.querySelector('.reports__title')!.textContent!.trim()).toBe('Dana Levi');
       expect(card.querySelector('.badge--alert')!.textContent!.trim()).toBe('שליחת הודעות פרטיות');
-      expect(fieldsOf(card)).toContain('בתוקף עד: 18/07/2026 09:30');
+      expect(fieldsOf(card)).toContain(`בתוקף עד: ${wallClock(row.expires_at)}`);
+      expect(fieldsOf(card)).toContain(`הופעלה בתאריך: ${wallClock(row.created_at)}`);
+    });
+
+    /**
+     * Both dates arrive as naive UTC — `2026-07-18T09:30:00`, no offset — and
+     * the date pipe reads a string without one as a *local* wall clock. Left
+     * raw, the column tells a moderator in Israel that a restriction runs
+     * until 09:30 when it in fact lifts at 12:30, and the same three hours are
+     * off the date it was applied. utc-date.util.ts exists for this; the chat
+     * screen already states this very timestamp to the restricted member
+     * through it.
+     *
+     * Asserted on the instant rather than on rendered text on purpose: CI runs
+     * in UTC, where the bug is invisible, so a rendered-string assertion would
+     * pass either way and guard nothing.
+     */
+    it('states both dates as UTC, not as a local wall clock', () => {
+      component.showTab('restrictions');
+      const row = component.restrictions()[0];
+
+      expect(component.endsAt(row)).toBe('2026-07-18T09:30:00Z');
+      expect(new Date(component.endsAt(row)).toISOString()).toBe('2026-07-18T09:30:00.000Z');
+      expect(component.appliedAt(row)).toBe('2026-07-16T09:30:00Z');
+      expect(new Date(component.appliedAt(row)).toISOString()).toBe('2026-07-16T09:30:00.000Z');
     });
 
     /**
