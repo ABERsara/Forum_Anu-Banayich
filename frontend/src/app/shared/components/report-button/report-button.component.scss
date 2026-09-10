@@ -56,9 +56,14 @@
     border-radius: $radius-md;
     transition: border-color $transition-fast;
 
-    &:focus {
+    // A focus ring, not just a 1px border tint. `outline: none` with only a
+    // border-colour change is close to invisible on a light field, and
+    // keyboard focus has to be seen (WCAG 2.4.7) — this screen is used
+    // entirely from the keyboard by anyone who cannot use a pointer.
+    &:focus-visible {
       border-color: $color-primary;
-      outline: none;
+      outline: 2px solid $color-primary;
+      outline-offset: 2px;
     }
   }
 
@@ -66,10 +71,32 @@
     resize: vertical;
   }
 
+  // The warning that this report hands private content to a moderator.
+  // Carries a border as well as a colour, because colour alone is not an
+  // acceptable carrier (WCAG 1.4.1) and this is the one thing in the dialog
+  // the reader must not miss. `border-inline-start` rather than -left: the
+  // rule belongs on the side the text starts on, in both directions.
+  &__disclosure {
+    margin: 0 0 $spacing-lg;
+    padding: $spacing-sm;
+    border-inline-start: 3px solid $color-warning;
+    background-color: $color-bg-subtle;
+    // $color-text, not the muted grey: a warning is not secondary text, and
+    // #6b7280 on #f9fafb does not clear 4.5:1 at this size.
+    color: $color-text;
+    font-size: $font-size-sm;
+  }
+
   &__actions {
     display: flex;
     gap: $spacing-sm;
     justify-content: space-between;
+  }
+
+  &__hint {
+    margin: $spacing-xs 0 0;
+    font-size: $font-size-sm;
+    color: $color-text;
   }
 }
 
@@ -81,6 +108,11 @@
   font-weight: $font-weight-medium;
   cursor: pointer;
   transition: background-color $transition-fast;
+
+  &:focus-visible {
+    outline: 2px solid $color-primary;
+    outline-offset: 2px;
+  }
 
   &:disabled {
     opacity: 0.5;

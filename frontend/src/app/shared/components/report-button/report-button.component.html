@@ -1,26 +1,60 @@
 <div class="report-button">
-  @if (isSubmitted()) {
-    <p class="report-button__submitted">{{ 'shared.report.submitted' | transloco }}</p>
+  @if (hasReported()) {
+    <!--
+      role="status" so the change is announced when it happens: the reader who
+      just sent the report is the one who most needs to hear that it landed,
+      and she has just lost the button she was standing on.
+    -->
+    <p class="report-button__submitted" role="status">
+      {{ 'shared.report.submitted' | transloco }}
+    </p>
   } @else {
-    <button type="button" (click)="onOpenClick()">{{ 'shared.report.button' | transloco }}</button>
+    <button type="button" [attr.aria-label]="triggerLabel()" (click)="onOpenClick($event)">
+      {{ 'shared.report.button' | transloco }}
+    </button>
   }
 </div>
 
 @if (showDialog()) {
   <div class="overlay">
-    <div class="dialog">
-      <h2 class="dialog__title">{{ 'shared.report.dialog_title' | transloco }}</h2>
+    <!--
+      A real dialog, not a styled div: named by its own heading, announced as
+      modal, and closed by Escape. The keydown sits on the box rather than the
+      document so it cannot swallow Escape for anything else on the page.
+    -->
+    <div
+      #dialog
+      class="dialog"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-labelledby]="fieldId() + '-title'"
+      [attr.aria-describedby]="disclosureKey() ? fieldId() + '-disclosure' : null"
+      [attr.aria-busy]="isSubmitting()"
+      (keydown)="onDialogKeydown($event)"
+    >
+      <h2 class="dialog__title" [id]="fieldId() + '-title'">
+        {{ 'shared.report.dialog_title' | transloco }}
+      </h2>
 
       <div class="dialog__field">
-        <label class="dialog__label" for="report-reason">
+        <label class="dialog__label" [attr.for]="fieldId() + '-reason'">
           {{ 'shared.report.reason_label' | transloco }}
         </label>
         <select
-          id="report-reason"
+          #firstField
+          [id]="fieldId() + '-reason'"
           class="dialog__select"
-          [value]="reason()"
+          required
+          aria-required="true"
+          [value]="reason() ?? ''"
           (change)="onReasonChange($any($event.target).value)"
         >
+          <!--
+            The empty option is what makes "no report without a reason" visible
+            rather than merely enforced: the dialog opens on nothing chosen, so
+            the reader is asked the question instead of inheriting an answer.
+          -->
+          <option value="">{{ 'shared.report.reason_placeholder' | transloco }}</option>
           @for (option of reasonOptions; track option) {
             <option [value]="option">{{ reasonLabels[option] | transloco }}</option>
           }
@@ -28,17 +62,29 @@
       </div>
 
       <div class="dialog__field">
-        <label class="dialog__label" for="report-description">
+        <label class="dialog__label" [attr.for]="fieldId() + '-description'">
           {{ 'shared.report.description_label' | transloco }}
         </label>
         <textarea
-          id="report-description"
+          [id]="fieldId() + '-description'"
           class="dialog__textarea"
           rows="3"
           [value]="description()"
           (input)="onDescriptionChange($any($event.target).value)"
         ></textarea>
       </div>
+
+      <!--
+        Said before the confirmation, and part of the dialog's own description,
+        so it is read out when the dialog opens rather than sitting where only
+        a sighted reader would find it. §5.3 calls a report consent to hand one
+        message over; consent has to be informed to be worth anything.
+      -->
+      @if (disclosureKey(); as key) {
+        <p class="dialog__disclosure" [id]="fieldId() + '-disclosure'">
+          {{ key | transloco }}
+        </p>
+      }
 
       @if (errorKey(); as key) {
         <app-error-display [message]="key | transloco" />
@@ -51,12 +97,30 @@
         <button
           class="btn btn--primary"
           type="button"
-          [disabled]="isSubmitting()"
+          [disabled]="!canSubmit()"
           (click)="onSubmit()"
         >
           {{ 'shared.report.submit' | transloco }}
         </button>
       </div>
+
+      <!--
+        The dialog's three states in one live region: sending, why submit is
+        unavailable, and nothing. One region rather than three, because two
+        polite regions changing at once are read in an order nobody chose —
+        and these are mutually exclusive anyway. It exists from the start and
+        empty, so what appears in it is a change, which is what gets read.
+
+        Failure is the fourth state and lives in app-error-display above, next
+        to the fields the reader would change to retry.
+      -->
+      <p class="dialog__hint" role="status">
+        @if (isSubmitting()) {
+          {{ 'shared.report.sending' | transloco }}
+        } @else if (reason() === null) {
+          {{ 'shared.report.reason_required' | transloco }}
+        }
+      </p>
     </div>
   </div>
 }

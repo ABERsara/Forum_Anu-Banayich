@@ -21,6 +21,7 @@ from app.core.constants import (
     UserRole,
     UserType,
 )
+from app.core.messages import HEBREW, MESSAGES
 from app.models.audit import AuditLog
 from app.models.forum import ForumPost
 from app.models.report import Report
@@ -123,17 +124,13 @@ class TestFileReportCreatesReport:
 
 
 class TestFileReportUnsupportedTargetType:
-    def test_direct_message_rejected(self, db_session: Session) -> None:
-        reporter = _make_user(db_session, "reporter@example.com")
-
-        with pytest.raises(HTTPException) as exc_info:
-            report_service.file_report(
-                db_session,
-                _report_data("some-id", target_type=ReportTargetType.DIRECT_MESSAGE),
-                reporter,
-            )
-
-        assert exc_info.value.status_code == 400
+    """
+    PROFESSIONAL_QUERY is the only target type left with no endpoint behind
+    it. DIRECT_MESSAGE used to sit here too; since ABF-112 it is supported,
+    and its own refusals — which are 403s, not 400s, so that they cannot be
+    used to probe for message ids — are covered in
+    test_direct_message_reports.py.
+    """
 
     def test_professional_query_rejected(self, db_session: Session) -> None:
         reporter = _make_user(db_session, "reporter@example.com")
@@ -148,6 +145,9 @@ class TestFileReportUnsupportedTargetType:
             )
 
         assert exc_info.value.status_code == 400
+        assert (
+            exc_info.value.detail == MESSAGES["reports.target_type_unsupported"][HEBREW]
+        )
 
 
 class TestFileReportTargetNotFound:

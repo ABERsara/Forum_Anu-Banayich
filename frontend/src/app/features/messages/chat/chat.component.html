@@ -71,6 +71,30 @@
                   <span class="chat__receipt">{{ receiptKey(message) | transloco }}</span>
                 }
               </span>
+              <!--
+                Only on a message that was received, and only once it exists on
+                the server: her own messages are not hers to report, and a
+                bubble still in flight has no id to report yet.
+
+                The accessible name names the message rather than repeating
+                "report" fifty times down the log — the only difference between
+                these buttons is which message each one is about, so that is
+                what the name has to carry.
+              -->
+              @if (!message.mine && !message.pending) {
+                <app-report-button
+                  class="chat__report"
+                  [contentType]="reportTargetType"
+                  [contentId]="message.id"
+                  [alreadyReported]="message.reported"
+                  [triggerLabel]="
+                    'messages.chat.report_message'
+                      | transloco
+                        : { name: otherUserName(), time: message.createdAt | date: 'shortTime' }
+                  "
+                  (reported)="onReported(message.id)"
+                />
+              }
             </div>
           </li>
         }
