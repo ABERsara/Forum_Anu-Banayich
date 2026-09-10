@@ -43,6 +43,7 @@ import {
   REPORT_REASON_LABELS,
   RESTRICTION_TYPE_LABELS,
   ReportDecision,
+  RestrictionType,
 } from '../../../core/constants';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { ReportService } from '../../../core/services/report.service';
@@ -65,6 +66,23 @@ const MIN_NOTE_LENGTH = 5;
  * dashboard chevron got in ABF-132 and the description dash got in ABF-134.
  */
 const EMPTY_VALUE = '–';
+
+/**
+ * The sentence that explains one restriction's `report_count` (SPEC §7.2).
+ *
+ * Two keys rather than one, because the same number means opposite things on
+ * the two kinds of row: a messaging restriction counts reports upheld
+ * *against* the member, a reporting one counts her own reports that a
+ * moderator dismissed. A single shared sentence told the moderator the
+ * opposite of what happened on every row of the second kind.
+ *
+ * A `Record` keyed by the enum rather than a lookup with a fallback: a third
+ * RestrictionType would not compile until it says what its count means.
+ */
+const RESTRICTION_REASON_KEYS: Record<RestrictionType, string> = {
+  [RestrictionType.MESSAGING]: 'moderator.restrictions.reason_value_messaging',
+  [RestrictionType.REPORTING]: 'moderator.restrictions.reason_value_reporting',
+};
 
 type Tab = 'pending' | 'history' | 'restrictions';
 
@@ -320,5 +338,13 @@ export class ModeratorReportsComponent implements OnInit {
   /** A restricted member's name, for the row heading. */
   memberName(restriction: RestrictionWithMember): string {
     return `${restriction.member.first_name} ${restriction.member.last_name}`;
+  }
+
+  /**
+   * The key that says why this restriction was applied — which is not the
+   * same sentence for the two kinds. See RESTRICTION_REASON_KEYS.
+   */
+  reasonKey(restriction: RestrictionWithMember): string {
+    return RESTRICTION_REASON_KEYS[restriction.restriction_type];
   }
 }

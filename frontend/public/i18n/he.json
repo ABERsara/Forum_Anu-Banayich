@@ -434,7 +434,8 @@
       "expires_label": "בתוקף עד",
       "applied_label": "הופעלה בתאריך",
       "reason_label": "הסיבה",
-      "reason_value": "{{count}} דיווחים שנמצאו מוצדקים ב-{{days}} הימים האחרונים"
+      "reason_value_messaging": "{{count}} דיווחים עליה נמצאו מוצדקים ב-{{days}} הימים האחרונים",
+      "reason_value_reporting": "{{count}} דיווחים שהגישה נמצאו שגויים ב-{{days}} הימים האחרונים"
     },
     "errors": {
       "load_reports_failed": "אירעה שגיאה בטעינת הדיווחים. נסי לרענן את הדף.",

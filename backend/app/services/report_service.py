@@ -666,8 +666,15 @@ def _check_auto_suspension(db: Session, reported_user: User) -> None:
     in.
 
     TODO:
-      1. Count reports with decision=VALID against reported_user in last 7 days
-      2. If >= 2 and not already suspended: call user_service.suspend_user()
+      1. Count reports with decision=VALID against reported_user inside
+         settings.AUTO_SUSPEND_DAYS_WINDOW
+      2. If >= settings.AUTO_SUSPEND_VALID_REPORTS and not already suspended:
+         call user_service.suspend_user()
+
+    Read the count from the setting, not from a literal — and note that the
+    setting still holds 3 while §7.2 reads 2. Settling that is this rule's
+    job; ABF-116 left the value alone rather than re-pointing a threshold
+    nothing enforces.
     """
     # TODO: implement this function
     pass

@@ -97,6 +97,24 @@ function makeRestriction(expiresAt = '2026-08-03T10:00:00'): MyRestrictionRespon
   };
 }
 
+/**
+ * The same instant as this runner's clock writes it, in the screen's
+ * `dd/MM/yyyy HH:mm`.
+ *
+ * Derived rather than hardcoded: `expires_at` is naive UTC, the notice renders
+ * it in the reader's zone, and the digits therefore differ between CI (UTC)
+ * and a machine in Israel (UTC+3). A literal here would pin the wrong one of
+ * the two and fail on the other.
+ */
+function formattedEnd(response: MyRestrictionResponse): string {
+  const at = new Date(`${response.restriction!.expires_at}Z`);
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return (
+    `${pad(at.getDate())}/${pad(at.getMonth() + 1)}/${at.getFullYear()} ` +
+    `${pad(at.getHours())}:${pad(at.getMinutes())}`
+  );
+}
+
 /** Ten messages, oldest first, the way a page arrives. */
 function manyMessages(count: number, prefix = 'old'): DirectMessage[] {
   return Array.from({ length: count }, (_, index) =>
@@ -1173,7 +1191,40 @@ describe('ChatComponent', () => {
       expect(component.isRestricted()).toBe(true);
       expect(composer().disabled).toBe(true);
       expect(sendButton().disabled).toBe(true);
-      expect(text()).toContain('שליחת הודעות פרטיות מוגבלת עד 03/08/2026 10:00');
+      // The rendered clock time is the runner's own zone, so the sentence is
+      // matched up to the date and the instant is pinned separately below.
+      expect(text()).toContain('שליחת הודעות פרטיות מוגבלת עד');
+      expect(text()).toContain(formattedEnd(makeRestriction()));
+    });
+
+    /**
+     * `expires_at` arrives as naive UTC — `2026-08-03T10:00:00`, no offset —
+     * and both `new Date()` and the date pipe read that as *local* time. Left
+     * raw, the notice names 10:00 to a member in Israel whose restriction
+     * actually lifts at 13:00, and she comes back on time to find she still
+     * cannot write. utc-date.util.ts exists for exactly this; the message
+     * bubbles on this screen already go through it.
+     *
+     * Asserted on the instant rather than on rendered text on purpose: CI runs
+     * in UTC, where the bug is invisible, so a rendered-string assertion would
+     * pass either way and guard nothing.
+     */
+    it('states the end of the restriction as UTC, not as a local wall clock', async () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+      await settle();
+
+      expect(component.restrictionEndsAt()).toBe('2026-08-03T10:00:00Z');
+      expect(new Date(component.restrictionEndsAt()!).toISOString()).toBe(
+        '2026-08-03T10:00:00.000Z',
+      );
+    });
+
+    it('has no end to state when there is no restriction', async () => {
+      setup();
+      await settle();
+
+      expect(component.restrictionEndsAt()).toBeNull();
     });
 
     /**

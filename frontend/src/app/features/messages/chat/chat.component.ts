@@ -176,6 +176,21 @@ export class ChatComponent implements OnInit {
   atLimit = computed(() => this.draft().length >= MAX_MESSAGE_LENGTH);
   /** True while sending is withdrawn; reading the log is unaffected. */
   isRestricted = computed(() => this.restriction() !== null);
+
+  /**
+   * When the restriction ends, as an *instant* — null while there is none.
+   *
+   * `expires_at` arrives as naive UTC with no offset, which the date pipe
+   * would read as local time and render three hours early in Israel (see
+   * utc-date.util.ts). The message bubbles on this screen already go through
+   * `utcIso()` in toChatMessage(); this is the same conversion for the one
+   * date here that is a promise rather than a record — a member told her
+   * restriction ends at 10:00 comes back at 10:05 and finds it does not.
+   */
+  restrictionEndsAt = computed(() => {
+    const active = this.restriction();
+    return active === null ? null : utcIso(active.expires_at);
+  });
   canSend = computed(() => this.draft().trim().length > 0 && !this.isRestricted());
 
   /** Points at the message *before* the oldest one on screen. */

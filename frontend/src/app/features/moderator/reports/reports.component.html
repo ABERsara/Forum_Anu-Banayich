@@ -265,12 +265,15 @@
                 </div>
                 <!-- One key with two parameters rather than two text nodes:
                      the two numbers sit in different places in the sentence
-                     in Hebrew and in English (ABF-131). -->
+                     in Hebrew and in English (ABF-131). The key itself comes
+                     from the restriction's type — the same count means
+                     "upheld against her" on one kind of row and "filed by her
+                     and dismissed" on the other. -->
                 <div class="reports__note">
                   <dt>{{ 'moderator.restrictions.reason_label' | transloco }}</dt>
                   <dd>
                     {{
-                      'moderator.restrictions.reason_value'
+                      reasonKey(restriction)
                         | transloco
                           : { count: restriction.report_count, days: restriction.window_days }
                     }}

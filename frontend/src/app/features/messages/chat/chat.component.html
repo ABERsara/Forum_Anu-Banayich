@@ -150,11 +150,15 @@
       aria-describedby, so focusing the field says the same thing again.
     -->
     <div class="chat__live" role="status">
-      @if (restriction(); as active) {
+      @if (restrictionEndsAt(); as until) {
         <p class="chat__restricted" id="chat-restricted">
+          <!-- restrictionEndsAt(), not restriction().expires_at: the server's
+               timestamp carries no zone, and the date pipe would read it as
+               local time and name a moment three hours before the restriction
+               lifts (utc-date.util.ts). -->
           {{
             'messages.chat.restricted_notice'
-              | transloco: { until: active.expires_at | date: 'dd/MM/yyyy HH:mm' }
+              | transloco: { until: until | date: 'dd/MM/yyyy HH:mm' }
           }}
         </p>
       }

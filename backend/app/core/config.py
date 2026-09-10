@@ -145,7 +145,14 @@ class Settings(BaseSettings):
     # Moderation thresholds (can be tuned without code changes)
     # ------------------------------------------------------------------
     AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide
-    AUTO_SUSPEND_VALID_REPORTS: int = 3  # Valid reports in 7 days → suspend
+    #: §7.2's third row ("אירוע חוזר משמעותי") reads 2+ upheld incidents in 7
+    #: days; this default still holds the 3 it was written with. Nothing reads
+    #: it yet — the rule is report_service._check_auto_suspension(), which is
+    #: still a stub — so the two numbers are reconciled there, against this
+    #: setting rather than against a literal, when it is implemented. Left at
+    #: 3 here on purpose: re-pointing a threshold nothing enforces belongs to
+    #: the ticket that enforces it, not to ABF-116.
+    AUTO_SUSPEND_VALID_REPORTS: int = 3
     AUTO_SUSPEND_DAYS_WINDOW: int = 7
     AUTO_SUSPEND_HOURS: int = 48
 

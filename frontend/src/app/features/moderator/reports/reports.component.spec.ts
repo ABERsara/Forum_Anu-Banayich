@@ -87,6 +87,27 @@ function makeRestrictions(overrides: Partial<RestrictionList> = {}): Restriction
   };
 }
 
+/**
+ * The other direction of ABF-116, as the dashboard receives it: a member whose
+ * own reports keep being dismissed. Same shape, same `report_count` field —
+ * and the count means the opposite of what it means above.
+ */
+function makeReportingRestrictions(): RestrictionList {
+  return makeRestrictions({
+    items: [
+      {
+        id: 'restriction-2',
+        restriction_type: RestrictionType.REPORTING,
+        expires_at: '2026-08-15T09:30:00',
+        report_count: 5,
+        window_days: 30,
+        created_at: '2026-07-16T09:30:00',
+        member: { id: 'user-3', first_name: 'Rivka', last_name: 'Cohen' },
+      },
+    ],
+  });
+}
+
 function makeHistoryPage(overrides: Partial<ReportHistoryList> = {}): ReportHistoryList {
   return {
     items: [
@@ -522,13 +543,56 @@ describe('ModeratorReportsComponent', () => {
       const transloco = TestBed.inject(TranslocoService);
 
       transloco.setTranslationKey(
-        'moderator.restrictions.reason_value',
+        'moderator.restrictions.reason_value_messaging',
         '{{days}} ימים, {{count}} דיווחים',
         { lang: 'he' },
       );
       fixture.detectChanges();
 
       expect(fieldsOf(cards()[0])).toContain('הסיבה: 30 ימים, 3 דיווחים');
+    });
+
+    /**
+     * The two kinds of row carry the same `report_count` and it means opposite
+     * things: on a messaging restriction the reports were upheld *against* the
+     * member, on a reporting one they are her own reports that were dismissed.
+     * One shared sentence — which is what this screen first shipped with —
+     * told the moderator that a member whose reports keep being thrown out had
+     * five reports upheld against her, which is the reverse of the truth.
+     */
+    it('says why a reporting restriction was applied without calling it upheld', async () => {
+      await render({ restrictions: of(makeReportingRestrictions()) });
+      component.showTab('restrictions');
+      fixture.detectChanges();
+      const card = cards()[0];
+
+      expect(card.querySelector('.badge--alert')!.textContent!.trim()).toBe('מכסת דיווחים יומית');
+      expect(fieldsOf(card)).toContain('הסיבה: 5 דיווחים שהגישה נמצאו שגויים ב-30 הימים האחרונים');
+      expect(fieldsOf(card).join(' ')).not.toContain('מוצדקים');
+
+      switchToEnglish();
+
+      expect(fieldsOf(cards()[0])).toContain(
+        'Reason: 5 reports she filed were dismissed in the last 30 days',
+      );
+      expect(fieldsOf(cards()[0]).join(' ')).not.toContain('upheld');
+    });
+
+    /** The other kind still reads as what it is, in both catalogues. */
+    it('says a messaging restriction was upheld against her', () => {
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(fieldsOf(cards()[0])).toContain(
+        'הסיבה: 3 דיווחים עליה נמצאו מוצדקים ב-30 הימים האחרונים',
+      );
+
+      switchToEnglish();
+
+      expect(fieldsOf(cards()[0])).toContain(
+        'Reason: 3 reports about her were upheld in the last 30 days',
+      );
+      expect(text()).not.toMatch(HEBREW);
     });
 
     it('shows nothing but the member — no report content, no reporter', () => {

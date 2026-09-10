@@ -27,8 +27,12 @@ class MyRestriction(BaseModel):
     """
 
     restriction_type: RestrictionType
-    #: Naive UTC, like every timestamp this API returns. The client renders
-    #: it in the reader's own zone.
+    #: Naive UTC, like every timestamp this API returns — no offset and no
+    #: trailing `Z`. A client has to say so before rendering it: both
+    #: `new Date()` and Angular's date pipe read an offset-less string as
+    #: *local* time, so read straight through, this field names a time three
+    #: hours before the restriction actually ends in Israel. The Angular
+    #: client passes it through `core/utils/utc-date.util.ts` first.
     expires_at: datetime
 
 

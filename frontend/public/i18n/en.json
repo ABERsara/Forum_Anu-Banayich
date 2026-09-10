@@ -434,7 +434,8 @@
       "expires_label": "In force until",
       "applied_label": "Applied on",
       "reason_label": "Reason",
-      "reason_value": "{{count}} reports upheld in the last {{days}} days"
+      "reason_value_messaging": "{{count}} reports about her were upheld in the last {{days}} days",
+      "reason_value_reporting": "{{count}} reports she filed were dismissed in the last {{days}} days"
     },
     "errors": {
       "load_reports_failed": "Something went wrong loading the reports. Try refreshing the page.",
