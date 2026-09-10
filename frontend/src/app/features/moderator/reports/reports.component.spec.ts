@@ -2,9 +2,9 @@
  * The moderator reports board, on both counts it has to get right.
  *
  * `the pending queue` / `deciding on a report` / `the history tab` pin the
- * behaviour this ticket built: what the moderator is shown before a decision,
- * that no decision is sent without a confirmed note, and that the history
- * reflects the decision just taken.
+ * behaviour ABF-105 and ABF-100 built: what the moderator is shown before a
+ * decision, that no decision is sent without a confirmed note, and that the
+ * history reflects the decision just taken.
  *
  * `i18n` is the guard ABF-134 wrote for the scaffold this screen replaced,
  * carried onto the screen that replaced it. Without it nothing catches a label
@@ -14,6 +14,7 @@
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { NEVER, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
@@ -175,7 +176,7 @@ describe('ModeratorReportsComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [ModeratorReportsComponent, translocoTesting()],
-      providers: [{ provide: ReportService, useValue: reportServiceMock }],
+      providers: [{ provide: ReportService, useValue: reportServiceMock }, provideRouter([])],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ModeratorReportsComponent);
@@ -254,6 +255,13 @@ describe('ModeratorReportsComponent', () => {
       expect(text()).toContain('הטרדה');
       expect(text()).toContain('2 דיווחים');
       expect(text()).not.toContain('user-1');
+    });
+
+    it('opens the way through to the card of the reported user', () => {
+      const link: HTMLAnchorElement = root().querySelector('.reports__card-link')!;
+
+      expect(link.getAttribute('href')).toBe('/moderator/users/user-2');
+      expect(link.getAttribute('aria-label')).toContain('כותרת ההודעה');
     });
 
     it('shows a spinner instead of the list while the request is in flight', async () => {
@@ -726,7 +734,11 @@ describe('ModeratorReportsComponent', () => {
         'תאריך הדיווח: 15/07/2026 09:30',
         'מצב ההודעה: גלוי',
       ]);
-      expect(actionLabels()).toEqual(['מחיקת ההודעה (מוצדק)', 'ביטול הדיווח (שגוי)']);
+      expect(actionLabels()).toEqual([
+        'מחיקת ההודעה (מוצדק)',
+        'ביטול הדיווח (שגוי)',
+        'כרטיס המשתמש/ת',
+      ]);
     });
 
     it('leaves no Hebrew on the pending queue in English', async () => {
@@ -744,6 +756,7 @@ describe('ModeratorReportsComponent', () => {
       expect(actionLabels()).toEqual([
         'Delete the message (valid)',
         'Dismiss the report (invalid)',
+        'User card',
       ]);
       expect(text()).not.toMatch(HEBREW);
     });
@@ -751,7 +764,7 @@ describe('ModeratorReportsComponent', () => {
     /**
      * The sweep above reads `textContent`, which an `aria-label` is not part
      * of — a screen reader would have gone on reading Hebrew on an English
-     * page and nothing would have said so. Two of them on this screen name
+     * page and nothing would have said so. Three of them on this screen name
      * the reported post, so they are also the parameters check.
      */
     it('translates the aria-labels, which the text sweep cannot see', async () => {
@@ -761,6 +774,7 @@ describe('ModeratorReportsComponent', () => {
         'דיווחים',
         'מחיקת ההודעה ״A post about the paperwork״',
         'ביטול הדיווח על ״A post about the paperwork״',
+        'כרטיס המשתמש/ת שכתב/ה את ״A post about the paperwork״',
       ]);
 
       switchToEnglish();
@@ -769,6 +783,7 @@ describe('ModeratorReportsComponent', () => {
         'Reports',
         'Delete the message “A post about the paperwork”',
         'Dismiss the report about “A post about the paperwork”',
+        'Card of the user who wrote “A post about the paperwork”',
       ]);
       expect(ariaLabels().join(' ')).not.toMatch(HEBREW);
     });

@@ -34,6 +34,7 @@ import {
   signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ReportWithContent, RestrictionWithMember } from '../../../core/models';
@@ -101,6 +102,7 @@ interface PendingDecision {
   standalone: true,
   imports: [
     DatePipe,
+    RouterLink,
     TranslocoPipe,
     ConfirmDialogComponent,
     ErrorDisplayComponent,

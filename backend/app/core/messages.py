@@ -259,6 +259,10 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "הגעת למכסת הדיווחים היומית. אפשר לדווח שוב מחר.",
         ENGLISH: "You have reached today's reporting limit. You can report again tomorrow.",
     },
+    "reports.user_outside_your_cells": {
+        HEBREW: "המשתמש אינו בתא שבאחריותך.",
+        ENGLISH: "This member is not in a cell you are responsible for.",
+    },
     # -- Professional Q&A -------------------------------------------------
     "professionals.query_not_found": {
         HEBREW: "השאלה לא נמצאה.",

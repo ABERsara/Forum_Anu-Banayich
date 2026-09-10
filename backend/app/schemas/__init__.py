@@ -46,6 +46,7 @@ from app.schemas.user import (
     RegistrationRejectRequest,
     SuspendUserRequest,
     UserAdminView,
+    UserModerationCard,
     UserProfile,
     UserPublic,
 )
@@ -58,6 +59,7 @@ __all__ = [
     "UserPublic",
     "UserProfile",
     "UserAdminView",
+    "UserModerationCard",
     "ProfessionalProfile",
     "RegistrationRejectRequest",
     "SuspendUserRequest",
