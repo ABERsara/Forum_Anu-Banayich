@@ -140,6 +140,27 @@ class ReportDecision(enum.StrEnum):
     CLOSED_ACCOUNT_DELETED = "closed_account_deleted"
 
 
+class RestrictionType(enum.StrEnum):
+    """
+    What an automatic restriction takes away (spec §5.3 מה"ק, §7.2).
+
+    Neither value suspends an account: a restricted member still logs in and
+    still reads everything she could read before. The two of them are the
+    only measures §7.2 applies without a human deciding, which is why they
+    are narrow — an automatic rule that could lock someone out of a support
+    platform on a count of reports would be a worse failure than the abuse
+    it answers.
+    """
+
+    # Sending private messages, for a sender repeatedly reported and upheld
+    # (§7.2 "מדווח-עליו תכוף ומוצדק"). Reading a conversation is untouched.
+    MESSAGING = "messaging"
+    # Filing further reports beyond a daily allowance, for a member whose
+    # reports keep being dismissed (§7.2 "מדווח-שגוי תכוף"). Reporting is not
+    # taken away — the allowance is what is left of it.
+    REPORTING = "reporting"
+
+
 class DocumentType(enum.StrEnum):
     """Types of documents uploaded during registration."""
 
@@ -178,6 +199,11 @@ class AuditAction(enum.StrEnum):
     DIRECT_MESSAGE_ACCESS_DENIED = "direct_message_access_denied"
     DIRECT_MESSAGE_PRUNED = "direct_message_pruned"
     DIRECT_MESSAGE_REPORTED = "direct_message_reported"
+    # One member value for both directions of ABF-116's automatic restriction:
+    # the details payload names which RestrictionType was applied. A second
+    # enum member per direction would have to be added again for every future
+    # one, and Postgres cannot remove an enum value once it exists.
+    USER_RESTRICTED = "user_restricted"
     AGENT_CONVERSATION = "agent_conversation"
 
 

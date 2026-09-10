@@ -415,6 +415,21 @@ describe('ReportButtonComponent', () => {
     expect(dialogText()).toContain('כבר דיווחת על תוכן זה.');
   });
 
+  /**
+   * ABF-116's daily allowance (SPEC §7.2). A member whose reports keep being
+   * dismissed still gets three a day, and the fourth has to say so — a
+   * generic "something went wrong" reads as a broken dialog and gets retried,
+   * which is exactly what the allowance is trying to stop.
+   */
+  it('shows a specific message when the daily reporting limit is reached (429)', () => {
+    setup();
+
+    failWith(429);
+
+    expect(component.errorKey()).toBe('shared.report.error_rate_limited');
+    expect(dialogText()).toContain('הגעת למכסת הדיווחים היומית.');
+  });
+
   it('shows a generic message for other errors', () => {
     setup();
 

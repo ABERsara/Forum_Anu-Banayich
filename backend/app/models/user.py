@@ -166,6 +166,16 @@ class User(Base):
     reports_filed: Mapped[list["Report"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "Report", back_populates="reporter", foreign_keys="Report.reporter_id"
     )
+    # order_by: newest first, so the most recent restriction — the only one
+    # that can still be in force — is the head of the list wherever this is
+    # read directly. The service reads through a query with its own filter;
+    # this is for the ORM-side reader who does not.
+    restrictions: Mapped[list["UserRestriction"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
+        "UserRestriction",
+        back_populates="user",
+        foreign_keys="UserRestriction.user_id",
+        order_by="UserRestriction.created_at.desc()",
+    )
     audit_logs: Mapped[list["AuditLog"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "AuditLog",
         primaryjoin="foreign(AuditLog.actor_id) == User.id",

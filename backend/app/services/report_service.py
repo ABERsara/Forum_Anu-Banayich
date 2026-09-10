@@ -6,12 +6,18 @@ Implements the automated protection rules from spec section 7.
 Rules:
   1st report on a post  → email to responsible moderator
   2nd report (different user) → auto-hide post + urgent notification
-  3+ valid reports on a USER in 7 days → auto-suspend 48h + notify admin
-  5+ false reports from same USER in 30 days → restrict that user's reporting
+  3+ upheld reports on a USER in 30 days → she cannot send private messages
+      for 48h + notify her cell's moderator and the admin (§7.2, ABF-116)
+  5+ dismissed reports from the same USER in 30 days → her reporting drops
+      to 3 a day + notify her cell's moderator (§7.2, ABF-116)
+  2+ upheld incidents in 7 days → auto-suspend 48h + notify admin
+
+The threshold rules themselves live in `restriction_service`; this module is
+where a decision is recorded and where the people who need to hear about one
+are worked out.
 
 TODO list for junior developer:
-  [ ] implement _check_auto_suspension()          – Sprint 5
-  [ ] implement _check_frequent_false_reporter()  – Sprint 5
+  [ ] implement _check_auto_suspension()          – §7.2's third row, still open
 """
 
 import logging
@@ -19,7 +25,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import ColumnElement, and_, case, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Query, Session
 
 from app.core.constants import (
@@ -28,22 +34,27 @@ from app.core.constants import (
     PostStatus,
     ReportDecision,
     ReportTargetType,
+    RestrictionType,
     UserRole,
 )
 from app.core.i18n import translate
 from app.models.forum import DirectMessage, ForumPost
 from app.models.report import Report
+from app.models.restriction import UserRestriction
 from app.models.user import User
 from app.schemas.report import ReportCreate, ReportDecideRequest
 from app.schemas.user import SuspendUserRequest, UserModerationCard
-from app.services import forum_service, user_service
+from app.services import forum_service, restriction_service, user_service
 from app.services.audit_service import build_entry, log_action
 from app.services.email_service import (
     send_content_removed_notification,
     send_direct_message_report_alert,
     send_moderator_alert,
+    send_reporting_restriction_alert,
+    send_sending_restriction_alert,
     send_urgent_moderator_alert,
 )
+from app.services.user_service import cell_match_filter
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +74,16 @@ def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     its two participants and so has to be captured into the report itself.
     What they share — one report per user per target, and who gets told —
     stays shared.
+
+    The daily allowance is checked first, before either path and before
+    anything is looked up. §7.2's limit applies to reporting itself, not to
+    reporting a particular thing, and checking it here means a member who is
+    over it gets the same answer whatever id she names — a check made after
+    the lookup would answer 404 for an id that does not exist and 429 for one
+    that does, which is a probe for other people's content.
     """
+    restriction_service.assert_may_file_report(db, reporter)
+
     if data.target_type == ReportTargetType.DIRECT_MESSAGE:
         return _file_direct_message_report(db, data, reporter)
     if data.target_type != ReportTargetType.FORUM_POST:
@@ -268,30 +288,13 @@ def _handle_second_plus_report_notification(
         send_urgent_moderator_alert(email, report.id)
 
 
-def _cell_match_filter(cells: list[dict[str, str]]) -> ColumnElement[bool]:
-    """
-    Build an OR-of-ANDs SQLAlchemy filter matching User.user_type/sector
-    against a moderator's list of {"group", "sector"} cells (spec §4.3).
-    Shared by get_pending_reports() and get_report_for_moderator() — both
-    start from "these are my cells" and query outward for matching users.
-    (_moderator_emails_for_author() runs the opposite direction — one known author,
-    searching moderators' JSON cell lists — so it can't reuse this filter.)
-    """
-    return or_(
-        *(
-            and_(User.user_type == cell["group"], User.sector == cell["sector"])
-            for cell in cells
-        )
-    )
-
-
 def _moderator_covers(moderator: User, user: User) -> bool:
     """
     True if `user` sits in one of the cells this moderator oversees.
 
-    The in-Python counterpart to _cell_match_filter(): that one starts from
-    the cells and queries for matching users, this one has both objects in
-    hand already and only has to compare them.
+    The in-Python counterpart to user_service.cell_match_filter(): that one
+    starts from the cells and queries for matching users, this one has both
+    objects in hand already and only has to compare them.
 
     A user with no group or sector – every non-USER role, plus a registration
     the admin has not yet placed – belongs to no cell, so no moderator covers
@@ -407,9 +410,16 @@ def decide_report(
     )
     db.refresh(report)
 
-    # Sprint 5 hooks in right here: _check_auto_suspension() for the reported
-    # user after VALID, _check_frequent_false_reporter() for the reporter
-    # after INVALID (SPEC §7.2). Both are out of scope for this ticket.
+    # §7.2's thresholds, evaluated on the decision that was just committed
+    # (ABF-116). Deliberately *not* wrapped in a try/except, unlike every
+    # notification in this module: a restriction is state, not mail. If it
+    # cannot be written the caller has to hear about it — a protection
+    # measure that silently fails to apply is the failure this whole
+    # mechanism exists to prevent, and the alternative is a 500 on a
+    # decision that is already recorded, which a retry answers honestly
+    # with 409 "already handled".
+    restriction = restriction_service.evaluate_after_decision(db, report, moderator)
+    db.refresh(report)
 
     # Strictly after the commit, and never fatal: the decision is already
     # recorded, and a notification that fails must not turn it into a failed
@@ -420,7 +430,69 @@ def decide_report(
         except Exception:
             logger.exception("Failed to notify the author about report %s", report.id)
 
+    if restriction is not None:
+        try:
+            _notify_restriction(db, restriction)
+        except Exception:
+            logger.exception(
+                "Failed to send the restriction alerts for report %s", report.id
+            )
+
     return report
+
+
+def _notify_restriction(db: Session, restriction: UserRestriction) -> None:
+    """
+    §7.2's "התראה" column — tell the people who can act on a restriction that
+    one was applied automatically.
+
+    Who hears depends on the direction, because §7.2 says so and because the
+    two mean different things. A member restricted from sending has been
+    found against repeatedly: the moderator responsible for her cell needs to
+    know, and so does the admin, who is the only one who can suspend
+    ("עיון בהשעיה" — the admin considers it; nothing here decides it). A
+    member whose reports keep being dismissed is a moderator's problem alone
+    — it is the moderator's queue she is filling — and escalating that to an
+    admin would turn an over-eager reporter into an administrative case.
+
+    The alerts carry the restricted member's id and when the measure ends.
+    Never the reports themselves, never their content: one of them can be a
+    private message, and mail is not a channel anyone consented to it
+    reaching (same rule as send_direct_message_report_alert).
+
+    Lives here rather than in restriction_service because "which moderators
+    cover this cell" is this module's knowledge — and keeping it here is what
+    lets restriction_service stay importable from both services without a
+    cycle.
+    """
+    member = restriction.user
+    moderator_emails = _moderator_emails_for_author(db, member)
+
+    if restriction.restriction_type == RestrictionType.MESSAGING:
+        for email in moderator_emails + _admin_alert_emails(db):
+            send_sending_restriction_alert(email, member.id, restriction.expires_at)
+        return
+
+    for email in moderator_emails:
+        send_reporting_restriction_alert(email, member.id, restriction.expires_at)
+
+
+def _admin_alert_emails(db: Session) -> list[str]:
+    """
+    Contact addresses for the admins who take §7.2's escalations.
+
+    `alert_email` rather than the login address, and only where one is set —
+    the same roster user_service.escalate_overdue_registrations() escalates
+    to, so a deployment configures who is on call once.
+    """
+    admins = (
+        db.query(User)
+        .filter(User.role == UserRole.ADMIN)
+        .filter(User.account_status == AccountStatus.ACTIVE)
+        .filter(User.alert_email.isnot(None))
+        .all()
+    )
+    return [admin.alert_email for admin in admins if admin.alert_email]
 
 
 def _apply_content_decision(post: ForumPost, decision: ReportDecision) -> str:
@@ -479,7 +551,7 @@ def _scoped_report_query(db: Session, moderator: User) -> Query[Any] | None:
     cells = moderator.moderator_cells or []
     if not cells:
         return None
-    return query.filter(_cell_match_filter(cells))
+    return query.filter(cell_match_filter(cells))
 
 
 def get_pending_reports(db: Session, moderator: User) -> list[tuple[Report, ForumPost]]:
@@ -582,7 +654,7 @@ def get_report_for_moderator(
         covered = bool(cells) and (
             db.query(User)
             .filter(User.id == report.reported_user_id)
-            .filter(_cell_match_filter(cells))
+            .filter(cell_match_filter(cells))
             .first()
             is not None
         )
@@ -703,29 +775,26 @@ def _check_auto_suspension(db: Session, reported_user: User) -> None:
     """
     Check if the reported user should be automatically suspended.
 
-    Rule: 3+ valid reports in 7 days → suspend 48 hours + notify admin
+    Rule: §7.2's third row — 2+ upheld incidents in 7 days → temporary
+    automatic suspension (48h) + notify admin.
 
-    Sprint 5 — decide_report() marks where this is called from once it exists.
-
-    TODO:
-      1. Count reports with decision=VALID against reported_user in last 7 days
-      2. If >= 3 and not already suspended: call suspend_user()
-    """
-    # TODO: implement this function
-    pass
-
-
-def _check_frequent_false_reporter(db: Session, reporter: User) -> None:
-    """
-    Check if this user is filing too many false reports.
-
-    Rule: 5+ INVALID reports filed by same user in 30 days → restrict + notify moderator
-
-    Sprint 5 — decide_report() marks where this is called from once it exists.
+    Still open, and deliberately not what ABF-116 built. That ticket
+    implements §7.2's *first two* rows, both of which restrict one action and
+    leave the account alone; this one takes the account away, which is a
+    heavier measure on a different window and count. decide_report() calls
+    restriction_service.evaluate_after_decision() where this would also hook
+    in.
 
     TODO:
-      1. Count reports filed BY reporter with decision=INVALID in last 30 days
-      2. If >= 5: add a report limit flag on the user
+      1. Count reports with decision=VALID against reported_user inside
+         settings.AUTO_SUSPEND_DAYS_WINDOW
+      2. If >= settings.AUTO_SUSPEND_VALID_REPORTS and not already suspended:
+         call user_service.suspend_user()
+
+    Read the count from the setting, not from a literal — and note that the
+    setting still holds 3 while §7.2 reads 2. Settling that is this rule's
+    job; ABF-116 left the value alone rather than re-pointing a threshold
+    nothing enforces.
     """
     # TODO: implement this function
     pass

@@ -14,6 +14,7 @@
  */
 export const KNOWN_ERROR_KEYS = [
   'errors.dm_forbidden',
+  'errors.dm_restricted',
   'errors.invalid_cursor',
   'errors.internal_server_error',
 ];

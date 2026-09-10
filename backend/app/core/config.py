@@ -145,12 +145,50 @@ class Settings(BaseSettings):
     # Moderation thresholds (can be tuned without code changes)
     # ------------------------------------------------------------------
     AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide
-    AUTO_SUSPEND_VALID_REPORTS: int = 3  # Valid reports in 7 days → suspend
+    #: §7.2's third row ("אירוע חוזר משמעותי") reads 2+ upheld incidents in 7
+    #: days; this default still holds the 3 it was written with. Nothing reads
+    #: it yet — the rule is report_service._check_auto_suspension(), which is
+    #: still a stub — so the two numbers are reconciled there, against this
+    #: setting rather than against a literal, when it is implemented. Left at
+    #: 3 here on purpose: re-pointing a threshold nothing enforces belongs to
+    #: the ticket that enforces it, not to ABF-116.
+    AUTO_SUSPEND_VALID_REPORTS: int = 3
     AUTO_SUSPEND_DAYS_WINDOW: int = 7
     AUTO_SUSPEND_HOURS: int = 48
+
+    # ------------------------------------------------------------------
+    # Automatic restrictions (spec §5.3 מה"ק, §7.2) — ABF-116
+    #
+    # Every number below is read through `settings` at the moment a
+    # threshold is evaluated, never inlined at the call site, because the
+    # ticket's own note is that these have to be re-calibrated after the
+    # first real run. Inlining is the mistake FINDINGS M-01 records for
+    # AUTO_HIDE_REPORT_COUNT: a setting nothing reads looks tunable and is
+    # not.
+    #
+    # Direction A — the repeatedly-reported sender. Upheld (VALID) reports
+    # only: a report that a moderator dismissed is not evidence of anything,
+    # and CLOSED_ACCOUNT_DELETED is the system closing a report, not a
+    # finding against anyone.
+    # ------------------------------------------------------------------
+    DM_BLOCK_AFTER_REPORTS: int = 3  # Upheld reports in the window → restrict
+    DM_BLOCK_DAYS_WINDOW: int = 30
+    #: How long the sending restriction lasts. 48 hours to match
+    #: AUTO_SUSPEND_HOURS above — the platform's one stated duration for a
+    #: temporary automatic measure, and §5.3 gives none of its own.
+    DM_BLOCK_HOURS: int = 48
+
+    # ------------------------------------------------------------------
+    # Direction B — the member whose reports keep being dismissed. Not a
+    # ban on reporting: §7.2 asks for a daily allowance, so she can still
+    # report the thing that happens to her today.
+    # ------------------------------------------------------------------
     FALSE_REPORT_LIMIT: int = 5  # False reports in 30 days → restrict
     FALSE_REPORT_DAYS_WINDOW: int = 30
-    DM_BLOCK_AFTER_REPORTS: int = 3  # DM reports before auto-block
+    #: Reports still allowed per day while the restriction is in force.
+    RESTRICTED_REPORTS_PER_DAY: int = 3
+    #: How long the reporting allowance lasts, in days.
+    FALSE_REPORT_RESTRICTION_DAYS: int = 30
 
     # ------------------------------------------------------------------
     # Private messaging storage cap (spec section 5.3)

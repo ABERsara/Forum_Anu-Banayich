@@ -26,6 +26,9 @@ BACKEND_DIR = Path(__file__).parent.parent  # backend/
 # The merge revision that ABF-114's read_at migration sits directly on top of.
 REVISION_BEFORE_READ_AT = "aac7e1fb8f49"
 
+# The merge revision ABF-116's user_restrictions migration sits directly on top of.
+REVISION_BEFORE_RESTRICTIONS = "45019c151eb8"
+
 
 @contextmanager
 def _alembic_on_a_temp_sqlite_db(monkeypatch):
@@ -180,6 +183,47 @@ def test_read_at_migration_carries_the_read_flag_across_in_both_directions(
 
         command.downgrade(alembic_cfg, REVISION_BEFORE_READ_AT)
         assert _read_state(db_url, "is_read") == {"m-read": 1, "m-unread": 0}
+
+
+def _restriction_indexes(db_url: str) -> set[str]:
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        return {i["name"] for i in inspect(engine).get_indexes("user_restrictions")}
+    finally:
+        engine.dispose()  # release the file lock before tempdir cleanup (Windows)
+
+
+def test_user_restrictions_migration_goes_down_and_up_again_cleanly(
+    monkeypatch,
+) -> None:
+    """
+    The shared Definition of Done asks for a migration that runs both ways
+    (ABF-116, a4d7c81f0e93).
+
+    The index is asserted alongside the table, and the second upgrade is the
+    point of the test rather than a formality: a downgrade that drops the
+    table but leaves something of it behind — the index here, and on
+    PostgreSQL the `restrictiontype` enum type, which is why the downgrade
+    drops that too — fails on the way back up, not on the way down, which is
+    where nobody is looking.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        assert "user_restrictions" in _created_tables(db_url)
+        assert _restriction_indexes(db_url) == {
+            "ix_user_restrictions_user_type_expires"
+        }
+
+        # Named rather than "-1": this says which schema state the downgrade is
+        # meant to land on, and it keeps saying it however the graph grows.
+        command.downgrade(alembic_cfg, REVISION_BEFORE_RESTRICTIONS)
+        assert "user_restrictions" not in _created_tables(db_url)
+
+        command.upgrade(alembic_cfg, "head")
+        assert "user_restrictions" in _created_tables(db_url)
+        assert _restriction_indexes(db_url) == {
+            "ix_user_restrictions_user_type_expires"
+        }
 
 
 def test_no_agent_model_migration_drift(monkeypatch) -> None:

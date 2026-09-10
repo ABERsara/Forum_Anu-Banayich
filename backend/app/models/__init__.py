@@ -16,6 +16,7 @@ from app.models.forum import DirectMessage, ForumPost
 from app.models.like import Like
 from app.models.professional import ProfessionalQuery
 from app.models.report import Report
+from app.models.restriction import UserRestriction
 from app.models.user import User
 
 __all__ = [
@@ -24,6 +25,7 @@ __all__ = [
     "DirectMessage",
     "ProfessionalQuery",
     "Report",
+    "UserRestriction",
     "Like",
     "Document",
     "AuditLog",

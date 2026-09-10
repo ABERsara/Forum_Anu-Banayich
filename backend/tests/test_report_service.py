@@ -642,7 +642,7 @@ class TestGetReportForModerator:
         Regression test: an empty moderator_cells list must deny access to
         every report, not grant it. or_() with no clauses is a SQL no-op
         (matches every row) rather than "match none", so this has to be
-        special-cased rather than left to the filter — see _cell_match_filter.
+        special-cased rather than left to the filter — see cell_match_filter.
         """
         moderator = _make_user(
             db_session, "mod@example.com", role=UserRole.MODERATOR, moderator_cells=[]

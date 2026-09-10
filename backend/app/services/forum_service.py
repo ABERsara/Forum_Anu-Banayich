@@ -49,6 +49,7 @@ from app.schemas.forum import (
     ForumPostUpdate,
 )
 from app.schemas.user import UserPublic
+from app.services import restriction_service
 from app.services.audit_service import build_entry, log_action
 from app.services.user_service import get_user_by_id
 
@@ -589,7 +590,15 @@ def send_direct_message(
     The new message is stored first and the cap enforced after, never the
     other way round: pruning ahead of a send that then fails validation would
     delete history to make room for nothing.
+
+    A sender under §7.2's messaging restriction is refused before the
+    recipient is even resolved (ABF-116). That order is what keeps the
+    refusal from saying anything about the recipient: every send she attempts
+    answers identically, so the restriction cannot be used to find out who
+    exists in her cell.
     """
+    restriction_service.assert_may_send_direct_message(db, sender)
+
     recipient = (
         None if sender.role != UserRole.USER else get_user_by_id(db, data.recipient_id)
     )
