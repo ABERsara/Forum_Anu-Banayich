@@ -19,6 +19,7 @@ import logging
 import smtplib
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from html import escape
@@ -240,6 +241,46 @@ def send_content_removed_notification(email: str, report_id: str) -> None:
     written about them.
     """
     logger.info(f"[EMAIL] Content removed after report {report_id} → {email}")
+    # TODO: send real email
+
+
+def send_sending_restriction_alert(
+    recipient_email: str, user_id: str, expires_at: datetime
+) -> None:
+    """
+    Tell a moderator or an admin that §7.2's threshold restricted a member
+    from sending private messages (ABF-116).
+
+    Ids and an end date — the same signature discipline as
+    send_direct_message_report_alert(): no parameter can carry the reports it
+    was triggered by, and none can carry their content, because one of them
+    may be a private message. Whoever reads this opens the moderator
+    dashboard to see the rest.
+    """
+    logger.info(
+        f"[EMAIL] Messaging restriction applied to user {user_id} "
+        f"until {expires_at.isoformat()} → {recipient_email}"
+    )
+    # TODO: send real email
+
+
+def send_reporting_restriction_alert(
+    moderator_email: str, user_id: str, expires_at: datetime
+) -> None:
+    """
+    Tell a moderator that §7.2's threshold dropped a member's reporting to a
+    daily allowance (ABF-116).
+
+    Separate from send_sending_restriction_alert() despite the identical
+    signature: the two say opposite things about the member — one keeps being
+    found against, the other keeps being wrong about other people — and a
+    single function with a `kind` argument is one call-site mistake away from
+    telling a moderator the wrong one.
+    """
+    logger.info(
+        f"[EMAIL] Reporting restriction applied to user {user_id} "
+        f"until {expires_at.isoformat()} → {moderator_email}"
+    )
     # TODO: send real email
 
 

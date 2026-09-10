@@ -251,6 +251,14 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "הדיווח כבר טופל.",
         ENGLISH: "This report has already been handled.",
     },
+    # §7.2's daily allowance for a member whose reports keep being dismissed.
+    # Says that the limit is daily, so the reader knows it lifts by itself —
+    # and does not say how many are left, which would turn the message into a
+    # counter to game.
+    "reports.daily_limit_reached": {
+        HEBREW: "הגעת למכסת הדיווחים היומית. אפשר לדווח שוב מחר.",
+        ENGLISH: "You have reached today's reporting limit. You can report again tomorrow.",
+    },
     # -- Professional Q&A -------------------------------------------------
     "professionals.query_not_found": {
         HEBREW: "השאלה לא נמצאה.",

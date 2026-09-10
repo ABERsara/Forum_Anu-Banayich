@@ -5,6 +5,7 @@ All routes require UserRole.MODERATOR (or ADMIN).
 
 GET  /moderator/reports             – pending reports in moderator's cells
 GET  /moderator/reports/history     – reports already decided, paginated
+GET  /moderator/restrictions        – automatic restrictions in force in those cells
 GET  /moderator/reports/{id}        – single report with full context
 POST /moderator/reports/{id}/decide – decide on a report (valid/invalid)
 """
@@ -24,7 +25,12 @@ from app.schemas.report import (
     ReportResponse,
     ReportWithContent,
 )
-from app.services import report_service
+from app.schemas.restriction import (
+    RestrictedMember,
+    RestrictionListResponse,
+    RestrictionWithMember,
+)
+from app.services import report_service, restriction_service
 
 router = APIRouter(
     prefix="/moderator",
@@ -79,6 +85,40 @@ def list_decided_reports(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/restrictions", response_model=RestrictionListResponse)
+def list_active_restrictions(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> RestrictionListResponse:
+    """
+    Return the automatic restrictions in force right now in the moderator's
+    assigned cells, newest first (§7.2 "התראה למבקר", §7.3).
+
+    Scoped exactly like the report queue: a moderator sees her own cells, an
+    admin sees everything. A restriction names a member and what the platform
+    stopped her doing — it is the same private fact as the reports behind it,
+    and it does not travel outside the cell the moderator is responsible for.
+
+    Never any report content, and never a reporter's identity. The list says
+    how many decided reports crossed the threshold and over what window; the
+    reports themselves are read one at a time in the queue above.
+    """
+    pairs = restriction_service.list_active_restrictions(db, current_user)
+    items = [
+        RestrictionWithMember(
+            id=restriction.id,
+            restriction_type=restriction.restriction_type,
+            expires_at=restriction.expires_at,
+            report_count=restriction.report_count,
+            window_days=restriction.window_days,
+            created_at=restriction.created_at,
+            member=RestrictedMember.model_validate(member),
+        )
+        for restriction, member in pairs
+    ]
+    return RestrictionListResponse(items=items, total=len(items))
 
 
 @router.get("/reports/{report_id}", response_model=ReportWithContent)
