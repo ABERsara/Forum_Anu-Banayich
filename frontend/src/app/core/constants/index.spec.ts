@@ -19,13 +19,23 @@ import {
   QUERY_STATUS_LABELS,
   REPORT_DECISION_LABELS,
   REPORT_REASON_LABELS,
+  RESTRICTION_TYPE_LABELS,
   SECTOR_LABELS,
   SECTOR_VISIBILITY_LABELS,
   USER_TYPE_LABELS,
 } from './index';
 import { TRANSLATIONS } from '../../../testing/transloco-testing';
 
-/** The ten maps this ticket moved onto translation keys, by their export name. */
+/**
+ * The ten maps this ticket moved onto translation keys, by their export name,
+ * plus the two that were written straight onto keys afterwards
+ * (REPORT_DECISION_LABELS, and RESTRICTION_TYPE_LABELS since ABF-116).
+ *
+ * A map added here and left out of this object is not merely untested — the
+ * "no orphaned translation" check below would then read its `constants.*`
+ * entries as belonging to nothing and fail. Registering the map is what makes
+ * that check keep meaning what it says.
+ */
 const LABEL_MAPS: Record<string, Record<string, LabelKey>> = {
   ACCOUNT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
@@ -35,6 +45,7 @@ const LABEL_MAPS: Record<string, Record<string, LabelKey>> = {
   QUERY_STATUS_LABELS,
   REPORT_DECISION_LABELS,
   REPORT_REASON_LABELS,
+  RESTRICTION_TYPE_LABELS,
   SECTOR_LABELS,
   SECTOR_VISIBILITY_LABELS,
   USER_TYPE_LABELS,

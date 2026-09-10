@@ -51,6 +51,27 @@ const DISCLOSURE_KEYS: Partial<Record<ReportTargetType, string>> = {
   [ReportTargetType.DIRECT_MESSAGE]: 'shared.report.disclosure_direct_message',
 };
 
+/**
+ * What a failed report says, chosen by status code rather than by reading
+ * `detail`.
+ *
+ * The server's `detail` is a finished sentence in the *request's* language
+ * (ABF-137's translate()), so showing it would freeze the message in the
+ * language it was raised in and stop it following a language switch. The
+ * status code is language-free, and these three are the only outcomes this
+ * dialog can produce.
+ *
+ * 429 is ABF-116's daily allowance (SPEC §7.2): a member whose reports keep
+ * being dismissed still gets three a day, and the fourth says so rather than
+ * failing as "something went wrong" — a generic error would read as a broken
+ * dialog and be retried.
+ */
+function errorKeyForStatus(status: number): string {
+  if (status === 409) return 'shared.report.error_duplicate';
+  if (status === 429) return 'shared.report.error_rate_limited';
+  return 'shared.report.error_generic';
+}
+
 @Component({
   selector: 'app-report-button',
   standalone: true,
@@ -225,9 +246,7 @@ export class ReportButtonComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.isSubmitting.set(false);
-          this.errorKey.set(
-            err.status === 409 ? 'shared.report.error_duplicate' : 'shared.report.error_generic',
-          );
+          this.errorKey.set(errorKeyForStatus(err.status));
         },
       });
   }

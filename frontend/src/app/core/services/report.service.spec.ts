@@ -4,8 +4,20 @@ import { TestBed } from '@angular/core/testing';
 
 import { ReportService } from './report.service';
 import { environment } from '../../../environments/environment';
-import { PostStatus, ReportDecision, ReportReason, ReportTargetType } from '../constants';
-import type { Report, ReportCreate, ReportHistoryList, ReportWithContent } from '../models';
+import {
+  PostStatus,
+  ReportDecision,
+  ReportReason,
+  ReportTargetType,
+  RestrictionType,
+} from '../constants';
+import type {
+  Report,
+  ReportCreate,
+  ReportHistoryList,
+  ReportWithContent,
+  RestrictionList,
+} from '../models';
 
 const MOCK_REPORT: Report = {
   id: 'report-1',
@@ -161,5 +173,33 @@ describe('ReportService', () => {
     req.flush({ items: [decided], total: 5, page: 3, page_size: 2 });
 
     expect(result?.items).toEqual([decided]);
+  });
+
+  it('getActiveRestrictions GETs the moderator restrictions list', () => {
+    const restrictions: RestrictionList = {
+      items: [
+        {
+          id: 'restriction-1',
+          restriction_type: RestrictionType.MESSAGING,
+          expires_at: '2026-07-18T09:30:00',
+          report_count: 3,
+          window_days: 30,
+          created_at: '2026-07-16T09:30:00',
+          member: { id: 'user-2', first_name: 'דנה', last_name: 'לוי' },
+        },
+      ],
+      total: 1,
+    };
+    let result: RestrictionList | undefined;
+
+    service.getActiveRestrictions().subscribe((res) => (result = res));
+
+    // No page parameter: the list is what is in force now, and it shrinks by
+    // itself as restrictions expire.
+    const req = httpMock.expectOne(`${environment.apiUrl}/moderator/restrictions`);
+    expect(req.request.method).toBe('GET');
+
+    req.flush(restrictions);
+    expect(result).toEqual(restrictions);
   });
 });

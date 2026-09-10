@@ -424,12 +424,23 @@
       "confirm_invalid_title": "Dismiss the report",
       "confirm_invalid_message": "The report will be marked invalid. A message hidden automatically after two reports will be shown in the forum again.",
       "note_input_label": "Moderator's note (required)",
-      "note_placeholder": "For example: the content includes an offensive remark about another user"
+      "note_placeholder": "For example: the content includes an offensive remark about another user",
+      "tab_restrictions": "Active restrictions"
+    },
+    "restrictions": {
+      "hint": "Restrictions applied automatically by the thresholds in the spec, in the cells you oversee. Each one ends by itself on the date shown.",
+      "loading": "Loading restrictions...",
+      "empty": "No restrictions are in force in the cells you oversee.",
+      "expires_label": "In force until",
+      "applied_label": "Applied on",
+      "reason_label": "Reason",
+      "reason_value": "{{count}} reports upheld in the last {{days}} days"
     },
     "errors": {
       "load_reports_failed": "Something went wrong loading the reports. Try refreshing the page.",
       "load_history_failed": "Something went wrong loading the history. Try refreshing the page.",
-      "decide_failed": "Something went wrong saving the decision. Please try again."
+      "decide_failed": "Something went wrong saving the decision. Please try again.",
+      "load_restrictions_failed": "Something went wrong loading the restrictions. Try refreshing the page."
     }
   },
   "profile": {
@@ -484,7 +495,8 @@
       "description_label": "Details (optional)",
       "submit": "Send report",
       "error_duplicate": "You have already reported this content.",
-      "error_generic": "Something went wrong sending the report. Please try again."
+      "error_generic": "Something went wrong sending the report. Please try again.",
+      "error_rate_limited": "You have reached today's reporting limit. You can report again tomorrow."
     },
     "file_upload": {
       "choose_file": "Choose file",
@@ -501,7 +513,8 @@
     "dm_forbidden": "You don't have permission to send or view this message.",
     "invalid_cursor": "The request for older messages was not valid. Please refresh the page.",
     "internal_server_error": "Internal server error. Please try again later.",
-    "generic": "Something went wrong. Please try again."
+    "generic": "Something went wrong. Please try again.",
+    "dm_restricted": "Sending private messages is temporarily restricted following reports that were upheld. You can still read your conversations."
   },
   "messages": {
     "inbox": {
@@ -549,7 +562,9 @@
       "send_failed": "The message was not sent. Please try again.",
       "pruned_notice": "This conversation reached its {{limit}}-message limit, so the oldest message was deleted to make room.",
       "pruned_notice_many": "This conversation reached its {{limit}}-message limit, so the {{count}} oldest messages were deleted to make room.",
-      "report_message": "Report the message from {{name}} at {{time}}"
+      "report_message": "Report the message from {{name}} at {{time}}",
+      "restricted_notice": "Sending private messages is restricted until {{until}}, following reports that were upheld. You can still read this conversation, and write again once the restriction ends.",
+      "restricted_placeholder": "You cannot send messages while the restriction is in force"
     }
   },
   "constants": {
@@ -615,6 +630,10 @@
       "invalid": "Report dismissed",
       "valid": "Report upheld",
       "closed_account_deleted": "Closed — account deleted"
+    },
+    "restriction_type": {
+      "messaging": "Sending private messages",
+      "reporting": "Daily reporting allowance"
     },
     "document_type": {
       "death_certificate": "Death certificate",

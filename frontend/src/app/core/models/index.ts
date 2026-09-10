@@ -18,6 +18,7 @@ import {
   ReportDecision,
   ReportReason,
   ReportTargetType,
+  RestrictionType,
   Sector,
   SectorVisibility,
   PostStatus,
@@ -485,6 +486,55 @@ export interface ReportList {
 
 /** Reports already decided in this moderator's cells, newest first. */
 export type ReportHistoryList = PaginatedResponse<ReportWithContent>;
+
+// ---------------------------------------------------------------------------
+// Automatic restrictions (ABF-116)
+// ---------------------------------------------------------------------------
+
+/**
+ * The restriction on the *current* user, as she is allowed to see it.
+ *
+ * Deliberately just the two fields the server sends: what she cannot do and
+ * until when. The count of reports behind it stays on the moderator's side —
+ * handed back to the person they were filed against it would be a hint about
+ * who has been reporting her.
+ */
+export interface MyRestriction {
+  restriction_type: RestrictionType;
+  /** Naive-UTC ISO timestamp, like every other date this API returns. */
+  expires_at: string;
+}
+
+/** GET /messages/restriction — null when there is none, never a 404. */
+export interface MyRestrictionResponse {
+  restriction: MyRestriction | null;
+}
+
+/** The member a restriction applies to, as a moderator dashboard shows her. */
+export interface RestrictedMember {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+/** One active restriction in a moderator's cells, with the evidence behind it. */
+export interface RestrictionWithMember {
+  id: string;
+  restriction_type: RestrictionType;
+  expires_at: string;
+  /** How many decided reports were inside the window when it was applied. */
+  report_count: number;
+  /** The window that count was taken over, in days. */
+  window_days: number;
+  created_at: string;
+  member: RestrictedMember;
+}
+
+/** GET /moderator/restrictions — unpaginated, like the pending queue. */
+export interface RestrictionList {
+  items: RestrictionWithMember[];
+  total: number;
+}
 
 // ---------------------------------------------------------------------------
 // Pagination helper

@@ -5,11 +5,18 @@ import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ChatComponent } from './chat.component';
-import { AccountStatus, Sector, UserRole, UserType } from '../../../core/constants';
+import {
+  AccountStatus,
+  RestrictionType,
+  Sector,
+  UserRole,
+  UserType,
+} from '../../../core/constants';
 import type {
   ConversationMessagesPage,
   DirectMessage,
   DirectMessageSendResult,
+  MyRestrictionResponse,
   UserProfile,
   UserPublic,
 } from '../../../core/models';
@@ -80,6 +87,16 @@ function makeSendResult(overrides: Partial<DirectMessageSendResult> = {}): Direc
   };
 }
 
+/** What the server answers a member who may send: a successful "no". */
+const NO_RESTRICTION: MyRestrictionResponse = { restriction: null };
+
+/** What it answers one who may not (ABF-116). */
+function makeRestriction(expiresAt = '2026-08-03T10:00:00'): MyRestrictionResponse {
+  return {
+    restriction: { restriction_type: RestrictionType.MESSAGING, expires_at: expiresAt },
+  };
+}
+
 /** Ten messages, oldest first, the way a page arrives. */
 function manyMessages(count: number, prefix = 'old'): DirectMessage[] {
   return Array.from({ length: count }, (_, index) =>
@@ -99,6 +116,7 @@ describe('ChatComponent', () => {
     getConversation: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
     getCellMembers: ReturnType<typeof vi.fn>;
+    getMessagingRestriction: ReturnType<typeof vi.fn>;
   };
   let reportServiceMock: { fileReport: ReturnType<typeof vi.fn> };
 
@@ -182,6 +200,7 @@ describe('ChatComponent', () => {
       getConversation: vi.fn().mockReturnValue(of(makePage([makeMessage()]))),
       sendMessage: vi.fn().mockReturnValue(of(makeSendResult())),
       getCellMembers: vi.fn().mockReturnValue(of([OTHER])),
+      getMessagingRestriction: vi.fn().mockReturnValue(of(NO_RESTRICTION)),
     };
     reportServiceMock = { fileReport: vi.fn().mockReturnValue(of({ id: 'report-1' })) };
   });
@@ -1101,6 +1120,171 @@ describe('ChatComponent', () => {
 
       expect(text()).toContain('Report content');
       expect(reportTriggers()[0]?.getAttribute('aria-label') ?? text()).not.toMatch(HEBREW);
+      expect(text()).not.toMatch(HEBREW);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // The messaging restriction (ABF-116, SPEC §7.2)
+  // -------------------------------------------------------------------------
+
+  describe('a member restricted from sending', () => {
+    function composer(): HTMLTextAreaElement {
+      return query<HTMLTextAreaElement>('#chat-new-message')!;
+    }
+
+    function sendButton(): HTMLButtonElement {
+      return query<HTMLButtonElement>('.chat__composer-row button')!;
+    }
+
+    /**
+     * Let `[disabled]` reach the DOM.
+     *
+     * NgModel sets up its control in a microtask, so a `disabled` binding on
+     * an ngModel-bound field is applied one tick after the render that
+     * changed it. Imperceptible in a browser; the difference between a green
+     * and a red assertion here.
+     */
+    async function settle(): Promise<void> {
+      await Promise.resolve();
+      fixture.detectChanges();
+    }
+
+    it('asks about the restriction when the screen opens', () => {
+      setup();
+
+      expect(forumServiceMock.getMessagingRestriction).toHaveBeenCalledOnce();
+    });
+
+    it('leaves the composer open for a member who is not restricted', async () => {
+      setup();
+      await settle();
+
+      expect(component.isRestricted()).toBe(false);
+      expect(composer().disabled).toBe(false);
+      expect(query('.chat__restricted')).toBeNull();
+    });
+
+    it('closes the composer and says why, with the date it ends', async () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+      await settle();
+
+      expect(component.isRestricted()).toBe(true);
+      expect(composer().disabled).toBe(true);
+      expect(sendButton().disabled).toBe(true);
+      expect(text()).toContain('שליחת הודעות פרטיות מוגבלת עד 03/08/2026 10:00');
+    });
+
+    /**
+     * The acceptance criterion, on this side of the wire: "ההגבלה חוסמת
+     * שליחה ולא קריאה". The log is rendered from the same page as always.
+     */
+    it('still shows the conversation', () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+
+      expect(component.messages().length).toBe(1);
+      expect(text()).toContain('שלום');
+    });
+
+    it('does not send even if the form is submitted anyway', () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+
+      component.draft.set('נסיון לשלוח');
+      component.send();
+
+      expect(forumServiceMock.sendMessage).not.toHaveBeenCalled();
+      expect(component.messages().length).toBe(1);
+    });
+
+    /**
+     * The notice is a live region so that a restriction beginning mid-session
+     * is announced rather than appearing in silence — and the state it reads
+     * from comes back from the server, which is the only side that knows when
+     * the restriction ends.
+     */
+    it('closes the composer when a send comes back restricted', async () => {
+      forumServiceMock.getMessagingRestriction
+        .mockReturnValueOnce(of(NO_RESTRICTION))
+        .mockReturnValueOnce(of(makeRestriction()));
+      forumServiceMock.sendMessage.mockReturnValue(
+        throwError(() => ({ error: { detail: 'errors.dm_restricted' } })),
+      );
+      setup();
+
+      component.draft.set('הודעה');
+      component.send();
+      await settle();
+
+      expect(component.isRestricted()).toBe(true);
+      expect(composer().disabled).toBe(true);
+      expect(text()).toContain('שליחת הודעות פרטיות מוגבלת');
+    });
+
+    it('does not re-ask after an ordinary send failure', () => {
+      forumServiceMock.sendMessage.mockReturnValue(
+        throwError(() => ({ error: { detail: 'errors.dm_forbidden' } })),
+      );
+      setup();
+
+      component.draft.set('הודעה');
+      component.send();
+
+      expect(forumServiceMock.getMessagingRestriction).toHaveBeenCalledOnce();
+      expect(component.isRestricted()).toBe(false);
+    });
+
+    /**
+     * Fails open on purpose: this request explains, it does not enforce. The
+     * server refuses a restricted send whatever this screen believes, and
+     * blanking the composer because a status call timed out would take
+     * messaging away from someone entitled to it.
+     */
+    it('leaves the composer open when the restriction cannot be read', async () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(
+        throwError(() => new Error('offline')),
+      );
+      setup();
+      await settle();
+
+      expect(component.isRestricted()).toBe(false);
+      expect(composer().disabled).toBe(false);
+    });
+
+    it('announces the notice rather than letting it appear in silence', () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+
+      const live = query('.chat__restricted')!.closest('[role="status"]');
+      expect(live).not.toBeNull();
+    });
+
+    it('describes the closed composer with the reason it is closed', async () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+      await settle();
+
+      expect(composer().getAttribute('aria-describedby')).toBe('chat-restricted');
+      expect(query('#chat-restricted')).not.toBeNull();
+    });
+
+    it('translates the notice and the placeholder', async () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage([makeLatinMessage()])));
+      forumServiceMock.getCellMembers.mockReturnValue(
+        of([{ id: 'other-1', first_name: 'Rivka', last_name: 'Cohen' }]),
+      );
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+      await settle();
+
+      switchToEnglish();
+
+      expect(text()).toContain('Sending private messages is restricted until');
+      expect(composer().placeholder).toBe(
+        'You cannot send messages while the restriction is in force',
+      );
       expect(text()).not.toMatch(HEBREW);
     });
   });

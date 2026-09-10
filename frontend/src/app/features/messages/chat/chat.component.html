@@ -137,6 +137,29 @@
       <app-error-display [message]="key | transloco" />
     }
 
+    <!--
+      Why this member cannot write here (ABF-116, SPEC §7.2). A real region
+      rather than a disabled field on its own: a control that is disabled and
+      unexplained is WCAG 3.3.1 with nothing in it, and a bereaved member who
+      finds she cannot answer a message is owed the reason and the date it
+      ends.
+
+      role="status" so it is announced when it arrives mid-session — the
+      restriction can begin while this screen is open, and the composer
+      closing under her hands must not be silent. It is also the composer's
+      aria-describedby, so focusing the field says the same thing again.
+    -->
+    <div class="chat__live" role="status">
+      @if (restriction(); as active) {
+        <p class="chat__restricted" id="chat-restricted">
+          {{
+            'messages.chat.restricted_notice'
+              | transloco: { until: active.expires_at | date: 'dd/MM/yyyy HH:mm' }
+          }}
+        </p>
+      }
+    </div>
+
     <label class="chat__sr-only" for="chat-new-message">{{
       'messages.chat.new_message_label' | transloco
     }}</label>
@@ -148,9 +171,13 @@
         [ngModel]="draft()"
         (ngModelChange)="draft.set($event)"
         (keydown.enter)="onEnter($event)"
-        [placeholder]="'messages.chat.placeholder' | transloco"
+        [placeholder]="
+          (isRestricted() ? 'messages.chat.restricted_placeholder' : 'messages.chat.placeholder')
+            | transloco
+        "
         [attr.maxlength]="maxLength"
-        aria-describedby="chat-char-count"
+        [disabled]="isRestricted()"
+        [attr.aria-describedby]="isRestricted() ? 'chat-restricted' : 'chat-char-count'"
       ></textarea>
       <button type="submit" [disabled]="!canSend()">
         {{ 'messages.chat.send' | transloco }}

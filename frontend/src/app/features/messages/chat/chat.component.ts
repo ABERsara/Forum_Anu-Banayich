@@ -38,7 +38,12 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslocoModule } from '@jsverse/transloco';
 
 import { ReportTargetType } from '../../../core/constants';
-import { DirectMessage, DirectMessageSendResult, UserPublic } from '../../../core/models';
+import {
+  DirectMessage,
+  DirectMessageSendResult,
+  MyRestriction,
+  UserPublic,
+} from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
 import { errorKeyFrom } from '../../../core/utils/error-key.util';
@@ -98,6 +103,14 @@ interface PruneNotice {
   limit: number;
 }
 
+/**
+ * The refusal the server sends a member under §7.2's messaging restriction.
+ *
+ * Matched by name here rather than by status code: a 403 on this route also
+ * means "not in your cell", and the two need different words on screen.
+ */
+const RESTRICTED_ERROR_KEY = 'errors.dm_restricted';
+
 @Component({
   selector: 'app-chat',
   standalone: true,
@@ -140,6 +153,17 @@ export class ChatComponent implements OnInit {
 
   isLoading = signal(false);
   loadErrorKey = signal<string>('');
+
+  /**
+   * §7.2's messaging restriction on the *current* user, or null (ABF-116).
+   *
+   * Asked for when the screen opens rather than discovered by a rejected
+   * send: a member who has been restricted should be told so before she
+   * writes a message, not after. The rejected send is still handled — the
+   * restriction can begin while this screen is open — and re-reads this so
+   * the composer closes behind it.
+   */
+  restriction = signal<MyRestriction | null>(null);
   isLoadingOlder = signal(false);
   olderErrorKey = signal<string>('');
   hasMore = signal(false);
@@ -150,7 +174,9 @@ export class ChatComponent implements OnInit {
   olderLoadedCount = signal(0);
 
   atLimit = computed(() => this.draft().length >= MAX_MESSAGE_LENGTH);
-  canSend = computed(() => this.draft().trim().length > 0);
+  /** True while sending is withdrawn; reading the log is unaffected. */
+  isRestricted = computed(() => this.restriction() !== null);
+  canSend = computed(() => this.draft().trim().length > 0 && !this.isRestricted());
 
   /** Points at the message *before* the oldest one on screen. */
   private nextCursor: string | null = null;
@@ -160,6 +186,26 @@ export class ChatComponent implements OnInit {
     this.otherUserId = this.route.snapshot.paramMap.get('userId') ?? '';
     this.loadCellMemberName();
     this.loadNewestPage();
+    this.loadRestriction();
+  }
+
+  /**
+   * Ask whether this member may send, and lock the composer if she may not.
+   *
+   * A failure is swallowed, and deliberately fails *open*: this request is
+   * what puts an explanation on screen, not what enforces anything — the
+   * server refuses a restricted send whatever this screen believes. Blanking
+   * the composer because a status request timed out would take messaging
+   * away from someone who is entitled to it.
+   */
+  private loadRestriction(): void {
+    this.forumService
+      .getMessagingRestriction()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => this.restriction.set(response.restriction),
+        error: () => undefined,
+      });
   }
 
   /**
@@ -250,7 +296,7 @@ export class ChatComponent implements OnInit {
   send(): void {
     const content = this.draft().trim();
     const myUserId = this.auth.currentUser()?.id;
-    if (!content || !myUserId) return;
+    if (!content || !myUserId || this.isRestricted()) return;
 
     const localId = `pending-${++this.pendingCounter}`;
     this.messages.update((current) => [
@@ -312,7 +358,12 @@ export class ChatComponent implements OnInit {
   private rollback(localId: string, content: string, err: unknown): void {
     this.messages.update((current) => current.filter((message) => message.id !== localId));
     if (this.draft() === '') this.draft.set(content);
-    this.sendErrorKey.set(errorKeyFrom(err, 'messages.chat.send_failed'));
+    const key = errorKeyFrom(err, 'messages.chat.send_failed');
+    this.sendErrorKey.set(key);
+    // A restriction that began while this screen was open. Re-read it rather
+    // than inventing one from the error, so the notice can say until when —
+    // which only the server knows.
+    if (key === RESTRICTED_ERROR_KEY) this.loadRestriction();
   }
 
   private loadNewestPage(): void {

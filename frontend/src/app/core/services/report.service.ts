@@ -15,6 +15,7 @@ import {
   ReportDecideRequest,
   ReportHistoryList,
   ReportList,
+  RestrictionList,
 } from '../models';
 import { ApiService } from './api.service';
 
@@ -53,6 +54,15 @@ export class ReportService {
 
   decideReport(reportId: string, data: ReportDecideRequest): Observable<Report> {
     return this.api.post<Report>(`/moderator/reports/${reportId}/decide`, data);
+  }
+
+  /**
+   * The automatic restrictions in force right now in this moderator's cells
+   * (ABF-116). Unpaginated: it is a picture of the situation now, and it
+   * shrinks by itself as restrictions expire.
+   */
+  getActiveRestrictions(): Observable<RestrictionList> {
+    return this.api.get<RestrictionList>('/moderator/restrictions');
   }
 
   // Admin

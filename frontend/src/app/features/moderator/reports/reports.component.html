@@ -35,7 +35,7 @@
       [attr.tabindex]="activeTab() === 'pending' ? 0 : -1"
       aria-controls="panel-pending"
       (click)="showTab('pending')"
-      (keydown)="moveToTab($event, 'history', historyTab)"
+      (keydown)="moveToTab($event, [pendingTab, historyTab, restrictionsTab])"
     >
       {{ 'moderator.reports.tab_pending' | transloco }}
       @if (pendingReports().length > 0) {
@@ -53,9 +53,24 @@
       [attr.tabindex]="activeTab() === 'history' ? 0 : -1"
       aria-controls="panel-history"
       (click)="showTab('history')"
-      (keydown)="moveToTab($event, 'pending', pendingTab)"
+      (keydown)="moveToTab($event, [pendingTab, historyTab, restrictionsTab])"
     >
       {{ 'moderator.reports.tab_history' | transloco }}
+    </button>
+    <button
+      #restrictionsTab
+      type="button"
+      role="tab"
+      id="tab-restrictions"
+      class="tabs__tab"
+      [class.tabs__tab--active]="activeTab() === 'restrictions'"
+      [attr.aria-selected]="activeTab() === 'restrictions'"
+      [attr.tabindex]="activeTab() === 'restrictions' ? 0 : -1"
+      aria-controls="panel-restrictions"
+      (click)="showTab('restrictions')"
+      (keydown)="moveToTab($event, [pendingTab, historyTab, restrictionsTab])"
+    >
+      {{ 'moderator.reports.tab_restrictions' | transloco }}
     </button>
   </div>
 
@@ -198,6 +213,59 @@
             </button>
           </nav>
         }
+      }
+    </section>
+  }
+
+  <!-- ─────────────────────── הגבלות אוטומטיות ─────────────────────── -->
+  @if (activeTab() === 'restrictions') {
+    <section id="panel-restrictions" role="tabpanel" aria-labelledby="tab-restrictions">
+      <p class="panel__hint">{{ 'moderator.restrictions.hint' | transloco }}</p>
+
+      @if (isRestrictionsLoading()) {
+        <app-loading-spinner [message]="'moderator.restrictions.loading' | transloco" />
+      } @else if (restrictionsError()) {
+        <app-error-display [message]="'moderator.errors.load_restrictions_failed' | transloco" />
+      } @else if (restrictions().length === 0) {
+        <p class="panel__empty">{{ 'moderator.restrictions.empty' | transloco }}</p>
+      } @else {
+        <ul class="reports">
+          @for (restriction of restrictions(); track restriction.id) {
+            <li class="reports__item">
+              <div class="reports__head">
+                <!-- A member's own name: content, not copy (ABF-130). -->
+                <h2 class="reports__title">{{ memberName(restriction) }}</h2>
+                <span class="badge badge--alert">{{
+                  restrictionTypeLabels[restriction.restriction_type] | transloco
+                }}</span>
+              </div>
+
+              <dl class="reports__meta">
+                <div>
+                  <dt>{{ 'moderator.restrictions.expires_label' | transloco }}</dt>
+                  <dd>{{ restriction.expires_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
+                </div>
+                <div>
+                  <dt>{{ 'moderator.restrictions.applied_label' | transloco }}</dt>
+                  <dd>{{ restriction.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
+                </div>
+                <!-- One key with two parameters rather than two text nodes:
+                     the two numbers sit in different places in the sentence
+                     in Hebrew and in English (ABF-131). -->
+                <div class="reports__note">
+                  <dt>{{ 'moderator.restrictions.reason_label' | transloco }}</dt>
+                  <dd>
+                    {{
+                      'moderator.restrictions.reason_value'
+                        | transloco
+                          : { count: restriction.report_count, days: restriction.window_days }
+                    }}
+                  </dd>
+                </div>
+              </dl>
+            </li>
+          }
+        </ul>
       }
     </section>
   }

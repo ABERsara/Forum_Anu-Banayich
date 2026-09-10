@@ -158,13 +158,24 @@
   }
 
   &__notice,
-  &__limit {
+  &__limit,
+  &__restricted {
     margin: 0 0 $spacing-sm;
     padding: $spacing-sm $spacing-md;
     border-radius: $radius-md;
     background: $color-bg-subtle;
     color: $color-text;
     font-size: $font-size-sm;
+  }
+
+  // The restriction notice carries more weight than the prune notice beside
+  // it: it is the reason the composer below is closed. $color-text on
+  // $color-bg-subtle stays the carrier of the message (13.9:1 — the accent is
+  // an accent, never the information, WCAG 1.4.1), and the rule is on the
+  // inline start so it turns with <html dir> instead of sitting on the left
+  // of a Hebrew screen (see core/i18n/direction.spec.ts).
+  &__restricted {
+    border-inline-start: 3px solid $color-danger;
   }
 
   &__composer-row {
