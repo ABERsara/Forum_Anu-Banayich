@@ -569,6 +569,37 @@ describe('ModeratorReportsComponent', () => {
       expect(text()).toContain('אירעה שגיאה בטעינת ההגבלות');
     });
 
+    /**
+     * A moderator using a screen reader otherwise hears silence and cannot
+     * tell an empty list from one that never arrived. app-error-display
+     * carries its own role="alert"; the spinner and the empty line have
+     * nothing of their own, which is what the wrapper is for.
+     */
+    it('announces its loading, empty and error states', async () => {
+      await render({ restrictions: NEVER });
+      component.showTab('restrictions');
+      fixture.detectChanges();
+      const live = () => root().querySelector('[aria-live="polite"]')!;
+
+      expect(live().getAttribute('aria-busy')).toBe('true');
+      expect(live().textContent).toContain('טוען הגבלות');
+
+      await render({ restrictions: of({ items: [], total: 0 }) });
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(live().getAttribute('aria-busy')).toBe('false');
+      expect(live().textContent).toContain('אין הגבלות פעילות');
+
+      await render({ restrictions: throwError(() => new Error('boom')) });
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(live().querySelector('[role="alert"]')!.textContent).toContain(
+        'אירעה שגיאה בטעינת ההגבלות',
+      );
+    });
+
     it('wraps to the last tab on ArrowLeft from the first', () => {
       component.moveToTab(new KeyboardEvent('keydown', { key: 'ArrowLeft' }), tabButtons());
 

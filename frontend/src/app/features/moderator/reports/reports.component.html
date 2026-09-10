@@ -222,13 +222,27 @@
     <section id="panel-restrictions" role="tabpanel" aria-labelledby="tab-restrictions">
       <p class="panel__hint">{{ 'moderator.restrictions.hint' | transloco }}</p>
 
-      @if (isRestrictionsLoading()) {
-        <app-loading-spinner [message]="'moderator.restrictions.loading' | transloco" />
-      } @else if (restrictionsError()) {
-        <app-error-display [message]="'moderator.errors.load_restrictions_failed' | transloco" />
-      } @else if (restrictions().length === 0) {
-        <p class="panel__empty">{{ 'moderator.restrictions.empty' | transloco }}</p>
-      } @else {
+      <!--
+        The three screen states in one live region, so that "loading", "there
+        is nothing here" and "it failed" are announced rather than only drawn
+        — a moderator using a screen reader otherwise hears silence and has no
+        way to tell an empty list from one that never arrived.
+        app-error-display carries its own role="alert"; the other two have
+        nothing of their own, which is what this wrapper is for. aria-busy
+        marks the region as still filling so the empty state is not announced
+        as a result while the request is in flight.
+      -->
+      <div aria-live="polite" [attr.aria-busy]="isRestrictionsLoading()">
+        @if (isRestrictionsLoading()) {
+          <app-loading-spinner [message]="'moderator.restrictions.loading' | transloco" />
+        } @else if (restrictionsError()) {
+          <app-error-display [message]="'moderator.errors.load_restrictions_failed' | transloco" />
+        } @else if (restrictions().length === 0) {
+          <p class="panel__empty">{{ 'moderator.restrictions.empty' | transloco }}</p>
+        }
+      </div>
+
+      @if (!isRestrictionsLoading() && !restrictionsError() && restrictions().length > 0) {
         <ul class="reports">
           @for (restriction of restrictions(); track restriction.id) {
             <li class="reports__item">
