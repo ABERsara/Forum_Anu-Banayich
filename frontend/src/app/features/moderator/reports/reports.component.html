@@ -125,6 +125,15 @@
                 >
                   {{ 'moderator.reports.decide_invalid' | transloco }}
                 </button>
+                <a
+                  class="reports__card-link"
+                  [routerLink]="['/moderator/users', report.reported_user_id]"
+                  [attr.aria-label]="
+                    'moderator.reports.user_card_aria' | transloco: { title: report.content_title }
+                  "
+                >
+                  {{ 'moderator.reports.user_card_link' | transloco }}
+                </a>
               </div>
             </li>
           }
@@ -172,6 +181,18 @@
                   <dd>{{ report.moderator_note ?? emptyValue }}</dd>
                 </div>
               </dl>
+
+              <div class="reports__actions">
+                <a
+                  class="reports__card-link"
+                  [routerLink]="['/moderator/users', report.reported_user_id]"
+                  [attr.aria-label]="
+                    'moderator.reports.user_card_aria' | transloco: { title: report.content_title }
+                  "
+                >
+                  {{ 'moderator.reports.user_card_link' | transloco }}
+                </a>
+              </div>
             </li>
           }
         </ul>

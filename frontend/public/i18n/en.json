@@ -411,6 +411,8 @@
       "decide_invalid": "Dismiss the report (invalid)",
       "decide_valid_aria": "Delete the message “{{title}}”",
       "decide_invalid_aria": "Dismiss the report about “{{title}}”",
+      "user_card_link": "User card",
+      "user_card_aria": "Card of the user who wrote “{{title}}”",
       "history_loading": "Loading history...",
       "history_empty": "No decisions have been made yet in the cells you oversee.",
       "decided_at_label": "Decision date",
@@ -426,10 +428,30 @@
       "note_input_label": "Moderator's note (required)",
       "note_placeholder": "For example: the content includes an offensive remark about another user"
     },
+    "user_card": {
+      "back_to_reports": "Back to the dashboard",
+      "title": "User card",
+      "hint": "The history below is the basis for a suspension decision. The counts are for the user themselves — including reports filed in other cells.",
+      "loading": "Loading user card...",
+      "suspended_until": "Suspended until {{date}}",
+      "not_suspended": "The account is not suspended.",
+      "reports_section": "Report history",
+      "reports_against_total": "Reports against this user",
+      "reports_against_valid": "Of those, found valid",
+      "reports_against_invalid": "Of those, found invalid",
+      "reports_filed_total": "Reports this user filed",
+      "false_reports_filed": "Of those, found false",
+      "actions_section": "Actions",
+      "suspend": "Suspend the user",
+      "suspend_message": "Suspend {{name}} for the number of hours you choose. They will be notified with the reason, and the action will be recorded in the audit log.",
+      "suspend_confirm": "Suspend"
+    },
     "errors": {
       "load_reports_failed": "Something went wrong loading the reports. Try refreshing the page.",
       "load_history_failed": "Something went wrong loading the history. Try refreshing the page.",
-      "decide_failed": "Something went wrong saving the decision. Please try again."
+      "decide_failed": "Something went wrong saving the decision. Please try again.",
+      "load_user_card_failed": "Something went wrong loading the user card. Try refreshing the page.",
+      "suspend_failed": "Something went wrong suspending the user. Please try again."
     }
   },
   "profile": {

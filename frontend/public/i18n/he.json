@@ -411,6 +411,8 @@
       "decide_invalid": "ביטול הדיווח (שגוי)",
       "decide_valid_aria": "מחיקת ההודעה ״{{title}}״",
       "decide_invalid_aria": "ביטול הדיווח על ״{{title}}״",
+      "user_card_link": "כרטיס המשתמש/ת",
+      "user_card_aria": "כרטיס המשתמש/ת שכתב/ה את ״{{title}}״",
       "history_loading": "טוען היסטוריה...",
       "history_empty": "עדיין לא התקבלו החלטות בתאים שבאחריותך.",
       "decided_at_label": "תאריך ההחלטה",
@@ -426,10 +428,30 @@
       "note_input_label": "הערת המבקר/ת (חובה)",
       "note_placeholder": "לדוגמה: התוכן כולל התבטאות פוגענית כלפי משתמש אחר"
     },
+    "user_card": {
+      "back_to_reports": "חזרה ללוח הבקרה",
+      "title": "כרטיס משתמש",
+      "hint": "ההיסטוריה שלהלן היא הבסיס להחלטה על השעיה. המספרים מתייחסים למשתמש/ת עצמו/ה — גם לדיווחים שהוגשו בתאים אחרים.",
+      "loading": "טוען כרטיס משתמש...",
+      "suspended_until": "מושעה/ית עד {{date}}",
+      "not_suspended": "החשבון אינו מושעה כרגע.",
+      "reports_section": "היסטוריית דיווחים",
+      "reports_against_total": "דיווחים נגד המשתמש/ת",
+      "reports_against_valid": "מהם נמצאו מוצדקים",
+      "reports_against_invalid": "מהם נמצאו שגויים",
+      "reports_filed_total": "דיווחים שהגיש/ה",
+      "false_reports_filed": "מהם נמצאו כוזבים",
+      "actions_section": "פעולות",
+      "suspend": "השעיית המשתמש/ת",
+      "suspend_message": "השעיית {{name}} למשך מספר השעות שייקבע. תישלח הודעה עם הסיבה, והפעולה תירשם ביומן הביקורת.",
+      "suspend_confirm": "השעיה"
+    },
     "errors": {
       "load_reports_failed": "אירעה שגיאה בטעינת הדיווחים. נסי לרענן את הדף.",
       "load_history_failed": "אירעה שגיאה בטעינת ההיסטוריה. נסי לרענן את הדף.",
-      "decide_failed": "אירעה שגיאה בשמירת ההחלטה. נסי שוב."
+      "decide_failed": "אירעה שגיאה בשמירת ההחלטה. נסי שוב.",
+      "load_user_card_failed": "אירעה שגיאה בטעינת כרטיס המשתמש. נסי לרענן את הדף.",
+      "suspend_failed": "אירעה שגיאה בהשעיית המשתמש. נסי שוב."
     }
   },
   "profile": {
