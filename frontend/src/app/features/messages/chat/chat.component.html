@@ -62,7 +62,9 @@
                 (message.mine ? 'messages.chat.speaker_me' : 'messages.chat.speaker_other')
                   | transloco: { name: otherUserName() }
               }}</span>
-              <span class="chat__text">{{ message.content }}</span>
+              <span class="chat__text">{{
+                message.hidden ? ('messages.chat.content_hidden' | transloco) : message.content
+              }}</span>
               <span class="chat__meta">
                 <time [attr.datetime]="message.createdAt">{{
                   message.createdAt | date: 'shortTime'

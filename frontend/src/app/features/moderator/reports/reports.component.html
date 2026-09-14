@@ -88,15 +88,26 @@
           @for (report of pendingReports(); track report.id) {
             <li class="reports__item">
               <div class="reports__head">
-                <!-- The reported post's title and body are what a user wrote:
-                     shown as they were written, in either UI language (ABF-130). -->
-                <h2 class="reports__title">{{ report.content_title }}</h2>
-                <span class="badge badge--alert">{{
-                  'moderator.reports.report_count' | transloco: { count: report.report_count }
-                }}</span>
+                @if (report.target_type === targetTypes.FORUM_POST) {
+                  <!-- The reported post's title and body are what a user wrote:
+                       shown as they were written, in either UI language (ABF-130). -->
+                  <h2 class="reports__title">{{ report.content_title }}</h2>
+                  <span class="badge badge--alert">{{
+                    'moderator.reports.report_count' | transloco: { count: report.report_count }
+                  }}</span>
+                } @else {
+                  <!-- No content preview here, ever — ABF-113, spec §9.1/§9.3:
+                       a private message is read only through the audited
+                       single-report view, never from a list. -->
+                  <h2 class="reports__title">
+                    {{ 'moderator.reports.direct_message_title' | transloco }}
+                  </h2>
+                }
               </div>
 
-              <p class="reports__content">{{ previewOf(report.content_text) }}</p>
+              @if (report.target_type === targetTypes.FORUM_POST) {
+                <p class="reports__content">{{ previewOf(report.content_text!) }}</p>
+              }
 
               <dl class="reports__meta">
                 <div>
@@ -111,10 +122,12 @@
                   <dt>{{ 'moderator.reports.created_at_label' | transloco }}</dt>
                   <dd>{{ report.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
                 </div>
-                <div>
-                  <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
-                  <dd>{{ postStatusLabels[report.content_status] | transloco }}</dd>
-                </div>
+                @if (report.target_type === targetTypes.FORUM_POST) {
+                  <div>
+                    <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
+                    <dd>{{ postStatusLabels[report.content_status!] | transloco }}</dd>
+                  </div>
+                }
               </dl>
 
               <div class="reports__actions">
@@ -171,11 +184,19 @@
           @for (report of history(); track report.id) {
             <li class="reports__item">
               <div class="reports__head">
-                <h2 class="reports__title">{{ report.content_title }}</h2>
+                @if (report.target_type === targetTypes.FORUM_POST) {
+                  <h2 class="reports__title">{{ report.content_title }}</h2>
+                } @else {
+                  <h2 class="reports__title">
+                    {{ 'moderator.reports.direct_message_title' | transloco }}
+                  </h2>
+                }
                 <span class="badge">{{ decisionLabels[report.decision] | transloco }}</span>
               </div>
 
-              <p class="reports__content">{{ previewOf(report.content_text) }}</p>
+              @if (report.target_type === targetTypes.FORUM_POST) {
+                <p class="reports__content">{{ previewOf(report.content_text!) }}</p>
+              }
 
               <dl class="reports__meta">
                 <div>
@@ -186,10 +207,12 @@
                   <dt>{{ 'moderator.reports.decided_at_label' | transloco }}</dt>
                   <dd>{{ report.decided_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
                 </div>
-                <div>
-                  <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
-                  <dd>{{ postStatusLabels[report.content_status] | transloco }}</dd>
-                </div>
+                @if (report.target_type === targetTypes.FORUM_POST) {
+                  <div>
+                    <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
+                    <dd>{{ postStatusLabels[report.content_status!] | transloco }}</dd>
+                  </div>
+                }
                 <div class="reports__note">
                   <dt>{{ 'moderator.reports.note_label' | transloco }}</dt>
                   <!-- The moderator's own words: content, not copy (ABF-130). -->

@@ -44,6 +44,7 @@ import {
   REPORT_REASON_LABELS,
   RESTRICTION_TYPE_LABELS,
   ReportDecision,
+  ReportTargetType,
   RestrictionType,
 } from '../../../core/constants';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
@@ -155,6 +156,7 @@ export class ModeratorReportsComponent implements OnInit {
   readonly minNoteLength = MIN_NOTE_LENGTH;
   readonly emptyValue = EMPTY_VALUE;
   readonly decisions = ReportDecision;
+  readonly targetTypes = ReportTargetType;
 
   readonly hasPreviousPage = computed(() => this.historyPage() > 1);
   readonly hasNextPage = computed(() => this.historyPage() < this.historyPageCount());

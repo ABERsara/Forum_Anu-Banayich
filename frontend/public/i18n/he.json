@@ -407,6 +407,7 @@
       "description_label": "פירוט המדווח/ת",
       "created_at_label": "תאריך הדיווח",
       "content_status_label": "מצב ההודעה",
+      "direct_message_title": "הודעה פרטית",
       "decide_valid": "מחיקת ההודעה (מוצדק)",
       "decide_invalid": "ביטול הדיווח (שגוי)",
       "decide_valid_aria": "מחיקת ההודעה ״{{title}}״",
