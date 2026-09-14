@@ -37,6 +37,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslocoModule } from '@jsverse/transloco';
 
+import { ReportTargetType } from '../../../core/constants';
 import { DirectMessage, DirectMessageSendResult, UserPublic } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
@@ -44,6 +45,7 @@ import { errorKeyFrom } from '../../../core/utils/error-key.util';
 import { utcIso } from '../../../core/utils/utc-date.util';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
+import { ReportButtonComponent } from '../../../shared/components/report-button/report-button.component';
 
 /** How many messages one history request asks for. */
 const PAGE_SIZE = 50;
@@ -80,6 +82,14 @@ export interface ChatMessage {
   readAt: string | null;
   /** Shown, but not yet acknowledged by the server. */
   pending: boolean;
+  /**
+   * The current user has already reported this message (ABF-112).
+   *
+   * Comes from the server on every load, so the mark is still there tomorrow
+   * — and is set locally the moment a report succeeds, so the reader does not
+   * have to reload to see that it was.
+   */
+  reported: boolean;
 }
 
 /** What the storage cap cost the conversation on the last send. */
@@ -102,6 +112,7 @@ interface PruneNotice {
     TranslocoModule,
     LoadingSpinnerComponent,
     ErrorDisplayComponent,
+    ReportButtonComponent,
   ],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss',
@@ -116,6 +127,9 @@ export class ChatComponent implements OnInit {
   @ViewChild('messageLog') private messageLog?: ElementRef<HTMLElement>;
 
   readonly maxLength = MAX_MESSAGE_LENGTH;
+
+  /** What the report control files against, for every bubble on this screen. */
+  readonly reportTargetType = ReportTargetType.DIRECT_MESSAGE;
 
   otherUserId = '';
   otherUserName = signal<string>('');
@@ -146,6 +160,21 @@ export class ChatComponent implements OnInit {
     this.otherUserId = this.route.snapshot.paramMap.get('userId') ?? '';
     this.loadCellMemberName();
     this.loadNewestPage();
+  }
+
+  /**
+   * Mark a message as reported, now that the server has stored the report.
+   *
+   * The report control keeps its own "sent" state, so this is not what puts
+   * the confirmation on screen; it is what makes the mark survive the next
+   * page of history arriving, and what the reload reads back from the server.
+   */
+  onReported(messageId: string): void {
+    this.messages.update((current) =>
+      current.map((message) =>
+        message.id === messageId ? { ...message, reported: true } : message,
+      ),
+    );
   }
 
   /** Which receipt a bubble of the current user's own shows. */
@@ -233,6 +262,8 @@ export class ChatComponent implements OnInit {
         mine: true,
         readAt: null,
         pending: true,
+        // Her own message, so there is nothing to report and nothing to mark.
+        reported: false,
       },
     ]);
     this.draft.set('');
@@ -326,6 +357,7 @@ export class ChatComponent implements OnInit {
       mine: message.sender.id === this.auth.currentUser()?.id,
       readAt: message.read_at,
       pending: false,
+      reported: message.reported_by_me,
     };
   }
 

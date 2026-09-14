@@ -24,9 +24,20 @@ import { ApiService } from './api.service';
 export class ReportService {
   private readonly api = inject(ApiService);
 
+  /**
+   * File a report on one piece of content.
+   *
+   * The route is derived from the target type rather than passed in: each
+   * content type is reported to the endpoint that owns it, and a caller that
+   * had to name the URL could aim a private-message report at the forum route
+   * — which the server rejects, but only after the mistake has been made.
+   */
   fileReport(data: ReportCreate): Observable<Report> {
     if (data.target_type === ReportTargetType.FORUM_POST) {
       return this.api.post<Report>(`/forum/posts/${data.target_id}/report`, data);
+    }
+    if (data.target_type === ReportTargetType.DIRECT_MESSAGE) {
+      return this.api.post<Report>(`/messages/${data.target_id}/report`, data);
     }
     return throwError(
       () => new Error(`Reporting ${data.target_type} content is not supported yet.`),

@@ -89,6 +89,14 @@ class DirectMessageResponse(BaseModel):
     content: str
     read_at: datetime | None
     created_at: datetime
+    #: Whether the caller has already reported this message (ABF-112), so the
+    #: screen can mark it and not offer to report it twice. Always false for a
+    #: message the caller sent — only a recipient can report one.
+    #:
+    #: On the message rather than fetched separately because the alternative
+    #: is a second request per open conversation asking "which of these fifty
+    #: did I report", answered from the same rows this one already read.
+    reported_by_me: bool = False
 
     model_config = {"from_attributes": True}
 

@@ -333,6 +333,15 @@ export interface DirectMessage {
    */
   read_at: string | null; // ISO datetime
   created_at: string;
+  /**
+   * Whether *this viewer* has already reported the message (ABF-112).
+   *
+   * Server-side rather than remembered on the screen, so the mark is still
+   * there after a reload — and so the same message cannot be reported twice
+   * by a client that forgot it had. Always false on a message the viewer
+   * sent: only its recipient can report one.
+   */
+  reported_by_me: boolean;
 }
 
 /**
@@ -461,7 +470,8 @@ export interface ReportCreate {
 
 export interface Report {
   id: string;
-  reporter_id: string;
+  /** Null once the report has been anonymized — see §9.4. */
+  reporter_id: string | null;
   reported_user_id: string;
   target_type: ReportTargetType;
   target_id: string;

@@ -31,15 +31,16 @@ from app.core.constants import (
     UserRole,
 )
 from app.core.i18n import translate
-from app.models.forum import ForumPost
+from app.models.forum import DirectMessage, ForumPost
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.report import ReportCreate, ReportDecideRequest
 from app.schemas.user import SuspendUserRequest, UserModerationCard
-from app.services import user_service
-from app.services.audit_service import log_action
+from app.services import forum_service, user_service
+from app.services.audit_service import build_entry, log_action
 from app.services.email_service import (
     send_content_removed_notification,
+    send_direct_message_report_alert,
     send_moderator_alert,
     send_urgent_moderator_alert,
 )
@@ -49,11 +50,22 @@ logger = logging.getLogger(__name__)
 
 def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     """
-    File a new report on a piece of content.
+    File a new report on a piece of content, and alert the moderators
+    responsible for the cell it came from (§7.1).
 
-    Only FORUM_POST is supported today – DIRECT_MESSAGE and PROFESSIONAL_QUERY
-    reporting are out of scope for this sprint (no endpoint wires them yet).
+    Two content types are wired: FORUM_POST, and — since ABF-112 — a
+    DIRECT_MESSAGE the reporter received. PROFESSIONAL_QUERY has no endpoint
+    yet and is refused here rather than half-handled.
+
+    The two paths diverge enough to be separate functions: a reported post
+    stays readable where it is and carries a report_count that drives §7.1's
+    auto-hide, while a reported private message is unreadable by anybody but
+    its two participants and so has to be captured into the report itself.
+    What they share — one report per user per target, and who gets told —
+    stays shared.
     """
+    if data.target_type == ReportTargetType.DIRECT_MESSAGE:
+        return _file_direct_message_report(db, data, reporter)
     if data.target_type != ReportTargetType.FORUM_POST:
         raise HTTPException(
             status_code=400, detail=translate("reports.target_type_unsupported")
@@ -105,6 +117,103 @@ def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     return report
 
 
+def _file_direct_message_report(
+    db: Session, data: ReportCreate, reporter: User
+) -> Report:
+    """
+    Report one private message the reporter received (§7.1 steps 3-5).
+
+    Exactly one message ends up in the report, and it is the one that was
+    reported: `get_received_message()` resolves the id the caller named, and
+    nothing here ever widens that to the conversation it sits in. A moderator
+    reading this report therefore has no handle on the message before or
+    after it — §5.3 lets her see content a user consented to hand over, and
+    consent was given for one message.
+
+    The snapshot is the message's stored ciphertext, copied byte for byte
+    along with its key_version. Not decrypt-then-re-encrypt: this way the
+    plaintext is never materialised while filing a report, so there is no
+    moment at which it could reach a log line, a traceback frame or an error
+    body. It also cannot drift from what was reported, which a second
+    encryption of freshly-read text could.
+
+    Why a copy at all, rather than reading `target_id` when a moderator opens
+    the report: §5.3's 1,000-message cap deletes old messages, and the
+    exemption that protects a reported one lasts only while its report is
+    PENDING. Without the copy a decided report would, sooner or later, be a
+    report about nothing — for the remaining years of the five §9.4 keeps it.
+    """
+    message = forum_service.get_received_message(db, reporter, data.target_id)
+
+    _ensure_not_duplicate_report(db, reporter, data)
+
+    report = Report(
+        reporter_id=reporter.id,
+        target_type=data.target_type,
+        target_id=message.id,
+        reported_user_id=message.sender_id,
+        reason=data.reason,
+        description=data.description,
+        reported_content=message.content,
+        reported_content_key_version=message.key_version,
+    )
+    db.add(report)
+    # report.id is a client-side default (uuid4) — only populated once flushed,
+    # and the audit entry below has to name it.
+    db.flush()
+
+    # §9.3: filing this report is what opens someone else's private message to
+    # a moderator, so the consent itself is the auditable event — not the
+    # later read. Built rather than log_action()'d because log_action() commits
+    # on its own: a report that is saved without its audit row, or an audit row
+    # for a report that was never saved, are both worse than neither.
+    #
+    # Ids and a reason code only. The one thing this entry must never carry is
+    # the message it is about.
+    db.add(
+        build_entry(
+            actor=reporter,
+            action=AuditAction.DIRECT_MESSAGE_REPORTED,
+            entity_type="DirectMessage",
+            entity_id=message.id,
+            details={"report_id": report.id, "reason": report.reason.value},
+        )
+    )
+    db.commit()
+    db.refresh(report)
+
+    # After the commit, and never able to fail the request — same policy as
+    # the forum path: a saved report must not be undone by a mail server, and
+    # a moderator must not be alerted about a report that was not saved.
+    try:
+        _notify_direct_message_moderators(db, message, report)
+    except Exception:
+        logger.exception("Failed to notify moderators for report %s", report.id)
+
+    return report
+
+
+def _notify_direct_message_moderators(
+    db: Session, message: DirectMessage, report: Report
+) -> None:
+    """
+    §7.1 step 5 — tell the moderators responsible for the sender's cell.
+
+    The alert carries the report id and nothing else. The forum path can put a
+    hundred characters of the post in its email because that post is already
+    visible to a whole cell; a private message is visible to two people, and
+    mail is not the channel the reader consented to. She reads it in the
+    moderator view, behind an authenticated, audited request — task 6's.
+
+    No auto-hide and no urgency escalation here: §7.1's second-report rule
+    hides *content*, and a private message has no visibility to withdraw —
+    it is already visible to exactly the two people in the conversation.
+    Thresholds are task 7's.
+    """
+    for email in _moderator_emails_for_author(db, message.sender):
+        send_direct_message_report_alert(email, report.id)
+
+
 def _ensure_not_duplicate_report(
     db: Session, reporter: User, data: ReportCreate
 ) -> None:
@@ -147,7 +256,7 @@ def _handle_first_report_notification(
     db: Session, post: ForumPost, report: Report
 ) -> None:
     """1st report → regular email to moderators."""
-    for email in _moderator_emails_for(db, post):
+    for email in _moderator_emails_for_author(db, post.author):
         send_moderator_alert(email, report.id, post.content[:100])
 
 
@@ -155,7 +264,7 @@ def _handle_second_plus_report_notification(
     db: Session, post: ForumPost, report: Report
 ) -> None:
     """2nd+ report → urgent email, repeated on every report from here on."""
-    for email in _moderator_emails_for(db, post):
+    for email in _moderator_emails_for_author(db, post.author):
         send_urgent_moderator_alert(email, report.id)
 
 
@@ -165,7 +274,7 @@ def _cell_match_filter(cells: list[dict[str, str]]) -> ColumnElement[bool]:
     against a moderator's list of {"group", "sector"} cells (spec §4.3).
     Shared by get_pending_reports() and get_report_for_moderator() — both
     start from "these are my cells" and query outward for matching users.
-    (_moderator_emails_for() runs the opposite direction — one known author,
+    (_moderator_emails_for_author() runs the opposite direction — one known author,
     searching moderators' JSON cell lists — so it can't reuse this filter.)
     """
     return or_(
@@ -197,17 +306,22 @@ def _moderator_covers(moderator: User, user: User) -> bool:
     )
 
 
-def _moderator_emails_for(db: Session, post: ForumPost) -> list[str]:
+def _moderator_emails_for_author(db: Session, author: User) -> list[str]:
     """
-    Return contact addresses for moderators responsible for this post's
-    author's cell (group + sector), per moderator.moderator_cells.
+    Return contact addresses for the moderators responsible for this author's
+    cell (group + sector), per moderator.moderator_cells.
+
+    Takes the author rather than the content since ABF-112: §7.1 step 5 routes
+    by the cell the reported content came from, and that cell is a property of
+    whoever wrote it, not of what they wrote. A forum post passes its author;
+    a private message passes its sender — whose cell is also the recipient's,
+    because §5.3 does not let a conversation cross one.
 
     Removed moderators keep their row with role=MODERATOR — the appointment is
     revoked by cancelling the account (see user_service.remove_moderator) — so
     the status filter is what keeps alerts from following someone off the
     roster.
     """
-    author = post.author
     if author.user_type is None or author.sector is None:
         return []
 

@@ -148,6 +148,7 @@ describe('ForumService', () => {
       content: 'שלום',
       read_at: null,
       created_at: '2026-08-01T10:00:00',
+      reported_by_me: false,
     };
 
     const MOCK_SEND_RESULT: DirectMessageSendResult = {
