@@ -151,10 +151,17 @@ class Settings(BaseSettings):
     # names the missing key rather than surfacing as a 401 from Google.
     GEMINI_API_KEY: str = ""
 
-    # Bound to the vector(768) column the migration creates. A model of a
-    # different output dimension cannot be swapped in here alone — it needs a
-    # migration and a re-index of every existing entry.
-    GEMINI_EMBED_MODEL: str = "text-embedding-004"
+    # Bound to the vector(768) column the migration creates. This model's own
+    # default is 3072, so rag_service asks for 768 explicitly on every request;
+    # a model that cannot produce 768 at all needs a migration and a re-index of
+    # every existing entry, not just a new value here.
+    #
+    # A model name belongs in config precisely because these are retired on a
+    # schedule: embedding-001 went on 2025-10-30 and text-embedding-004 on
+    # 2026-01-14. This one has no announced shutdown date yet, which is not the
+    # same as never. See https://ai.google.dev/gemini-api/docs/deprecations
+    # before changing it.
+    GEMINI_EMBED_MODEL: str = "gemini-embedding-001"
 
     # One embedding call sits inside a request the professional is waiting on,
     # so it fails fast rather than holding the worker open.

@@ -161,14 +161,30 @@ class TestEmbedText:
         self, captured_request, monkeypatch
     ) -> None:
         monkeypatch.setattr(
-            rag_service.settings, "GEMINI_EMBED_MODEL", "text-embedding-004"
+            rag_service.settings, "GEMINI_EMBED_MODEL", "gemini-embedding-001"
         )
         rag_service.embed_text("שאלה", TASK_TYPE_QUERY)
 
-        assert "models/text-embedding-004" in captured_request["url"]
+        assert "models/gemini-embedding-001" in captured_request["url"]
         request = captured_request["json"]["requests"][0]
         assert request["taskType"] == TASK_TYPE_QUERY
-        assert request["model"] == "models/text-embedding-004"
+        assert request["model"] == "models/gemini-embedding-001"
+
+    def test_the_stored_width_is_asked_for_explicitly(self, captured_request) -> None:
+        """Every request names 768 rather than accepting the model's default.
+
+        gemini-embedding-001 answers 3072 unless asked otherwise. Left to the
+        default, the vectors are rejected by the vector(768) column inside
+        index_entry(), which the endpoint logs and swallows — so the symptom
+        would be a knowledge base that saves everything and retrieves nothing.
+        """
+        rag_service.embed_texts(["א", "ב"], TASK_TYPE_DOCUMENT)
+
+        requests = captured_request["json"]["requests"]
+        assert [r["outputDimensionality"] for r in requests] == [
+            EMBEDDING_DIMENSIONS,
+            EMBEDDING_DIMENSIONS,
+        ]
 
     def test_indexing_and_querying_use_different_task_types(
         self, captured_request
@@ -716,6 +732,32 @@ class TestMalformedGeminiResponses:
         monkeypatch.setattr(rag_service.httpx, "post", _post)
 
         with pytest.raises(EmbeddingError, match="expected embeddings"):
+            rag_service.embed_text("שאלה", TASK_TYPE_QUERY)
+
+    def test_an_embedding_of_the_wrong_width_names_the_setting(
+        self, monkeypatch, gemini_key
+    ) -> None:
+        """A model that answers 3072 is a configuration error, not a bad row.
+
+        This is what a GEMINI_EMBED_MODEL pointing at a model of another
+        dimension actually looks like on the wire. Caught here, the log says
+        which setting to change; left to the INSERT, it is a database error
+        that _index() reports as an unindexed entry.
+        """
+        monkeypatch.setattr(
+            rag_service.settings, "GEMINI_EMBED_MODEL", "gemini-embedding-001"
+        )
+
+        def _post(url: str, **kwargs: object) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={"embeddings": [{"values": [0.01] * 3072}]},
+                request=httpx.Request("POST", url),
+            )
+
+        monkeypatch.setattr(rag_service.httpx, "post", _post)
+
+        with pytest.raises(EmbeddingError, match="GEMINI_EMBED_MODEL"):
             rag_service.embed_text("שאלה", TASK_TYPE_QUERY)
 
 

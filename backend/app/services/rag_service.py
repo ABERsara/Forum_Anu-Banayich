@@ -46,7 +46,11 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.agent import AgentKnowledgeChunk, AgentKnowledgeEntry
+from app.models.agent import (
+    EMBEDDING_DIMENSIONS,
+    AgentKnowledgeChunk,
+    AgentKnowledgeEntry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +241,13 @@ def _embed_one_batch(texts: list[str], task_type: str) -> list[list[float]]:
                 "model": model,
                 "content": {"parts": [{"text": text}]},
                 "taskType": task_type,
+                # Asked for explicitly, never left to the model's default.
+                # gemini-embedding-001 returns 3072 unless told otherwise, and
+                # the column is vector(768): the mismatch would not surface
+                # here but as a failed INSERT two steps later, which _index()
+                # swallows — leaving an entry that saves and is never
+                # retrievable, with a log line as the only symptom.
+                "outputDimensionality": EMBEDDING_DIMENSIONS,
             }
             for text in texts
         ]
@@ -282,6 +293,19 @@ def _embed_one_batch(texts: list[str], task_type: str) -> list[list[float]]:
             f"Gemini returned {len(embeddings)} embeddings for {len(texts)} "
             "texts. Refusing to store chunks against the wrong vectors."
         )
+
+    # The width, checked here rather than discovered by the INSERT. A model
+    # that ignores outputDimensionality, or a GEMINI_EMBED_MODEL that cannot
+    # produce 768 at all, otherwise fails as a database error inside
+    # index_entry() — which the endpoint treats as "saved but not indexed" and
+    # only logs. Named at the boundary, the log says which setting is wrong.
+    wrong = next((len(e) for e in embeddings if len(e) != EMBEDDING_DIMENSIONS), None)
+    if wrong is not None:
+        raise EmbeddingError(
+            f"{settings.GEMINI_EMBED_MODEL} returned a {wrong}-dimension "
+            f"embedding; the stored column is vector({EMBEDDING_DIMENSIONS}). "
+            "Check GEMINI_EMBED_MODEL."
+        )
     return embeddings
 
 
@@ -314,6 +338,13 @@ def index_entry(db: Session, entry: AgentKnowledgeEntry) -> None:
     Between (1) and (3) the entry is not retrievable. That window is the price
     of never serving retracted content, and a failed run leaves the entry in it:
     saved, editable, and not yet searchable until the next PATCH re-indexes it.
+
+    Two edits of the same entry landing at once are left to the unique
+    constraint rather than to a lock. Both delete, both insert, and the second
+    commit fails on UNIQUE(entry_id, chunk_index) — the endpoint logs it as an
+    unindexed entry. The cost is an index built from the older of two texts
+    that were saved seconds apart; the alternative is a lock held across the
+    embedding call, which is the one thing the ordering above exists to avoid.
 
     Commits — twice. Called from the endpoint after the entry itself is
     committed.
