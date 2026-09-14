@@ -47,12 +47,33 @@ class ReportResponse(BaseModel):
 
 
 class ReportWithContent(ReportResponse):
-    """A report enriched with the reported content, for moderator views."""
+    """
+    A report enriched with the reported content, for moderator views.
 
-    content_title: str
-    content_text: str
-    content_status: PostStatus
-    report_count: int
+    One shape for both target types, since a list mixes them (SPEC §7.3) —
+    each group of fields is populated only for its own target_type, and left
+    at its default for the other. FORUM_POST content is always present on a
+    row of that type (a post is never hard-deleted); DIRECT_MESSAGE content
+    is present only in a single report's detail view, never in a list — see
+    moderator.py's _to_report_with_content() and get_report().
+    """
+
+    # FORUM_POST only.
+    content_title: str | None = None
+    content_text: str | None = None
+    content_status: PostStatus | None = None
+    report_count: int | None = None
+
+    # DIRECT_MESSAGE only.
+    #: The decrypted message, populated exclusively by GET /reports/{id} —
+    #: an audited read (ABF-113, spec §9.3) — and never by the pending or
+    #: history list. None on CLOSED_ACCOUNT_DELETED even there: §9.4 keeps
+    #: the report once the reported-on account is deleted, not its content.
+    message_content: str | None = None
+    #: Whether a moderator's VALID decision hid this message (hidden_at is
+    #: not None) — a state, not content, so unlike message_content this is
+    #: safe to show in list views too.
+    message_hidden: bool | None = None
 
 
 class ReportDecideRequest(BaseModel):

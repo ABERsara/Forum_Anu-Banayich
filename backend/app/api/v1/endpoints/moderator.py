@@ -12,12 +12,13 @@ GET  /moderator/users/{id}/card     – one user's moderation history
 POST /moderator/users/{id}/suspend  – suspend that user by hand
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.constants import UserRole
+from app.core.constants import ReportTargetType, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
-from app.models.forum import ForumPost
+from app.core.i18n import translate
+from app.models.forum import DirectMessage, ForumPost
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.report import (
@@ -42,13 +43,44 @@ router = APIRouter(
 )
 
 
-def _to_report_with_content(report: Report, post: ForumPost) -> ReportWithContent:
+def _to_report_with_content(db: Session, report: Report) -> ReportWithContent:
+    """
+    Enrich a report with the context a moderator needs to see it — the two
+    target_types share nothing to read from, so this branches on it.
+
+    Never decrypts DIRECT_MESSAGE content: this is what backs the pending
+    and history lists too (§7.3), and a list row is metadata only —
+    decrypting one there would mean auditing a "view" that never happened
+    (report_service.decrypt_reported_message() is the one place that ever
+    calls decrypt_message() on a report, and get_report() below is the only
+    caller of it). message_content stays at its schema default (None) here;
+    get_report() fills it in afterwards, for the one report actually opened.
+    """
+    if report.target_type == ReportTargetType.FORUM_POST:
+        post = db.query(ForumPost).filter(ForumPost.id == report.target_id).first()
+        if post is None:
+            raise HTTPException(
+                status_code=404, detail=translate("reports.target_not_found")
+            )
+        return ReportWithContent(
+            **ReportResponse.model_validate(report).model_dump(),
+            content_title=post.title,
+            content_text=post.content,
+            content_status=post.status,
+            report_count=post.report_count,
+        )
+
+    # DIRECT_MESSAGE. The live row can legitimately be gone (pruned, or
+    # purged with its sender's account) while the report itself survives —
+    # that is the whole reason report_service.decrypt_reported_message()
+    # reads from the report's own snapshot rather than here. A message this
+    # gone counts as hidden: there is nothing left to show either way.
+    message = (
+        db.query(DirectMessage).filter(DirectMessage.id == report.target_id).first()
+    )
     return ReportWithContent(
         **ReportResponse.model_validate(report).model_dump(),
-        content_title=post.title,
-        content_text=post.content,
-        content_status=post.status,
-        report_count=post.report_count,
+        message_hidden=message.hidden_at is not None if message else True,
     )
 
 
@@ -59,10 +91,12 @@ def list_pending_reports(
 ) -> ReportListResponse:
     """
     Return pending reports in the moderator's assigned cells.
-    Sorted by report_count DESC (most-reported content first).
+    Sorted by report_count DESC (most-reported content first, SPEC §7.3) —
+    a DIRECT_MESSAGE report counts as 1 (see report_service.get_pending_
+    reports() for why that's exact, not a placeholder).
     """
-    pairs = report_service.get_pending_reports(db, current_user)
-    items = [_to_report_with_content(report, post) for report, post in pairs]
+    reports = report_service.get_pending_reports(db, current_user)
+    items = [_to_report_with_content(db, report) for report in reports]
 
     return ReportListResponse(items=items, total=len(items), pending_count=len(items))
 
@@ -80,10 +114,10 @@ def list_decided_reports(
     Return decisions already made in the moderator's assigned cells,
     newest first (SPEC §7.3, "היסטוריית דיווחים").
     """
-    pairs, total = report_service.get_decided_reports(db, current_user, page, page_size)
+    reports, total = report_service.get_decided_reports(db, current_user, page, page_size)
 
     return ReportHistoryResponse(
-        items=[_to_report_with_content(report, post) for report, post in pairs],
+        items=[_to_report_with_content(db, report) for report in reports],
         total=total,
         page=page,
         page_size=page_size,
@@ -132,9 +166,21 @@ def get_report(
 ) -> ReportWithContent:
     """
     Return a single report with the full context of the reported content.
+
+    The one path that ever decrypts a DIRECT_MESSAGE report's content — and
+    the one that is audited for it (ABF-113, spec §9.1/§9.3): opening this
+    report is the "צפייה" that report_service.decrypt_reported_message()
+    logs, not merely knowing it exists (which listing already allows).
     """
-    report, post = report_service.get_report_for_moderator(db, report_id, current_user)
-    return _to_report_with_content(report, post)
+    report = report_service.get_report_for_moderator(db, report_id, current_user)
+    item = _to_report_with_content(db, report)
+
+    if report.target_type == ReportTargetType.DIRECT_MESSAGE:
+        item.message_content = report_service.decrypt_reported_message(
+            db, report, current_user
+        )
+
+    return item
 
 
 @router.post("/reports/{report_id}/decide", response_model=ReportResponse)
