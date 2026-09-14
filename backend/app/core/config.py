@@ -142,6 +142,25 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
 
     # ------------------------------------------------------------------
+    # Gemini embeddings (agent knowledge base retrieval)
+    # ------------------------------------------------------------------
+    # Deliberately defaulted to empty rather than guarded like SECRET_KEY
+    # above: an absent key must not stop the API from starting, because every
+    # part of the system other than knowledge-base indexing works without it.
+    # rag_service validates it at the point of the call instead, so the failure
+    # names the missing key rather than surfacing as a 401 from Google.
+    GEMINI_API_KEY: str = ""
+
+    # Bound to the vector(768) column the migration creates. A model of a
+    # different output dimension cannot be swapped in here alone — it needs a
+    # migration and a re-index of every existing entry.
+    GEMINI_EMBED_MODEL: str = "text-embedding-004"
+
+    # One embedding call sits inside a request the professional is waiting on,
+    # so it fails fast rather than holding the worker open.
+    GEMINI_TIMEOUT_SECONDS: int = 10
+
+    # ------------------------------------------------------------------
     # Moderation thresholds (can be tuned without code changes)
     # ------------------------------------------------------------------
     AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide

@@ -248,3 +248,95 @@ def test_no_agent_model_migration_drift(monkeypatch) -> None:
 
     agent_drift = [entry for entry in diff if "agent_" in repr(entry)]
     assert not agent_drift, f"agent model/migration drift detected: {agent_drift}"
+
+
+# The revision agent_knowledge_chunks sits directly on top of.
+REVISION_BEFORE_CHUNKS = "a4d7c81f0e93"
+
+
+def _domain_fk_ondelete(db_url: str) -> str | None:
+    """The ON DELETE rule on agent_knowledge_entries.domain_id, as stored."""
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        foreign_keys = inspect(engine).get_foreign_keys("agent_knowledge_entries")
+    finally:
+        engine.dispose()
+    fk = next(fk for fk in foreign_keys if fk["constrained_columns"] == ["domain_id"])
+    return fk.get("options", {}).get("ondelete")
+
+
+def _entry_ids(db_url: str) -> set[str]:
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        with engine.connect() as conn:
+            return {
+                row[0]
+                for row in conn.execute(
+                    text("SELECT id FROM agent_knowledge_entries")
+                ).all()
+            }
+    finally:
+        engine.dispose()
+
+
+def test_chunks_migration_goes_down_and_up_again_cleanly(monkeypatch) -> None:
+    """
+    ABF-121 does more than add a table: it changes the foreign key ABF-120 left
+    without ON DELETE CASCADE, which on SQLite means rebuilding
+    agent_knowledge_entries around it. Both directions are asserted, because a
+    downgrade that drops the new table but leaves the rebuilt constraint behind
+    is broken in the way that only shows up on the next upgrade.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        assert "agent_knowledge_chunks" in _created_tables(db_url)
+        assert _domain_fk_ondelete(db_url) == "CASCADE"
+
+        command.downgrade(alembic_cfg, REVISION_BEFORE_CHUNKS)
+        assert "agent_knowledge_chunks" not in _created_tables(db_url)
+        assert _domain_fk_ondelete(db_url) is None
+
+        command.upgrade(alembic_cfg, "head")
+        assert "agent_knowledge_chunks" in _created_tables(db_url)
+        assert _domain_fk_ondelete(db_url) == "CASCADE"
+
+
+def test_the_entries_rebuild_keeps_the_rows_it_rebuilds(monkeypatch) -> None:
+    """
+    The SQLite path recreates agent_knowledge_entries to change its foreign
+    key. A developer running this against dev.db has real content in that
+    table, and a rebuild that quietly starts it empty would take the knowledge
+    base with it.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, REVISION_BEFORE_CHUNKS)
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO agent_domains (id, name, description, "
+                    "group_visibility, sector_visibility, professional_domain, "
+                    "is_active, created_at) VALUES ('d-1', 'zchuyot', 'desc', "
+                    "'ALL', 'ALL', 'LAWYER', 1, '2026-09-01 10:00:00')"
+                )
+            )
+            # updated_by points at no users row on purpose: SQLite does not
+            # enforce foreign keys here, and spelling out every NOT NULL column
+            # on users would tie this test to that table's shape instead of to
+            # the one it is about.
+            conn.execute(
+                text(
+                    "INSERT INTO agent_knowledge_entries (id, domain_id, title, "
+                    "content, updated_by, created_at, updated_at) VALUES "
+                    "('e-1', 'd-1', 'arnona', 'body', 'u-1', "
+                    "'2026-09-01 10:00:00', '2026-09-01 10:00:00')"
+                )
+            )
+        engine.dispose()
+
+        command.upgrade(alembic_cfg, "head")
+        assert _entry_ids(db_url) == {"e-1"}
+
+        command.downgrade(alembic_cfg, REVISION_BEFORE_CHUNKS)
+        assert _entry_ids(db_url) == {"e-1"}
