@@ -88,26 +88,24 @@
           @for (report of pendingReports(); track report.id) {
             <li class="reports__item">
               <div class="reports__head">
+                <!-- FORUM_POST: what she wrote (ABF-130). DIRECT_MESSAGE:
+                     no title exists — reportTitle() falls back to a generic
+                     one, since this heading also feeds the aria-labels
+                     below and those can't nest a second | transloco. -->
+                <h2 class="reports__title">{{ reportTitle(report) }}</h2>
                 @if (report.target_type === targetTypes.FORUM_POST) {
-                  <!-- The reported post's title and body are what a user wrote:
-                       shown as they were written, in either UI language (ABF-130). -->
-                  <h2 class="reports__title">{{ report.content_title }}</h2>
                   <span class="badge badge--alert">{{
                     'moderator.reports.report_count' | transloco: { count: report.report_count }
                   }}</span>
-                } @else {
-                  <!-- No content preview here, ever — ABF-113, spec §9.1/§9.3:
-                       a private message is read only through the audited
-                       single-report view, never from a list. -->
-                  <h2 class="reports__title">
-                    {{ 'moderator.reports.direct_message_title' | transloco }}
-                  </h2>
                 }
               </div>
 
               @if (report.target_type === targetTypes.FORUM_POST) {
                 <p class="reports__content">{{ previewOf(report.content_text!) }}</p>
               }
+              <!-- No content preview here for DIRECT_MESSAGE, ever — ABF-113,
+                   spec §9.1/§9.3: a private message is read only through
+                   the audited single-report view, never from a list. -->
 
               <dl class="reports__meta">
                 <div>
@@ -136,7 +134,7 @@
                   class="btn btn--danger"
                   [attr.aria-label]="
                     'moderator.reports.decide_valid_aria'
-                      | transloco: { title: report.content_title }
+                      | transloco: { title: reportTitle(report) }
                   "
                   (click)="decide(report, decisions.VALID)"
                 >
@@ -147,7 +145,7 @@
                   class="btn"
                   [attr.aria-label]="
                     'moderator.reports.decide_invalid_aria'
-                      | transloco: { title: report.content_title }
+                      | transloco: { title: reportTitle(report) }
                   "
                   (click)="decide(report, decisions.INVALID)"
                 >
@@ -157,7 +155,7 @@
                   class="reports__card-link"
                   [routerLink]="['/moderator/users', report.reported_user_id]"
                   [attr.aria-label]="
-                    'moderator.reports.user_card_aria' | transloco: { title: report.content_title }
+                    'moderator.reports.user_card_aria' | transloco: { title: reportTitle(report) }
                   "
                 >
                   {{ 'moderator.reports.user_card_link' | transloco }}
@@ -184,13 +182,7 @@
           @for (report of history(); track report.id) {
             <li class="reports__item">
               <div class="reports__head">
-                @if (report.target_type === targetTypes.FORUM_POST) {
-                  <h2 class="reports__title">{{ report.content_title }}</h2>
-                } @else {
-                  <h2 class="reports__title">
-                    {{ 'moderator.reports.direct_message_title' | transloco }}
-                  </h2>
-                }
+                <h2 class="reports__title">{{ reportTitle(report) }}</h2>
                 <span class="badge">{{ decisionLabels[report.decision] | transloco }}</span>
               </div>
 
@@ -225,7 +217,7 @@
                   class="reports__card-link"
                   [routerLink]="['/moderator/users', report.reported_user_id]"
                   [attr.aria-label]="
-                    'moderator.reports.user_card_aria' | transloco: { title: report.content_title }
+                    'moderator.reports.user_card_aria' | transloco: { title: reportTitle(report) }
                   "
                 >
                   {{ 'moderator.reports.user_card_link' | transloco }}

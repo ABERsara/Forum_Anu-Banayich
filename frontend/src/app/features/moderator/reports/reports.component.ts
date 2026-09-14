@@ -35,7 +35,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
 import { ReportWithContent, RestrictionWithMember } from '../../../core/models';
 import {
@@ -115,6 +115,7 @@ interface PendingDecision {
 })
 export class ModeratorReportsComponent implements OnInit {
   private readonly reportService = inject(ReportService);
+  private readonly transloco = inject(TranslocoService);
 
   readonly activeTab = signal<Tab>('pending');
 
@@ -226,6 +227,23 @@ export class ModeratorReportsComponent implements OnInit {
     return contentText.length > PREVIEW_LENGTH
       ? `${contentText.slice(0, PREVIEW_LENGTH)}…`
       : contentText;
+  }
+
+  /**
+   * A display title for the card's heading and its aria-labels alike.
+   *
+   * A plain string, not a template pipe: `[attr.aria-label]` interpolates
+   * this into another translated string (e.g. "moderator.reports.decide_
+   * valid_aria"), and a `| transloco` result can't itself be a param to a
+   * second `| transloco` in the template — so the DIRECT_MESSAGE fallback is
+   * resolved here, once, through the service directly (ABF-113: a DM report
+   * has no content_title at all, unlike a FORUM_POST one).
+   */
+  reportTitle(report: ReportWithContent): string {
+    return (
+      report.content_title ??
+      this.transloco.translate('moderator.reports.direct_message_title')
+    );
   }
 
   // ---------------------------------------------------------------------------
