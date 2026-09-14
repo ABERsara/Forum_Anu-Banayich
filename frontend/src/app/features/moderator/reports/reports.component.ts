@@ -150,6 +150,16 @@ export class ModeratorReportsComponent implements OnInit {
   /** Held as a key or a server sentence, never as translated text (ABF-132). */
   readonly actionError = signal<ScreenError>(NO_ERROR);
 
+  /**
+   * The DIRECT_MESSAGE report currently expanded, if any (ABF-113) — one at
+   * a time, deliberately: fetching several at once would decrypt (and audit
+   * a view of) content nobody asked to read yet.
+   */
+  readonly openReportId = signal<string | null>(null);
+  readonly openReportContent = signal<ReportWithContent | null>(null);
+  readonly isContentLoading = signal(false);
+  readonly contentError = signal<ScreenError>(NO_ERROR);
+
   readonly reasonLabels = REPORT_REASON_LABELS;
   readonly decisionLabels = REPORT_DECISION_LABELS;
   readonly postStatusLabels = POST_STATUS_LABELS;
@@ -244,6 +254,41 @@ export class ModeratorReportsComponent implements OnInit {
       report.content_title ??
       this.transloco.translate('moderator.reports.direct_message_title')
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Viewing a DIRECT_MESSAGE report's content (ABF-113)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Fetch and expand one DIRECT_MESSAGE report's decrypted content.
+   *
+   * The server decrypts and audits the read on this exact call (spec
+   * §9.1/§9.3) — nothing before this point ever saw the plaintext, including
+   * the list this report came from.
+   */
+  viewContent(report: ReportWithContent): void {
+    this.openReportId.set(report.id);
+    this.openReportContent.set(null);
+    this.isContentLoading.set(true);
+    this.contentError.set(NO_ERROR);
+
+    this.reportService.getReport(report.id).subscribe({
+      next: (full) => {
+        this.openReportContent.set(full);
+        this.isContentLoading.set(false);
+      },
+      error: (err: unknown) => {
+        this.contentError.set(screenErrorFrom(err, 'moderator.errors.content_load_failed'));
+        this.isContentLoading.set(false);
+      },
+    });
+  }
+
+  closeContent(): void {
+    this.openReportId.set(null);
+    this.openReportContent.set(null);
+    this.contentError.set(NO_ERROR);
   }
 
   // ---------------------------------------------------------------------------

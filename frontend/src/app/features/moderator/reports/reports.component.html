@@ -102,10 +102,40 @@
 
               @if (report.target_type === targetTypes.FORUM_POST) {
                 <p class="reports__content">{{ previewOf(report.content_text!) }}</p>
+              } @else {
+                <!-- No content preview here, ever — ABF-113, spec §9.1/§9.3:
+                     a private message is read only through this audited
+                     single-report view, never from the list itself. -->
+                @if (openReportId() === report.id) {
+                  @if (isContentLoading()) {
+                    <app-loading-spinner
+                      size="sm"
+                      [message]="'moderator.reports.content_loading' | transloco"
+                    />
+                  } @else if (contentError().text; as text) {
+                    <app-error-display [message]="text" />
+                  } @else if (contentError().key; as key) {
+                    <app-error-display [message]="key | transloco" />
+                  } @else if (openReportContent(); as full) {
+                    <p class="reports__content">{{ full.message_content }}</p>
+                  }
+                  <button type="button" class="btn" (click)="closeContent()">
+                    {{ 'moderator.reports.hide_content' | transloco }}
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    class="btn"
+                    [attr.aria-label]="
+                      'moderator.reports.view_content_aria'
+                        | transloco: { title: reportTitle(report) }
+                    "
+                    (click)="viewContent(report)"
+                  >
+                    {{ 'moderator.reports.view_content' | transloco }}
+                  </button>
+                }
               }
-              <!-- No content preview here for DIRECT_MESSAGE, ever — ABF-113,
-                   spec §9.1/§9.3: a private message is read only through
-                   the audited single-report view, never from a list. -->
 
               <dl class="reports__meta">
                 <div>
@@ -188,6 +218,40 @@
 
               @if (report.target_type === targetTypes.FORUM_POST) {
                 <p class="reports__content">{{ previewOf(report.content_text!) }}</p>
+              } @else if (report.decision === decisions.CLOSED_ACCOUNT_DELETED) {
+                <!-- Closed, not decided — the reported-on account is gone.
+                     No content, ever, even to the moderator who would have
+                     ruled on it (spec §9.4, ABF-113). -->
+                <p class="reports__content">
+                  {{ 'moderator.reports.closed_account_deleted_note' | transloco }}
+                </p>
+              } @else if (openReportId() === report.id) {
+                @if (isContentLoading()) {
+                  <app-loading-spinner
+                    size="sm"
+                    [message]="'moderator.reports.content_loading' | transloco"
+                  />
+                } @else if (contentError().text; as text) {
+                  <app-error-display [message]="text" />
+                } @else if (contentError().key; as key) {
+                  <app-error-display [message]="key | transloco" />
+                } @else if (openReportContent(); as full) {
+                  <p class="reports__content">{{ full.message_content }}</p>
+                }
+                <button type="button" class="btn" (click)="closeContent()">
+                  {{ 'moderator.reports.hide_content' | transloco }}
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="btn"
+                  [attr.aria-label]="
+                    'moderator.reports.view_content_aria' | transloco: { title: reportTitle(report) }
+                  "
+                  (click)="viewContent(report)"
+                >
+                  {{ 'moderator.reports.view_content' | transloco }}
+                </button>
               }
 
               <dl class="reports__meta">
