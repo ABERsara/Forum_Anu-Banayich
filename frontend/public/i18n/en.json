@@ -577,6 +577,7 @@
       "receipt_sending": "Sending...",
       "receipt_sent": "Sent",
       "receipt_read": "Read",
+      "content_hidden": "This message was removed following a report",
       "new_message_label": "New message",
       "placeholder": "Write a message...",
       "char_count": "{{count}} of {{max}} characters",

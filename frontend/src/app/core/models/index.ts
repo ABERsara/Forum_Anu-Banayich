@@ -343,6 +343,14 @@ export interface DirectMessage {
    * sent: only its recipient can report one.
    */
   reported_by_me: boolean;
+  /**
+   * A moderator upheld a report on this message (ABF-113).
+   *
+   * `content` is already empty when this is true — the server never
+   * decrypts a hidden message — so this is what tells the screen to render
+   * a placeholder instead of an empty bubble.
+   */
+  hidden: boolean;
 }
 
 /**
@@ -485,12 +493,31 @@ export interface Report {
   created_at: string;
 }
 
-/** A report enriched with the reported content, returned by moderator views. */
+/**
+ * A report enriched with the reported content, returned by moderator views.
+ *
+ * One shape for both target types — a pending/history list mixes them
+ * (SPEC §7.3) — so every field below is populated for its own target_type
+ * only and left undefined for the other; check `target_type` before reading
+ * either group.
+ */
 export interface ReportWithContent extends Report {
-  content_title: string;
-  content_text: string;
-  content_status: PostStatus;
-  report_count: number;
+  // FORUM_POST only.
+  content_title?: string;
+  content_text?: string;
+  content_status?: PostStatus;
+  report_count?: number;
+
+  // DIRECT_MESSAGE only.
+  /**
+   * The decrypted message. Present only on the single report fetched by
+   * `GET /moderator/reports/{id}` (an audited read, ABF-113, spec §9.3) —
+   * never on a list row, and never (even there) once the report is
+   * CLOSED_ACCOUNT_DELETED.
+   */
+  message_content?: string | null;
+  /** Whether a moderator's VALID decision hid this message. Safe in lists — state, not content. */
+  message_hidden?: boolean;
 }
 
 /**

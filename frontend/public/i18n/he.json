@@ -577,6 +577,7 @@
       "receipt_sending": "בשליחה...",
       "receipt_sent": "נשלח",
       "receipt_read": "נקרא",
+      "content_hidden": "הודעה זו הוסרה בעקבות דיווח",
       "new_message_label": "הודעה חדשה",
       "placeholder": "כתבו הודעה...",
       "char_count": "{{count}} מתוך {{max}} תווים",

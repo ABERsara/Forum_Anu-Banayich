@@ -97,6 +97,12 @@ class DirectMessageResponse(BaseModel):
     #: is a second request per open conversation asking "which of these fifty
     #: did I report", answered from the same rows this one already read.
     reported_by_me: bool = False
+    #: A moderator upheld a report on this message (ABF-113). `content` is
+    #: already empty whenever this is true — forum_service._to_response_dict()
+    #: never decrypts a hidden message — so the client has a flag to render a
+    #: placeholder rather than an empty bubble it might mistake for a blank
+    #: message someone actually sent.
+    hidden: bool = False
 
     model_config = {"from_attributes": True}
 

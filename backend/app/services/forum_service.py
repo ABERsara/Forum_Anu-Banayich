@@ -92,6 +92,11 @@ class DirectMessageData(TypedDict):
     #: herself did, and how many other people reported the same message is a
     #: moderator's business, not hers.
     reported_by_me: bool
+    #: A moderator upheld a report on this message (ABF-113, hidden_at is not
+    #: None). `content` is empty whenever this is true — see
+    #: _to_response_dict() — so neither participant reads it again once a
+    #: moderator has ruled on it, the same as before anyone did.
+    hidden: bool
 
 
 class ConversationPageData(TypedDict):
@@ -540,7 +545,11 @@ def _to_response_dict(
     message: DirectMessage, *, reported_by_me: bool = False
 ) -> DirectMessageData:
     """
-    Decrypt one row's content for the API response layer.
+    Decrypt one row's content for the API response layer — unless a
+    moderator has hidden it (ABF-113), in which case it is not decrypted at
+    all: hidden_at means a report against this exact message was upheld, and
+    neither participant is shown the content again from here on, the same as
+    before either of them ever could.
 
     Returns a plain dict rather than mutating message.content in place: this
     ORM instance may still be session-tracked, and writing the decrypted
@@ -553,12 +562,16 @@ def _to_response_dict(
     generic 500 rather than propagating, so the failure detail (and the fact
     that it's specifically a decryption failure) never reaches the client.
     """
-    try:
-        content = decrypt_message(message.content, message.key_version)
-    except InvalidTag as exc:
-        raise HTTPException(
-            status_code=500, detail="errors.internal_server_error"
-        ) from exc
+    hidden = message.hidden_at is not None
+    if hidden:
+        content = ""
+    else:
+        try:
+            content = decrypt_message(message.content, message.key_version)
+        except InvalidTag as exc:
+            raise HTTPException(
+                status_code=500, detail="errors.internal_server_error"
+            ) from exc
 
     return {
         "id": message.id,
@@ -571,6 +584,7 @@ def _to_response_dict(
         # at a message the viewer just sent: reporting is only ever open on a
         # message she received (see get_received_message).
         "reported_by_me": reported_by_me,
+        "hidden": hidden,
     }
 
 
