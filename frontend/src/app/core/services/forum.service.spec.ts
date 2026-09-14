@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { ForumService, buildConversationKey } from './forum.service';
 import { environment } from '../../../environments/environment';
-import { GroupVisibility, PostStatus, SectorVisibility } from '../constants';
+import { GroupVisibility, PostStatus, RestrictionType, SectorVisibility } from '../constants';
 import type {
   ConversationMessagesPage,
   DirectMessage,
@@ -12,6 +12,7 @@ import type {
   ForumPost,
   ForumPostList,
   LikeResponse,
+  MyRestrictionResponse,
   UserPublic,
 } from '../models';
 
@@ -210,6 +211,34 @@ describe('ForumService', () => {
       const members: UserPublic[] = [{ id: 'other-1', first_name: 'רבקה', last_name: 'כהן' }];
       req.flush(members);
       expect(result).toEqual(members);
+    });
+
+    it('getMessagingRestriction asks about the caller, naming nobody', () => {
+      let result: MyRestrictionResponse | undefined;
+      service.getMessagingRestriction().subscribe((res) => (result = res));
+
+      // No id in the URL: the server answers about whoever holds the token,
+      // so there is no shape of this request that asks about someone else.
+      const req = httpMock.expectOne(`${environment.apiUrl}/messages/restriction`);
+      expect(req.request.method).toBe('GET');
+
+      const restricted: MyRestrictionResponse = {
+        restriction: {
+          restriction_type: RestrictionType.MESSAGING,
+          expires_at: '2026-08-03T10:00:00',
+        },
+      };
+      req.flush(restricted);
+      expect(result).toEqual(restricted);
+    });
+
+    it('passes a null restriction through as the successful answer it is', () => {
+      let result: MyRestrictionResponse | undefined;
+      service.getMessagingRestriction().subscribe((res) => (result = res));
+
+      httpMock.expectOne(`${environment.apiUrl}/messages/restriction`).flush({ restriction: null });
+
+      expect(result).toEqual({ restriction: null });
     });
   });
 });

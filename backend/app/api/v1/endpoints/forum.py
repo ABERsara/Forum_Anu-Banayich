@@ -15,13 +15,19 @@ POST   /messages                          – send a direct message (own cell on
 GET    /conversations/{key}/messages      – one page of a conversation, newest first
 GET    /cells/me/members                  – other ACTIVE users in your own cell
 GET    /messages/recipients               – search own-cell members by name (autocomplete)
+GET    /messages/restriction               – am I restricted from sending, and until when
 POST   /messages/{id}/report               – report one received private message
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.constants import LikeTargetType, ReportTargetType, UserRole
+from app.core.constants import (
+    LikeTargetType,
+    ReportTargetType,
+    RestrictionType,
+    UserRole,
+)
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.core.i18n import translate
 from app.models.user import User
@@ -38,8 +44,14 @@ from app.schemas.forum import (
 )
 from app.schemas.like import LikeResponse
 from app.schemas.report import ReportCreate, ReportResponse
+from app.schemas.restriction import MyRestriction, MyRestrictionResponse
 from app.schemas.user import UserPublic
-from app.services import forum_service, like_service, report_service
+from app.services import (
+    forum_service,
+    like_service,
+    report_service,
+    restriction_service,
+)
 
 router = APIRouter(tags=["Forum & Messages"])
 
@@ -283,6 +295,40 @@ def search_recipients(
     """
     results = forum_service.search_users_for_dm(db, current_user, q)
     return [UserPublic.model_validate(r) for r in results]
+
+
+@router.get("/messages/restriction", response_model=MyRestrictionResponse)
+def get_my_messaging_restriction(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> MyRestrictionResponse:
+    """
+    Whether the caller is currently restricted from sending private messages,
+    and until when (§7.2, ABF-116).
+
+    About the caller and nobody else — there is no user id in the path or the
+    query, so there is no shape of this request that asks about someone else.
+    A member finding out that another member is restricted is a moderator's
+    view (`GET /moderator/restrictions`), not this one.
+
+    200 with `restriction: null` when there is none. The chat screen asks on
+    every open, and "you are fine" is an answer, not an error.
+
+    Declared before /messages/{message_id}/report for the usual FastAPI
+    reason — routes match in order, and a path-parameter route declared first
+    would swallow "restriction" as a message id.
+    """
+    restriction = restriction_service.active_restriction(
+        db, current_user.id, RestrictionType.MESSAGING
+    )
+    if restriction is None:
+        return MyRestrictionResponse()
+    return MyRestrictionResponse(
+        restriction=MyRestriction(
+            restriction_type=restriction.restriction_type,
+            expires_at=restriction.expires_at,
+        )
+    )
 
 
 @router.post(

@@ -26,8 +26,9 @@ import {
   ReportDecision,
   ReportReason,
   ReportTargetType,
+  RestrictionType,
 } from '../../../core/constants';
-import type { ReportHistoryList, ReportWithContent } from '../../../core/models';
+import type { ReportHistoryList, ReportWithContent, RestrictionList } from '../../../core/models';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 function makeReport(overrides: Partial<ReportWithContent> = {}): ReportWithContent {
@@ -69,6 +70,64 @@ function makeLatinReport(overrides: Partial<ReportWithContent> = {}): ReportWith
   });
 }
 
+function makeRestrictions(overrides: Partial<RestrictionList> = {}): RestrictionList {
+  return {
+    items: [
+      {
+        id: 'restriction-1',
+        restriction_type: RestrictionType.MESSAGING,
+        expires_at: '2026-07-18T09:30:00',
+        report_count: 3,
+        window_days: 30,
+        created_at: '2026-07-16T09:30:00',
+        member: { id: 'user-2', first_name: 'Dana', last_name: 'Levi' },
+      },
+    ],
+    total: 1,
+    ...overrides,
+  };
+}
+
+/**
+ * The other direction of ABF-116, as the dashboard receives it: a member whose
+ * own reports keep being dismissed. Same shape, same `report_count` field —
+ * and the count means the opposite of what it means above.
+ */
+function makeReportingRestrictions(): RestrictionList {
+  return makeRestrictions({
+    items: [
+      {
+        id: 'restriction-2',
+        restriction_type: RestrictionType.REPORTING,
+        expires_at: '2026-08-15T09:30:00',
+        report_count: 5,
+        window_days: 30,
+        created_at: '2026-07-16T09:30:00',
+        member: { id: 'user-3', first_name: 'Rivka', last_name: 'Cohen' },
+      },
+    ],
+  });
+}
+
+/**
+ * A naive-UTC timestamp as this runner's clock renders it, in the screen's
+ * `dd/MM/yyyy HH:mm`.
+ *
+ * Derived rather than hardcoded: the dates on a restriction row arrive as
+ * naive UTC and the column shows them in the moderator's own zone, so the
+ * digits differ between CI (UTC) and a machine in Israel (UTC+3). A literal
+ * here would pin one of the two and fail on the other — the same reason
+ * chat.component.spec.ts derives its `formattedEnd`.
+ */
+function wallClock(naiveUtc: string): string {
+  const at = new Date(`${naiveUtc}Z`);
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return (
+    `${pad(at.getDate())}/${pad(at.getMonth() + 1)}/${at.getFullYear()} ` +
+    `${pad(at.getHours())}:${pad(at.getMinutes())}`
+  );
+}
+
 function makeHistoryPage(overrides: Partial<ReportHistoryList> = {}): ReportHistoryList {
   return {
     items: [
@@ -93,19 +152,25 @@ describe('ModeratorReportsComponent', () => {
   let reportServiceMock: {
     getPendingReports: ReturnType<typeof vi.fn>;
     getReportHistory: ReturnType<typeof vi.fn>;
+    getActiveRestrictions: ReturnType<typeof vi.fn>;
     decideReport: ReturnType<typeof vi.fn>;
   };
 
-  /** Builds the screen; `pending` and `history` override the default fixtures. */
+  /**
+   * Builds the screen; `pending`, `history` and `restrictions` override the
+   * default fixtures.
+   */
   async function render({
     pending = of({ items: [makeReport()], total: 1, pending_count: 1 }),
     history = of(makeHistoryPage()),
-  }: { pending?: unknown; history?: unknown } = {}): Promise<void> {
+    restrictions = of(makeRestrictions()),
+  }: { pending?: unknown; history?: unknown; restrictions?: unknown } = {}): Promise<void> {
     TestBed.resetTestingModule();
 
     reportServiceMock = {
       getPendingReports: vi.fn().mockReturnValue(pending),
       getReportHistory: vi.fn().mockReturnValue(history),
+      getActiveRestrictions: vi.fn().mockReturnValue(restrictions),
       decideReport: vi.fn().mockReturnValue(of(makeReport({ decision: ReportDecision.VALID }))),
     };
 
@@ -142,6 +207,11 @@ describe('ModeratorReportsComponent', () => {
       const value = row.querySelector('dd')!.textContent!.replace(/\s+/g, ' ').trim();
       return `${term}: ${value}`;
     });
+  }
+
+  /** The tab buttons in the order the tablist renders them. */
+  function tabButtons(): HTMLElement[] {
+    return [...root().querySelectorAll<HTMLElement>('.tabs__tab')];
   }
 
   function tabLabels(): string[] {
@@ -322,23 +392,17 @@ describe('ModeratorReportsComponent', () => {
       expect(reportServiceMock.getReportHistory).not.toHaveBeenCalled();
     });
 
-    it('reaches the unselected tab with the arrow keys, and focuses it', () => {
+    it('reaches the next tab with the arrow keys, and focuses it', () => {
       const historyTab: HTMLElement = root().querySelector('#tab-history')!;
 
-      component.moveToTab(
-        new KeyboardEvent('keydown', { key: 'ArrowLeft' }),
-        'history',
-        historyTab,
-      );
+      component.moveToTab(new KeyboardEvent('keydown', { key: 'ArrowRight' }), tabButtons());
 
       expect(component.activeTab()).toBe('history');
       expect(document.activeElement).toBe(historyTab);
     });
 
     it('leaves other keys to the browser', () => {
-      const historyTab: HTMLElement = root().querySelector('#tab-history')!;
-
-      component.moveToTab(new KeyboardEvent('keydown', { key: 'Tab' }), 'history', historyTab);
+      component.moveToTab(new KeyboardEvent('keydown', { key: 'Tab' }), tabButtons());
 
       expect(component.activeTab()).toBe('pending');
     });
@@ -445,10 +509,225 @@ describe('ModeratorReportsComponent', () => {
     });
   });
 
+  /**
+   * ABF-116's half of this screen: the restrictions §7.2 applied by itself.
+   *
+   * Read-only on purpose — there is no control here that lifts one — so what
+   * these pin is that the right rows arrive, that they arrive when the tab is
+   * opened rather than on every page load, and that a decision taken in the
+   * queue makes them stale.
+   */
+  describe('the restrictions tab', () => {
+    it('does not fetch restrictions before the tab is opened', () => {
+      expect(reportServiceMock.getActiveRestrictions).not.toHaveBeenCalled();
+    });
+
+    it('loads them the first time the tab is opened', () => {
+      component.showTab('restrictions');
+
+      expect(reportServiceMock.getActiveRestrictions).toHaveBeenCalledOnce();
+      expect(component.restrictions().length).toBe(1);
+      expect(component.isRestrictionsLoading()).toBe(false);
+      expect(component.restrictionsError()).toBe(false);
+    });
+
+    it('does not fetch them again while nothing has been decided', () => {
+      component.showTab('restrictions');
+      component.showTab('pending');
+      component.showTab('restrictions');
+
+      expect(reportServiceMock.getActiveRestrictions).toHaveBeenCalledOnce();
+    });
+
+    it('re-reads them after a decision, which is what can apply one', () => {
+      component.showTab('restrictions');
+      component.showTab('pending');
+
+      component.decide(makeReport(), ReportDecision.VALID);
+      component.confirmDecision('הערה מנומקת');
+      component.showTab('restrictions');
+
+      expect(reportServiceMock.getActiveRestrictions).toHaveBeenCalledTimes(2);
+    });
+
+    it('names the restricted member, the measure and when it ends', () => {
+      component.showTab('restrictions');
+      fixture.detectChanges();
+      const card = cards()[0];
+      const row = makeRestrictions().items[0];
+
+      expect(card.querySelector('.reports__title')!.textContent!.trim()).toBe('Dana Levi');
+      expect(card.querySelector('.badge--alert')!.textContent!.trim()).toBe('שליחת הודעות פרטיות');
+      expect(fieldsOf(card)).toContain(`בתוקף עד: ${wallClock(row.expires_at)}`);
+      expect(fieldsOf(card)).toContain(`הופעלה בתאריך: ${wallClock(row.created_at)}`);
+    });
+
+    /**
+     * Both dates arrive as naive UTC — `2026-07-18T09:30:00`, no offset — and
+     * the date pipe reads a string without one as a *local* wall clock. Left
+     * raw, the column tells a moderator in Israel that a restriction runs
+     * until 09:30 when it in fact lifts at 12:30, and the same three hours are
+     * off the date it was applied. utc-date.util.ts exists for this; the chat
+     * screen already states this very timestamp to the restricted member
+     * through it.
+     *
+     * Asserted on the instant rather than on rendered text on purpose: CI runs
+     * in UTC, where the bug is invisible, so a rendered-string assertion would
+     * pass either way and guard nothing.
+     */
+    it('states both dates as UTC, not as a local wall clock', () => {
+      component.showTab('restrictions');
+      const row = component.restrictions()[0];
+
+      expect(component.endsAt(row)).toBe('2026-07-18T09:30:00Z');
+      expect(new Date(component.endsAt(row)).toISOString()).toBe('2026-07-18T09:30:00.000Z');
+      expect(component.appliedAt(row)).toBe('2026-07-16T09:30:00Z');
+      expect(new Date(component.appliedAt(row)).toISOString()).toBe('2026-07-16T09:30:00.000Z');
+    });
+
+    /**
+     * The count and the window move to different places in the sentence
+     * between Hebrew and English, so they are two parameters of one key
+     * rather than text either side of a number (ABF-131).
+     */
+    it('says why, from one key with the count and the window as parameters', () => {
+      component.showTab('restrictions');
+      const transloco = TestBed.inject(TranslocoService);
+
+      transloco.setTranslationKey(
+        'moderator.restrictions.reason_value_messaging',
+        '{{days}} ימים, {{count}} דיווחים',
+        { lang: 'he' },
+      );
+      fixture.detectChanges();
+
+      expect(fieldsOf(cards()[0])).toContain('הסיבה: 30 ימים, 3 דיווחים');
+    });
+
+    /**
+     * The two kinds of row carry the same `report_count` and it means opposite
+     * things: on a messaging restriction the reports were upheld *against* the
+     * member, on a reporting one they are her own reports that were dismissed.
+     * One shared sentence — which is what this screen first shipped with —
+     * told the moderator that a member whose reports keep being thrown out had
+     * five reports upheld against her, which is the reverse of the truth.
+     */
+    it('says why a reporting restriction was applied without calling it upheld', async () => {
+      await render({ restrictions: of(makeReportingRestrictions()) });
+      component.showTab('restrictions');
+      fixture.detectChanges();
+      const card = cards()[0];
+
+      expect(card.querySelector('.badge--alert')!.textContent!.trim()).toBe('מכסת דיווחים יומית');
+      expect(fieldsOf(card)).toContain('הסיבה: 5 דיווחים שהגישה נמצאו שגויים ב-30 הימים האחרונים');
+      expect(fieldsOf(card).join(' ')).not.toContain('מוצדקים');
+
+      switchToEnglish();
+
+      expect(fieldsOf(cards()[0])).toContain(
+        'Reason: 5 reports she filed were dismissed in the last 30 days',
+      );
+      expect(fieldsOf(cards()[0]).join(' ')).not.toContain('upheld');
+    });
+
+    /** The other kind still reads as what it is, in both catalogues. */
+    it('says a messaging restriction was upheld against her', () => {
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(fieldsOf(cards()[0])).toContain(
+        'הסיבה: 3 דיווחים עליה נמצאו מוצדקים ב-30 הימים האחרונים',
+      );
+
+      switchToEnglish();
+
+      expect(fieldsOf(cards()[0])).toContain(
+        'Reason: 3 reports about her were upheld in the last 30 days',
+      );
+      expect(text()).not.toMatch(HEBREW);
+    });
+
+    it('shows nothing but the member — no report content, no reporter', () => {
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(cards()[0].querySelector('.reports__content')).toBeNull();
+      expect(text()).not.toContain('תוכן ההודעה שדווחה');
+      expect(text()).not.toContain('user-1');
+    });
+
+    it('reports an empty list rather than showing nothing', async () => {
+      await render({ restrictions: of({ items: [], total: 0 }) });
+
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(text()).toContain('אין הגבלות פעילות');
+    });
+
+    it('shows a loading state while the list is in flight', async () => {
+      await render({ restrictions: NEVER });
+
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(component.isRestrictionsLoading()).toBe(true);
+      expect(text()).toContain('טוען הגבלות');
+    });
+
+    it('shows an error state when the list cannot be loaded', async () => {
+      await render({ restrictions: throwError(() => new Error('boom')) });
+
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(component.restrictionsError()).toBe(true);
+      expect(text()).toContain('אירעה שגיאה בטעינת ההגבלות');
+    });
+
+    /**
+     * A moderator using a screen reader otherwise hears silence and cannot
+     * tell an empty list from one that never arrived. app-error-display
+     * carries its own role="alert"; the spinner and the empty line have
+     * nothing of their own, which is what the wrapper is for.
+     */
+    it('announces its loading, empty and error states', async () => {
+      await render({ restrictions: NEVER });
+      component.showTab('restrictions');
+      fixture.detectChanges();
+      const live = () => root().querySelector('[aria-live="polite"]')!;
+
+      expect(live().getAttribute('aria-busy')).toBe('true');
+      expect(live().textContent).toContain('טוען הגבלות');
+
+      await render({ restrictions: of({ items: [], total: 0 }) });
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(live().getAttribute('aria-busy')).toBe('false');
+      expect(live().textContent).toContain('אין הגבלות פעילות');
+
+      await render({ restrictions: throwError(() => new Error('boom')) });
+      component.showTab('restrictions');
+      fixture.detectChanges();
+
+      expect(live().querySelector('[role="alert"]')!.textContent).toContain(
+        'אירעה שגיאה בטעינת ההגבלות',
+      );
+    });
+
+    it('wraps to the last tab on ArrowLeft from the first', () => {
+      component.moveToTab(new KeyboardEvent('keydown', { key: 'ArrowLeft' }), tabButtons());
+
+      expect(component.activeTab()).toBe('restrictions');
+      expect(document.activeElement).toBe(root().querySelector('#tab-restrictions'));
+    });
+  });
+
   describe('i18n', () => {
     it('reads in Hebrew exactly as the screen was written', () => {
       expect(heading()).toBe('לוח בקרת מבקר');
-      expect(tabLabels()).toEqual(['דיווחים ממתינים 1', 'היסטוריה']);
+      expect(tabLabels()).toEqual(['דיווחים ממתינים 1', 'היסטוריה', 'הגבלות פעילות']);
       expect(fieldsOf(cards()[0])).toEqual([
         'סיבת הדיווח: הטרדה',
         'פירוט המדווח/ת: התבטאות פוגענית',

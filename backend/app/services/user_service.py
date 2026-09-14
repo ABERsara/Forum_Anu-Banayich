@@ -24,6 +24,7 @@ from enum import StrEnum
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.constants import AccountStatus, AuditAction, UserRole
@@ -68,6 +69,30 @@ def get_user_by_id(db: Session, user_id: str) -> User | None:
     Fetch a user by id, or None if no such user exists.
     """
     return db.query(User).filter(User.id == user_id).first()
+
+
+def cell_match_filter(cells: list[dict[str, str]]) -> ColumnElement[bool]:
+    """
+    Build an OR-of-ANDs filter matching User.user_type/sector against a
+    moderator's list of {"group", "sector"} cells (spec §4.3).
+
+    Lives here rather than beside either caller because what it filters is
+    `User`: report_service scopes a report queue with it, restriction_service
+    scopes a list of restricted members, and a second copy of the expression
+    is a second place for "which cells is she responsible for" to be answered
+    differently.
+
+    Note what it does *not* handle: an empty `cells` list. An empty or_() is
+    a SQL no-op that matches every row — the exact opposite of "responsible
+    for nothing" — so every caller special-cases that before calling, and
+    there is no safe default this function could pick on their behalf.
+    """
+    return or_(
+        *(
+            and_(User.user_type == cell["group"], User.sector == cell["sector"])
+            for cell in cells
+        )
+    )
 
 
 def ensure_account_active(user: User) -> None:

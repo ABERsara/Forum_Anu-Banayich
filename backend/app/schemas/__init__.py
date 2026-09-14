@@ -34,6 +34,13 @@ from app.schemas.report import (
     ReportResponse,
     ReportWithContent,
 )
+from app.schemas.restriction import (
+    MyRestriction,
+    MyRestrictionResponse,
+    RestrictedMember,
+    RestrictionListResponse,
+    RestrictionWithMember,
+)
 from app.schemas.user import (
     ProfessionalProfile,
     RegistrationRejectRequest,
@@ -73,5 +80,10 @@ __all__ = [
     "ReportListResponse",
     "ReportHistoryResponse",
     "ReportWithContent",
+    "MyRestriction",
+    "MyRestrictionResponse",
+    "RestrictedMember",
+    "RestrictionWithMember",
+    "RestrictionListResponse",
     "AgentDomainResponse",
 ]

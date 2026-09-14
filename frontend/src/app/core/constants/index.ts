@@ -258,6 +258,29 @@ export const REPORT_DECISION_LABELS: Record<ReportDecision, LabelKey> = {
 };
 
 // ---------------------------------------------------------------------------
+// Automatic restrictions (ABF-116)
+// ---------------------------------------------------------------------------
+
+/**
+ * What an automatic restriction takes away (SPEC §5.3 מה"ק, §7.2).
+ *
+ * Neither value is a suspension — a restricted member still logs in and still
+ * reads everything she could read before. Mirrors
+ * `backend/app/core/constants.py::RestrictionType`.
+ */
+export enum RestrictionType {
+  /** Sending private messages. Reading a conversation is untouched. */
+  MESSAGING = 'messaging',
+  /** Reporting beyond a daily allowance. Reporting itself is not withdrawn. */
+  REPORTING = 'reporting',
+}
+
+export const RESTRICTION_TYPE_LABELS: Record<RestrictionType, LabelKey> = {
+  [RestrictionType.MESSAGING]: 'constants.restriction_type.messaging',
+  [RestrictionType.REPORTING]: 'constants.restriction_type.reporting',
+};
+
+// ---------------------------------------------------------------------------
 // Likes
 // ---------------------------------------------------------------------------
 

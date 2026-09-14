@@ -57,6 +57,15 @@
   color: $color-text-muted;
 }
 
+// The restrictions panel explains itself before its list: what is on it was
+// applied by a threshold rather than by anyone on this screen, and that is
+// not something a moderator can infer from the rows.
+.panel__hint {
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+  margin: 0 0 $spacing-md;
+}
+
 // ---------------------------------------------------------------------------
 // One reported post, in either tab
 // ---------------------------------------------------------------------------
