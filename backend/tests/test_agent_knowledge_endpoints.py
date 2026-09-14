@@ -376,6 +376,37 @@ class TestUpdate:
 
         assert response.status_code == 422
 
+    async def test_an_edit_survives_an_indexing_failure(
+        self, client, as_user, lawyer, lawyer_domain, db_session, monkeypatch
+    ) -> None:
+        # The PATCH counterpart of TestCreate's version. An edit that cannot be
+        # indexed still has to be kept: the entry is left updated and merely
+        # unretrievable, which the next edit fixes. Losing the correction
+        # because Google was down would be the worse of the two failures.
+        entry = _add_entry(db_session, lawyer_domain.id, lawyer)
+        attempted = []
+
+        def _fail(db: Session, entry: AgentKnowledgeEntry) -> None:
+            attempted.append(entry.id)
+            raise rag_service.EmbeddingError("Gemini is unreachable")
+
+        monkeypatch.setattr(rag_service, "index_entry", _fail)
+        as_user(lawyer)
+
+        response = await client.patch(
+            f"{_entries_url(lawyer_domain.id)}/{entry.id}",
+            json={"content": "תוכן מעודכן"},
+        )
+
+        assert response.status_code == 200
+        # Both halves matter: that a content edit does reach the indexer, and
+        # that its failure does not reach the caller. Without the first, this
+        # would pass just as well if re-indexing had quietly stopped happening.
+        assert attempted == [entry.id]
+        db_session.expire_all()
+        saved = db_session.get(AgentKnowledgeEntry, entry.id)
+        assert saved.content == "תוכן מעודכן"
+
     async def test_clearing_a_source_is_allowed(
         self, client, as_user, lawyer, lawyer_domain, db_session, indexed
     ) -> None:

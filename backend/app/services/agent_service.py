@@ -12,16 +12,34 @@ asks "which domains is this member offered"; editing a knowledge base asks "may
 this professional edit this one", and the answer turns on their discipline, not
 on their bereavement group — an admin and a professional have neither
 user_type nor sector at all.
+
+The write functions at the end own the whole operation: the commit, and whether
+the edit earns a re-index. The endpoints authorize and hand off, so none of this
+is reachable only through a request.
 """
+
+import logging
 
 from fastapi import HTTPException
 from sqlalchemy import func, or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.constants import GroupVisibility, SectorVisibility, UserRole
 from app.core.i18n import translate
 from app.models.agent import AgentDomain, AgentKnowledgeEntry
 from app.models.user import User
+from app.schemas.agent import AgentKnowledgeEntryCreate, AgentKnowledgeEntryUpdate
+from app.services import rag_service
+
+logger = logging.getLogger(__name__)
+
+# The only two fields an embedding is built from. index_entry() embeds each
+# chunk with the title in front of it, so a title left unindexed would go on
+# being searched for under the old one — which is worse than not indexing it at
+# all. A source_name or source_url fix changes nothing an embedding sees, and
+# must not spend a paid round trip rebuilding identical vectors.
+_INDEXED_FIELDS = frozenset({"title", "content"})
 
 
 def get_visible_domains(db: Session, user: User) -> list[AgentDomain]:
@@ -142,3 +160,95 @@ def get_entry_or_404(db: Session, domain_id: str, entry_id: str) -> AgentKnowled
             status_code=404, detail=translate("agents.knowledge_entry_not_found")
         )
     return entry
+
+
+def index_entry_safe(db: Session, entry: AgentKnowledgeEntry) -> None:
+    """Re-index one entry, without letting a failed index fail the write.
+
+    The entry is already committed by the time this runs, and it is the
+    professional's work. Reporting a 500 for it because Google was unreachable
+    would be the worse outcome by far — the write did happen, and the caller
+    would be told it did not. An unindexed entry is saved, visible and editable,
+    and the next edit that touches its title or content indexes it. So this logs
+    and returns.
+
+    SQLAlchemyError is caught alongside EmbeddingError because index_entry()
+    commits: a deadlock or a dropped connection on either commit is exactly as
+    survivable as a failed embedding, and leaves the session needing a rollback
+    before the request can be answered at all.
+    """
+    try:
+        rag_service.index_entry(db, entry)
+    except (rag_service.EmbeddingError, SQLAlchemyError):
+        db.rollback()
+        logger.exception(
+            "Knowledge entry %s was saved but could not be indexed; it will not "
+            "be retrievable until it is edited again.",
+            entry.id,
+        )
+
+
+def create_knowledge_entry(
+    db: Session,
+    domain_id: str,
+    data: AgentKnowledgeEntryCreate,
+    author: User,
+) -> AgentKnowledgeEntry:
+    """Add an entry to a domain's knowledge base and index it for retrieval.
+
+    `domain_id` comes from the path and `author` from the token, never from the
+    body: both are the caller's authorization, not their claim. Whether this
+    caller may write to this domain is get_manageable_domain()'s question, and
+    is settled before this is called.
+
+    Indexing runs after the commit, never inside it — index_entry() makes an
+    HTTP call, and a transaction held open across it would hold row locks for
+    the length of a network round trip.
+    """
+    entry = AgentKnowledgeEntry(
+        domain_id=domain_id,
+        updated_by=author.id,
+        **data.model_dump(),
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+
+    index_entry_safe(db, entry)
+    return entry
+
+
+def update_knowledge_entry(
+    db: Session,
+    entry: AgentKnowledgeEntry,
+    data: AgentKnowledgeEntryUpdate,
+    editor: User,
+) -> AgentKnowledgeEntry:
+    """Edit a knowledge base entry, re-indexing it only if its meaning changed.
+
+    Only the fields actually present in the body are written, which is what lets
+    a source be corrected without re-sending the content — and, because
+    re-indexing turns on which fields arrived, without paying for a round of
+    embeddings that would produce identical chunks.
+    """
+    changes = data.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        setattr(entry, field, value)
+    entry.updated_by = editor.id
+    db.commit()
+    db.refresh(entry)
+
+    if changes.keys() & _INDEXED_FIELDS:
+        index_entry_safe(db, entry)
+    return entry
+
+
+def delete_knowledge_entry(db: Session, entry: AgentKnowledgeEntry) -> None:
+    """Remove a knowledge base entry; its chunks go with it.
+
+    The chunks are deleted by the relationship's delete-orphan cascade, so
+    nothing is left behind to be retrieved and quoted after the entry that said
+    it is gone.
+    """
+    db.delete(entry)
+    db.commit()

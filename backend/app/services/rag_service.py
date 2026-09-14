@@ -390,6 +390,11 @@ def index_entry(db: Session, entry: AgentKnowledgeEntry) -> None:
 class RetrievedChunk:
     """One retrieved passage, with the entry it came from.
 
+    Part of retrieve()'s contract, and imported by ABF-122 (the agent chat
+    flow) — not dead code, though nothing outside this module names it yet.
+    Deliberately a plain dataclass and not the chunk ORM row, so ABF-122 is not
+    coupled to the chunk table's schema.
+
     `content` is the chunk's own text, not the whole entry — that is the point
     of chunking. `title`, `source_name` and `source_url` come from the parent
     entry, so an answer built on this can say where the passage came from.
