@@ -33,7 +33,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -104,6 +104,7 @@ interface PendingDecision {
   standalone: true,
   imports: [
     DatePipe,
+    NgTemplateOutlet,
     RouterLink,
     TranslocoPipe,
     ConfirmDialogComponent,
