@@ -1046,6 +1046,7 @@ def get_inbox(
         db.query(
             DirectMessage.content,
             DirectMessage.key_version,
+            DirectMessage.hidden_at,
             DirectMessage.created_at,
             partner_id,
             func.row_number()
@@ -1066,6 +1067,7 @@ def get_inbox(
         db.query(
             ranked.c.content,
             ranked.c.key_version,
+            ranked.c.hidden_at,
             ranked.c.created_at,
             ranked.c.unread_count,
             User,
@@ -1085,11 +1087,18 @@ def get_inbox(
     items = [
         ConversationSummary(
             other_user=UserPublic.model_validate(partner),
-            last_message_preview=decrypt_message(content, key_version),
+            # A moderator-hidden message (ABF-113) is never decrypted here —
+            # same rule as forum_service._to_response_dict() for the open
+            # conversation view, so the preview can't leak what the thread
+            # itself already refuses to show.
+            last_message_preview=(
+                "" if hidden_at is not None else decrypt_message(content, key_version)
+            ),
             last_message_at=created_at,
             unread_count=int(unread_count),
+            hidden=hidden_at is not None,
         )
-        for content, key_version, created_at, unread_count, partner in rows
+        for content, key_version, hidden_at, created_at, unread_count, partner in rows
     ]
 
     return ConversationListResponse(

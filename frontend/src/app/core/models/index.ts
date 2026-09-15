@@ -388,6 +388,8 @@ export interface ConversationSummary {
   last_message_preview: string;
   last_message_at: string;
   unread_count: number;
+  /** A moderator upheld a report on the last message (ABF-113). last_message_preview is already empty when this is true. */
+  hidden: boolean;
 }
 
 export interface ConversationList {

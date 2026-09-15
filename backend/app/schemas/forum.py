@@ -156,6 +156,9 @@ class ConversationSummary(BaseModel):
     last_message_preview: str
     last_message_at: datetime
     unread_count: int
+    #: A moderator upheld a report on the last message (ABF-113).
+    #: last_message_preview is already empty when this is true.
+    hidden: bool = False
 
 
 class ConversationListResponse(BaseModel):
