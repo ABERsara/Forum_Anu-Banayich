@@ -42,10 +42,15 @@ router = APIRouter(
 )
 
 
-def _to_report_with_content(db: Session, report: Report) -> ReportWithContent:
+def _to_reports_with_content(db: Session, reports: list[Report]) -> list[ReportWithContent]:
     """
-    Enrich a report with the context a moderator needs to see it — the two
-    target_types share nothing to read from, so this branches on it.
+    Enrich a batch of reports with the context a moderator needs to see
+    them — the two target_types share nothing to read from, so each report
+    branches on it, but the content itself is fetched in two bounded
+    queries (one per target_type) up front rather than one query per
+    report: get_pending_reports() alone is unpaginated, so a per-report
+    query here would cost the whole cell's queue size in DB round trips
+    for every load.
 
     Never decrypts DIRECT_MESSAGE content: this is what backs the pending
     and history lists too (§7.3), and a list row is metadata only —
@@ -59,37 +64,58 @@ def _to_report_with_content(db: Session, report: Report) -> ReportWithContent:
     only ever sets status=DELETED, the row stays — so this has nothing to
     degrade against yet. It still doesn't raise: this function backs
     list_pending_reports()/list_decided_reports() as well as get_report()
-    now, and a 404 raised from inside their list comprehensions would take
-    down every other report in the response over one row, the same
-    inconsistency decide_report()'s own "target_gone" branch already
-    exists to avoid on the decide side. Content fields are simply left at
-    the schema's None default — the same degrade-gracefully answer the
-    DIRECT_MESSAGE branch two lines below already gives.
+    now, and a 404 raised here would take down every other report in the
+    response over one row, the same inconsistency decide_report()'s own
+    "target_gone" branch already exists to avoid on the decide side.
+    Content fields are simply left at the schema's None default — the same
+    degrade-gracefully answer the DIRECT_MESSAGE branch below already gives.
     """
-    if report.target_type == ReportTargetType.FORUM_POST:
-        post = db.query(ForumPost).filter(ForumPost.id == report.target_id).first()
-        if post is None:
-            return ReportWithContent(**ReportResponse.model_validate(report).model_dump())
-        return ReportWithContent(
-            **ReportResponse.model_validate(report).model_dump(),
-            content_title=post.title,
-            content_text=post.content,
-            content_status=post.status,
-            report_count=post.report_count,
-        )
+    post_ids = [r.target_id for r in reports if r.target_type == ReportTargetType.FORUM_POST]
+    message_ids = [
+        r.target_id for r in reports if r.target_type == ReportTargetType.DIRECT_MESSAGE
+    ]
 
-    # DIRECT_MESSAGE. The live row can legitimately be gone (pruned, or
-    # purged with its sender's account) while the report itself survives —
-    # that is the whole reason report_service.decrypt_reported_message()
-    # reads from the report's own snapshot rather than here. A message this
-    # gone counts as hidden: there is nothing left to show either way.
-    message = (
-        db.query(DirectMessage).filter(DirectMessage.id == report.target_id).first()
-    )
-    return ReportWithContent(
-        **ReportResponse.model_validate(report).model_dump(),
-        message_hidden=message.hidden_at is not None if message else True,
-    )
+    posts_by_id = {
+        post.id: post for post in db.query(ForumPost).filter(ForumPost.id.in_(post_ids)).all()
+    }
+    messages_by_id = {
+        message.id: message
+        for message in db.query(DirectMessage).filter(DirectMessage.id.in_(message_ids)).all()
+    }
+
+    items: list[ReportWithContent] = []
+    for report in reports:
+        base = ReportResponse.model_validate(report).model_dump()
+        if report.target_type == ReportTargetType.FORUM_POST:
+            post = posts_by_id.get(report.target_id)
+            if post is None:
+                items.append(ReportWithContent(**base))
+                continue
+            items.append(
+                ReportWithContent(
+                    **base,
+                    content_title=post.title,
+                    content_text=post.content,
+                    content_status=post.status,
+                    report_count=post.report_count,
+                )
+            )
+            continue
+
+        # DIRECT_MESSAGE. The live row can legitimately be gone (pruned, or
+        # purged with its sender's account) while the report itself
+        # survives — that is the whole reason
+        # report_service.decrypt_reported_message() reads from the
+        # report's own snapshot rather than here. A message this gone
+        # counts as hidden: there is nothing left to show either way.
+        message = messages_by_id.get(report.target_id)
+        items.append(
+            ReportWithContent(
+                **base,
+                message_hidden=message.hidden_at is not None if message else True,
+            )
+        )
+    return items
 
 
 @router.get("/reports", response_model=ReportListResponse)
@@ -104,7 +130,7 @@ def list_pending_reports(
     reports() for why that's exact, not a placeholder).
     """
     reports = report_service.get_pending_reports(db, current_user)
-    items = [_to_report_with_content(db, report) for report in reports]
+    items = _to_reports_with_content(db, reports)
 
     return ReportListResponse(items=items, total=len(items), pending_count=len(items))
 
@@ -125,7 +151,7 @@ def list_decided_reports(
     reports, total = report_service.get_decided_reports(db, current_user, page, page_size)
 
     return ReportHistoryResponse(
-        items=[_to_report_with_content(db, report) for report in reports],
+        items=_to_reports_with_content(db, reports),
         total=total,
         page=page,
         page_size=page_size,
@@ -181,7 +207,7 @@ def get_report(
     logs, not merely knowing it exists (which listing already allows).
     """
     report = report_service.get_report_for_moderator(db, report_id, current_user)
-    item = _to_report_with_content(db, report)
+    item = _to_reports_with_content(db, [report])[0]
 
     if report.target_type == ReportTargetType.DIRECT_MESSAGE:
         item.message_content = report_service.decrypt_reported_message(
