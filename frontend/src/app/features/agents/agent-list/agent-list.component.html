@@ -1,0 +1,54 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="agent-list">
+  <h1 class="agent-list__title">{{ 'agents.list.title' | transloco }}</h1>
+  <p class="agent-list__intro">{{ 'agents.list.intro' | transloco }}</p>
+
+  <!--
+    aria-busy on the region rather than on the page: a reader who arrives while
+    the catalog is still in flight is told it is loading instead of being told
+    the list is empty.
+  -->
+  <div class="agent-list__states" aria-live="polite" [attr.aria-busy]="isLoading()">
+    @if (isLoading()) {
+      <app-loading-spinner [message]="'common.loading' | transloco" />
+    } @else if (error().text; as text) {
+      <!-- The API's own `detail` is a finished sentence and is shown as it
+           came; our fallback is a key, so it follows a language switch. -->
+      <app-error-display [message]="text" />
+    } @else if (error().key; as key) {
+      <app-error-display [message]="key | transloco" />
+    } @else if (domains().length === 0) {
+      <p class="agent-list__empty">{{ 'agents.list.empty' | transloco }}</p>
+    }
+  </div>
+
+  @if (domains().length > 0) {
+    <ul class="agent-list__cards">
+      @for (domain of domains(); track domain.id) {
+        <li class="agent-card">
+          <!-- The agent's name and description are written by the association
+               and shown as they came, in either language. -->
+          <h2 class="agent-card__name">{{ domain.name }}</h2>
+          <p class="agent-card__field">
+            {{ 'agents.list.field_label' | transloco }}:
+            {{ domainLabels[domain.professional_domain] | transloco }}
+          </p>
+          <p class="agent-card__description">{{ domain.description }}</p>
+          <!--
+            The link names the agent it opens, not just "open": on a page of
+            identical links, a reader listing them by name gets nothing out of
+            "Open a conversation" five times over (WCAG 2.4.4).
+          -->
+          <a
+            class="agent-card__open"
+            [routerLink]="['/agents', domain.id, 'chat']"
+            [attr.aria-label]="('agents.list.open' | transloco) + ' – ' + domain.name"
+          >
+            {{ 'agents.list.open' | transloco }}
+          </a>
+        </li>
+      }
+    </ul>
+  }
+</div>

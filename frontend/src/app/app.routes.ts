@@ -6,7 +6,7 @@
  *
  * Route structure:
  *   Public:      /login, /register
- *   User:        /forum, /advice, /messages, /profile
+ *   User:        /forum, /advice, /agents, /messages, /profile
  *   Admin:       /admin/**
  *   Moderator:   /moderator/**
  *   Professional: /professional/**
@@ -109,6 +109,36 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/advice/my-questions/my-questions.component').then(
             (m) => m.MyQuestionsComponent,
+          ),
+      },
+    ],
+  },
+  {
+    // The AI agents (ABF-123), a sibling of `advice` rather than a child of
+    // it: SPEC §12 puts an agent *alongside* human advice, never inside it,
+    // and the chat screen's own referral button is the link between the two.
+    //
+    // authGuard only. The catalog endpoint answers 403 to every role but USER,
+    // so a roleGuard here would be a second copy of a rule the server already
+    // enforces — and one that would have to be edited again when the admin
+    // tooling widens it.
+    path: 'agents',
+    canActivate: [authGuard],
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/agents/agent-list/agent-list.component').then(
+            (m) => m.AgentListComponent,
+          ),
+      },
+      {
+        // :domainId is an agent_domains row id (uuid), bound straight to the
+        // component's `domainId` input by withComponentInputBinding.
+        path: ':domainId/chat',
+        loadComponent: () =>
+          import('./features/agents/agent-chat/agent-chat.component').then(
+            (m) => m.AgentChatComponent,
           ),
       },
     ],

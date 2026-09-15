@@ -10,6 +10,21 @@ import { AdviceError, NO_ERROR, adviceErrorFrom } from '../advice-error';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
+/**
+ * Query parameters this screen can be opened with.
+ *
+ * `professionalId` addresses one named advisor — the advice catalog's "ask
+ * this person" link. `domain` addresses a whole discipline, and is what the AI
+ * agent chat hands over when a member asks to be referred to a human
+ * (ABF-123): the agent knows which profession it covers and the member should
+ * not have to name it again. Anything else in the URL is ignored.
+ */
+const PROFESSIONAL_PARAM = 'professionalId';
+const DOMAIN_PARAM = 'domain';
+
+/** The disciplines the select actually offers, for checking a URL against. */
+const KNOWN_DOMAINS = new Set<string>(Object.values(ProfessionalDomain));
+
 @Component({
   selector: 'app-ask-question',
   standalone: true,
@@ -48,13 +63,33 @@ export class AskQuestionComponent implements OnInit {
     return this.form.get('content')?.value?.length ?? 0;
   }
 
+  /** True when the discipline was chosen for the member, not by them. */
+  cameWithDomain = false;
+
   ngOnInit(): void {
-    this.professionalId = this.route.snapshot.queryParamMap.get('professionalId');
-    if (!this.professionalId) {
-      const domainControl = this.form.controls.domain;
-      domainControl.addValidators(Validators.required);
-      domainControl.updateValueAndValidity();
+    const params = this.route.snapshot.queryParamMap;
+    this.professionalId = params.get(PROFESSIONAL_PARAM);
+    if (this.professionalId) {
+      return;
     }
+
+    const domainControl = this.form.controls.domain;
+    domainControl.addValidators(Validators.required);
+
+    // A discipline handed over in the URL is pre-selected rather than
+    // enforced: the select stays open, so a member who was referred by an
+    // agent about the wrong subject can correct it without going back.
+    //
+    // Checked against the enum before it is used. A URL is user input, and an
+    // unknown value set on the control would be a select with nothing chosen
+    // that the required validator nonetheless considers filled.
+    const domain = params.get(DOMAIN_PARAM);
+    if (domain !== null && KNOWN_DOMAINS.has(domain)) {
+      domainControl.setValue(domain as ProfessionalDomain);
+      this.cameWithDomain = true;
+    }
+
+    domainControl.updateValueAndValidity();
   }
 
   onSubmit(): void {

@@ -187,6 +187,7 @@
       "title": "Professional question",
       "hint_professional": "Your question will be sent to the professional you chose.",
       "hint_domain": "Choose a field — your question will be sent to every professional in it.",
+      "hint_domain_preselected": "Your question will be sent to the professionals in the field you came from. You can choose a different one.",
       "domain_label": "Field",
       "domain_placeholder": "Choose a field",
       "domain_error": "Please choose a field",
@@ -241,6 +242,40 @@
       "load_my_questions_failed": "Something went wrong loading your questions.",
       "load_pending_failed": "Something went wrong loading the pending questions.",
       "answer_failed": "Something went wrong sending the answer."
+    }
+  },
+  "agents": {
+    "list": {
+      "title": "AI agents",
+      "intro": "An AI agent answers general questions from a knowledge base the association maintains. For a personal question you can always reach a professional.",
+      "empty": "No agents are available to you right now.",
+      "open": "Open a conversation",
+      "field_label": "Field"
+    },
+    "chat": {
+      "back_to_list": "Back to AI agents",
+      "log_label": "The conversation with the agent",
+      "loading_conversation": "Loading the conversation...",
+      "empty": "You can ask the agent your first question.",
+      "thinking": "The agent is writing an answer...",
+      "speaker_me": "You:",
+      "speaker_agent": "The agent:",
+      "new_message_label": "Your question for the agent",
+      "placeholder": "What would you like to ask?",
+      "send": "Send",
+      "char_count": "{{count}} of {{max}} characters",
+      "limit_reached": "You have reached the maximum question length ({{max}} characters).",
+      "sources_title": "From the knowledge base:",
+      "source_link": "To the source",
+      "refer_title": "Need a binding answer?",
+      "refer_hint": "The agent gives general information. For a personal question you can reach a professional in this field.",
+      "refer_button": "Refer me to human advice"
+    },
+    "errors": {
+      "load_domains_failed": "Something went wrong loading the agents list. Please try again later.",
+      "domain_unavailable": "This agent is not available to you.",
+      "load_conversation_failed": "Something went wrong loading the previous conversation. You can start a new one.",
+      "send_failed": "Something went wrong sending your question to the agent. Please try again."
     }
   },
   "auth": {
@@ -377,6 +412,11 @@
       "subtitle": "Reach out to a professional",
       "body": "Personal, professional advice on whatever is on your mind."
     },
+    "agents": {
+      "title": "AI agents",
+      "subtitle": "General information, right away",
+      "body": "Ask an AI agent about rights and procedures, from a knowledge base the association maintains."
+    },
     "admin": {
       "title": "Administration",
       "subtitle": "Admin dashboard",
@@ -498,6 +538,9 @@
     "confirm_dialog": {
       "title": "Are you sure?",
       "confirm": "Confirm"
+    },
+    "disclaimer": {
+      "agent": "This information is general only and is not binding professional advice."
     },
     "suspend_dialog": {
       "title": "Suspend user",

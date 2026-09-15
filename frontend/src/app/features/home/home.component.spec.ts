@@ -64,6 +64,13 @@ describe('HomeComponent', () => {
     return clone.textContent ?? '';
   }
 
+  /** The home card that opens the AI agent catalog, if this role has one. */
+  function agentsLink(): HTMLAnchorElement | null {
+    return (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      'a[href="/agents"]',
+    );
+  }
+
   function switchToEnglish(): void {
     TestBed.inject(TranslocoService).setActiveLang('en');
     fixture.detectChanges();
@@ -89,6 +96,43 @@ describe('HomeComponent', () => {
       expect(text()).toContain('ייעוץ');
       expect(text()).toContain('קבלת ייעוץ אישי ומקצועי בנושאים שמעסיקים אתכם.');
     });
+
+    /**
+     * The cards on this page are the only way into a feature — `header.component`
+     * carries no navigation links — so the agent catalog is unreachable without
+     * this one. ABF-123's acceptance criterion is exactly that.
+     */
+    it('sees the AI agents card, and it leads to the catalog', () => {
+      setup(UserRole.USER);
+
+      const link = agentsLink();
+      expect(link).toBeTruthy();
+      expect(link!.getAttribute('href')).toBe('/agents');
+      expect(link!.textContent).toContain('סוכני AI');
+      expect(link!.textContent).toContain('מידע כללי, מיד');
+      expect(link!.textContent).toContain('שאלה לסוכן AI על זכויות ונהלים');
+    });
+
+    it('sees the same AI agents card in English', () => {
+      setup(UserRole.USER);
+
+      switchToEnglish();
+
+      const link = agentsLink()!;
+      expect(link.textContent).toContain('AI agents');
+      expect(link.textContent).toContain('General information, right away');
+      expect(link.textContent).not.toMatch(HEBREW);
+    });
+
+    /** The card belongs to members. No other role is offered an agent. */
+    it.each([UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROFESSIONAL])(
+      'does not show it to a %s',
+      (role) => {
+        setup(role);
+
+        expect(agentsLink()).toBeNull();
+      },
+    );
 
     /**
      * The greeting is the one interpolated string on this page: the name is a
