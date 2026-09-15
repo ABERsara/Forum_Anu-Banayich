@@ -285,6 +285,19 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "ניתן לסמן לייק רק לשאלה שנענתה.",
         ENGLISH: "Only a question that has been answered can be liked.",
     },
+    # -- AI agents --------------------------------------------------------
+    "agents.domain_not_found": {
+        HEBREW: "תחום הסוכן המבוקש לא נמצא.",
+        ENGLISH: "The requested agent domain was not found.",
+    },
+    "agents.knowledge_manage_forbidden": {
+        HEBREW: "אין לך הרשאה לנהל את בסיס הידע של תחום זה.",
+        ENGLISH: "You do not have permission to manage this domain's knowledge base.",
+    },
+    "agents.knowledge_entry_not_found": {
+        HEBREW: "פריט הידע המבוקש לא נמצא בתחום זה.",
+        ENGLISH: "The requested knowledge entry was not found in this domain.",
+    },
     # -- Cross-cutting ----------------------------------------------------
     "errors.unauthenticated": {
         HEBREW: "לא ניתן לאמת את הזהות. יש להתחבר מחדש.",
