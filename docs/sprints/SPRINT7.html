@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ספרינט 7 — ספרינט הסיום | אנו בניך</title>
+<style>
+  /* ── palette: navy + gold (אנו בניך brand) ── */
+  :root {
+    --navy-dk:  #1a2f4a;
+    --navy:     #2b4c7e;
+    --navy-lt:  #e8f0fb;
+    --navy-xlt: #f0f5ff;
+    --gold-dk:  #7c5a00;
+    --gold:     #b8860b;
+    --gold-lt:  #f5e6b2;
+    --gold-xlt: #fdf8ec;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f0; color: #222; direction: rtl; font-size: 15px; line-height: 1.7; }
+
+  .cover { background: linear-gradient(135deg, #0f1f35 0%, #1a2f4a 55%, #2b4c7e 100%); color: white; padding: 70px 40px; text-align: center; }
+  .cover h1 { font-size: 38px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1px; }
+  .cover .sprint-title { font-size: 22px; opacity: 0.85; margin-bottom: 8px; background: rgba(255,255,255,0.12); border-radius: 10px; display: inline-block; padding: 6px 24px; }
+  .cover .subtitle { font-size: 17px; opacity: 0.75; margin-bottom: 28px; }
+  .cover .meta { display: inline-flex; gap: 24px; flex-wrap: wrap; justify-content: center; background: rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 28px; }
+  .cover .meta span { font-size: 13px; opacity: 0.85; }
+  .cover .meta strong { opacity: 1; }
+
+  .goal-banner { background: linear-gradient(90deg, #1a2f4a, #2b4c7e); color: white; padding: 24px 40px; text-align: center; font-size: 17px; line-height: 1.6; }
+  .goal-banner strong { font-size: 19px; display: block; margin-bottom: 6px; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
+
+  .toc { background: white; border-radius: 16px; padding: 28px 32px; box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 40px; }
+  .toc h2 { font-size: 18px; color: var(--navy); margin-bottom: 16px; border-bottom: 2px solid #e8e8e8; padding-bottom: 10px; }
+  .toc ol { padding-right: 20px; columns: 2; column-gap: 32px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: var(--navy); text-decoration: none; font-size: 14px; }
+  .toc a:hover { text-decoration: underline; }
+
+  .section { background: white; border-radius: 16px; padding: 32px 36px; box-shadow: 0 2px 16px rgba(0,0,0,0.07); margin-bottom: 28px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 14px; border-bottom: 3px solid #f0f0f0; }
+  .section-number { background: var(--navy); color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .section-number.gold   { background: var(--gold); }
+  .section-number.blue   { background: #1d4ed8; }
+  .section-number.red    { background: #dc2626; }
+  .section-number.purple { background: #7c3aed; }
+  .section-number.teal   { background: #0d9488; }
+  .section h2 { font-size: 22px; color: var(--navy); }
+  .section h3 { font-size: 17px; color: var(--navy-dk); margin: 22px 0 10px; padding-right: 12px; border-right: 4px solid var(--gold); }
+  .section h4 { font-size: 15px; color: #444; margin: 16px 0 8px; font-weight: 600; }
+  .section p  { margin-bottom: 12px; color: #333; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th { background: var(--navy); color: white; padding: 10px 14px; text-align: right; font-weight: 600; }
+  td { padding: 9px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) { background: var(--navy-xlt); }
+  tr:hover { background: var(--navy-lt); }
+
+  code { background: var(--navy-xlt); color: var(--navy); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'Courier New', monospace; }
+
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin: 2px; }
+  .badge-green  { background: var(--gold-lt); color: var(--gold-dk); }
+  .badge-red    { background: #fee2e2; color: #991b1b; }
+  .badge-blue   { background: #dbeafe; color: #1e40af; }
+  .badge-orange { background: #fef3c7; color: #92400e; }
+  .badge-purple { background: #ede9fe; color: #4c1d95; }
+  .badge-grey   { background: #e9ecef; color: #495057; }
+  .badge-teal   { background: var(--navy-lt); color: var(--navy-dk); }
+
+  .callout { border-radius: 10px; padding: 16px 20px; margin: 14px 0; border-right: 5px solid; font-size: 14px; }
+  .callout-green  { background: var(--gold-xlt); border-color: var(--gold); color: var(--gold-dk); }
+  .callout-blue   { background: var(--navy-xlt); border-color: var(--navy); color: var(--navy-dk); }
+  .callout-orange { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+  .callout-red    { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+  .callout-purple { background: #faf5ff; border-color: #a855f7; color: #581c87; }
+  .callout-teal   { background: var(--navy-xlt); border-color: var(--navy); color: var(--navy-dk); }
+
+  .task-card { border-radius: 12px; border: 2px solid var(--navy-lt); margin-bottom: 28px; overflow: hidden; }
+  .task-card-header { padding: 16px 22px; display: flex; align-items: center; gap: 12px; }
+  .task-card-header.color-green  { background: var(--gold-xlt); border-bottom: 2px solid var(--gold-lt); }
+  .task-card-header.color-blue   { background: #dbeafe; border-bottom: 2px solid #bfdbfe; }
+  .task-card-header.color-red    { background: #fee2e2; border-bottom: 2px solid #fecaca; }
+  .task-card-header.color-orange { background: #ffedd5; border-bottom: 2px solid #fed7aa; }
+  .task-card-header.color-purple { background: #ede9fe; border-bottom: 2px solid #ddd6fe; }
+  .task-card-header.color-teal   { background: var(--navy-lt); border-bottom: 2px solid #bfdbfe; }
+  .task-card-header.color-grey   { background: #f1f5f9; border-bottom: 2px solid #e2e8f0; }
+  .task-card-body { padding: 20px 22px; }
+  .task-jira { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 6px; background: rgba(0,0,0,0.08); }
+  .task-title { font-size: 18px; font-weight: 700; flex: 1; }
+  .task-effort { font-size: 13px; opacity: 0.75; }
+
+  .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  .before-card { background: #fff5f5; border: 2px solid #fecaca; border-radius: 10px; padding: 18px 20px; }
+  .after-card  { background: var(--navy-xlt); border: 2px solid var(--navy-lt); border-radius: 10px; padding: 18px 20px; }
+  .before-card h4 { color: #991b1b; margin-bottom: 10px; }
+  .after-card h4  { color: var(--navy-dk); margin-bottom: 10px; }
+  .before-card ul, .after-card ul { padding-right: 18px; font-size: 14px; }
+  .before-card li, .after-card li { margin-bottom: 6px; }
+
+  .checklist { list-style: none; padding: 0; margin: 10px 0; }
+  .checklist li { padding: 6px 0 6px 28px; border-bottom: 1px solid #f0f0f0; font-size: 14px; position: relative; }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before { content: '☐'; position: absolute; left: 4px; color: var(--gold); font-size: 16px; }
+
+  .dep-graph { background: var(--navy-xlt); border-radius: 12px; padding: 28px 20px; margin: 14px 0; direction: ltr; text-align: center; }
+  .dep-node { background: white; border: 2px solid var(--navy); border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 600; color: var(--navy-dk); display: inline-block; min-width: 150px; text-align: center; margin: 4px; }
+  .dep-node small { display: block; font-size: 11px; font-weight: 400; opacity: 0.75; margin-top: 2px; }
+  .dep-node.independent { border-color: #6b7280; color: #374151; background: #f9fafb; }
+  .dep-node.review { border-color: var(--gold); color: var(--gold-dk); background: var(--gold-xlt); }
+  .dep-row { display: flex; justify-content: center; align-items: flex-start; gap: 12px; margin: 4px 0; }
+  .dep-arrow { color: var(--navy); font-size: 20px; font-weight: 700; display: block; text-align: center; }
+  .dep-col { display: flex; flex-direction: column; align-items: center; }
+
+  .backlog-card { border: 2px solid var(--gold-lt); border-radius: 12px; padding: 20px 22px; background: var(--gold-xlt); margin-bottom: 16px; }
+  .backlog-card h4 { color: var(--gold-dk); font-size: 15px; margin-bottom: 8px; }
+  .backlog-card p { font-size: 14px; color: #555; margin: 0; }
+  .backlog-card .effort { font-size: 12px; color: var(--gold-dk); font-weight: 600; margin-top: 8px; }
+
+  .dod-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .dod-item { background: var(--navy-xlt); border: 1px solid var(--navy-lt); border-radius: 8px; padding: 12px 16px; font-size: 14px; color: var(--navy-dk); display: flex; gap: 10px; align-items: flex-start; }
+  .dod-check { color: var(--gold); font-weight: 700; flex-shrink: 0; }
+
+  .app-screens { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+  .app-frame { width: 300px; background: #f9fafb; border-radius: 20px; box-shadow: 0 8px 32px rgba(27,47,74,0.13), 0 2px 8px rgba(0,0,0,0.07); overflow: hidden; border: 1px solid #e5e7eb; direction: rtl; }
+  .app-topbar-row { background: var(--navy-dk); color: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .app-topbar-logo { font-weight: 700; font-size: 14px; }
+  .app-topbar-user { font-size: 12px; opacity: 0.9; }
+  .app-topbar-logout { background: rgba(255,255,255,0.2); border-radius: 6px; padding: 3px 9px; font-size: 11px; }
+  .app-body { padding: 16px 14px; }
+  .app-page-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 12px; }
+  .app-label { font-size: 11px; font-weight: 600; color: #6b7280; margin-bottom: 4px; display: block; }
+  .app-field { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 7px 10px; font-size: 12px; color: #9ca3af; margin-bottom: 8px; }
+  .app-btn { border-radius: 7px; padding: 7px 12px; text-align: center; font-weight: 700; font-size: 12px; margin: 4px 0; }
+  .app-btn-primary { background: var(--navy); color: white; }
+  .app-btn-outline { background: white; border: 1.5px solid #e5e7eb; color: #374151; }
+  .app-btn-danger  { background: #dc2626; color: white; }
+  .app-btn-success { background: var(--navy-dk); color: white; }
+  .app-btn-row { display: flex; gap: 6px; margin-top: 6px; }
+  .app-btn-row .app-btn { flex: 1; }
+  .app-note { background: var(--navy-xlt); color: var(--navy); border-radius: 8px; padding: 7px 10px; font-size: 11px; margin-top: 6px; text-align: center; }
+  .app-caption { font-size: 12px; color: #6b7280; text-align: center; padding: 10px; background: white; border-top: 1px solid #e5e7eb; font-style: italic; }
+  .app-row { background: white; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 11px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+  .app-row-title { font-size: 12px; font-weight: 700; color: #111827; }
+  .app-row-meta  { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  .app-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; }
+  .app-badge-dm  { background: #ede9fe; color: #5b21b6; }
+  .app-badge-meet { background: var(--gold-lt); color: var(--gold-dk); }
+  .app-filter-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .app-filter { background: white; border: 1.5px solid var(--navy-lt); border-radius: 6px; padding: 5px 9px; font-size: 11px; color: var(--navy); font-weight: 600; }
+  .app-meet-card { background: var(--gold-xlt); border: 2px solid var(--gold-lt); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+  .app-meet-title { font-size: 13px; font-weight: 700; color: var(--gold-dk); margin-bottom: 4px; }
+  .app-meet-meta  { font-size: 11px; color: #6b7280; }
+
+  @media (max-width: 700px) {
+    .before-after, .dod-grid { grid-template-columns: 1fr; }
+    .toc ol { columns: 1; }
+    .cover { padding: 40px 20px; }
+    .section { padding: 22px 18px; }
+    .app-screens { flex-direction: column; align-items: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="sprint-title">ספרינט 7 — הסיום</div>
+  <h1>יומן פעולות · הפרה אוטומטית · מבקרים · Google Meet</h1>
+  <p class="subtitle">אנו בניך — ספרינט סיום | פרקטיקום סניף</p>
+  <div class="meta">
+    <span><strong>שבועות</strong> 13–14</span>
+    <span><strong>צוות</strong> 3 מפתחות</span>
+    <span><strong>ספרינט</strong> אחרון</span>
+    <span><strong>Jira</strong> ABF-151–156 + חדש</span>
+  </div>
+</div>
+
+<!-- GOAL -->
+<div class="goal-banner">
+  <strong>מטרת הספרינט</strong>
+  לסגור חמישה תחומים פתוחים ולהביא את הפלטפורמה למצב תפעולי מלא לדמו ללקוח — יומן פעולות (דרישה חוקית), הגנה אוטומטית (מנגנון בטיחות), דיווחי DM ופרטי דיווח (השלמת פיצ'רים שנשלחו), וGoogle Meet (בקשה חדשה).
+</div>
+
+<div class="container">
+
+<!-- TOC -->
+<div class="toc">
+  <h2>תוכן עניינים</h2>
+  <ol>
+    <li><a href="#s-before-after">לפני ואחרי — מה משתנה</a></li>
+    <li><a href="#s-deps">מפת תלויות</a></li>
+    <li><a href="#s-abf152">ABF-152 — יומן: תצוגה + סינון</a></li>
+    <li><a href="#s-abf153">ABF-153 — יומן: פריט בודד</a></li>
+    <li><a href="#s-csv">CSV — ייצוא יומן</a></li>
+    <li><a href="#s-abf154">ABF-154 — הפרה אוטומטית</a></li>
+    <li><a href="#s-abf113">ABF-113 — דיווחי DM בממשק מבקר</a></li>
+    <li><a href="#s-abf155">ABF-155 — ניווט מבקר + דף פרטי</a></li>
+    <li><a href="#s-abf156">ABF-156 — Google Meet</a></li>
+    <li><a href="#s-backlog">בקלוג — מוכן לקיבולת</a></li>
+    <li><a href="#s-mockup">מוקאפ — האפליקציה בסוף הספרינט</a></li>
+    <li><a href="#s-dod">Definition of Done</a></li>
+  </ol>
+</div>
+
+<!-- SECTION 1 — BEFORE/AFTER -->
+<div class="section" id="s-before-after">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2>לפני ואחרי — מה משתנה</h2>
+  </div>
+
+  <h3>Backend</h3>
+  <table>
+    <tr><th>קובץ / מרכיב</th><th>לפני ספרינט 7</th><th>אחרי ספרינט 7</th><th>משימה</th></tr>
+    <tr>
+      <td><code>admin.py → get_audit_log()</code></td>
+      <td><span class="badge badge-red">מחזיר [] — TODO</span></td>
+      <td>נתונים אמיתיים + פילטרים + עימוד</td>
+      <td>ABF-152</td>
+    </tr>
+    <tr>
+      <td><code>audit_service.get_audit_log()</code></td>
+      <td><span class="badge badge-orange">חתימה חלקית בלבד</span></td>
+      <td>כל פרמטרי הקונטרקט + count query</td>
+      <td>ABF-152</td>
+    </tr>
+    <tr>
+      <td><code>GET /admin/audit-log/{id}</code></td>
+      <td><span class="badge badge-red">לא קיים</span></td>
+      <td>endpoint חדש — Admin בלבד</td>
+      <td>ABF-153</td>
+    </tr>
+    <tr>
+      <td><code>GET /admin/audit-log/export</code></td>
+      <td><span class="badge badge-red">לא קיים</span></td>
+      <td>StreamingResponse CSV — UTF-8 BOM</td>
+      <td>חדש</td>
+    </tr>
+    <tr>
+      <td><code>_check_auto_suspension()</code></td>
+      <td><span class="badge badge-red">stub ריק — pass</span></td>
+      <td>כלל 1: 3 דיווחים תקפים ב-7 ימים → השעיה 48 שעות</td>
+      <td>ABF-154</td>
+    </tr>
+    <tr>
+      <td><code>_check_frequent_false_reporter()</code></td>
+      <td><span class="badge badge-red">stub ריק — pass</span></td>
+      <td>כלל 2: 5 דיווחי שווא ב-30 יום → is_report_restricted</td>
+      <td>ABF-154</td>
+    </tr>
+    <tr>
+      <td><code>User.is_report_restricted</code></td>
+      <td><span class="badge badge-red">עמודה לא קיימת</span></td>
+      <td>Mapped[bool] + Alembic migration</td>
+      <td>ABF-154</td>
+    </tr>
+    <tr>
+      <td><code>_to_report_with_content()</code></td>
+      <td><span class="badge badge-orange">מחבר ForumPost בלבד</span></td>
+      <td>מפענח DM snapshot גם + audit log בכל צפייה</td>
+      <td>ABF-113</td>
+    </tr>
+    <tr>
+      <td><code>google_meet_service.py</code></td>
+      <td><span class="badge badge-red">לא קיים</span></td>
+      <td>Calendar API OAuth + create_meeting()</td>
+      <td>ABF-156</td>
+    </tr>
+    <tr>
+      <td><code>meetings.py endpoints</code></td>
+      <td><span class="badge badge-red">לא קיים</span></td>
+      <td>POST + GET /api/meetings</td>
+      <td>ABF-156</td>
+    </tr>
+    <tr>
+      <td><code>Meeting model</code></td>
+      <td><span class="badge badge-red">לא קיים</span></td>
+      <td>טבלה חדשה + migration</td>
+      <td>ABF-156</td>
+    </tr>
+  </table>
+
+  <h3>Frontend</h3>
+  <table>
+    <tr><th>קובץ / מרכיב</th><th>לפני</th><th>אחרי</th><th>משימה</th></tr>
+    <tr>
+      <td><code>audit-log.component.ts</code></td>
+      <td><span class="badge badge-red">TODO stub</span></td>
+      <td>טבלה אמיתית + פילטרים + עימוד + ייצוא CSV</td>
+      <td>ABF-152 + חדש</td>
+    </tr>
+    <tr>
+      <td><code>header.component.html</code></td>
+      <td><span class="badge badge-red">אין קישור ניווט למבקר</span></td>
+      <td>קישור "דיווחים" למבקר ומנהל</td>
+      <td>ABF-155</td>
+    </tr>
+    <tr>
+      <td><code>/moderator/reports/:id</code></td>
+      <td><span class="badge badge-red">route חסר</span></td>
+      <td>component חדש + route מוגן</td>
+      <td>ABF-155</td>
+    </tr>
+    <tr>
+      <td><code>reports.component.ts</code></td>
+      <td><span class="badge badge-orange">פורום בלבד</span></td>
+      <td>מזהה DM + מציג הודעה פרטית</td>
+      <td>ABF-113</td>
+    </tr>
+    <tr>
+      <td><code>meeting.service.ts</code></td>
+      <td><span class="badge badge-red">לא קיים</span></td>
+      <td>createMeeting + getUpcomingMeetings</td>
+      <td>ABF-156</td>
+    </tr>
+    <tr>
+      <td>הכרזת פגישה בפורום</td>
+      <td><span class="badge badge-red">לא קיים</span></td>
+      <td>כרטיס MEETING עם כפתור "הצטרפות"</td>
+      <td>ABF-156</td>
+    </tr>
+  </table>
+</div>
+
+<!-- SECTION 2 — DEPENDENCY MAP -->
+<div class="section" id="s-deps">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <h2>מפת תלויות — סדר עבודה</h2>
+  </div>
+
+  <div class="dep-graph">
+    <div class="dep-row">
+      <div class="dep-col">
+        <div class="dep-node">ABF-152<small>Audit List</small></div>
+        <span class="dep-arrow">↑</span>
+        <div class="dep-col" style="flex-direction:row; gap:8px;">
+          <div class="dep-node" style="min-width:120px;">ABF-153<small>Audit Detail</small></div>
+          <div class="dep-node" style="min-width:120px;">CSV Export<small>שיתוף קונטרקט</small></div>
+        </div>
+      </div>
+      <div class="dep-col">
+        <div class="dep-node" style="border-color:#7c3aed; color:#5b21b6; background:#faf5ff;">ABF-156 שלב A<small>Backend</small></div>
+        <span class="dep-arrow" style="color:#7c3aed;">↑</span>
+        <div class="dep-node" style="border-color:#7c3aed; color:#5b21b6; background:#faf5ff;">ABF-156 שלב B<small>Frontend</small></div>
+      </div>
+    </div>
+    <div style="margin-top:16px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+      <div class="dep-node independent">ABF-154<small>Auto-violation</small></div>
+      <div class="dep-node review">ABF-113<small>DM Reports — In Review</small></div>
+      <div class="dep-node independent">ABF-155<small>Moderator Nav</small></div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>משימה</th><th>Jira</th><th>אומדן</th><th>תלויה ב</th><th>הערה</th></tr>
+    <tr>
+      <td>Audit Log — תצוגה + סינון + עימוד</td>
+      <td>ABF-152</td>
+      <td><span class="badge badge-orange">~2.5 ימים</span></td>
+      <td>—</td>
+      <td>הקונטרקט חייב להיות קפוא לפני כתיבת קוד</td>
+    </tr>
+    <tr>
+      <td>Audit Log — פריט בודד</td>
+      <td>ABF-153</td>
+      <td><span class="badge badge-green">~0.5 ימים</span></td>
+      <td>ABF-152</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Audit Log — ייצוא CSV</td>
+      <td>חדש</td>
+      <td><span class="badge badge-green">~0.5 ימים</span></td>
+      <td>קונטרקט ABF-152 קפוא</td>
+      <td>לא דורש מיזוג, רק קונטרקט מוסכם</td>
+    </tr>
+    <tr>
+      <td>הפרה אוטומטית</td>
+      <td>ABF-154</td>
+      <td><span class="badge badge-orange">~1.5 ימים</span></td>
+      <td>—</td>
+      <td>ABF-154 ו-ABF-113 שניהם נוגעים ב-report_service — לתאם</td>
+    </tr>
+    <tr>
+      <td>דיווחי DM בממשק מבקר</td>
+      <td>ABF-113</td>
+      <td><span class="badge badge-teal">~0 — In Review</span></td>
+      <td>—</td>
+      <td>ממתין למיזוג</td>
+    </tr>
+    <tr>
+      <td>ניווט מבקר + דף פרטי דיווח</td>
+      <td>ABF-155</td>
+      <td><span class="badge badge-green">~1 יום</span></td>
+      <td>—</td>
+      <td>עצמאית לחלוטין</td>
+    </tr>
+    <tr>
+      <td>Google Meet — שלב A (Backend)</td>
+      <td>ABF-156</td>
+      <td><span class="badge badge-red">~3 ימים</span></td>
+      <td>—</td>
+      <td>חייב למזג לפני שלב B</td>
+    </tr>
+    <tr>
+      <td>Google Meet — שלב B (Frontend)</td>
+      <td>ABF-156</td>
+      <td><span class="badge badge-red">~2 ימים</span></td>
+      <td>ABF-156 שלב A מוזג</td>
+      <td>—</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ABF-152 -->
+<div class="section" id="s-abf152">
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <h2>ABF-152 — יומן פעולות: תצוגה, סינון ועימוד</h2>
+  </div>
+  <div class="task-card">
+    <div class="task-card-header color-green">
+      <span class="task-jira">ABF-152</span>
+      <span class="task-title">Audit Log — תצוגה + סינון + עימוד</span>
+      <span class="task-effort">~2.5 ימים</span>
+    </div>
+    <div class="task-card-body">
+      <div class="callout callout-orange">
+        <strong>לפני כתיבת שורת קוד:</strong> לוודא שקיים <code>audit_service.get_audit_log()</code> — אם קיים, להרחיב את החתימה. אם לא, ליצור. הקונטרקט מתפרסם לצוות לפני שמישהי מתחילה לקודד.
+      </div>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li><code>GET /admin/audit-log</code> מחזיר <code>[]</code> עם TODO comment</li>
+            <li><code>AuditLogComponent</code> מציג <code>&lt;p&gt;TODO&lt;/p&gt;</code> בלבד</li>
+            <li><code>audit_service.get_audit_log()</code> — חתימה חלקית בלבד</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>טבלה אמיתית: מי / מה / מתי / ישות</li>
+            <li>פאנל סינון, עמודות ניתנות למיון, עימוד</li>
+            <li>DB-level LIMIT/OFFSET — ללא full-table fetch</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout callout-teal">
+        <strong>החלטה מתועדת — IP:</strong> IP מאוחסן מוצפן ב-DB כנדרש, אך לעולם לא מוצג ב-UI. הסיבה: מידע אישי תחת GDPR; יומן הפעולות ממלא את ייעודו המלא דרך actor_id + action_type + timestamp בלבד.
+      </div>
+
+      <h4>קונטרקט API (קפוא — לא לשנות)</h4>
+      <table>
+        <tr><th>פרמטר</th><th>סוג</th><th>תיאור</th></tr>
+        <tr><td><code>actor_id</code></td><td>optional</td><td>סינון לפי מבצע הפעולה</td></tr>
+        <tr><td><code>action_type</code></td><td>optional</td><td>סוג הפעולה</td></tr>
+        <tr><td><code>entity_type</code></td><td>optional</td><td>סוג הישות</td></tr>
+        <tr><td><code>date_from / date_to</code></td><td>optional</td><td>טווח תאריכים</td></tr>
+        <tr><td><code>sort / direction</code></td><td>default: timestamp / desc</td><td>מיון</td></tr>
+        <tr><td><code>page / page_size</code></td><td>required</td><td>עימוד</td></tr>
+      </table>
+      <p style="font-size:13px; color:#555;">תגובה: <code>{ items: [...], total_count, page, page_size }</code></p>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>User / Moderator / Professional → 403 ברמת ה-API</li>
+        <li>Admin → 200 עם נתונים אמיתיים מה-DB</li>
+        <li>כל שילוב פילטרים מחזיר את החיתוך הנכון</li>
+        <li>עמוד 1 ≠ עמוד 2; total_count מדויק</li>
+        <li>שאילתת ה-DB מוגבלת — אין full-table fetch</li>
+        <li>תוצאה ריקה → הודעה ברורה על המסך</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-153 -->
+<div class="section" id="s-abf153">
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <h2>ABF-153 — יומן פעולות: פריט בודד</h2>
+  </div>
+  <div class="task-card">
+    <div class="task-card-header color-teal">
+      <span class="task-jira">ABF-153</span>
+      <span class="task-title">Audit Log — drill-down לפריט בודד</span>
+      <span class="task-effort">~0.5 ימים | תלויה ב-ABF-152</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li><code>GET /admin/audit-log/{id}</code> — לא קיים</li>
+            <li>אין אפשרות לראות שדה <code>details</code> בפירוט</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>לחיצה על שורה פותחת modal עם הרשומה המלאה</li>
+            <li>שדה <code>details</code> מוצג כ-JSON קריא, לא מחרוזת</li>
+          </ul>
+        </div>
+      </div>
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>לחיצה על שורה → modal עם הרשומה המלאה</li>
+        <li><code>details</code> קריא — לא escaped string</li>
+        <li>סגירה חוזרת לאותו פילטר ועמוד</li>
+        <li>GET ישיר לכתובת ה-API ע"י non-Admin → 403</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- CSV -->
+<div class="section" id="s-csv">
+  <div class="section-header">
+    <div class="section-number gold">5</div>
+    <h2>חדש — יומן פעולות: ייצוא CSV</h2>
+  </div>
+  <div class="task-card">
+    <div class="task-card-header color-orange">
+      <span class="task-jira">חדש</span>
+      <span class="task-title">Audit Log CSV Export</span>
+      <span class="task-effort">~0.5 ימים | תלויה בקונטרקט ABF-152</span>
+    </div>
+    <div class="task-card-body">
+      <div class="callout callout-blue">
+        <strong>פורמט: CSV בלבד.</strong> הקהל הוא מנהלים לא-טכניים שמשתמשים ב-Excel לצרכי ציות ועורכי דין. JSON יכול להתווסף בטיקט עתידי אם יעלה צורך טכני.
+      </div>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>אין אפשרות לייצוא</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>כפתור "ייצוא CSV" — מעביר את הפילטרים הפעילים</li>
+            <li>StreamingResponse עם UTF-8 BOM לתמיכה ב-Excel</li>
+            <li>ללא IP בייצוא</li>
+          </ul>
+        </div>
+      </div>
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>Non-Admin → 403</li>
+        <li>שורות הקובץ תואמות בדיוק לתצוגה הסוננת</li>
+        <li>הקובץ נפתח ב-Excel ללא בעיות encoding עם עברית</li>
+        <li>אין full-table fetch — שאילתת ה-DB מוגבלת לשורות המתאימות</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-154 -->
+<div class="section" id="s-abf154">
+  <div class="section-header">
+    <div class="section-number red">6</div>
+    <h2>ABF-154 — כללי הפרה אוטומטית</h2>
+  </div>
+  <div class="task-card">
+    <div class="task-card-header color-red">
+      <span class="task-jira">ABF-154</span>
+      <span class="task-title">Auto-violation Rules — 2 כללים אוטומטיים</span>
+      <span class="task-effort">~1.5 ימים</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li><code>_check_auto_suspension()</code> — stub ריק (pass)</li>
+            <li><code>_check_frequent_false_reporter()</code> — stub ריק</li>
+            <li>שתיהן לא נקראות בשום מקום</li>
+            <li>עמודת <code>is_report_restricted</code> — לא קיימת</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>כלל 1: 3+ דיווחים תקפים ב-7 ימים → השעיה 48 שעות</li>
+            <li>כלל 2: 5+ דיווחי שווא ב-30 יום → is_report_restricted</li>
+            <li>שתי הפונקציות מחוברות ל-<code>decide_report()</code></li>
+            <li>דיווח ע"י משתמש מוגבל → 403</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout callout-orange">
+        <strong>שימו לב:</strong> ABF-154 ו-ABF-113 שתיהן נוגעות ב-<code>report_service.py</code>. מי שלוקחת את ABF-113 צריכה לעשות rebase על ABF-154 אחרי מיזוגה, או לתאם מראש.
+      </div>
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>2 דיווחים תקפים ב-7 ימים — כלום לא קורה</li>
+        <li>3 דיווחים תקפים ב-7 ימים — המשתמש מושעה 48 שעות</li>
+        <li>משתמש מושעה כבר — אין השעיה כפולה</li>
+        <li>4 דיווחי שווא ב-30 יום — כלום לא קורה</li>
+        <li>5 דיווחי שווא ב-30 יום — is_report_restricted = True</li>
+        <li>משתמש מוגבל שמנסה לדווח → 403</li>
+        <li>כל ההתנהגות מכוסה בטסטים עם fixtures לשליטה בזמן</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-113 -->
+<div class="section" id="s-abf113">
+  <div class="section-header">
+    <div class="section-number blue">7</div>
+    <h2>ABF-113 — דיווחי DM בממשק המבקר</h2>
+  </div>
+  <div class="task-card">
+    <div class="task-card-header color-blue">
+      <span class="task-jira">ABF-113 — In Review</span>
+      <span class="task-title">DM Reports — מבקר רואה ומחליט על הודעות פרטיות</span>
+      <span class="task-effort">~0 — ממתין למיזוג</span>
+    </div>
+    <div class="task-card-body">
+      <div class="callout callout-blue">
+        <strong>הטיקט In Review — </strong> ABF-112 (ספרינט 5) בנה את צד המשתמש: כפתור דיווח, הסכמה, צילום מוצפן. ABF-113 הוא הצד של המבקר — היה מחוץ ל-scope בכוונה ונכנס עכשיו.
+      </div>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li><code>_to_report_with_content()</code> — מחבר ForumPost בלבד</li>
+            <li>מבקר לא יכול לראות תוכן הודעה פרטית שדווחה</li>
+            <li>ממשק הדיווחים לא מבחין בין DM לפוסט</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>מבקר רואה את ההודעה המדווחת — הצילום המוצפן בלבד</li>
+            <li>אין גישה לשיחה המלאה — by design</li>
+            <li>כל צפייה נרשמת ב-audit log</li>
+          </ul>
+        </div>
+      </div>
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>דיווח DM מופיע ברשימה עם תווית "הודעה פרטית"</li>
+        <li>מבקר רואה רק ההודעה המדווחת — לא שיחה, לא metadata של שיחה</li>
+        <li>מבקר מחוץ לתא של הדיווח לא יכול לגשת אליו</li>
+        <li>כל צפייה בתוכן מוצפן נרשמת ב-audit log</li>
+        <li>אין רגרסיה בטיפול בדיווחי פוסט בפורום</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-155 -->
+<div class="section" id="s-abf155">
+  <div class="section-header">
+    <div class="section-number">8</div>
+    <h2>ABF-155 — ניווט מבקר + דף פרטי דיווח</h2>
+  </div>
+  <div class="task-card">
+    <div class="task-card-header color-grey">
+      <span class="task-jira">ABF-155</span>
+      <span class="task-title">Moderator Navigation + Report Detail Page</span>
+      <span class="task-effort">~1 יום | עצמאית</span>
+    </div>
+    <div class="task-card-body">
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>אין קישור ניווט בheader למבקר</li>
+            <li>route <code>/moderator/reports/:id</code> לא קיים בפרונט</li>
+            <li>ה-backend endpoint קיים ועובד</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>מבקר ומנהל רואים "דיווחים" ב-header</li>
+            <li>לחיצה על דיווח ברשימה → דף פרטי מלא</li>
+            <li>route מוגן ב-roleGuard</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout callout-green">
+        <strong>שים לב:</strong> אין קישור admin קיים ב-header שניתן להשתמש בו כתבנית — זה הקישור הראשון מוגבל-תפקיד ב-header. יש לעקוב אחרי דפוס הקישור הקיים למשתמש רגיל (messages).
+      </div>
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>מבקר ומנהל רואים קישור "דיווחים" ב-header</li>
+        <li>משתמש רגיל ויועץ לא רואים את הקישור</li>
+        <li>לחיצה על דיווח → <code>/moderator/reports/:id</code> עם פרטים מלאים</li>
+        <li>ניווט ישיר לנתיב ע"י role לא מורשה → נחסם ע"י route guard</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ABF-156 -->
+<div class="section" id="s-abf156">
+  <div class="section-header">
+    <div class="section-number purple">9</div>
+    <h2>ABF-156 — Google Meet</h2>
+  </div>
+  <div class="task-card">
+    <div class="task-card-header color-purple">
+      <span class="task-jira">ABF-156</span>
+      <span class="task-title">Google Meet — תזמון פגישות ויועץ-תא</span>
+      <span class="task-effort">~5 ימים | שלב A לפני שלב B</span>
+    </div>
+    <div class="task-card-body">
+      <div class="callout callout-purple">
+        <strong>OAuth נפרד:</strong> Google Login קיים ועובד (openid, email, profile). יצירת Google Meet דורשת אישור נוסף ל-Google Calendar API — צעד הרשאה נפרד שמשתמש רואה בפעם הראשונה שהוא יוצר פגישה.
+      </div>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>לפני</h4>
+          <ul>
+            <li>אין Meeting model, אין meetings endpoint</li>
+            <li>אין google_meet_service</li>
+            <li>אין תמיכה בפוסט מסוג MEETING בפורום</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>אחרי</h4>
+          <ul>
+            <li>יועץ מתזמן פגישה עם תאריך + כותרת</li>
+            <li>הפגישה מופיעה בפורום כהכרזה עם "הצטרפות"</li>
+            <li>לחיצה על "הצטרפות" → Google Meet</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>שלב A — Backend (חייב למזג לפני שלב B)</h3>
+      <ul class="checklist">
+        <li><code>backend/app/models/</code> — מודל Meeting חדש + migration</li>
+        <li><code>backend/app/services/google_meet_service.py</code> — exchange_calendar_token + create_meeting</li>
+        <li><code>backend/app/api/v1/endpoints/meetings.py</code> — POST + GET /api/meetings</li>
+        <li><code>backend/app/api/v1/router.py</code> — רישום meetings router</li>
+        <li><code>backend/core/config.py</code> + <code>.env.example</code> — GOOGLE_CALENDAR_SCOPE + GOOGLE_REDIRECT_URI_MEET</li>
+      </ul>
+
+      <h3>שלב B — Frontend (אחרי מיזוג שלב A)</h3>
+      <ul class="checklist">
+        <li><code>frontend/src/app/core/services/meeting.service.ts</code> — createMeeting + getUpcomingMeetings</li>
+        <li><code>frontend/src/app/features/forum/</code> — כרטיס MEETING: כותרת, תאריך/שעה, כפתור "הצטרפות"; ללא לייק, ללא תגובות</li>
+        <li><code>frontend/src/app/features/advice/</code> — כפתור "תזמון פגישה" ליועץ; אם Calendar לא מאושר — צעד "חיבור Google Calendar" לפני השליחה</li>
+        <li><code>frontend/src/app/app.routes.ts</code> — route לתהליך יצירת פגישה אם נדרש</li>
+      </ul>
+
+      <h4>Definition of Done</h4>
+      <ul class="checklist">
+        <li>יועץ ללא אישור Calendar → prompt להרשאה → לאחר אישור הטופס ממשיך</li>
+        <li>משתמש / מבקר / מנהל לא יכולים לגשת לפתיחת פגישה</li>
+        <li>יצירת פגישה → Meeting record ב-DB + ForumPost מסוג MEETING</li>
+        <li>ההכרזה גלויה לכל חברי התא ובלתי גלויה מחוצה לו</li>
+        <li>לחיצה על "הצטרפות" → קישור Google Meet הנכון</li>
+        <li>פגישה שעברה → "הצטרפות" מושבת; ההכרזה נשארת</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- BACKLOG -->
+<div class="section" id="s-backlog">
+  <div class="section-header">
+    <div class="section-number gold">10</div>
+    <h2>בקלוג מוכן — אם יש קיבולת</h2>
+  </div>
+  <div class="backlog-card">
+    <h4>B1 — ביטול הגבלת דיווח ידנית</h4>
+    <p>מנהל יכול לראות אילו משתמשים בעלי <code>is_report_restricted = True</code> ולבטל את ההגבלה דרך ממשק ניהול המשתמשים הקיים. הרחבה של ABF-154.</p>
+    <p class="effort">הרחבה של ABF-154 · ~1 יום</p>
+  </div>
+
+  <div class="backlog-card">
+    <h4>B2 — עריכה וביטול פגישה</h4>
+    <p>יועץ שיצר פגישה יכול לערוך כותרת או שעה (ההכרזה בפורום ואירוע ה-Calendar מתעדכנים), או לבטל אותה לחלוטין (ההכרזה מתעדכנת ל"בוטל" והאירוע נמחק). הרחבה של ABF-156.</p>
+    <p class="effort">הרחבה של ABF-156 · ~1.5 ימים</p>
+  </div>
+
+  <div class="backlog-card">
+    <h4>B3 — מייל התראה על הפרה אוטומטית</h4>
+    <p>כשמופעלת השעיה אוטומטית (כלל 1) — מייל למנהל. כשמופעלת הגבלת דיווח (כלל 2) — מייל למבקר הרלוונטי. הרחבה של ABF-154.</p>
+    <p class="effort">הרחבה של ABF-154 · ~0.5 ימים</p>
+  </div>
+</div>
+
+<!-- MOCKUP -->
+<div class="section" id="s-mockup">
+  <div class="section-header">
+    <div class="section-number teal">11</div>
+    <h2>מוקאפ — האפליקציה בסוף הספרינט</h2>
+  </div>
+  <div class="app-screens">
+
+    <!-- Audit Log -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <span class="app-topbar-logo">אנו בניך</span>
+        <span class="app-topbar-user">מנהל</span>
+        <span class="app-topbar-logout">יציאה</span>
+      </div>
+      <div class="app-body">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div class="app-page-title" style="margin:0;">יומן פעולות</div>
+          <div class="app-btn app-btn-outline" style="font-size:11px; padding:4px 9px;">ייצוא CSV</div>
+        </div>
+        <div class="app-filter-row">
+          <div class="app-filter">סוג: דיווח</div>
+          <div class="app-filter">תאריך: היום</div>
+        </div>
+        <div class="app-row">
+          <div>
+            <div class="app-row-title">REPORT_DECIDED</div>
+            <div class="app-row-meta">admin@site · לפני 3 דקות · Report #42</div>
+          </div>
+          <div class="app-badge app-badge-dm" style="font-size:10px;">פרטי</div>
+        </div>
+        <div class="app-row">
+          <div>
+            <div class="app-row-title">USER_SUSPENDED</div>
+            <div class="app-row-meta">system · לפני 3 דקות · User #17</div>
+          </div>
+        </div>
+        <div class="app-row">
+          <div>
+            <div class="app-row-title">REPORT_DECIDED</div>
+            <div class="app-row-meta">mod@site · לפני 15 דקות · Report #41</div>
+          </div>
+        </div>
+        <div class="app-note">עמוד 1 מתוך 12 · 234 תוצאות</div>
+      </div>
+      <div class="app-caption">יומן פעולות — Admin בלבד</div>
+    </div>
+
+    <!-- Moderator Reports -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <span class="app-topbar-logo">אנו בניך</span>
+        <span class="app-topbar-user">מבקר: רחל כ.</span>
+        <span class="app-topbar-logout">יציאה</span>
+      </div>
+      <div class="app-body">
+        <div class="app-page-title">דיווחים</div>
+
+        <div class="app-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+          <div style="display:flex; justify-content:space-between; width:100%;">
+            <div class="app-row-title">דיווח על: יעקב ל.</div>
+            <span class="app-badge app-badge-dm">הודעה פרטית</span>
+          </div>
+          <div class="app-row-meta">סיבה: תוכן פוגעני</div>
+          <div class="app-field" style="font-size:11px; color:#374151; margin:0;">"...התוכן המדווח מוצג כאן..."</div>
+          <div class="app-btn-row" style="width:100%;">
+            <div class="app-btn app-btn-success" style="font-size:11px; padding:5px;">תקין</div>
+            <div class="app-btn app-btn-danger" style="font-size:11px; padding:5px;">לא תקין</div>
+          </div>
+        </div>
+
+        <div class="app-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
+          <div class="app-row-title">דיווח על: שרה מ.</div>
+          <div class="app-row-meta">סיבה: ספאם · פוסט פורום</div>
+          <div class="app-btn-row" style="width:100%;">
+            <div class="app-btn app-btn-success" style="font-size:11px; padding:5px;">תקין</div>
+            <div class="app-btn app-btn-danger" style="font-size:11px; padding:5px;">לא תקין</div>
+          </div>
+        </div>
+        <div class="app-note">רק דיווחים בתאים שלך</div>
+      </div>
+      <div class="app-caption">ממשק מבקר + דיווחי DM</div>
+    </div>
+
+    <!-- Google Meet -->
+    <div class="app-frame">
+      <div class="app-topbar-row">
+        <span class="app-topbar-logo">אנו בניך</span>
+        <span class="app-topbar-user">עו"ד מרים כ.</span>
+        <span class="app-topbar-logout">יציאה</span>
+      </div>
+      <div class="app-body">
+        <div class="app-page-title">פורום — אשכנזיות</div>
+
+        <div class="app-meet-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">
+            <div class="app-meet-title">פגישת ייעוץ משפטי — ירושה</div>
+            <span class="app-badge app-badge-meet">Meet</span>
+          </div>
+          <div class="app-meet-meta">יום ד' 18.9 · 20:00 · עו"ד מרים כהן</div>
+          <div class="app-btn app-btn-primary" style="margin-top:8px; font-size:11px; padding:6px; text-align:center;">הצטרפות לפגישה</div>
+        </div>
+
+        <div class="app-row">
+          <div>
+            <div class="app-row-title">שאלה: איך מסדרים ירושה ללא צוואה?</div>
+            <div class="app-row-meta">אלמנה — ספרדי · לפני שעה</div>
+          </div>
+        </div>
+        <div class="app-row">
+          <div>
+            <div class="app-row-title">תמיכה רגשית — מחשבות?</div>
+            <div class="app-row-meta">יתום · לפני 2 שעות</div>
+          </div>
+        </div>
+      </div>
+      <div class="app-caption">הכרזת פגישה בפורום</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DOD -->
+<div class="section" id="s-dod">
+  <div class="section-header">
+    <div class="section-number" style="background:#059669;">12</div>
+    <h2>Definition of Done — ספרינט הסיום</h2>
+  </div>
+
+  <h3>כל משימה</h3>
+  <div class="dod-grid">
+    <div class="dod-item"><span class="dod-check">✓</span> endpoint חדש → schema Pydantic (request + response) קיים</div>
+    <div class="dod-item"><span class="dod-check">✓</span> endpoint חדש → רשום ב-router.py</div>
+    <div class="dod-item"><span class="dod-check">✓</span> route רגיש → auth dependency מוזרק</div>
+    <div class="dod-item"><span class="dod-check">✓</span> component חדש → standalone: true</div>
+    <div class="dod-item"><span class="dod-check">✓</span> דף חדש → lazy-loaded via loadComponent</div>
+    <div class="dod-item"><span class="dod-check">✓</span> התנהגות חדשה → טסט נוסף או מעודכן</div>
+    <div class="dod-item"><span class="dod-check">✓</span> אין console.log / print() בקוד</div>
+    <div class="dod-item"><span class="dod-check">✓</span> אין secrets, tokens, או API keys קשיחים</div>
+  </div>
+
+  <div class="callout callout-green" style="margin-top:24px; font-size:15px;">
+    <strong>סיום ספרינט 7 = המערכת מוכנה לשימוש מלא.</strong><br>
+    כל המודולים מ-SPEC.md מיושמים. אין <code>NotImplementedError</code> ואין stubs פתוחים. ניתן לפנות ללקוח לדמו סופי.
+  </div>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>
