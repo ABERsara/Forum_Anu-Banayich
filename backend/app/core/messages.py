@@ -45,32 +45,20 @@ Not in here, on purpose
   single string built from both maps, so moving one would render it half in
   each language.
 
-Left, and came back
--------------------
+Was in here, and is back
+------------------------
 The agent's "conversation not found", "forbidden", "unavailable" and rate-limit
-messages lived here until `main` reverted ABF-122 (the agent conversation
-schema collided). Their only two callers, `services/agent_service.py` and
-`dependencies.rate_limit_chat`, went with them, and
-`test_i18n_catalogue.py::test_every_key_in_the_catalogue_is_used` is what made
-leaving the entries behind impossible. ABF-122 has landed again and they are
-back — under the `agents.` prefix ABF-121 established for this domain, not the
-`agent.` they carried before, so that one agent namespace covers the catalog,
-the knowledge base and the chat.
+messages left with `main`'s revert of ABF-122 and return with it, under the
+`agents.` prefix ABF-121 gave this domain rather than the `agent.` they had
+before. `agents.rate_limited` is again the catalogue's only entry with a
+`{placeholder}` — the daily quota is a setting, so it cannot be written into
+either translation.
 
-They are back **as keys**, not as the Hebrew literals they were originally
-written as: `test_no_message_is_raised_in_hebrew` walks the whole of `app/`, so
-the returning modules were held to this rule on the day they arrived.
-
-Two Hebrew strings in `services/llm_service.py` are deliberately *not* here,
-and they are not an exception to that rule. `ANSWER_DISCLAIMER` and
-`NO_CONTEXT_ANSWER` are not messages *about* a request — they are part of the
-agent's answer, stored encrypted in an `agent_messages` row and replayed
-verbatim long after the request that produced them. A stored row cannot follow
-a later reader's `Accept-Language`, and resolving them at write time would
-leave a Hebrew answer with an English paragraph welded to the end of it.
-
-`agents.rate_limited` is the catalogue's only entry with a `{placeholder}`;
-`TestCatalogue::test_placeholders_match_across_languages` guards it.
+Not here, and not an exception to the rule above: `ANSWER_DISCLAIMER` and
+`NO_CONTEXT_ANSWER` in `services/llm_service.py`. Those are not messages
+*about* a request — they are part of the agent's answer, stored encrypted in an
+`agent_messages` row and read again months later, and a stored row cannot
+follow a later reader's `Accept-Language`.
 """
 
 from typing import Final

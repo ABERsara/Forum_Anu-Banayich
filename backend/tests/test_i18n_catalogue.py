@@ -37,12 +37,9 @@ PLACEHOLDER = re.compile(r"\{(\w+)\}")
 # `HTTPException` added to email_service.py tomorrow would have passed in
 # silence.
 # `test_a_formerly_exempt_module_is_not_a_blind_spot` pins that it no longer
-# does. Being scoped by shape is also what let ABF-122's modules arrive without
-# anyone remembering to list them here: `agent_service.py` and `llm_service.py`
-# were held to this rule on the day they reappeared, and the Hebrew they do
-# carry — the agent's disclaimer and its "I have nothing on that" answer — is
-# in none of the three shapes, because it is answer text stored in a row rather
-# than a message about a request. See app/core/messages.py.
+# does. Being scoped by shape is also what lets a module arrive without anyone
+# remembering to list it here: when ABF-122 lands again, agent_service.py and
+# llm_service.py are held to this rule on the day they reappear.
 
 
 def _sources():
@@ -156,11 +153,11 @@ class TestCatalogue:
         with the number missing — `translate()` fills what the template asks
         for, and fills it per language.
 
-        `agents.rate_limited` is the only entry that carries one today — the
-        configured daily quota, which cannot be written into either translation
-        because it is a setting. A translator dropping `{limit}` from one side
-        would leave that language telling the reader they have reached a limit
-        without saying which; this is what catches it.
+        No entry carries a placeholder today: `agent.rate_limited` was the only
+        one and it left with `main`'s revert of ABF-122. The check stays because
+        the cost of keeping it is nothing and the failure it catches is silent;
+        `test_i18n.py::TestTranslate` covers the rendering itself against an
+        entry it supplies.
         """
         mismatched = {
             key: (

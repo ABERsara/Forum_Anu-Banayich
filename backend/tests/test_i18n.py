@@ -154,13 +154,13 @@ class TestTranslate:
         """
         A catalogue entry with a placeholder, supplied by the test.
 
-        `agents.rate_limited` is the only real one. Its own rendering is
-        asserted end to end in `test_agent_chat.py`; what is under test here is
-        `translate()`'s substitution itself, which should not go untested the
-        next time the catalogue happens to hold no parameterised entry. So this
-        brings its own.
-        `test_i18n_catalogue.py::test_placeholders_match_across_languages` is
-        the half of this that guards the *catalogue*.
+        `agent.rate_limited` was the only real one, and it left the catalogue
+        with `main`'s revert of ABF-122. `translate()` still fills placeholders,
+        and the next message that needs one will rely on it, so the coverage
+        stays and brings its own entry instead of pointing at a key that is
+        gone. `test_i18n_catalogue.py::test_placeholders_match_across_languages`
+        is the half of this that guards the *catalogue*; it currently has
+        nothing to look at, and holds the line for whatever arrives next.
         """
         key = "test.placeholder"
         monkeypatch.setitem(
