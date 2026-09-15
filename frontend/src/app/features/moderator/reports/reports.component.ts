@@ -260,6 +260,11 @@ export class ModeratorReportsComponent implements OnInit {
   // Viewing a DIRECT_MESSAGE report's content (ABF-113)
   // ---------------------------------------------------------------------------
 
+  /** Whether this report is the one currently expanded. */
+  isOpen(reportId: string): boolean {
+    return this.openReportId() === reportId;
+  }
+
   /**
    * Fetch and expand one DIRECT_MESSAGE report's decrypted content.
    *
@@ -275,10 +280,18 @@ export class ModeratorReportsComponent implements OnInit {
 
     this.reportService.getReport(report.id).subscribe({
       next: (full) => {
+        // A second click may have moved on to another report while this was
+        // in flight; that report's own response is what belongs on screen.
+        if (!this.isOpen(report.id)) {
+          return;
+        }
         this.openReportContent.set(full);
         this.isContentLoading.set(false);
       },
       error: (err: unknown) => {
+        if (!this.isOpen(report.id)) {
+          return;
+        }
         this.contentError.set(screenErrorFrom(err, 'moderator.errors.content_load_failed'));
         this.isContentLoading.set(false);
       },
@@ -323,6 +336,10 @@ export class ModeratorReportsComponent implements OnInit {
           // A decision is what applies a restriction, so whatever this tab
           // last showed may already be out of date.
           this.areRestrictionsFresh.set(false);
+          // Whatever content was open belongs to a report that just changed
+          // decision — closing it means the next look, in History, is a
+          // fresh audited fetch rather than this stale one replayed for free.
+          this.closeContent();
           this.pendingDecision.set(null);
         },
         error: (err: unknown) => {
