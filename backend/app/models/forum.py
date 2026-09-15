@@ -152,6 +152,20 @@ class DirectMessage(Base):
         server_default=func.now(),
     )
 
+    # When a moderator upholds a report on this message (ABF-113, spec §7.1
+    # "מחיקה"). NULL until then — the single source of truth for "hidden",
+    # the same convention read_at already uses for "read": a timestamp, not a
+    # boolean, so the row can also answer *when*.
+    #
+    # Deliberately not called `deleted_at`: that name is already spoken for by
+    # retention_service's hard purge (§9.4 — full row deletion on account
+    # deletion, or after the 3-year cap). This is a soft, reversible-in-design
+    # flag on a row that keeps existing, so the two are never confused —
+    # decide_report() only ever sets it, never clears it, because a DM report
+    # is never re-opened once decided, but the column itself does not enforce
+    # that; it is just a timestamp.
+    hidden_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     # ------------------------------------------------------------------
     # Relationships
     # ------------------------------------------------------------------

@@ -50,6 +50,7 @@ function makeMessage(overrides: Partial<DirectMessage> = {}): DirectMessage {
     read_at: null,
     created_at: '2026-08-01T10:00:00',
     reported_by_me: false,
+    hidden: false,
     ...overrides,
   };
 }

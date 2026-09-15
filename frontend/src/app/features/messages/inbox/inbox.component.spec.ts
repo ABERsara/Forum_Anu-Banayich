@@ -14,6 +14,7 @@ function makeConversation(overrides: Partial<ConversationSummary> = {}): Convers
     last_message_preview: 'הי, מה שלומך?',
     last_message_at: '2026-08-01T10:00:00Z',
     unread_count: 0,
+    hidden: false,
     ...overrides,
   };
 }

@@ -15,6 +15,7 @@ import {
   ReportDecideRequest,
   ReportHistoryList,
   ReportList,
+  ReportWithContent,
   RestrictionList,
   SuspendUserRequest,
   UserModerationCard,
@@ -56,6 +57,17 @@ export class ReportService {
 
   decideReport(reportId: string, data: ReportDecideRequest): Observable<Report> {
     return this.api.post<Report>(`/moderator/reports/${reportId}/decide`, data);
+  }
+
+  /**
+   * A single report with full content — for a DIRECT_MESSAGE report, this is
+   * the one call that ever returns its decrypted text, and the server audits
+   * it as a view (ABF-113, spec §9.1/§9.3). Never call this to build a list;
+   * getPendingReports()/getReportHistory() already carry everything a list
+   * needs without decrypting anything.
+   */
+  getReport(reportId: string): Observable<ReportWithContent> {
+    return this.api.get<ReportWithContent>(`/moderator/reports/${reportId}`);
   }
 
   /**
