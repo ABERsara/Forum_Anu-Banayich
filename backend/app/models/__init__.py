@@ -7,6 +7,7 @@ When you create a new model file, add it to this list.
 from app.models.agent import (
     AgentConversation,
     AgentDomain,
+    AgentKnowledgeChunk,
     AgentKnowledgeEntry,
     AgentMessage,
 )
@@ -31,6 +32,7 @@ __all__ = [
     "AuditLog",
     "AgentDomain",
     "AgentKnowledgeEntry",
+    "AgentKnowledgeChunk",
     "AgentConversation",
     "AgentMessage",
 ]
