@@ -12,12 +12,11 @@ GET  /moderator/users/{id}/card     – one user's moderation history
 POST /moderator/users/{id}/suspend  – suspend that user by hand
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.constants import ReportTargetType, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
-from app.core.i18n import translate
 from app.models.forum import DirectMessage, ForumPost
 from app.models.report import Report
 from app.models.user import User
@@ -55,13 +54,22 @@ def _to_report_with_content(db: Session, report: Report) -> ReportWithContent:
     calls decrypt_message() on a report, and get_report() below is the only
     caller of it). message_content stays at its schema default (None) here;
     get_report() fills it in afterwards, for the one report actually opened.
+
+    A FORUM_POST's post is never actually missing today — delete_post()
+    only ever sets status=DELETED, the row stays — so this has nothing to
+    degrade against yet. It still doesn't raise: this function backs
+    list_pending_reports()/list_decided_reports() as well as get_report()
+    now, and a 404 raised from inside their list comprehensions would take
+    down every other report in the response over one row, the same
+    inconsistency decide_report()'s own "target_gone" branch already
+    exists to avoid on the decide side. Content fields are simply left at
+    the schema's None default — the same degrade-gracefully answer the
+    DIRECT_MESSAGE branch two lines below already gives.
     """
     if report.target_type == ReportTargetType.FORUM_POST:
         post = db.query(ForumPost).filter(ForumPost.id == report.target_id).first()
         if post is None:
-            raise HTTPException(
-                status_code=404, detail=translate("reports.target_not_found")
-            )
+            return ReportWithContent(**ReportResponse.model_validate(report).model_dump())
         return ReportWithContent(
             **ReportResponse.model_validate(report).model_dump(),
             content_title=post.title,

@@ -235,10 +235,6 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "הדיווח לא נמצא.",
         ENGLISH: "The report was not found.",
     },
-    "reports.target_not_found": {
-        HEBREW: "התוכן המדווח לא נמצא.",
-        ENGLISH: "The reported content was not found.",
-    },
     "reports.view_forbidden": {
         HEBREW: "אין הרשאה לצפות בדיווח זה.",
         ENGLISH: "You do not have permission to view this report.",
