@@ -29,7 +29,9 @@
             >
               <span class="inbox__name" aria-hidden="true">{{ otherUserName(conv) }}</span>
               <span class="inbox__preview" aria-hidden="true">{{
-                conv.hidden ? ('messages.chat.content_hidden' | transloco) : conv.last_message_preview
+                conv.hidden
+                  ? ('messages.chat.content_hidden' | transloco)
+                  : conv.last_message_preview
               }}</span>
               <span class="inbox__date" aria-hidden="true">{{
                 conv.last_message_at | date: 'short'

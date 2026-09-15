@@ -81,7 +81,9 @@ def _make_post(
     return post
 
 
-def _make_direct_message(db_session: Session, sender: User, recipient: User) -> DirectMessage:
+def _make_direct_message(
+    db_session: Session, sender: User, recipient: User
+) -> DirectMessage:
     result = forum_service.send_direct_message(
         db_session,
         DirectMessageCreate(recipient_id=recipient.id, content="test message content"),

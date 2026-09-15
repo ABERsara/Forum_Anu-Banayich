@@ -442,9 +442,7 @@ describe('ModeratorReportsComponent', () => {
    * one audited fetch, triggered by hand, ever decrypts it.
    */
   describe('viewing a DIRECT_MESSAGE report’s content', () => {
-    async function renderWithPendingDm(
-      ...reports: DirectMessageReport[]
-    ): Promise<HTMLElement[]> {
+    async function renderWithPendingDm(...reports: DirectMessageReport[]): Promise<HTMLElement[]> {
       await render({
         pending: of({ items: reports, total: reports.length, pending_count: reports.length }),
       });

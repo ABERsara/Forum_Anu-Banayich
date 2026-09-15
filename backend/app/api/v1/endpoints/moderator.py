@@ -42,7 +42,9 @@ router = APIRouter(
 )
 
 
-def _to_reports_with_content(db: Session, reports: list[Report]) -> list[ReportWithContent]:
+def _to_reports_with_content(
+    db: Session, reports: list[Report]
+) -> list[ReportWithContent]:
     """
     Enrich a batch of reports with the context a moderator needs to see
     them — the two target_types share nothing to read from, so each report
@@ -70,9 +72,12 @@ def _to_reports_with_content(db: Session, reports: list[Report]) -> list[ReportW
     Content fields are simply left at the schema's None default — the same
     degrade-gracefully answer the DIRECT_MESSAGE branch below already gives.
     """
-    post_ids = [r.target_id for r in reports if r.target_type == ReportTargetType.FORUM_POST]
+    post_ids = [
+        r.target_id for r in reports if r.target_type == ReportTargetType.FORUM_POST
+    ]
     posts_by_id = {
-        post.id: post for post in db.query(ForumPost).filter(ForumPost.id.in_(post_ids)).all()
+        post.id: post
+        for post in db.query(ForumPost).filter(ForumPost.id.in_(post_ids)).all()
     }
 
     items: list[ReportWithContent] = []
@@ -135,7 +140,9 @@ def list_decided_reports(
     Return decisions already made in the moderator's assigned cells,
     newest first (SPEC §7.3, "היסטוריית דיווחים").
     """
-    reports, total = report_service.get_decided_reports(db, current_user, page, page_size)
+    reports, total = report_service.get_decided_reports(
+        db, current_user, page, page_size
+    )
 
     return ReportHistoryResponse(
         items=_to_reports_with_content(db, reports),

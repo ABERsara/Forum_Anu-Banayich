@@ -37,7 +37,11 @@ import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { DirectMessageReport, ReportWithContent, RestrictionWithMember } from '../../../core/models';
+import {
+  DirectMessageReport,
+  ReportWithContent,
+  RestrictionWithMember,
+} from '../../../core/models';
 import {
   POST_STATUS_LABELS,
   REPORT_DECISION_LABELS,

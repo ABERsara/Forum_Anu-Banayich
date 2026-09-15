@@ -476,7 +476,9 @@ def decide_report(
             try:
                 send_content_removed_notification(author_email, report.id)
             except Exception:
-                logger.exception("Failed to notify the author about report %s", report.id)
+                logger.exception(
+                    "Failed to notify the author about report %s", report.id
+                )
 
     if restriction is not None:
         try:

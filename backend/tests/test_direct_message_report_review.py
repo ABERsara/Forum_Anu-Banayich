@@ -64,9 +64,13 @@ def _pair(db_session, make_user) -> tuple[User, User]:
     return sender, recipient
 
 
-def _send_message(db_session, sender: User, recipient: User, content: str) -> DirectMessage:
+def _send_message(
+    db_session, sender: User, recipient: User, content: str
+) -> DirectMessage:
     result = forum_service.send_direct_message(
-        db_session, DirectMessageCreate(recipient_id=recipient.id, content=content), sender
+        db_session,
+        DirectMessageCreate(recipient_id=recipient.id, content=content),
+        sender,
     )
     return (
         db_session.query(DirectMessage)
@@ -142,7 +146,9 @@ class TestPendingListIncludesDirectMessageReports:
     ):
         as_user(_make_moderator(db_session, make_user))
         sender, recipient = _pair(db_session, make_user)
-        message = _send_message(db_session, sender, recipient, "תוכן סודי שלא אמור להופיע")
+        message = _send_message(
+            db_session, sender, recipient, "תוכן סודי שלא אמור להופיע"
+        )
         _file_dm_report(db_session, message, recipient)
 
         response = await client.get(f"{BASE}/reports")
@@ -249,7 +255,8 @@ class TestDecideDirectMessageReport:
         report = _file_dm_report(db_session, message, recipient)
 
         response = await client.post(
-            f"{BASE}/reports/{report.id}/decide", json=_decide_body(ReportDecision.VALID)
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
         )
 
         assert response.status_code == 200
@@ -265,7 +272,8 @@ class TestDecideDirectMessageReport:
         report = _file_dm_report(db_session, message, recipient)
 
         response = await client.post(
-            f"{BASE}/reports/{report.id}/decide", json=_decide_body(ReportDecision.INVALID)
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.INVALID),
         )
 
         assert response.status_code == 200
@@ -280,11 +288,13 @@ class TestDecideDirectMessageReport:
         message = _send_message(db_session, sender, recipient, "תוכן")
         report = _file_dm_report(db_session, message, recipient)
         await client.post(
-            f"{BASE}/reports/{report.id}/decide", json=_decide_body(ReportDecision.VALID)
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
         )
 
         response = await client.post(
-            f"{BASE}/reports/{report.id}/decide", json=_decide_body(ReportDecision.INVALID)
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.INVALID),
         )
 
         assert response.status_code == 409
@@ -298,7 +308,8 @@ class TestDecideDirectMessageReport:
         report = _file_dm_report(db_session, message, recipient)
 
         response = await client.post(
-            f"{BASE}/reports/{report.id}/decide", json=_decide_body(ReportDecision.VALID)
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
         )
 
         assert response.status_code == 403
@@ -321,9 +332,7 @@ class TestDecideDirectMessageReport:
 
 
 class TestClosedAccountDeletedReport:
-    async def test_cannot_be_decided(
-        self, client, make_user, as_user, db_session
-    ):
+    async def test_cannot_be_decided(self, client, make_user, as_user, db_session):
         as_user(_make_moderator(db_session, make_user))
         sender, recipient = _pair(db_session, make_user)
         message = _send_message(db_session, sender, recipient, "תוכן")
@@ -332,7 +341,8 @@ class TestClosedAccountDeletedReport:
         db_session.commit()
 
         response = await client.post(
-            f"{BASE}/reports/{report.id}/decide", json=_decide_body(ReportDecision.VALID)
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
         )
 
         assert response.status_code == 409

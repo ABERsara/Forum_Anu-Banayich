@@ -212,7 +212,9 @@
                 <a
                   class="reports__card-link"
                   [routerLink]="['/moderator/users', report.reported_user_id]"
-                  [attr.aria-label]="'moderator.reports.user_card_aria' | transloco: { title: title }"
+                  [attr.aria-label]="
+                    'moderator.reports.user_card_aria' | transloco: { title: title }
+                  "
                 >
                   {{ 'moderator.reports.user_card_link' | transloco }}
                 </a>
@@ -303,7 +305,9 @@
                 <a
                   class="reports__card-link"
                   [routerLink]="['/moderator/users', report.reported_user_id]"
-                  [attr.aria-label]="'moderator.reports.user_card_aria' | transloco: { title: title }"
+                  [attr.aria-label]="
+                    'moderator.reports.user_card_aria' | transloco: { title: title }
+                  "
                 >
                   {{ 'moderator.reports.user_card_link' | transloco }}
                 </a>
