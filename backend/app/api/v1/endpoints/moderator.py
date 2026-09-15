@@ -214,8 +214,11 @@ def decide_report(
     """
     Moderator decides on a report, with a mandatory note for the record.
 
-    VALID   → the reported post is deleted and its author is notified
-    INVALID → a post that was auto-hidden is restored to visible
+    VALID   → a ForumPost is deleted; a DIRECT_MESSAGE is hidden from both
+              participants. Either way, the reported-on user is notified.
+    INVALID → a ForumPost the 2-report rule auto-hid is restored to visible;
+              a DIRECT_MESSAGE, never auto-hidden to begin with, is left as
+              it was.
     """
     report = report_service.decide_report(db, report_id, data, current_user)
     return ReportResponse.model_validate(report)
