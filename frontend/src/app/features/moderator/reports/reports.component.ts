@@ -254,9 +254,10 @@ export class ModeratorReportsComponent implements OnInit {
    * then goes stale across a language switch (CONTRIBUTING §6, ABF-128).
    */
   reportTitle(report: ReportWithContent): string {
-    return report.target_type === ReportTargetType.FORUM_POST
-      ? report.content_title
-      : this.labels.label('moderator.reports.direct_message_title');
+    if (report.target_type === ReportTargetType.FORUM_POST) {
+      return report.content_title ?? this.labels.label('moderator.reports.content_gone_title');
+    }
+    return this.labels.label('moderator.reports.direct_message_title');
   }
 
   // ---------------------------------------------------------------------------

@@ -498,15 +498,19 @@ export interface Report {
 /**
  * A FORUM_POST report enriched with the reported post.
  *
- * A post is never hard-deleted (only its status changes), so every field
- * here is always present — on a pending row and a history row alike.
+ * A post is never hard-deleted today (only its status changes), so these
+ * are populated on every row in practice — but the backend's own defensive
+ * branch for a post that is somehow gone (moderator.py's
+ * _to_reports_with_content()) sends this same target_type with all four
+ * left out, so they stay optional here too rather than claim a guarantee
+ * the backend doesn't actually make.
  */
 export interface ForumPostReport extends Report {
   target_type: ReportTargetType.FORUM_POST;
-  content_title: string;
-  content_text: string;
-  content_status: PostStatus;
-  report_count: number;
+  content_title?: string;
+  content_text?: string;
+  content_status?: PostStatus;
+  report_count?: number;
 }
 
 /** A DIRECT_MESSAGE report enriched with the reported message. */

@@ -407,6 +407,8 @@
       "description_label": "פירוט המדווח/ת",
       "created_at_label": "תאריך הדיווח",
       "content_status_label": "מצב ההודעה",
+      "content_unavailable": "התוכן שדווח עליו כבר לא זמין.",
+      "content_gone_title": "תוכן שאינו זמין",
       "direct_message_title": "הודעה פרטית",
       "view_content": "הצג תוכן ההודעה",
       "view_content_aria": "הצג את תוכן ״{{title}}״",

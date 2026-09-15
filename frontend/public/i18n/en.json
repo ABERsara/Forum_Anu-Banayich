@@ -407,6 +407,8 @@
       "description_label": "What the reporter wrote",
       "created_at_label": "Report date",
       "content_status_label": "Message status",
+      "content_unavailable": "The reported content is no longer available.",
+      "content_gone_title": "Unavailable content",
       "direct_message_title": "Private message",
       "view_content": "Show message content",
       "view_content_aria": "Show the content of “{{title}}”",
