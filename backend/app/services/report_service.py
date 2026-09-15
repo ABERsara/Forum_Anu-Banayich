@@ -424,7 +424,7 @@ def decide_report(
     # (ABF-112), and unlike message.sender it still resolves if the
     # DirectMessage row itself is gone by decision time (pruned, or purged
     # with its sender's own account).
-    reported_user = db.query(User).filter(User.id == report.reported_user_id).first()
+    reported_user = user_service.get_user_by_id(db, report.reported_user_id)
     author_email = reported_user.email if reported_user else None
 
     # log_action() commits internally, which persists the report fields and
