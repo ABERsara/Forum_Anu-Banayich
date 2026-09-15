@@ -35,7 +35,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ReportWithContent, RestrictionWithMember } from '../../../core/models';
 import {
@@ -47,6 +47,7 @@ import {
   ReportTargetType,
   RestrictionType,
 } from '../../../core/constants';
+import { LabelService } from '../../../core/i18n/label.service';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { ReportService } from '../../../core/services/report.service';
 import { utcIso } from '../../../core/utils/utc-date.util';
@@ -115,7 +116,7 @@ interface PendingDecision {
 })
 export class ModeratorReportsComponent implements OnInit {
   private readonly reportService = inject(ReportService);
-  private readonly transloco = inject(TranslocoService);
+  private readonly labels = inject(LabelService);
 
   readonly activeTab = signal<Tab>('pending');
 
@@ -246,13 +247,14 @@ export class ModeratorReportsComponent implements OnInit {
    * this into another translated string (e.g. "moderator.reports.decide_
    * valid_aria"), and a `| transloco` result can't itself be a param to a
    * second `| transloco` in the template — so the DIRECT_MESSAGE fallback is
-   * resolved here, once, through the service directly (ABF-113: a DM report
-   * has no content_title at all, unlike a FORUM_POST one).
+   * resolved here, once (ABF-113: a DM report has no content_title at all,
+   * unlike a FORUM_POST one). Through LabelService, not a bare
+   * `TranslocoService.translate()` — that returns the right text once and
+   * then goes stale across a language switch (CONTRIBUTING §6, ABF-128).
    */
   reportTitle(report: ReportWithContent): string {
     return (
-      report.content_title ??
-      this.transloco.translate('moderator.reports.direct_message_title')
+      report.content_title ?? this.labels.label('moderator.reports.direct_message_title')
     );
   }
 
