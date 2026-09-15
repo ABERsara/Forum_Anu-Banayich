@@ -373,7 +373,9 @@ def decide_report(
     # for_update: two moderators sharing a cell can have the same report open.
     # The lock makes the "still PENDING?" check below settle which of them
     # wins, instead of both writing a decision over each other.
-    report = get_report_for_moderator(db, report_id, moderator, for_update=True)
+    report = get_report_for_moderator(
+        db, report_id, moderator, for_update=True, context="decide"
+    )
 
     if report.decision != ReportDecision.PENDING:
         raise HTTPException(
@@ -419,14 +421,6 @@ def decide_report(
     else:
         content_action = _apply_direct_message_decision(db, report, data.decision)
 
-    # The reported-on user's own current email, via reported_user_id rather
-    # than post.author/message.sender — set at filing time either way
-    # (ABF-112), and unlike message.sender it still resolves if the
-    # DirectMessage row itself is gone by decision time (pruned, or purged
-    # with its sender's own account).
-    reported_user = user_service.get_user_by_id(db, report.reported_user_id)
-    author_email = reported_user.email if reported_user else None
-
     # log_action() commits internally, which persists the report fields and
     # the content's new state along with the audit entry – one transaction,
     # so a decision can never land without its content change, or the
@@ -463,15 +457,26 @@ def decide_report(
 
     # Strictly after the commit, and never fatal: the decision is already
     # recorded, and a notification that fails must not turn it into a failed
-    # request – same policy as file_report()'s moderator alerts. author_email
-    # can be None only if reported_user itself was gone by decision time —
-    # theoretical (a User row is never hard-deleted, only anonymised), but
-    # there is no address to notify either way.
-    if data.decision == ReportDecision.VALID and author_email:
-        try:
-            send_content_removed_notification(author_email, report.id)
-        except Exception:
-            logger.exception("Failed to notify the author about report %s", report.id)
+    # request – same policy as file_report()'s moderator alerts. Looked up
+    # only on this branch, not unconditionally above: INVALID never sends
+    # this notification, so every dismissed report — most of them — was
+    # paying for a query whose result it never read.
+    if data.decision == ReportDecision.VALID:
+        # The reported-on user's own current email, via reported_user_id
+        # rather than post.author/message.sender — set at filing time either
+        # way (ABF-112), and unlike message.sender it still resolves if the
+        # DirectMessage row itself is gone by decision time (pruned, or
+        # purged with its sender's own account). None only if reported_user
+        # itself was gone by decision time — theoretical (a User row is
+        # never hard-deleted, only anonymised), but there is no address to
+        # notify either way.
+        reported_user = user_service.get_user_by_id(db, report.reported_user_id)
+        author_email = reported_user.email if reported_user else None
+        if author_email:
+            try:
+                send_content_removed_notification(author_email, report.id)
+            except Exception:
+                logger.exception("Failed to notify the author about report %s", report.id)
 
     if restriction is not None:
         try:
@@ -622,14 +627,17 @@ def decrypt_reported_message(
     reported_content/reported_content_key_version are nullable on the model
     because a FORUM_POST report never sets them (models/report.py) — not
     because a DIRECT_MESSAGE one might skip them; _file_direct_message_report()
-    always writes both together. The assertion below documents that for
-    mypy, not a runtime case this function expects to hit.
+    always writes both together, so the check below is not expected to ever
+    fail in practice. It raises the same clean, translated 500 as InvalidTag
+    just below rather than a bare `assert`: an assert is compiled away
+    entirely under `python -O`, and this is the one function in the app
+    that ever touches this ciphertext at all.
     """
     if report.decision == ReportDecision.CLOSED_ACCOUNT_DELETED:
         return None
 
-    assert report.reported_content is not None
-    assert report.reported_content_key_version is not None
+    if report.reported_content is None or report.reported_content_key_version is None:
+        raise HTTPException(status_code=500, detail="errors.internal_server_error")
     # InvalidTag means the stored ciphertext failed authentication (DB
     # corruption, tampering, or a key_version whose key no longer matches) —
     # surfaced as a generic 500 rather than propagating, same policy as
@@ -758,6 +766,7 @@ def get_report_for_moderator(
     moderator: User,
     *,
     for_update: bool = False,
+    context: Literal["view", "decide"] = "view",
 ) -> Report:
     """
     Load a single report, enforcing that the moderator is responsible for its
@@ -776,7 +785,10 @@ def get_report_for_moderator(
     don't cover it — and for a DIRECT_MESSAGE report, audits the denial
     itself (spec §9.3: a refused attempt at private content is as
     reportable as a granted one — see decrypt_reported_message() for the
-    granted side).
+    granted side). `context` names what was actually being attempted —
+    decide_report() passes "decide", since a moderator refused there was
+    never granted so much as a look at the content either, and the audit
+    trail should say which one was refused.
     """
     query = db.query(Report).filter(Report.id == report_id)
     if for_update:
@@ -806,7 +818,7 @@ def get_report_for_moderator(
                     action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
                     entity_type="Report",
                     entity_id=report.id,
-                    details={"context": "moderator_report_view"},
+                    details={"context": f"moderator_report_{context}"},
                 )
             raise HTTPException(
                 status_code=403, detail=translate("reports.view_forbidden")

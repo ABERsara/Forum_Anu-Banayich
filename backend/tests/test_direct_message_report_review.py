@@ -289,6 +289,28 @@ class TestDecideDirectMessageReport:
 
         assert response.status_code == 409
 
+    async def test_denied_decide_is_audited_as_a_decide_attempt_not_a_view(
+        self, client, make_user, as_user, db_session
+    ):
+        as_user(_make_outside_moderator(db_session, make_user))
+        sender, recipient = _pair(db_session, make_user)
+        message = _send_message(db_session, sender, recipient, "תוכן")
+        report = _file_dm_report(db_session, message, recipient)
+
+        response = await client.post(
+            f"{BASE}/reports/{report.id}/decide", json=_decide_body(ReportDecision.VALID)
+        )
+
+        assert response.status_code == 403
+        entries = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == AuditAction.DIRECT_MESSAGE_ACCESS_DENIED)
+            .all()
+        )
+        assert len(entries) == 1
+        assert entries[0].entity_id == report.id
+        assert entries[0].details["context"] == "moderator_report_decide"
+
 
 # ---------------------------------------------------------------------------
 # A report closed by account deletion (spec §9.4, "הכרעה ו'") — already
