@@ -24,6 +24,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from cryptography.exceptions import InvalidTag
 from fastapi import HTTPException
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Query, Session
@@ -615,7 +616,18 @@ def decrypt_reported_message(
 
     assert report.reported_content is not None
     assert report.reported_content_key_version is not None
-    content = decrypt_message(report.reported_content, report.reported_content_key_version)
+    # InvalidTag means the stored ciphertext failed authentication (DB
+    # corruption, tampering, or a key_version whose key no longer matches) —
+    # surfaced as a generic 500 rather than propagating, same policy as
+    # forum_service._to_response_dict()'s identical call.
+    try:
+        content = decrypt_message(
+            report.reported_content, report.reported_content_key_version
+        )
+    except InvalidTag as exc:
+        raise HTTPException(
+            status_code=500, detail="errors.internal_server_error"
+        ) from exc
 
     log_action(
         db,
