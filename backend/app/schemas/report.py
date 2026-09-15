@@ -70,10 +70,6 @@ class ReportWithContent(ReportResponse):
     #: history list. None on CLOSED_ACCOUNT_DELETED even there: §9.4 keeps
     #: the report once the reported-on account is deleted, not its content.
     message_content: str | None = None
-    #: Whether a moderator's VALID decision hid this message (hidden_at is
-    #: not None) — a state, not content, so unlike message_content this is
-    #: safe to show in list views too.
-    message_hidden: bool | None = None
 
 
 class ReportDecideRequest(BaseModel):

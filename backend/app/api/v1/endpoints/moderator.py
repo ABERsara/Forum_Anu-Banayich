@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import ReportTargetType, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
-from app.models.forum import DirectMessage, ForumPost
+from app.models.forum import ForumPost
 from app.models.report import Report
 from app.models.user import User
 from app.schemas.report import (
@@ -71,16 +71,8 @@ def _to_reports_with_content(db: Session, reports: list[Report]) -> list[ReportW
     degrade-gracefully answer the DIRECT_MESSAGE branch below already gives.
     """
     post_ids = [r.target_id for r in reports if r.target_type == ReportTargetType.FORUM_POST]
-    message_ids = [
-        r.target_id for r in reports if r.target_type == ReportTargetType.DIRECT_MESSAGE
-    ]
-
     posts_by_id = {
         post.id: post for post in db.query(ForumPost).filter(ForumPost.id.in_(post_ids)).all()
-    }
-    messages_by_id = {
-        message.id: message
-        for message in db.query(DirectMessage).filter(DirectMessage.id.in_(message_ids)).all()
     }
 
     items: list[ReportWithContent] = []
@@ -102,19 +94,14 @@ def _to_reports_with_content(db: Session, reports: list[Report]) -> list[ReportW
             )
             continue
 
-        # DIRECT_MESSAGE. The live row can legitimately be gone (pruned, or
-        # purged with its sender's account) while the report itself
-        # survives — that is the whole reason
-        # report_service.decrypt_reported_message() reads from the
-        # report's own snapshot rather than here. A message this gone
-        # counts as hidden: there is nothing left to show either way.
-        message = messages_by_id.get(report.target_id)
-        items.append(
-            ReportWithContent(
-                **base,
-                message_hidden=message.hidden_at is not None if message else True,
-            )
-        )
+        # DIRECT_MESSAGE. No content lookup at all: a list row never shows
+        # decrypted content (see the docstring above), and there is nothing
+        # else about a DM report worth reading from the live row here — its
+        # hidden/visible state is already implied by report.decision (VALID
+        # always hides, INVALID never does; a report is decided at most
+        # once), so there is no independent fact left for a live lookup to
+        # add, unlike a ForumPost's content_status.
+        items.append(ReportWithContent(**base))
     return items
 
 

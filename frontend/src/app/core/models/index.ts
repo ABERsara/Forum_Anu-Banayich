@@ -518,8 +518,6 @@ export interface ReportWithContent extends Report {
    * CLOSED_ACCOUNT_DELETED.
    */
   message_content?: string | null;
-  /** Whether a moderator's VALID decision hid this message. Safe in lists — state, not content. */
-  message_hidden?: boolean;
 }
 
 /**
