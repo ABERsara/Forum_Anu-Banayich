@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.constants import AccountStatus, UserRole
+from app.core.i18n import translate
 from app.core.security import ALGORITHM, get_password_hash, verify_password
 from app.models.user import User
 from app.schemas.auth import (
@@ -66,7 +67,7 @@ def register(db: Session, data: RegisterRequest) -> User:
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         # PROD: deviates from spec — spec defines 400, changed to 409 Conflict for semantic correctness (valid request conflicting with existing resource). Reconsider before PROD.
-        raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
+        raise HTTPException(status_code=409, detail=translate("auth.email_taken"))
     hashed = get_password_hash(data.password)
     user = User(
         email=data.email,
@@ -95,13 +96,13 @@ def verify_otp(db: Session, email: str, otp_code: str) -> User:
     user = db.query(User).filter(User.email == email).first()
     if not user:
         # PROD: intentionally 400 instead of 404 — prevents User Enumeration Attack.
-        raise HTTPException(status_code=400, detail="הפרטים שהוזנו שגויים")
+        raise HTTPException(status_code=400, detail=translate("auth.invalid_details"))
     expires_at = user.otp_expires_at
     if expires_at is None or expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
         # PROD: deviates from spec — spec defines a generic message for all OTP errors. Distinguishing "expired" from "wrong code" slightly weakens User Enumeration protection. Reconsider before PROD.
-        raise HTTPException(status_code=400, detail="קוד האימות פג תוקף")
+        raise HTTPException(status_code=400, detail=translate("auth.otp_expired"))
     if user.otp_code != otp_code:
-        raise HTTPException(status_code=400, detail="הפרטים שהוזנו שגויים")
+        raise HTTPException(status_code=400, detail=translate("auth.invalid_details"))
     user.account_status = AccountStatus.PENDING_APPROVAL
     user.otp_code = None
     user.otp_expires_at = None
@@ -123,7 +124,7 @@ def _check_active_or_reactivate(db: Session, user: User) -> None:
         )
         if still_suspended:
             raise HTTPException(
-                status_code=403, detail="החשבון מושעה זמנית. נסה שוב מאוחר יותר."
+                status_code=403, detail=translate("auth.account_suspended")
             )
         user.account_status = AccountStatus.ACTIVE
         user.is_suspended = False
@@ -131,13 +132,13 @@ def _check_active_or_reactivate(db: Session, user: User) -> None:
         db.commit()
 
     if user.account_status != AccountStatus.ACTIVE:
-        raise HTTPException(status_code=403, detail="החשבון אינו פעיל. פנה/י למנהל.")
+        raise HTTPException(status_code=403, detail=translate("auth.account_inactive"))
 
 
 def login(db: Session, data: LoginRequest) -> TokenResponse:
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="אימות נכשל. בדוק/י מייל וסיסמה.")
+        raise HTTPException(status_code=401, detail=translate("auth.login_failed"))
 
     _check_active_or_reactivate(db, user)
 
@@ -165,10 +166,10 @@ def _verify_firebase_token(id_token: str) -> dict[str, Any]:
         )
     except ValueError as exc:
         raise HTTPException(
-            status_code=401, detail="אימות Google נכשל. נסה/י שוב."
+            status_code=401, detail=translate("auth.google_failed")
         ) from exc
     if claims is None or not claims.get("email") or not claims.get("email_verified"):
-        raise HTTPException(status_code=401, detail="אימות Google נכשל. נסה/י שוב.")
+        raise HTTPException(status_code=401, detail=translate("auth.google_failed"))
     return claims
 
 
@@ -195,11 +196,11 @@ def google_login(db: Session, data: GoogleAuthRequest) -> TokenResponse:
             # a real Google account for this exact email (Google signs the
             # claim), which is a much stronger bar than guessing an email.
             raise HTTPException(
-                status_code=403, detail="אין חשבון מקושר למייל זה. יש להירשם תחילה."
+                status_code=403, detail=translate("auth.google_no_account")
             )
         if user.google_uid is not None and user.google_uid != google_uid:
             raise HTTPException(
-                status_code=409, detail="כתובת המייל מקושרת לחשבון Google אחר."
+                status_code=409, detail=translate("auth.google_email_linked_elsewhere")
             )
 
     _check_active_or_reactivate(db, user)
@@ -234,7 +235,7 @@ def google_link(db: Session, current_user: User, data: GoogleAuthRequest) -> Non
     )
     if conflict is not None:
         raise HTTPException(
-            status_code=409, detail="חשבון Google זה כבר מקושר למשתמש אחר."
+            status_code=409, detail=translate("auth.google_already_linked")
         )
 
     current_user.google_uid = google_uid
@@ -245,15 +246,23 @@ def refresh_token(db: Session, refresh_tok: str) -> TokenResponse:
     try:
         payload = jwt.decode(refresh_tok, settings.SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
-        raise HTTPException(status_code=401, detail="טוקן רענון לא תקין.") from None
+        raise HTTPException(
+            status_code=401, detail=translate("auth.invalid_refresh_token")
+        ) from None
     if payload.get("type") != "refresh":
-        raise HTTPException(status_code=401, detail="טוקן רענון לא תקין.")
+        raise HTTPException(
+            status_code=401, detail=translate("auth.invalid_refresh_token")
+        )
     user_id: str | None = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=401, detail="טוקן רענון לא תקין.")
+        raise HTTPException(
+            status_code=401, detail=translate("auth.invalid_refresh_token")
+        )
     user = db.query(User).filter(User.id == user_id).first()
     if not user or user.account_status != AccountStatus.ACTIVE:
-        raise HTTPException(status_code=401, detail="טוקן רענון לא תקין.")
+        raise HTTPException(
+            status_code=401, detail=translate("auth.invalid_refresh_token")
+        )
     access = _create_token(
         user.id, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), "access"
     )
@@ -266,7 +275,7 @@ def resend_otp(db: Session, email: str) -> None:
     user = db.query(User).filter(User.email == email).first()
     if not user or user.account_status != AccountStatus.PENDING_OTP:
         # PROD: intentionally 400 instead of 404 — prevents User Enumeration Attack.
-        raise HTTPException(status_code=400, detail="לא ניתן לשלוח קוד אימות")
+        raise HTTPException(status_code=400, detail=translate("auth.otp_send_failed"))
     otp = _generate_and_assign_otp(user)
     db.commit()
     send_otp_email(user.email, otp)

@@ -29,15 +29,24 @@ from app.schemas.professional import (
 from app.schemas.report import (
     ReportCreate,
     ReportDecideRequest,
+    ReportHistoryResponse,
     ReportListResponse,
     ReportResponse,
     ReportWithContent,
+)
+from app.schemas.restriction import (
+    MyRestriction,
+    MyRestrictionResponse,
+    RestrictedMember,
+    RestrictionListResponse,
+    RestrictionWithMember,
 )
 from app.schemas.user import (
     ProfessionalProfile,
     RegistrationRejectRequest,
     SuspendUserRequest,
     UserAdminView,
+    UserModerationCard,
     UserProfile,
     UserPublic,
 )
@@ -50,6 +59,7 @@ __all__ = [
     "UserPublic",
     "UserProfile",
     "UserAdminView",
+    "UserModerationCard",
     "ProfessionalProfile",
     "RegistrationRejectRequest",
     "SuspendUserRequest",
@@ -68,6 +78,12 @@ __all__ = [
     "ReportResponse",
     "ReportDecideRequest",
     "ReportListResponse",
+    "ReportHistoryResponse",
     "ReportWithContent",
+    "MyRestriction",
+    "MyRestrictionResponse",
+    "RestrictedMember",
+    "RestrictionWithMember",
+    "RestrictionListResponse",
     "AgentDomainResponse",
 ]

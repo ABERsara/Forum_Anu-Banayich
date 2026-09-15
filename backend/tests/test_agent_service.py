@@ -16,8 +16,11 @@ shape:
     can write a message dated yesterday.
   - **The history window.** _recent_turns() takes the newest turns, in the
     order they were said, decrypted, with the fixed disclaimer taken back off.
-  - **The retrieval fallback.** _retrieve_for() widens a follow-up with the
-    question before it, but only when the follow-up found nothing itself.
+  - **The relevance floor and the retrieval fallback.** _retrieve() drops what
+    is not near enough to quote and _retrieve_for() widens a follow-up with the
+    question before it, but only when the follow-up found nothing itself. Both
+    are asserted against a stubbed rag_service.retrieve() — the real one needs
+    pgvector and a paid embedding call (see test_agent_chat.py's docstring).
 
 The DB is real (in-memory), per CONTRIBUTING §9.
 """
@@ -41,14 +44,9 @@ from app.core.constants import (
     UserType,
 )
 from app.core.encryption import encrypt_message
-from app.models.agent import (
-    AgentConversation,
-    AgentDomain,
-    AgentKnowledgeEntry,
-    AgentMessage,
-)
+from app.models.agent import AgentConversation, AgentDomain, AgentMessage
 from app.models.user import User
-from app.services import agent_service, llm_service
+from app.services import agent_service, llm_service, rag_service
 
 
 def _make_domain(
@@ -373,6 +371,7 @@ class TestPrecondition:
 # ===========================================================================
 
 HOUSING_TITLE = "סיוע בדיור למשפחות חד-הוריות"
+CHILDREN_TITLE = "קצבה עבור הילדים במשפחה חד-הורית"
 HOUSING_QUESTION = "האם מגיע לי סיוע בדיור?"
 PRONOUN_FOLLOW_UP = "וכמה זה בערך?"
 
@@ -402,20 +401,6 @@ def conversation(
     return row
 
 
-@pytest.fixture
-def housing_entry(db_session: Session, domain: AgentDomain) -> AgentKnowledgeEntry:
-    entry = AgentKnowledgeEntry(
-        domain_id=domain.id,
-        title=HOUSING_TITLE,
-        content="משפחה חד-הורית זכאית לסיוע בשכר דירה בכפוף למבחן הכנסה.",
-        source_name="נוהל סיוע בשכר דירה",
-        updated_by=_make_user(db_session, email="staff@example.com").id,
-    )
-    db_session.add(entry)
-    db_session.commit()
-    return entry
-
-
 def _say(
     db_session: Session,
     conversation: AgentConversation,
@@ -435,6 +420,48 @@ def _say(
     db_session.add(message)
     db_session.commit()
     return message
+
+
+def _chunk(
+    title: str, score: float, content: str = "תוכן"
+) -> rag_service.RetrievedChunk:
+    return rag_service.RetrievedChunk(
+        title=title,
+        content=content,
+        source_name="ביטוח לאומי",
+        source_url=None,
+        score=score,
+    )
+
+
+@pytest.fixture
+def ranking(monkeypatch):
+    """Answer rag_service.retrieve() from a script, and record what it was asked.
+
+    The real one embeds the question with Gemini and ranks with pgvector; what
+    these tests are about is what agent_service does with a ranking once it has
+    one, so the ranking is supplied. A callable per query, consumed in order,
+    so a test can say "the first search finds nothing near enough, the second
+    finds the housing passage" without owning a scoring function.
+    """
+
+    class Script:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+            self.results: list[list[rag_service.RetrievedChunk]] = []
+
+        def returns(self, *results: list[rag_service.RetrievedChunk]) -> None:
+            self.results = list(results)
+
+        def retrieve(self, db, domain_id, query, k=5):
+            self.queries.append(query)
+            if not self.results:
+                return []
+            return self.results.pop(0)
+
+    script = Script()
+    monkeypatch.setattr(rag_service, "retrieve", script.retrieve)
+    return script
 
 
 # ---------------------------------------------------------------------------
@@ -533,7 +560,14 @@ class TestGetVisibleDomain:
         self, db_session: Session, role: UserRole
     ) -> None:
         """Not a 500 from the missing user_type, and not access either: a
-        moderator has no business inside a member's agent thread (SPEC §9.3)."""
+        moderator has no business inside a member's agent thread (SPEC §9.3).
+
+        A professional is refused here too, and that is not in tension with
+        their editing rights: the knowledge base routes resolve the domain
+        through get_manageable_domain(), which asks about their discipline.
+        This function answers a different question — may this person *use* the
+        agent — and the answer for a professional is no.
+        """
         actor = _make_user(
             db_session,
             email=f"{role.value}@example.com",
@@ -738,21 +772,86 @@ class TestRecentTurns:
 
 
 # ---------------------------------------------------------------------------
+# _retrieve() — the relevance floor
+# ---------------------------------------------------------------------------
+
+
+class TestRelevanceFloor:
+    """rag_service.retrieve() ranks; it never refuses.
+
+    Cosine distance is defined for every pair of vectors, so the k nearest
+    chunks come back for any question at all. "Near enough to quote" is decided
+    here, and deciding it in code rather than in the prompt is what makes the
+    referral to human advice a guarantee instead of a request.
+    """
+
+    def test_a_passage_below_the_floor_is_dropped(
+        self, db_session: Session, domain: AgentDomain, ranking, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(settings, "AGENT_MIN_RELEVANCE_SCORE", 0.5)
+        ranking.returns([_chunk(HOUSING_TITLE, 0.8), _chunk(CHILDREN_TITLE, 0.49)])
+
+        chunks = agent_service._retrieve(db_session, domain, HOUSING_QUESTION)
+
+        assert [chunk.title for chunk in chunks] == [HOUSING_TITLE]
+
+    def test_a_passage_exactly_at_the_floor_is_kept(
+        self, db_session: Session, domain: AgentDomain, ranking, monkeypatch
+    ) -> None:
+        """The comparison is `>=`. Named in a test because the boundary is the
+        one thing a reader cannot infer from the setting's name."""
+        monkeypatch.setattr(settings, "AGENT_MIN_RELEVANCE_SCORE", 0.5)
+        ranking.returns([_chunk(HOUSING_TITLE, 0.5)])
+
+        assert len(agent_service._retrieve(db_session, domain, HOUSING_QUESTION)) == 1
+
+    def test_nothing_near_enough_reads_as_nothing_at_all(
+        self, db_session: Session, domain: AgentDomain, ranking, monkeypatch
+    ) -> None:
+        """The whole point: a ranking full of near-misses has to arrive at
+        _answer_body() as an empty list, or the model is asked to answer out of
+        material about something else."""
+        monkeypatch.setattr(settings, "AGENT_MIN_RELEVANCE_SCORE", 0.5)
+        ranking.returns([_chunk(HOUSING_TITLE, 0.2), _chunk(CHILDREN_TITLE, 0.1)])
+
+        assert agent_service._retrieve(db_session, domain, HOUSING_QUESTION) == []
+
+    def test_an_embedding_failure_is_not_swallowed_as_an_empty_result(
+        self, db_session: Session, domain: AgentDomain, monkeypatch
+    ) -> None:
+        """An outage must not read as "the knowledge base has nothing on
+        that" — that answer would be stored in the member's thread as if it
+        were true. chat() turns this into a 503."""
+
+        def _boom(db, domain_id, query, k=5):
+            raise rag_service.EmbeddingError("GEMINI_API_KEY is not set")
+
+        monkeypatch.setattr(rag_service, "retrieve", _boom)
+
+        with pytest.raises(rag_service.EmbeddingError):
+            agent_service._retrieve(db_session, domain, HOUSING_QUESTION)
+
+
+# ---------------------------------------------------------------------------
 # _retrieve_for()
 # ---------------------------------------------------------------------------
 
 
 class TestRetrieveFor:
     def test_a_question_that_stands_alone_is_searched_as_written(
-        self, db_session: Session, domain: AgentDomain, housing_entry
+        self, db_session: Session, domain: AgentDomain, ranking
     ) -> None:
-        entries = agent_service._retrieve_for(db_session, domain, HOUSING_QUESTION, [])
+        ranking.returns([_chunk(HOUSING_TITLE, 0.8)])
 
-        assert [entry.title for entry in entries] == [HOUSING_TITLE]
+        chunks = agent_service._retrieve_for(db_session, domain, HOUSING_QUESTION, [])
+
+        assert [chunk.title for chunk in chunks] == [HOUSING_TITLE]
+        assert ranking.queries == [HOUSING_QUESTION]
 
     def test_a_follow_up_borrows_the_words_of_the_question_before_it(
-        self, db_session: Session, domain: AgentDomain, housing_entry
+        self, db_session: Session, domain: AgentDomain, ranking
     ) -> None:
+        ranking.returns([], [_chunk(HOUSING_TITLE, 0.8)])
         history = [
             llm_service.HistoryTurn(
                 role=AgentMessageRole.USER, content=HOUSING_QUESTION
@@ -760,27 +859,36 @@ class TestRetrieveFor:
             llm_service.HistoryTurn(role=AgentMessageRole.AGENT, content="כן, בתנאים."),
         ]
 
-        entries = agent_service._retrieve_for(
+        chunks = agent_service._retrieve_for(
             db_session, domain, PRONOUN_FOLLOW_UP, history
         )
 
-        assert [entry.title for entry in entries] == [HOUSING_TITLE]
+        assert [chunk.title for chunk in chunks] == [HOUSING_TITLE]
+        assert ranking.queries == [
+            PRONOUN_FOLLOW_UP,
+            f"{HOUSING_QUESTION} {PRONOUN_FOLLOW_UP}",
+        ]
 
     def test_with_nothing_behind_it_a_bare_follow_up_finds_nothing(
-        self, db_session: Session, domain: AgentDomain, housing_entry
+        self, db_session: Session, domain: AgentDomain, ranking
     ) -> None:
         """The widening is a fallback for a follow-up, not a second attempt for
-        every question: an opening message has nothing to widen with."""
+        every question: an opening message has nothing to widen with, and the
+        second embedding call is not paid for."""
+        ranking.returns([])
+
         assert (
             agent_service._retrieve_for(db_session, domain, PRONOUN_FOLLOW_UP, []) == []
         )
+        assert ranking.queries == [PRONOUN_FOLLOW_UP]
 
     def test_only_the_users_own_words_are_borrowed(
-        self, db_session: Session, domain: AgentDomain, housing_entry
+        self, db_session: Session, domain: AgentDomain, ranking
     ) -> None:
         """The agent's replies are its words, not a statement of what is being
         asked about — widening with them would search the answer, not the
         question."""
+        ranking.returns([])
         history = [
             llm_service.HistoryTurn(
                 role=AgentMessageRole.AGENT, content=f"לפי {HOUSING_TITLE}, כן."
@@ -791,18 +899,82 @@ class TestRetrieveFor:
             agent_service._retrieve_for(db_session, domain, PRONOUN_FOLLOW_UP, history)
             == []
         )
+        assert ranking.queries == [PRONOUN_FOLLOW_UP]
 
-    def test_never_reads_another_agents_knowledge_base(
-        self, db_session: Session, domain: AgentDomain, housing_entry
+    def test_the_most_recent_question_is_the_one_borrowed(
+        self, db_session: Session, domain: AgentDomain, ranking
     ) -> None:
-        """SPEC §12.1: each agent is confined to its own material, and that is
-        enforced in the query rather than asked for in the prompt."""
-        other_domain = _make_domain(db_session, "second agent")
+        """A conversation that has wandered should be widened with what it is
+        about *now*, not with how it opened."""
+        ranking.returns([], [])
+        history = [
+            llm_service.HistoryTurn(role=AgentMessageRole.USER, content="שאלה ראשונה"),
+            llm_service.HistoryTurn(role=AgentMessageRole.AGENT, content="תשובה"),
+            llm_service.HistoryTurn(
+                role=AgentMessageRole.USER, content=HOUSING_QUESTION
+            ),
+            llm_service.HistoryTurn(role=AgentMessageRole.AGENT, content="תשובה שנייה"),
+        ]
 
-        assert (
-            agent_service._retrieve_for(db_session, other_domain, HOUSING_QUESTION, [])
-            == []
+        agent_service._retrieve_for(db_session, domain, PRONOUN_FOLLOW_UP, history)
+
+        assert ranking.queries[-1] == f"{HOUSING_QUESTION} {PRONOUN_FOLLOW_UP}"
+
+
+# ---------------------------------------------------------------------------
+# _to_sources()
+# ---------------------------------------------------------------------------
+
+
+class TestSources:
+    def test_one_entry_that_gave_several_chunks_is_named_once(self) -> None:
+        """Retrieval works on chunks; the reader is being shown documents."""
+        sources = agent_service._to_sources(
+            [
+                _chunk(HOUSING_TITLE, 0.9, content="פסקה ראשונה"),
+                _chunk(HOUSING_TITLE, 0.7, content="פסקה שנייה"),
+            ]
         )
+
+        assert [source.title for source in sources] == [HOUSING_TITLE]
+
+    def test_sources_keep_retrieval_order(self) -> None:
+        """Which is relevance order, so the passage that answered the question
+        is the first source listed."""
+        sources = agent_service._to_sources(
+            [_chunk(CHILDREN_TITLE, 0.9), _chunk(HOUSING_TITLE, 0.6)]
+        )
+
+        assert [source.title for source in sources] == [CHILDREN_TITLE, HOUSING_TITLE]
+
+    def test_two_entries_sharing_a_heading_stay_two_sources(self) -> None:
+        """Deduplicated on the whole provenance triple, not on the title: two
+        documents can carry the same heading and cite different places, and
+        collapsing them would credit one for what the other said."""
+        first = rag_service.RetrievedChunk(
+            title="זכאות",
+            content="א",
+            source_name="ביטוח לאומי",
+            source_url=None,
+            score=0.9,
+        )
+        second = rag_service.RetrievedChunk(
+            title="זכאות",
+            content="ב",
+            source_name="משרד הבינוי והשיכון",
+            source_url=None,
+            score=0.8,
+        )
+
+        sources = agent_service._to_sources([first, second])
+
+        assert [source.source_name for source in sources] == [
+            "ביטוח לאומי",
+            "משרד הבינוי והשיכון",
+        ]
+
+    def test_nothing_retrieved_is_no_sources(self) -> None:
+        assert agent_service._to_sources([]) == []
 
 
 # ---------------------------------------------------------------------------

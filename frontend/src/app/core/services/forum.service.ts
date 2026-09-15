@@ -18,6 +18,7 @@ import {
   ForumPostList,
   ForumPostUpdate,
   LikeResponse,
+  MyRestrictionResponse,
   ReportCreate,
   UserPublic,
 } from '../models';
@@ -125,5 +126,18 @@ export class ForumService {
    */
   searchUsers(name: string): Observable<UserPublic[]> {
     return this.api.get<UserPublic[]>(`/messages/recipients?q=${encodeURIComponent(name)}`);
+  }
+
+  /**
+   * Whether the current user is under SPEC §7.2's messaging restriction, and
+   * until when (ABF-116).
+   *
+   * Takes no user id and cannot be asked about anyone else — the server
+   * answers about whoever is holding the token. `restriction` is null when
+   * there is none, which is a 200, so a member who is fine does not put a
+   * failed request in her own console.
+   */
+  getMessagingRestriction(): Observable<MyRestrictionResponse> {
+    return this.api.get<MyRestrictionResponse>('/messages/restriction');
   }
 }

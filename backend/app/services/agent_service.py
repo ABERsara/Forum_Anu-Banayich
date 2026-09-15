@@ -1,12 +1,26 @@
 """
-AI agent service — the domain catalog (ABF-120) and the conversation flow
-(ABF-122).
+AI agent service — the domain catalog and its knowledge base (ABF-120/121),
+and the conversation flow (ABF-122).
 
-One question in, one grounded answer out. This module is where the pieces
-meet — retrieval (rag_service, ABF-121), generation (llm_service), the
-conversation rows (ABF-120) and the audit entry — and it exists so that the
-endpoints stay what CONTRIBUTING §2 asks an endpoint to be: receive, validate
-shape, delegate, return.
+get_visible_domains() applies the same group/sector visibility filter as the
+forum (see forum_service._content_filter): a domain is visible to a user when
+its group_visibility matches the user's group or is "all", AND its
+sector_visibility matches the user's sector or is "all". Inactive domains are
+never returned.
+
+The knowledge-base side answers a different question. Reading the catalog asks
+"which domains is this member offered"; editing a knowledge base asks "may this
+professional edit this one", and the answer turns on their discipline, not on
+their bereavement group — an admin and a professional have neither user_type
+nor sector at all. The write functions own the whole operation: the commit, and
+whether the edit earns a re-index. The endpoints authorize and hand off, so
+none of this is reachable only through a request.
+
+The chat side (ABF-122) is where the pieces meet — retrieval (rag_service),
+generation (llm_service), the conversation rows (ABF-120) and the audit entry.
+It lives here rather than in the endpoints so that those stay what
+CONTRIBUTING §2 asks an endpoint to be: receive, validate shape, delegate,
+return.
 
 Four rules are enforced here rather than in the prompt, because a prompt is a
 request and these are guarantees:
@@ -15,15 +29,16 @@ request and these are guarantees:
   ABF-120 an agent is a table row gated by group/sector exactly like a forum
   post, so `{domain_id}` is an id to be checked, not an enum FastAPI can
   validate for us. See get_visible_domain().
-* **No material, no answer.** When rag_service.retrieve() comes back empty the
-  provider is not called at all — the agent says it has nothing and points at
-  human advice. The model never gets the chance to fill a void.
+* **No material, no answer.** When nothing clears
+  settings.AGENT_MIN_RELEVANCE_SCORE the provider is not called at all — the
+  agent says it has nothing and points at human advice. The model never gets
+  the chance to fill a void.
 * **The disclaimer is always there.** It is concatenated onto the answer, not
   asked for, so it cannot be dropped or paraphrased away.
 * **A follow-up is read next to the question before it.** "וכמה זה בערך?"
   names nothing on its own, so retrieval that only sees those four words finds
-  nothing and the agent would refer the user to a human one turn after
-  answering the very question being followed up on. See _retrieve_for().
+  nothing near enough, and the agent would refer the user to a human one turn
+  after answering the very question being followed up on. See _retrieve_for().
 
 Message content is encrypted at rest, the same way DirectMessage.content is
 (AES-256-GCM, app/core/encryption.py) and for the same reason: on a
@@ -46,6 +61,7 @@ from typing import NoReturn
 from cryptography.exceptions import InvalidTag
 from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement, func, or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -59,6 +75,7 @@ from app.core.constants import (
     UserType,
 )
 from app.core.encryption import decrypt_message, encrypt_message
+from app.core.i18n import translate
 from app.models.agent import (
     AgentConversation,
     AgentDomain,
@@ -70,6 +87,8 @@ from app.schemas.agent import (
     AgentChatRequest,
     AgentChatResponse,
     AgentConversationResponse,
+    AgentKnowledgeEntryCreate,
+    AgentKnowledgeEntryUpdate,
     AgentMessageResponse,
     AgentSourceResponse,
 )
@@ -77,6 +96,13 @@ from app.services import llm_service, rag_service
 from app.services.audit_service import log_action
 
 logger = logging.getLogger(__name__)
+
+# The only two fields an embedding is built from. index_entry() embeds each
+# chunk with the title in front of it, so a title left unindexed would go on
+# being searched for under the old one — which is worse than not indexing it at
+# all. A source_name or source_url fix changes nothing an embedding sees, and
+# must not spend a paid round trip rebuilding identical vectors.
+_INDEXED_FIELDS = frozenset({"title", "content"})
 
 #: The rate limit is "per day" in the sense of a rolling 24 hours, not of a
 #: calendar day: a midnight reset would let one user spend two days' budget in
@@ -88,14 +114,12 @@ RATE_LIMIT_WINDOW = timedelta(hours=24)
 #: drift apart and leave the disclaimer stuck in the history.
 DISCLAIMER_SEPARATOR = "\n\n"
 
-#: Translation keys, not display text: the i18n DoD requires a server error to
-#: come back as a key the client resolves through Transloco (he/en), the way
-#: forum_service._DM_FORBIDDEN_MESSAGE already does. The agent's *answers* are
-#: the opposite case and stay Hebrew — see llm_service.ANSWER_DISCLAIMER.
-_DOMAIN_NOT_FOUND = "errors.agent_domain_not_found"
-_CONVERSATION_NOT_FOUND = "errors.agent_conversation_not_found"
-_CONVERSATION_FORBIDDEN = "errors.agent_conversation_forbidden"
-_AGENT_UNAVAILABLE = "errors.agent_unavailable"
+#: The detail behind a failed decrypt. A literal key rather than translate(),
+#: matching forum_service._to_response_dict() exactly: this particular key is
+#: already in the client's KNOWN_ERROR_KEYS and resolved there, so sending
+#: finished prose instead would drop the screen to its generic fallback.
+#: Unifying the two mechanisms needs a frontend change and is a ticket of its
+#: own — see app/core/messages.py's docstring.
 _DECRYPTION_FAILED = "errors.internal_server_error"
 
 
@@ -166,16 +190,17 @@ def get_visible_domains(db: Session, user: User) -> list[AgentDomain]:
 
 
 def get_visible_domain(db: Session, user: User, domain_id: str) -> AgentDomain:
-    """One domain by id, or 404 — the IDOR guard for every `{domain_id}` route.
+    """One agent a member may use, by id, or 404 — the IDOR guard for every
+    member-facing `{domain_id}` route.
 
     ABF-120 shipped only the plural `get_visible_domains()`, for the catalog
-    screen. Every endpoint that takes an id needs the singular one: a
-    `{domain_id}` in a URL is a guess until it has been resolved against the
-    caller's own group/sector, and without this a member could reach an agent
-    built for a different group by pasting its id.
+    screen. Every member-facing endpoint that takes an id needs the singular
+    one: a `{domain_id}` in a URL is a guess until it has been resolved against
+    the caller's own group/sector, and without this a member could reach an
+    agent built for a different group by pasting its id.
 
-    **404, never 403, and the same 404 for all four ways of failing** — no
-    such id, a domain of another group, of another sector, or one that is
+    **404, never 403, and the same 404 for all four ways of failing** — no such
+    id, a domain of another group, of another sector, or one that is
     deactivated. A reader who may not use an agent must not be able to tell
     "there is no such agent" from "there is one and it is not for you"; on a
     platform segmented by sector, that difference is itself information about
@@ -186,15 +211,23 @@ def get_visible_domain(db: Session, user: User, domain_id: str) -> AgentDomain:
     filter. An admin has no user_type/sector to filter by, and the reason an
     admin is here at all is the audit trail: an AuditLog row pointing at a
     conversation in a since-deactivated domain still has to open. Every other
-    non-USER role gets the same 404 as a stranger — a moderator has no
-    business inside a member's agent thread (SPEC §9.3).
+    non-USER role gets the same 404 as a stranger — a moderator has no business
+    inside a member's agent thread (SPEC §9.3).
+
+    Not a duplicate of get_domain_or_404() below; the two ask different
+    questions. This one asks "may this member *use* this agent", and hides
+    every reason for no behind one 404. That one asks "which domain is being
+    edited", for the admins and professionals who have no group or sector to be
+    filtered by, and for whom `is_active` is beside the point — a retired
+    agent's knowledge base still has to be correctable.
     """
     query = db.query(AgentDomain).filter(AgentDomain.id == domain_id)
 
     if user.role != UserRole.ADMIN:
         if user.role != UserRole.USER or user.user_type is None or user.sector is None:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=_DOMAIN_NOT_FOUND
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=translate("agents.domain_not_found"),
             )
         query = query.filter(
             AgentDomain.is_active.is_(True),
@@ -204,9 +237,190 @@ def get_visible_domain(db: Session, user: User, domain_id: str) -> AgentDomain:
     domain = query.first()
     if domain is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=_DOMAIN_NOT_FOUND
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=translate("agents.domain_not_found"),
         )
     return domain
+
+
+# ---------------------------------------------------------------------------
+# Who may maintain a knowledge base
+# ---------------------------------------------------------------------------
+
+
+def get_domain_or_404(db: Session, domain_id: str) -> AgentDomain:
+    """Load one domain by id, or raise 404.
+
+    Unfiltered on purpose. get_visible_domains() above raises ValueError for a
+    user without user_type/sector, which is every admin and every professional —
+    the two roles this lookup exists for.
+
+    404 rather than 403 for an id that does not exist: a 403 would confirm that
+    some other domain is there, which is the difference between refusing a
+    request and answering a question about the catalog that was not asked.
+    """
+    domain = db.get(AgentDomain, domain_id)
+    if domain is None:
+        raise HTTPException(
+            status_code=404, detail=translate("agents.domain_not_found")
+        )
+    return domain
+
+
+def can_manage_knowledge(user: User, domain: AgentDomain) -> bool:
+    """May this user add to or edit this domain's knowledge base?
+
+    Admins may edit any domain. A professional may edit the domains of their own
+    discipline: a lawyer maintains the legal-rights agent, not the medical one.
+
+    The role is checked as well as the discipline, though today every user with
+    a professional_domain set is a professional. professional_domain is nullable
+    and lives on User rather than on a professionals-only table, so the day it
+    is set on anyone else — an admin's own area of expertise, a moderator's —
+    that alone must not hand them an editor's rights.
+    """
+    if user.role == UserRole.ADMIN:
+        return True
+    return (
+        user.role == UserRole.PROFESSIONAL
+        and user.professional_domain is not None
+        and user.professional_domain == domain.professional_domain
+    )
+
+
+def get_manageable_domain(db: Session, domain_id: str, user: User) -> AgentDomain:
+    """The domain `user` is allowed to manage, or the right refusal.
+
+    404 when it does not exist, 403 when it does but is not theirs — in that
+    order, so the two questions stay separate and neither leaks the other.
+    """
+    domain = get_domain_or_404(db, domain_id)
+    if not can_manage_knowledge(user, domain):
+        raise HTTPException(
+            status_code=403, detail=translate("agents.knowledge_manage_forbidden")
+        )
+    return domain
+
+
+def get_entry_or_404(db: Session, domain_id: str, entry_id: str) -> AgentKnowledgeEntry:
+    """Load an entry *of this domain*, or raise 404.
+
+    Both ids are in the path, and only the domain one has been authorized by the
+    time this runs. Matching on the pair is what stops a professional from
+    pairing their own domain_id with an entry_id belonging to someone else's
+    domain and editing it. An entry that exists under a different domain is a
+    404 here, exactly like one that does not exist.
+    """
+    entry = (
+        db.query(AgentKnowledgeEntry)
+        .filter(
+            AgentKnowledgeEntry.id == entry_id,
+            AgentKnowledgeEntry.domain_id == domain_id,
+        )
+        .first()
+    )
+    if entry is None:
+        raise HTTPException(
+            status_code=404, detail=translate("agents.knowledge_entry_not_found")
+        )
+    return entry
+
+
+# ---------------------------------------------------------------------------
+# Writing a knowledge base
+# ---------------------------------------------------------------------------
+
+
+def index_entry_safe(db: Session, entry: AgentKnowledgeEntry) -> None:
+    """Re-index one entry, without letting a failed index fail the write.
+
+    The entry is already committed by the time this runs, and it is the
+    professional's work. Reporting a 500 for it because Google was unreachable
+    would be the worse outcome by far — the write did happen, and the caller
+    would be told it did not. An unindexed entry is saved, visible and editable,
+    and the next edit that touches its title or content indexes it. So this logs
+    and returns.
+
+    SQLAlchemyError is caught alongside EmbeddingError because index_entry()
+    commits: a deadlock or a dropped connection on either commit is exactly as
+    survivable as a failed embedding, and leaves the session needing a rollback
+    before the request can be answered at all.
+    """
+    try:
+        rag_service.index_entry(db, entry)
+    except (rag_service.EmbeddingError, SQLAlchemyError):
+        db.rollback()
+        logger.exception(
+            "Knowledge entry %s was saved but could not be indexed; it will not "
+            "be retrievable until it is edited again.",
+            entry.id,
+        )
+
+
+def create_knowledge_entry(
+    db: Session,
+    domain_id: str,
+    data: AgentKnowledgeEntryCreate,
+    author: User,
+) -> AgentKnowledgeEntry:
+    """Add an entry to a domain's knowledge base and index it for retrieval.
+
+    `domain_id` comes from the path and `author` from the token, never from the
+    body: both are the caller's authorization, not their claim. Whether this
+    caller may write to this domain is get_manageable_domain()'s question, and
+    is settled before this is called.
+
+    Indexing runs after the commit, never inside it — index_entry() makes an
+    HTTP call, and a transaction held open across it would hold row locks for
+    the length of a network round trip.
+    """
+    entry = AgentKnowledgeEntry(
+        domain_id=domain_id,
+        updated_by=author.id,
+        **data.model_dump(),
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+
+    index_entry_safe(db, entry)
+    return entry
+
+
+def update_knowledge_entry(
+    db: Session,
+    entry: AgentKnowledgeEntry,
+    data: AgentKnowledgeEntryUpdate,
+    editor: User,
+) -> AgentKnowledgeEntry:
+    """Edit a knowledge base entry, re-indexing it only if its meaning changed.
+
+    Only the fields actually present in the body are written, which is what lets
+    a source be corrected without re-sending the content — and, because
+    re-indexing turns on which fields arrived, without paying for a round of
+    embeddings that would produce identical chunks.
+    """
+    changes = data.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        setattr(entry, field, value)
+    entry.updated_by = editor.id
+    db.commit()
+    db.refresh(entry)
+
+    if changes.keys() & _INDEXED_FIELDS:
+        index_entry_safe(db, entry)
+    return entry
+
+
+def delete_knowledge_entry(db: Session, entry: AgentKnowledgeEntry) -> None:
+    """Remove a knowledge base entry; its chunks go with it.
+
+    The chunks are deleted by the relationship's delete-orphan cascade, so
+    nothing is left behind to be retrieved and quoted after the entry that said
+    it is gone.
+    """
+    db.delete(entry)
+    db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -262,8 +476,16 @@ def chat(
     # Stamped before the provider is called, so the question keeps the time it
     # was asked rather than the time the answer came back.
     asked_at = _utc_now()
-    entries = _retrieve_for(db, domain, data.message, history)
-    answer = _compose_answer(domain, data.message, entries, history)
+    try:
+        chunks = _retrieve_for(db, domain, data.message, history)
+    except rag_service.EmbeddingError:
+        # The question could not be embedded, so retrieval never ran. Storing
+        # the "I have nothing on that" reply would be a lie about the knowledge
+        # base and would sit in the member's thread forever; the outage is
+        # ours, and it says so.
+        logger.warning("Agent retrieval failed: the question could not be embedded")
+        raise _unavailable() from None
+    answer = _compose_answer(domain, data.message, chunks, history)
     answered_at = _utc_now()
 
     if conversation is None:
@@ -309,7 +531,7 @@ def chat(
             content=answer,
             created_at=answered_at,
         ),
-        sources=[AgentSourceResponse.model_validate(entry) for entry in entries],
+        sources=_to_sources(chunks),
     )
 
     # log_action() commits, which persists the two messages above with it.
@@ -323,8 +545,8 @@ def chat(
         entity_id=conversation.id,
         details={
             "domain_id": domain.id,
-            "retrieved_chunks": len(entries),
-            "answered_from_knowledge_base": bool(entries),
+            "retrieved_chunks": len(chunks),
+            "answered_from_knowledge_base": bool(chunks),
             "llm_provider": settings.LLM_PROVIDER,
         },
     )
@@ -355,10 +577,8 @@ def get_conversation(
     One consequence worth naming: a member whose group or sector changed, or
     whose agent has been deactivated, gets 404 on her own old threads, because
     get_visible_domain() runs first. That is the decision recorded on the
-    ticket ("call it at the start of chat(), get_conversation(), and every
-    endpoint that takes {domain_id}"), and it is why ABF-123 should reach
-    threads through the domains GET /agents returns rather than from a
-    standalone history screen.
+    ticket, and it is why ABF-123 should reach threads through the domains
+    GET /agents returns rather than from a standalone history screen.
 
     Returned whole, without the cursor paging forum_service gives a direct-
     message conversation. A DM thread is two people talking for years and is
@@ -479,7 +699,8 @@ def _deny(db: Session, user: User, conversation_id: str, reason: str) -> NoRetur
         details={"reason": reason},
     )
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail=_CONVERSATION_FORBIDDEN
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=translate("agents.conversation_forbidden"),
     )
 
 
@@ -502,7 +723,8 @@ def _get_conversation_in_domain(
     )
     if conversation is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=_CONVERSATION_NOT_FOUND
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=translate("agents.conversation_not_found"),
         )
     return conversation
 
@@ -575,29 +797,63 @@ def _without_disclaimer(content: str) -> str:
     return content.removesuffix(DISCLAIMER_SEPARATOR + llm_service.ANSWER_DISCLAIMER)
 
 
+def _retrieve(
+    db: Session, domain: AgentDomain, query: str
+) -> list[rag_service.RetrievedChunk]:
+    """Passages for one query that are actually close enough to quote.
+
+    rag_service.retrieve() is a ranking, not a filter: it returns the k nearest
+    chunks of the domain however far away they are, because "nearest" is
+    defined for every question ever asked. So a question the knowledge base has
+    nothing to say about does not come back empty — it comes back with the five
+    least-unrelated paragraphs in it, and an agent that passed those on would be
+    answering "מה תחזית מזג האוויר מחר?" out of a document about housing aid.
+
+    settings.AGENT_MIN_RELEVANCE_SCORE is where "nothing relevant" is decided,
+    and deciding it here rather than in the prompt is what makes the referral to
+    human advice a property of the code: below the floor nothing is sent, the
+    provider is never called, and there is no opportunity to invent an answer.
+
+    An embedding failure — no API key, a timeout, Gemini down — raises
+    EmbeddingError, which the caller turns into a 503. It is deliberately *not*
+    treated as "nothing found": that would store "I have no information on that"
+    as the agent's answer to a question the knowledge base may well cover, which
+    is a false statement kept forever in a thread the member can re-read.
+    """
+    return [
+        chunk
+        for chunk in rag_service.retrieve(db, domain.id, query)
+        if chunk.score >= settings.AGENT_MIN_RELEVANCE_SCORE
+    ]
+
+
 def _retrieve_for(
     db: Session,
     domain: AgentDomain,
     message: str,
     history: list[llm_service.HistoryTurn],
-) -> list[AgentKnowledgeEntry]:
+) -> list[rag_service.RetrievedChunk]:
     """Passages for this question, read in the light of the one before it.
 
     A follow-up carries none of its own subject: "וכמה זה בערך?" is four words
-    that name nothing, so retrieval on the message alone comes back empty and
-    the agent would answer "I have no information on that" one turn after
-    answering the question it is a follow-up to. When that happens and there
-    is a conversation behind the message, the search runs again with the
-    previous question folded in — the words the follow-up is leaning on.
+    that name nothing, so an embedding of the message alone lands near nothing
+    in particular and the agent would answer "I have no information on that"
+    one turn after answering the question it is a follow-up to. When that
+    happens and there is a conversation behind the message, the search runs
+    again with the previous question folded in — the words the follow-up is
+    leaning on.
 
     A fallback rather than the default: a message that already found its own
     material must not have its ranking dragged towards the earlier subject.
     And only the previous *user* turn, because the agent's replies are its own
     words, not a statement of what is being asked about.
+
+    The second search costs a second embedding call, which is why it only runs
+    when the first one found nothing worth quoting.
     """
-    entries = rag_service.retrieve(db, domain.id, message)
-    if entries:
-        return entries
+    chunks = _retrieve(db, domain, message)
+    if chunks:
+        return chunks
 
     previous = next(
         (
@@ -609,43 +865,77 @@ def _retrieve_for(
     )
     if previous is None:
         return []
-    return rag_service.retrieve(db, domain.id, f"{previous} {message}")
+    return _retrieve(db, domain, f"{previous} {message}")
 
 
-def _to_context_chunk(entry: AgentKnowledgeEntry) -> llm_service.ContextChunk:
-    """The four fields a provider is given about one passage.
+def _to_context_chunk(chunk: rag_service.RetrievedChunk) -> llm_service.ContextChunk:
+    """One retrieved passage as a provider is allowed to see it.
 
-    The whole of ABF-122's dependency on rag_service's row type: if ABF-121
-    ends up returning chunk rows rather than knowledge entries, this is the
-    function that changes.
+    The whole of ABF-122's dependency on rag_service's row type. The `score`
+    is dropped here on purpose: how one embedding model's distances are
+    distributed is retrieval's business, and a provider handed it could start
+    weighting passages by a number that means something different the day
+    GEMINI_EMBED_MODEL changes.
     """
     return llm_service.ContextChunk(
-        title=entry.title,
-        content=entry.content,
-        source_name=entry.source_name,
-        source_url=entry.source_url,
+        title=chunk.title,
+        content=chunk.content,
+        source_name=chunk.source_name,
+        source_url=chunk.source_url,
     )
+
+
+def _to_sources(
+    chunks: list[rag_service.RetrievedChunk],
+) -> list[AgentSourceResponse]:
+    """The documents behind an answer, each named once, best match first.
+
+    Retrieval works on chunks, and a long entry can contribute several of them
+    to the same answer — so the raw list routinely repeats one title three
+    times. What the reader is being shown is where the answer came from, and
+    "ביטוח לאומי ×3" says nothing more than "ביטוח לאומי" does. Deduplicated on
+    the full provenance triple rather than on the title alone, because two
+    entries can share a heading and cite different documents.
+
+    Order is retrieval's, which is relevance order, so the passage that
+    answered the question is the first source listed.
+    """
+    seen: set[tuple[str, str | None, str | None]] = set()
+    sources: list[AgentSourceResponse] = []
+    for chunk in chunks:
+        identity = (chunk.title, chunk.source_name, chunk.source_url)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        sources.append(
+            AgentSourceResponse(
+                title=chunk.title,
+                source_name=chunk.source_name,
+                source_url=chunk.source_url,
+            )
+        )
+    return sources
 
 
 def _compose_answer(
     domain: AgentDomain,
     question: str,
-    entries: list[AgentKnowledgeEntry],
+    chunks: list[rag_service.RetrievedChunk],
     history: list[llm_service.HistoryTurn],
 ) -> str:
     """The text stored as the agent's turn, disclaimer included."""
-    body = _answer_body(domain, question, entries, history)
+    body = _answer_body(domain, question, chunks, history)
     return f"{body}{DISCLAIMER_SEPARATOR}{llm_service.ANSWER_DISCLAIMER}"
 
 
 def _answer_body(
     domain: AgentDomain,
     question: str,
-    entries: list[AgentKnowledgeEntry],
+    chunks: list[rag_service.RetrievedChunk],
     history: list[llm_service.HistoryTurn],
 ) -> str:
     """Ask the provider — unless there is nothing to ground an answer in."""
-    if not entries:
+    if not chunks:
         return llm_service.NO_CONTEXT_ANSWER
 
     try:
@@ -653,7 +943,7 @@ def _answer_body(
         return provider.generate(
             system_prompt=llm_service.build_system_prompt(domain),
             user_message=question,
-            context_chunks=[_to_context_chunk(entry) for entry in entries],
+            context_chunks=[_to_context_chunk(chunk) for chunk in chunks],
             conversation_history=history,
         )
     except llm_service.LLMNotConfiguredError:
@@ -663,13 +953,24 @@ def _answer_body(
         logger.error(
             "No usable LLM provider for LLM_PROVIDER=%r", settings.LLM_PROVIDER
         )
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=_AGENT_UNAVAILABLE
-        ) from None
+        raise _unavailable() from None
     except llm_service.LLMError as exc:
         # The message is deliberately generic and the same for a timeout and
         # for a refusal: which one it was is in the log, not on the screen.
         logger.warning("Agent generation failed: %s", type(exc).__name__)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=_AGENT_UNAVAILABLE
-        ) from None
+        raise _unavailable() from None
+
+
+def _unavailable() -> HTTPException:
+    """The one refusal every provider- and embedding-side fault comes back as.
+
+    A 503 rather than a 500: nothing about the request was wrong, and trying
+    again in a minute is genuinely the right advice. One message for every
+    cause — a timeout, a refusal, a missing key, an unreachable embedding API —
+    because which third party is having a bad afternoon is in the log, not
+    something a member is owed on screen.
+    """
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=translate("agents.unavailable"),
+    )

@@ -9,6 +9,23 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # pgvector, not plain postgres: the embedding tests need the vector type
+    # and its distance operators, which SQLite has no equivalent for. Without a
+    # real database here they would skip on every pull request — green, and
+    # verifying nothing.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: anu_banayich_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U user -d anu_banayich_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,7 +36,12 @@ jobs:
       - run: ruff check app
       - run: ruff format --check app
       - run: mypy app
+      # The same variable a developer sets locally. tests/conftest.py skips the
+      # PostgreSQL-only tests when it is absent, so setting it here is what
+      # makes them actually run.
       - run: pytest -q
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg2://user:password@localhost:5432/anu_banayich_test
 
   frontend:
     runs-on: ubuntu-latest
@@ -36,3 +58,4 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      - run: npm test -- --watch=false

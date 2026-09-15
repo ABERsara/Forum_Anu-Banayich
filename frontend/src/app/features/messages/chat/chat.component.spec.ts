@@ -5,16 +5,24 @@ import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ChatComponent } from './chat.component';
-import { AccountStatus, Sector, UserRole, UserType } from '../../../core/constants';
+import {
+  AccountStatus,
+  RestrictionType,
+  Sector,
+  UserRole,
+  UserType,
+} from '../../../core/constants';
 import type {
   ConversationMessagesPage,
   DirectMessage,
   DirectMessageSendResult,
+  MyRestrictionResponse,
   UserProfile,
   UserPublic,
 } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
+import { ReportService } from '../../../core/services/report.service';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 const ME: UserProfile = {
@@ -41,6 +49,7 @@ function makeMessage(overrides: Partial<DirectMessage> = {}): DirectMessage {
     content: 'שלום',
     read_at: null,
     created_at: '2026-08-01T10:00:00',
+    reported_by_me: false,
     ...overrides,
   };
 }
@@ -78,6 +87,34 @@ function makeSendResult(overrides: Partial<DirectMessageSendResult> = {}): Direc
   };
 }
 
+/** What the server answers a member who may send: a successful "no". */
+const NO_RESTRICTION: MyRestrictionResponse = { restriction: null };
+
+/** What it answers one who may not (ABF-116). */
+function makeRestriction(expiresAt = '2026-08-03T10:00:00'): MyRestrictionResponse {
+  return {
+    restriction: { restriction_type: RestrictionType.MESSAGING, expires_at: expiresAt },
+  };
+}
+
+/**
+ * The same instant as this runner's clock writes it, in the screen's
+ * `dd/MM/yyyy HH:mm`.
+ *
+ * Derived rather than hardcoded: `expires_at` is naive UTC, the notice renders
+ * it in the reader's zone, and the digits therefore differ between CI (UTC)
+ * and a machine in Israel (UTC+3). A literal here would pin the wrong one of
+ * the two and fail on the other.
+ */
+function formattedEnd(response: MyRestrictionResponse): string {
+  const at = new Date(`${response.restriction!.expires_at}Z`);
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return (
+    `${pad(at.getDate())}/${pad(at.getMonth() + 1)}/${at.getFullYear()} ` +
+    `${pad(at.getHours())}:${pad(at.getMinutes())}`
+  );
+}
+
 /** Ten messages, oldest first, the way a page arrives. */
 function manyMessages(count: number, prefix = 'old'): DirectMessage[] {
   return Array.from({ length: count }, (_, index) =>
@@ -97,13 +134,16 @@ describe('ChatComponent', () => {
     getConversation: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
     getCellMembers: ReturnType<typeof vi.fn>;
+    getMessagingRestriction: ReturnType<typeof vi.fn>;
   };
+  let reportServiceMock: { fileReport: ReturnType<typeof vi.fn> };
 
   function setup(): void {
     TestBed.configureTestingModule({
       imports: [ChatComponent, translocoTesting()],
       providers: [
         { provide: ForumService, useValue: forumServiceMock },
+        { provide: ReportService, useValue: reportServiceMock },
         { provide: AuthService, useValue: { currentUser: () => ME } },
         {
           provide: ActivatedRoute,
@@ -178,7 +218,9 @@ describe('ChatComponent', () => {
       getConversation: vi.fn().mockReturnValue(of(makePage([makeMessage()]))),
       sendMessage: vi.fn().mockReturnValue(of(makeSendResult())),
       getCellMembers: vi.fn().mockReturnValue(of([OTHER])),
+      getMessagingRestriction: vi.fn().mockReturnValue(of(NO_RESTRICTION)),
     };
+    reportServiceMock = { fileReport: vi.fn().mockReturnValue(of({ id: 'report-1' })) };
   });
 
   // -------------------------------------------------------------------------
@@ -828,7 +870,7 @@ describe('ChatComponent', () => {
     it('reads in Hebrew exactly as the screen did before the rebuild', () => {
       setup();
 
-      expect(text()).toContain('→ חזרה לתיבה');
+      expect(text()).toContain('‹ חזרה לתיבה');
       expect(text()).toContain('רבקה כהן');
       expect(text()).toContain('שלח');
       expect(query('#chat-new-message')!.getAttribute('placeholder')).toBe('כתבו הודעה...');
@@ -912,6 +954,388 @@ describe('ChatComponent', () => {
 
       expect(text()).toContain('This conversation reached its 1,000-message limit');
       expect(text()).toContain('0 of 2,000 characters');
+      expect(text()).not.toMatch(HEBREW);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Reporting a message (ABF-112)
+  // -------------------------------------------------------------------------
+
+  describe('reporting a received message', () => {
+    /** The received / sent pair every test in here works from. */
+    function conversation(overrides: Partial<DirectMessage> = {}): DirectMessage[] {
+      return [
+        makeMessage({
+          id: 'theirs-1',
+          content: 'משהו פוגעני',
+          sender: OTHER,
+          recipient: ME_PUBLIC,
+          ...overrides,
+        }),
+        makeMessage({ id: 'mine-1', content: 'התשובה שלי' }),
+      ];
+    }
+
+    function reportTriggers(): HTMLElement[] {
+      return queryAll('.chat__report button');
+    }
+
+    function openReportDialog(): void {
+      reportTriggers()[0].click();
+      fixture.detectChanges();
+    }
+
+    function chooseReason(value: string): void {
+      const select = query<HTMLSelectElement>('.dialog__select')!;
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+    }
+
+    function confirm(): void {
+      query<HTMLButtonElement>('.btn--primary')!.click();
+      fixture.detectChanges();
+    }
+
+    it('offers a report control on a received message and not on a sent one', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+
+      const bubbles = queryAll('.chat__message');
+      expect(bubbles[0].querySelector('.chat__report')).toBeTruthy();
+      expect(bubbles[1].querySelector('.chat__report')).toBeFalsy();
+    });
+
+    /**
+     * An optimistic bubble has a local id, not a server one. Offering to
+     * report it would file a report against an id the server never issued.
+     */
+    it('offers nothing on a message still in flight', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage([])));
+      forumServiceMock.sendMessage.mockReturnValue(deferred<DirectMessageSendResult>().hold);
+      setup();
+
+      component.draft.set('שלום');
+      component.send();
+      fixture.detectChanges();
+
+      expect(reportTriggers()).toHaveLength(0);
+    });
+
+    it('names the message in the control, not just "report"', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+
+      const label = reportTriggers()[0].getAttribute('aria-label');
+      expect(label).toContain('רבקה כהן');
+      expect(label).toContain('דיווח על ההודעה');
+    });
+
+    it('shows what a report exposes before it is confirmed', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+
+      openReportDialog();
+
+      expect(text()).toContain('יחשוף את ההודעה הזו בלבד למבקר האחראי');
+    });
+
+    it('files the report against that one message', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+      openReportDialog();
+
+      chooseReason('offensive');
+      confirm();
+
+      expect(reportServiceMock.fileReport).toHaveBeenCalledWith({
+        target_type: 'direct_message',
+        target_id: 'theirs-1',
+        reason: 'offensive',
+        description: undefined,
+      });
+    });
+
+    it('sends nothing until a reason is chosen', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+      openReportDialog();
+
+      expect(query<HTMLButtonElement>('.btn--primary')!.disabled).toBe(true);
+
+      confirm();
+
+      expect(reportServiceMock.fileReport).not.toHaveBeenCalled();
+    });
+
+    it('marks the message once the report is stored', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      setup();
+      openReportDialog();
+      chooseReason('spam');
+
+      confirm();
+
+      expect(component.messages().find((m) => m.id === 'theirs-1')?.reported).toBe(true);
+      expect(text()).toContain('הדיווח נשלח, תודה.');
+    });
+
+    it('leaves the message unmarked when the report fails', () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage(conversation())));
+      reportServiceMock.fileReport.mockReturnValue(throwError(() => ({ status: 500 })));
+      setup();
+      openReportDialog();
+      chooseReason('spam');
+
+      confirm();
+
+      expect(component.messages().find((m) => m.id === 'theirs-1')?.reported).toBe(false);
+    });
+
+    /**
+     * The mark comes from the server, so it is still there after a reload —
+     * and the control is not offered a second time for the same message.
+     */
+    it('shows a message the server says was already reported as reported', () => {
+      forumServiceMock.getConversation.mockReturnValue(
+        of(makePage(conversation({ reported_by_me: true }))),
+      );
+      setup();
+
+      expect(component.messages()[0].reported).toBe(true);
+      expect(reportTriggers()).toHaveLength(0);
+      expect(text()).toContain('הדיווח נשלח, תודה.');
+    });
+
+    it('keeps the mark when an older page is loaded above it', () => {
+      forumServiceMock.getConversation
+        .mockReturnValueOnce(
+          of(
+            makePage(conversation({ reported_by_me: true }), { has_more: true, next_cursor: 'c1' }),
+          ),
+        )
+        .mockReturnValueOnce(of(makePage(manyMessages(2))));
+      setup();
+
+      component.loadOlder();
+      fixture.detectChanges();
+
+      expect(component.messages().find((m) => m.id === 'theirs-1')?.reported).toBe(true);
+    });
+
+    it('translates the control and its dialog', () => {
+      forumServiceMock.getConversation.mockReturnValue(
+        of(makePage([makeLatinMessage({ id: 'theirs-1', sender: OTHER, recipient: ME_PUBLIC })])),
+      );
+      forumServiceMock.getCellMembers.mockReturnValue(
+        of([{ id: 'other-1', first_name: 'Rivka', last_name: 'Cohen' }]),
+      );
+      setup();
+      openReportDialog();
+
+      switchToEnglish();
+
+      expect(text()).toContain('Report content');
+      expect(reportTriggers()[0]?.getAttribute('aria-label') ?? text()).not.toMatch(HEBREW);
+      expect(text()).not.toMatch(HEBREW);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // The messaging restriction (ABF-116, SPEC §7.2)
+  // -------------------------------------------------------------------------
+
+  describe('a member restricted from sending', () => {
+    function composer(): HTMLTextAreaElement {
+      return query<HTMLTextAreaElement>('#chat-new-message')!;
+    }
+
+    function sendButton(): HTMLButtonElement {
+      return query<HTMLButtonElement>('.chat__composer-row button')!;
+    }
+
+    /**
+     * Let `[disabled]` reach the DOM.
+     *
+     * NgModel sets up its control in a microtask, so a `disabled` binding on
+     * an ngModel-bound field is applied one tick after the render that
+     * changed it. Imperceptible in a browser; the difference between a green
+     * and a red assertion here.
+     */
+    async function settle(): Promise<void> {
+      await Promise.resolve();
+      fixture.detectChanges();
+    }
+
+    it('asks about the restriction when the screen opens', () => {
+      setup();
+
+      expect(forumServiceMock.getMessagingRestriction).toHaveBeenCalledOnce();
+    });
+
+    it('leaves the composer open for a member who is not restricted', async () => {
+      setup();
+      await settle();
+
+      expect(component.isRestricted()).toBe(false);
+      expect(composer().disabled).toBe(false);
+      expect(query('.chat__restricted')).toBeNull();
+    });
+
+    it('closes the composer and says why, with the date it ends', async () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+      await settle();
+
+      expect(component.isRestricted()).toBe(true);
+      expect(composer().disabled).toBe(true);
+      expect(sendButton().disabled).toBe(true);
+      // The rendered clock time is the runner's own zone, so the sentence is
+      // matched up to the date and the instant is pinned separately below.
+      expect(text()).toContain('שליחת הודעות פרטיות מוגבלת עד');
+      expect(text()).toContain(formattedEnd(makeRestriction()));
+    });
+
+    /**
+     * `expires_at` arrives as naive UTC — `2026-08-03T10:00:00`, no offset —
+     * and both `new Date()` and the date pipe read that as *local* time. Left
+     * raw, the notice names 10:00 to a member in Israel whose restriction
+     * actually lifts at 13:00, and she comes back on time to find she still
+     * cannot write. utc-date.util.ts exists for exactly this; the message
+     * bubbles on this screen already go through it.
+     *
+     * Asserted on the instant rather than on rendered text on purpose: CI runs
+     * in UTC, where the bug is invisible, so a rendered-string assertion would
+     * pass either way and guard nothing.
+     */
+    it('states the end of the restriction as UTC, not as a local wall clock', async () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+      await settle();
+
+      expect(component.restrictionEndsAt()).toBe('2026-08-03T10:00:00Z');
+      expect(new Date(component.restrictionEndsAt()!).toISOString()).toBe(
+        '2026-08-03T10:00:00.000Z',
+      );
+    });
+
+    it('has no end to state when there is no restriction', async () => {
+      setup();
+      await settle();
+
+      expect(component.restrictionEndsAt()).toBeNull();
+    });
+
+    /**
+     * The acceptance criterion, on this side of the wire: "ההגבלה חוסמת
+     * שליחה ולא קריאה". The log is rendered from the same page as always.
+     */
+    it('still shows the conversation', () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+
+      expect(component.messages().length).toBe(1);
+      expect(text()).toContain('שלום');
+    });
+
+    it('does not send even if the form is submitted anyway', () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+
+      component.draft.set('נסיון לשלוח');
+      component.send();
+
+      expect(forumServiceMock.sendMessage).not.toHaveBeenCalled();
+      expect(component.messages().length).toBe(1);
+    });
+
+    /**
+     * The notice is a live region so that a restriction beginning mid-session
+     * is announced rather than appearing in silence — and the state it reads
+     * from comes back from the server, which is the only side that knows when
+     * the restriction ends.
+     */
+    it('closes the composer when a send comes back restricted', async () => {
+      forumServiceMock.getMessagingRestriction
+        .mockReturnValueOnce(of(NO_RESTRICTION))
+        .mockReturnValueOnce(of(makeRestriction()));
+      forumServiceMock.sendMessage.mockReturnValue(
+        throwError(() => ({ error: { detail: 'errors.dm_restricted' } })),
+      );
+      setup();
+
+      component.draft.set('הודעה');
+      component.send();
+      await settle();
+
+      expect(component.isRestricted()).toBe(true);
+      expect(composer().disabled).toBe(true);
+      expect(text()).toContain('שליחת הודעות פרטיות מוגבלת');
+    });
+
+    it('does not re-ask after an ordinary send failure', () => {
+      forumServiceMock.sendMessage.mockReturnValue(
+        throwError(() => ({ error: { detail: 'errors.dm_forbidden' } })),
+      );
+      setup();
+
+      component.draft.set('הודעה');
+      component.send();
+
+      expect(forumServiceMock.getMessagingRestriction).toHaveBeenCalledOnce();
+      expect(component.isRestricted()).toBe(false);
+    });
+
+    /**
+     * Fails open on purpose: this request explains, it does not enforce. The
+     * server refuses a restricted send whatever this screen believes, and
+     * blanking the composer because a status call timed out would take
+     * messaging away from someone entitled to it.
+     */
+    it('leaves the composer open when the restriction cannot be read', async () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(
+        throwError(() => new Error('offline')),
+      );
+      setup();
+      await settle();
+
+      expect(component.isRestricted()).toBe(false);
+      expect(composer().disabled).toBe(false);
+    });
+
+    it('announces the notice rather than letting it appear in silence', () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+
+      const live = query('.chat__restricted')!.closest('[role="status"]');
+      expect(live).not.toBeNull();
+    });
+
+    it('describes the closed composer with the reason it is closed', async () => {
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+      await settle();
+
+      expect(composer().getAttribute('aria-describedby')).toBe('chat-restricted');
+      expect(query('#chat-restricted')).not.toBeNull();
+    });
+
+    it('translates the notice and the placeholder', async () => {
+      forumServiceMock.getConversation.mockReturnValue(of(makePage([makeLatinMessage()])));
+      forumServiceMock.getCellMembers.mockReturnValue(
+        of([{ id: 'other-1', first_name: 'Rivka', last_name: 'Cohen' }]),
+      );
+      forumServiceMock.getMessagingRestriction.mockReturnValue(of(makeRestriction()));
+      setup();
+      await settle();
+
+      switchToEnglish();
+
+      expect(text()).toContain('Sending private messages is restricted until');
+      expect(composer().placeholder).toBe(
+        'You cannot send messages while the restriction is in force',
+      );
       expect(text()).not.toMatch(HEBREW);
     });
   });

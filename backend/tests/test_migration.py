@@ -10,62 +10,79 @@ from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine, inspect, pool, text
 
 import app.core.config as _cfg
-import app.models  # noqa: F401  - registers every model on Base.metadata
+
+# Imported for its side effect: app.models.__init__ imports every model module,
+# and that is what attaches the tables to Base.metadata. Without it the metadata
+# is empty and test_migration_creates_all_tables has nothing to compare against.
+# migrations/env.py does not come through this package — it names the model
+# modules one by one — so adding a model to app/models/__init__.py puts it in
+# front of this test but not in front of autogenerate. That import list has to
+# be extended too.
+import app.models  # noqa: F401
 from app.db.base import Base
 
 BACKEND_DIR = Path(__file__).parent.parent  # backend/
 
 # The merge revision that ABF-114's read_at migration sits directly on top of.
 REVISION_BEFORE_READ_AT = "aac7e1fb8f49"
-EXPECTED_TABLES = {
-    "users",
-    "forum_posts",
-    "direct_messages",
-    "professional_queries",
-    "reports",
-    "documents",
-    "audit_logs",
-    "agent_domains",
-    "agent_knowledge_entries",
-    "agent_conversations",
-    "agent_messages",
-}
 
-
-def test_migration_creates_all_tables(monkeypatch) -> None:
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        db_path = os.path.join(tmp_dir, "test_migration.db")
-        db_url = f"sqlite:///{db_path}"
-
-        # env.py overrides sqlalchemy.url from settings.DATABASE_URL — patch it here
-        monkeypatch.setattr(_cfg.settings, "DATABASE_URL", db_url)
-
-        alembic_cfg = Config(str(BACKEND_DIR / "alembic.ini"))
-        alembic_cfg.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
-        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-
-        command.upgrade(alembic_cfg, "head")
-
-        engine = create_engine(db_url, poolclass=pool.NullPool)
-        actual_tables = set(inspect(engine).get_table_names())
-        engine.dispose()  # release file lock before tempdir cleanup (Windows)
-
-    assert actual_tables >= EXPECTED_TABLES, (
-        f"Missing tables: {EXPECTED_TABLES - actual_tables}"
-    )
+# The merge revision ABF-116's user_restrictions migration sits directly on top of.
+REVISION_BEFORE_RESTRICTIONS = "45019c151eb8"
 
 
 @contextmanager
 def _alembic_on_a_temp_sqlite_db(monkeypatch):
     """An alembic Config pointed at a throwaway SQLite file, plus its URL."""
     with tempfile.TemporaryDirectory() as tmp_dir:
-        db_url = f"sqlite:///{os.path.join(tmp_dir, 'test_roundtrip.db')}"
+        db_url = f"sqlite:///{os.path.join(tmp_dir, 'test_migration.db')}"
+        # env.py overrides sqlalchemy.url from settings.DATABASE_URL — patch it here
         monkeypatch.setattr(_cfg.settings, "DATABASE_URL", db_url)
 
         alembic_cfg = Config(str(BACKEND_DIR / "alembic.ini"))
         alembic_cfg.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
         alembic_cfg.set_main_option("sqlalchemy.url", db_url)
         yield alembic_cfg, db_url
+
+
+def _created_tables(db_url: str) -> set[str]:
+    """
+    Every table `alembic upgrade head` left behind. alembic_version is dropped
+    from the set: the migration runner creates it to record the revision, no
+    model declares it, and its presence is not drift.
+    """
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        return set(inspect(engine).get_table_names()) - {"alembic_version"}
+    finally:
+        engine.dispose()  # release the file lock before tempdir cleanup (Windows)
+
+
+def test_migration_creates_all_tables(monkeypatch) -> None:
+    """
+    What `alembic upgrade head` builds has to be what the models declare, read
+    off Base.metadata rather than a list maintained by hand here. The hand-kept
+    list is precisely what went stale: ABF-139's `likes` was never added to it,
+    so deleting that migration would still have passed, and ABF-120's three
+    agent tables (reverted since, in #118) only landed in it because whoever
+    wrote fff7271 remembered to edit two files. Reading the expectation off the
+    metadata instead covers every future migration for free, with nothing to
+    keep in step here.
+
+    Equality rather than a superset, so the drift is caught in both
+    directions — a model whose migration was never written, and a table a
+    migration still creates for a model that is gone.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        created = _created_tables(db_url)
+
+    declared = set(Base.metadata.tables)
+    missing = declared - created
+    unexpected = created - declared
+    assert not missing and not unexpected, (
+        f"Declared by a model but created by no migration: {sorted(missing)}. "
+        f"Created by a migration but declared by no model: {sorted(unexpected)}."
+    )
 
 
 def _direct_message_columns(db_url: str) -> set[str]:
@@ -117,12 +134,11 @@ def test_read_at_migration_goes_down_and_up_again_cleanly(monkeypatch) -> None:
         assert "is_read" not in _direct_message_columns(db_url)
         assert _unread_index_columns(db_url) == ["recipient_id", "read_at"]
 
-        # Not "-1": revisions keep landing on top of read_at (the agent tables
-        # of ABF-120 are the latest), so "one step back from head" walks off a
-        # different revision every sprint, and off a merge point it is an
-        # outright "Ambiguous walk" error. Naming the revision read_at sits on
-        # says what this actually undoes, and stays right however many
-        # migrations join above it.
+        # Naming the revision rather than "-1": this says which schema state the
+        # downgrade is meant to land on, and it keeps saying it however the
+        # graph grows. "-1" is read relative to whatever head is at the time —
+        # it walks somewhere else entirely once another migration lands on top,
+        # and stops being a single step at all once a branch joins above here.
         command.downgrade(alembic_cfg, REVISION_BEFORE_READ_AT)
         assert "is_read" in _direct_message_columns(db_url)
         assert "read_at" not in _direct_message_columns(db_url)
@@ -169,6 +185,47 @@ def test_read_at_migration_carries_the_read_flag_across_in_both_directions(
         assert _read_state(db_url, "is_read") == {"m-read": 1, "m-unread": 0}
 
 
+def _restriction_indexes(db_url: str) -> set[str]:
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        return {i["name"] for i in inspect(engine).get_indexes("user_restrictions")}
+    finally:
+        engine.dispose()  # release the file lock before tempdir cleanup (Windows)
+
+
+def test_user_restrictions_migration_goes_down_and_up_again_cleanly(
+    monkeypatch,
+) -> None:
+    """
+    The shared Definition of Done asks for a migration that runs both ways
+    (ABF-116, a4d7c81f0e93).
+
+    The index is asserted alongside the table, and the second upgrade is the
+    point of the test rather than a formality: a downgrade that drops the
+    table but leaves something of it behind — the index here, and on
+    PostgreSQL the `restrictiontype` enum type, which is why the downgrade
+    drops that too — fails on the way back up, not on the way down, which is
+    where nobody is looking.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        assert "user_restrictions" in _created_tables(db_url)
+        assert _restriction_indexes(db_url) == {
+            "ix_user_restrictions_user_type_expires"
+        }
+
+        # Named rather than "-1": this says which schema state the downgrade is
+        # meant to land on, and it keeps saying it however the graph grows.
+        command.downgrade(alembic_cfg, REVISION_BEFORE_RESTRICTIONS)
+        assert "user_restrictions" not in _created_tables(db_url)
+
+        command.upgrade(alembic_cfg, "head")
+        assert "user_restrictions" in _created_tables(db_url)
+        assert _restriction_indexes(db_url) == {
+            "ix_user_restrictions_user_type_expires"
+        }
+
+
 def test_no_agent_model_migration_drift(monkeypatch) -> None:
     """The agent tables' migration (79daa6708dd8) must produce exactly the
     schema `models/agent.py` describes. Otherwise the next
@@ -191,3 +248,95 @@ def test_no_agent_model_migration_drift(monkeypatch) -> None:
 
     agent_drift = [entry for entry in diff if "agent_" in repr(entry)]
     assert not agent_drift, f"agent model/migration drift detected: {agent_drift}"
+
+
+# The revision agent_knowledge_chunks sits directly on top of.
+REVISION_BEFORE_CHUNKS = "a4d7c81f0e93"
+
+
+def _domain_fk_ondelete(db_url: str) -> str | None:
+    """The ON DELETE rule on agent_knowledge_entries.domain_id, as stored."""
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        foreign_keys = inspect(engine).get_foreign_keys("agent_knowledge_entries")
+    finally:
+        engine.dispose()
+    fk = next(fk for fk in foreign_keys if fk["constrained_columns"] == ["domain_id"])
+    return fk.get("options", {}).get("ondelete")
+
+
+def _entry_ids(db_url: str) -> set[str]:
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        with engine.connect() as conn:
+            return {
+                row[0]
+                for row in conn.execute(
+                    text("SELECT id FROM agent_knowledge_entries")
+                ).all()
+            }
+    finally:
+        engine.dispose()
+
+
+def test_chunks_migration_goes_down_and_up_again_cleanly(monkeypatch) -> None:
+    """
+    ABF-121 does more than add a table: it changes the foreign key ABF-120 left
+    without ON DELETE CASCADE, which on SQLite means rebuilding
+    agent_knowledge_entries around it. Both directions are asserted, because a
+    downgrade that drops the new table but leaves the rebuilt constraint behind
+    is broken in the way that only shows up on the next upgrade.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        assert "agent_knowledge_chunks" in _created_tables(db_url)
+        assert _domain_fk_ondelete(db_url) == "CASCADE"
+
+        command.downgrade(alembic_cfg, REVISION_BEFORE_CHUNKS)
+        assert "agent_knowledge_chunks" not in _created_tables(db_url)
+        assert _domain_fk_ondelete(db_url) is None
+
+        command.upgrade(alembic_cfg, "head")
+        assert "agent_knowledge_chunks" in _created_tables(db_url)
+        assert _domain_fk_ondelete(db_url) == "CASCADE"
+
+
+def test_the_entries_rebuild_keeps_the_rows_it_rebuilds(monkeypatch) -> None:
+    """
+    The SQLite path recreates agent_knowledge_entries to change its foreign
+    key. A developer running this against dev.db has real content in that
+    table, and a rebuild that quietly starts it empty would take the knowledge
+    base with it.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, REVISION_BEFORE_CHUNKS)
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO agent_domains (id, name, description, "
+                    "group_visibility, sector_visibility, professional_domain, "
+                    "is_active, created_at) VALUES ('d-1', 'zchuyot', 'desc', "
+                    "'ALL', 'ALL', 'LAWYER', 1, '2026-09-01 10:00:00')"
+                )
+            )
+            # updated_by points at no users row on purpose: SQLite does not
+            # enforce foreign keys here, and spelling out every NOT NULL column
+            # on users would tie this test to that table's shape instead of to
+            # the one it is about.
+            conn.execute(
+                text(
+                    "INSERT INTO agent_knowledge_entries (id, domain_id, title, "
+                    "content, updated_by, created_at, updated_at) VALUES "
+                    "('e-1', 'd-1', 'arnona', 'body', 'u-1', "
+                    "'2026-09-01 10:00:00', '2026-09-01 10:00:00')"
+                )
+            )
+        engine.dispose()
+
+        command.upgrade(alembic_cfg, "head")
+        assert _entry_ids(db_url) == {"e-1"}
+
+        command.downgrade(alembic_cfg, REVISION_BEFORE_CHUNKS)
+        assert _entry_ids(db_url) == {"e-1"}

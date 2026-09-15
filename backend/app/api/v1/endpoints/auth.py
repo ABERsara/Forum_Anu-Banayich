@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_active_user, get_db
+from app.core.i18n import translate
 from app.models.user import User
 from app.schemas.auth import (
     GoogleAuthRequest,
@@ -38,7 +39,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)) -> dict[str, 
     An OTP is sent to their email.
     """
     user = auth_service.register(db, data)
-    return {"message": "נרשמת בהצלחה. בדוק את המייל לקוד OTP.", "user_id": user.id}
+    return {"message": translate("auth.registered"), "user_id": user.id}
 
 
 @router.post("/verify-otp")
@@ -49,7 +50,7 @@ def verify_otp(data: OtpVerifyRequest, db: Session = Depends(get_db)) -> dict[st
     After this, user moves to PENDING_APPROVAL status.
     """
     auth_service.verify_otp(db, data.email, data.otp_code)
-    return {"message": "אימות הצליח. הבקשה שלך ממתינה לאישור מנהלים."}
+    return {"message": translate("auth.otp_verified")}
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -73,7 +74,7 @@ def resend_otp(data: ResendOtpRequest, db: Session = Depends(get_db)) -> dict[st
     """Resend OTP to the given email."""
     auth_service.resend_otp(db, data.email)
     # PROD: deviates from spec — spec defines "קוד OTP חדש נשלח.", message changed for consistency with other project messages. Reconsider before PROD.
-    return {"message": "קוד אימות נשלח מחדש"}
+    return {"message": translate("auth.otp_resent")}
 
 
 @router.post("/google", response_model=TokenResponse)
@@ -97,4 +98,4 @@ def google_link(
 ) -> dict[str, str]:
     """Link a verified Google account to the currently logged-in session."""
     auth_service.google_link(db, current_user, data)
-    return {"message": "חשבון Google קושר בהצלחה."}
+    return {"message": translate("auth.google_linked")}

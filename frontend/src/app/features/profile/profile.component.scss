@@ -1,0 +1,77 @@
+@use '../../../styles/variables' as *;
+@use 'sass:color';
+
+.profile-page {
+  padding: $spacing-md;
+}
+
+.profile-details {
+  margin-bottom: $spacing-lg;
+}
+
+.profile-section {
+  max-width: 32rem;
+  padding: $spacing-md;
+  margin-bottom: $spacing-lg;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+
+  h2 {
+    margin-top: 0;
+    font-size: $font-size-lg;
+    color: $color-text;
+  }
+
+  p {
+    color: $color-text-muted;
+  }
+
+  &--danger {
+    border-color: $color-danger;
+  }
+
+  &__status {
+    margin-top: $spacing-sm;
+  }
+
+  &__success {
+    color: $color-success;
+  }
+}
+
+.btn {
+  padding: $spacing-sm $spacing-md;
+  border: none;
+  border-radius: $radius-md;
+  font-size: $font-size-base;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $color-primary;
+    outline-offset: 2px;
+  }
+
+  &--primary {
+    background: $color-primary;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background: $color-primary-dark;
+    }
+  }
+
+  &--danger {
+    background: $color-danger;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background: color.adjust($color-danger, $lightness: -10%);
+    }
+  }
+}

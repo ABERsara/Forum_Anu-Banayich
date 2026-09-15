@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.constants import UserRole
+from app.core.i18n import translate
 from app.core.security import decode_access_token
 from app.db.session import SessionLocal
 from app.services import agent_service
@@ -58,7 +59,7 @@ def get_current_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="לא ניתן לאמת את הזהות. יש להתחבר מחדש.",
+        detail=translate("errors.unauthenticated"),
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -93,7 +94,7 @@ def require_role(*roles: UserRole) -> Callable[..., "User"]:
         if current_user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="אין לך הרשאה לבצע פעולה זו.",
+                detail=translate("errors.forbidden"),
             )
         return current_user
 
@@ -112,15 +113,17 @@ def rate_limit_chat(
     the caller: the chat endpoint depends on this *instead of* on
     get_current_active_user, so there is no way to wire the endpoint up and
     leave the limit off. It runs before the endpoint body does, which is what
-    keeps an over-quota request from reaching retrieval or the provider.
+    keeps an over-quota request from reaching retrieval or the provider — the
+    two steps that cost money.
 
     The window is rolling — see agent_service.messages_left_today().
 
-    The detail is a translation key, like forum_service's: the client resolves
-    it through Transloco and can put the configured number in the sentence
-    itself. Spelling the limit out here would hardcode Hebrew in the API and
-    hand a caller the exact quota, which is a rate limiter's business, not a
-    401-adjacent message's.
+    The configured number is in the message. A reader told only that they have
+    reached the limit cannot tell whether to come back in an hour or tomorrow;
+    the quota is not a secret, it is the thing they are being asked to live
+    within. It is interpolated through the catalogue rather than written into
+    both translations, which is what keeps the two languages quoting the same
+    setting.
 
     `agent_service` is imported at module scope, not inside the function: it
     reaches config, constants, models, schemas and the llm/rag/audit services,
@@ -136,6 +139,8 @@ def rate_limit_chat(
     if agent_service.messages_left_today(db, current_user) <= 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="errors.agent_rate_limited",
+            detail=translate(
+                "agents.rate_limited", limit=settings.AGENT_RATE_LIMIT_PER_DAY
+            ),
         )
     return current_user

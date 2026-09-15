@@ -7,6 +7,7 @@ When you create a new model file, add it to this list.
 from app.models.agent import (
     AgentConversation,
     AgentDomain,
+    AgentKnowledgeChunk,
     AgentKnowledgeEntry,
     AgentMessage,
 )
@@ -16,6 +17,7 @@ from app.models.forum import DirectMessage, ForumPost
 from app.models.like import Like
 from app.models.professional import ProfessionalQuery
 from app.models.report import Report
+from app.models.restriction import UserRestriction
 from app.models.user import User
 
 __all__ = [
@@ -24,11 +26,13 @@ __all__ = [
     "DirectMessage",
     "ProfessionalQuery",
     "Report",
+    "UserRestriction",
     "Like",
     "Document",
     "AuditLog",
     "AgentDomain",
     "AgentKnowledgeEntry",
+    "AgentKnowledgeChunk",
     "AgentConversation",
     "AgentMessage",
 ]

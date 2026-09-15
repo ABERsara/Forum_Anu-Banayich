@@ -18,6 +18,7 @@ import {
   ReportDecision,
   ReportReason,
   ReportTargetType,
+  RestrictionType,
   Sector,
   SectorVisibility,
   PostStatus,
@@ -144,10 +145,38 @@ export interface ProfessionalUpdateRequest {
   is_active_professional?: boolean;
 }
 
-/** Admin suspends an active user for N hours. */
+/** Admin or moderator suspends an active user for N hours. */
 export interface SuspendUserRequest {
   hours: number;
   reason: string;
+}
+
+/**
+ * One user's moderation history, as the moderator responsible for their cell
+ * sees it (SPEC §7.3, "כרטיס משתמש").
+ *
+ * Deliberately without contact details: UserAdminView carries the email,
+ * phone and ID number, and it is an admin view for exactly that reason.
+ */
+export interface UserModerationCard {
+  id: string;
+  first_name: string;
+  last_name: string;
+  user_type: UserType | null;
+  sector: Sector | null;
+  account_status: AccountStatus;
+
+  /** Reports filed against this user; the rest of the total is still pending. */
+  reports_against_total: number;
+  reports_against_valid: number;
+  reports_against_invalid: number;
+
+  /** Reports this user filed about others. */
+  reports_filed_total: number;
+  false_reports_filed: number;
+
+  is_suspended: boolean;
+  suspended_until: string | null; // ISO datetime
 }
 
 // ---------------------------------------------------------------------------
@@ -305,6 +334,15 @@ export interface DirectMessage {
    */
   read_at: string | null; // ISO datetime
   created_at: string;
+  /**
+   * Whether *this viewer* has already reported the message (ABF-112).
+   *
+   * Server-side rather than remembered on the screen, so the mark is still
+   * there after a reload — and so the same message cannot be reported twice
+   * by a client that forgot it had. Always false on a message the viewer
+   * sent: only its recipient can report one.
+   */
+  reported_by_me: boolean;
 }
 
 /**
@@ -349,6 +387,25 @@ export interface ConversationList {
   total: number;
   page: number;
   page_size: number;
+}
+
+/**
+ * One message in a self-service export (SPEC §9.5, ABF-117). Ids, not nested
+ * UserPublic objects: this is a personal-data export, not a conversation view.
+ */
+export interface DirectMessageExportItem {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  sent_at: string; // ISO datetime
+  read_at: string | null; // ISO datetime
+}
+
+/** GET /users/me/messages/export — every message the caller sent or received. */
+export interface DirectMessageExportResult {
+  items: DirectMessageExportItem[];
+  total: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +471,8 @@ export interface ReportCreate {
 
 export interface Report {
   id: string;
-  reporter_id: string;
+  /** Null once the report has been anonymized — see §9.4. */
+  reporter_id: string | null;
   reported_user_id: string;
   target_type: ReportTargetType;
   target_id: string;
@@ -435,15 +493,75 @@ export interface ReportWithContent extends Report {
   report_count: number;
 }
 
+/**
+ * A moderator's decision on a report. `decision` is VALID or INVALID —
+ * PENDING is the state a report starts in, and the backend rejects it here.
+ *
+ * The note is required, unlike the nullable moderator_note on Report: rows
+ * decided before this endpoint existed carry none, but no new decision may
+ * be made without one (SPEC §7.3, "הערת מבקר (לתיעוד)").
+ */
 export interface ReportDecideRequest {
   decision: ReportDecision;
-  note?: string;
+  note: string;
 }
 
 export interface ReportList {
   items: ReportWithContent[];
   total: number;
   pending_count: number;
+}
+
+/** Reports already decided in this moderator's cells, newest first. */
+export type ReportHistoryList = PaginatedResponse<ReportWithContent>;
+
+// ---------------------------------------------------------------------------
+// Automatic restrictions (ABF-116)
+// ---------------------------------------------------------------------------
+
+/**
+ * The restriction on the *current* user, as she is allowed to see it.
+ *
+ * Deliberately just the two fields the server sends: what she cannot do and
+ * until when. The count of reports behind it stays on the moderator's side —
+ * handed back to the person they were filed against it would be a hint about
+ * who has been reporting her.
+ */
+export interface MyRestriction {
+  restriction_type: RestrictionType;
+  /** Naive-UTC ISO timestamp, like every other date this API returns. */
+  expires_at: string;
+}
+
+/** GET /messages/restriction — null when there is none, never a 404. */
+export interface MyRestrictionResponse {
+  restriction: MyRestriction | null;
+}
+
+/** The member a restriction applies to, as a moderator dashboard shows her. */
+export interface RestrictedMember {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+/** One active restriction in a moderator's cells, with the evidence behind it. */
+export interface RestrictionWithMember {
+  id: string;
+  restriction_type: RestrictionType;
+  expires_at: string;
+  /** How many decided reports were inside the window when it was applied. */
+  report_count: number;
+  /** The window that count was taken over, in days. */
+  window_days: number;
+  created_at: string;
+  member: RestrictedMember;
+}
+
+/** GET /moderator/restrictions — unpaginated, like the pending queue. */
+export interface RestrictionList {
+  items: RestrictionWithMember[];
+  total: number;
 }
 
 // ---------------------------------------------------------------------------

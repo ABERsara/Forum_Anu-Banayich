@@ -33,6 +33,7 @@ from app.core.constants import (
     UserRole,
 )
 from app.core.encryption import decrypt_message, encrypt_message
+from app.core.i18n import translate
 from app.models.forum import DirectMessage, ForumPost
 from app.models.like import Like
 from app.models.report import Report
@@ -48,6 +49,7 @@ from app.schemas.forum import (
     ForumPostUpdate,
 )
 from app.schemas.user import UserPublic
+from app.services import restriction_service
 from app.services.audit_service import build_entry, log_action
 from app.services.user_service import get_user_by_id
 
@@ -85,6 +87,11 @@ class DirectMessageData(TypedDict):
     content: str
     read_at: datetime | None
     created_at: datetime
+    #: Whether the *viewer* has already reported this message (ABF-112).
+    #: Per-viewer rather than a count on the row: a reader is told what she
+    #: herself did, and how many other people reported the same message is a
+    #: moderator's business, not hers.
+    reported_by_me: bool
 
 
 class ConversationPageData(TypedDict):
@@ -157,7 +164,7 @@ def get_posts(
       6. Return ForumPostListResponse
     """
     if current_user.role not in (UserRole.USER, UserRole.ADMIN):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לגשת לפורום הקהילתי.")
+        raise HTTPException(status_code=403, detail=translate("forum.access_forbidden"))
 
     query = db.query(ForumPost).options(joinedload(ForumPost.author))
 
@@ -244,7 +251,7 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
     group/sector don't match (the post exists, they just can't read it).
     """
     if current_user.role not in (UserRole.USER, UserRole.ADMIN, UserRole.MODERATOR):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לגשת לפורום הקהילתי.")
+        raise HTTPException(status_code=403, detail=translate("forum.access_forbidden"))
 
     post = (
         db.query(ForumPost)
@@ -253,19 +260,23 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
         .first()
     )
     if post is None:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     if current_user.role in (UserRole.ADMIN, UserRole.MODERATOR):
         if post.status == PostStatus.DELETED and current_user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+            raise HTTPException(
+                status_code=404, detail=translate("forum.post_not_found")
+            )
         return _attach_like_fields(db, post, current_user)
 
     # הגענו לכאן רק אם role == USER (ADMIN/MODERATOR תמיד יוצאים למעלה, עם return או raise)
     if post.status != PostStatus.VISIBLE:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     if not matches_content_filter(post, current_user):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לצפות בהודעה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_view_forbidden")
+        )
 
     return _attach_like_fields(db, post, current_user)
 
@@ -325,12 +336,14 @@ def delete_post(db: Session, post_id: str, current_user: User) -> ForumPost:
         .first()
     )
     if post is None:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     is_author = current_user.id == post.author_id
     is_privileged = current_user.role in (UserRole.MODERATOR, UserRole.ADMIN)
     if not (is_author or is_privileged):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה למחוק הודעה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_delete_forbidden")
+        )
 
     if post.status == PostStatus.DELETED:
         # Already deleted - nothing to do, and nothing new to audit-log.
@@ -367,7 +380,9 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
         (a widow cannot post in the widowers group)
     """
     if author.account_status != AccountStatus.ACTIVE:
-        raise HTTPException(status_code=403, detail="רק משתמש פעיל יכול לפרסם הודעה.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_requires_active_account")
+        )
 
     is_broadcast = (
         data.group_visibility == GroupVisibility.ALL
@@ -375,7 +390,7 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
     )
     if is_broadcast and author.role != UserRole.ADMIN:
         raise HTTPException(
-            status_code=403, detail="רק מנהל יכול לפרסם הודעה לכלל המשתמשים."
+            status_code=403, detail=translate("forum.broadcast_admin_only")
         )
 
     if data.group_visibility != GroupVisibility.ALL and (
@@ -383,7 +398,7 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
         or data.group_visibility != GroupVisibility(author.user_type.value)
     ):
         raise HTTPException(
-            status_code=403, detail="לא ניתן לפרסם הודעה לקבוצה שאינה שלך."
+            status_code=403, detail=translate("forum.post_group_forbidden")
         )
 
     if data.sector_visibility != SectorVisibility.ALL and (
@@ -391,7 +406,7 @@ def create_post(db: Session, data: ForumPostCreate, author: User) -> ForumPost:
         or data.sector_visibility != SectorVisibility(author.sector.value)
     ):
         raise HTTPException(
-            status_code=403, detail="לא ניתן לפרסם הודעה למגזר שאינו שלך."
+            status_code=403, detail=translate("forum.post_sector_forbidden")
         )
 
     post = ForumPost(
@@ -430,10 +445,12 @@ def update_post(
         .first()
     )
     if post is None or post.status == PostStatus.DELETED:
-        raise HTTPException(status_code=404, detail="ההודעה לא נמצאה.")
+        raise HTTPException(status_code=404, detail=translate("forum.post_not_found"))
 
     if current_user.id != post.author_id:
-        raise HTTPException(status_code=403, detail="רק המחבר יכול לערוך הודעה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("forum.post_edit_author_only")
+        )
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(post, field, value)
@@ -519,7 +536,9 @@ def _parse_conversation_key(conversation_key: str) -> tuple[str, str] | None:
     return parts[0], parts[1]
 
 
-def _to_response_dict(message: DirectMessage) -> DirectMessageData:
+def _to_response_dict(
+    message: DirectMessage, *, reported_by_me: bool = False
+) -> DirectMessageData:
     """
     Decrypt one row's content for the API response layer.
 
@@ -548,6 +567,10 @@ def _to_response_dict(message: DirectMessage) -> DirectMessageData:
         "content": content,
         "read_at": message.read_at,
         "created_at": message.created_at,
+        # Defaults to False, which is right for every caller that is looking
+        # at a message the viewer just sent: reporting is only ever open on a
+        # message she received (see get_received_message).
+        "reported_by_me": reported_by_me,
     }
 
 
@@ -567,7 +590,15 @@ def send_direct_message(
     The new message is stored first and the cap enforced after, never the
     other way round: pruning ahead of a send that then fails validation would
     delete history to make room for nothing.
+
+    A sender under §7.2's messaging restriction is refused before the
+    recipient is even resolved (ABF-116). That order is what keeps the
+    refusal from saying anything about the recipient: every send she attempts
+    answers identically, so the restriction cannot be used to find out who
+    exists in her cell.
     """
+    restriction_service.assert_may_send_direct_message(db, sender)
+
     recipient = (
         None if sender.role != UserRole.USER else get_user_by_id(db, data.recipient_id)
     )
@@ -863,14 +894,96 @@ def get_conversation_messages(
     has_more = len(rows) > limit
     page = list(reversed(rows[:limit]))
 
+    reported = _messages_reported_by(db, current_user, [message.id for message in page])
+
     return {
-        "items": [_to_response_dict(message) for message in page],
+        "items": [
+            _to_response_dict(message, reported_by_me=message.id in reported)
+            for message in page
+        ],
         "has_more": has_more,
         # The cursor is the page's OLDEST row — the next request asks for what
         # comes before it. Null when nothing older exists, so a client that
         # only looks at the cursor cannot loop forever.
         "next_cursor": _encode_cursor(page[0]) if has_more and page else None,
     }
+
+
+def _messages_reported_by(
+    db: Session, current_user: User, message_ids: list[str]
+) -> set[str]:
+    """
+    Which of `message_ids` this user has already reported (ABF-112).
+
+    One query for the whole page rather than one per message, and ids only —
+    a page of fifty is a single `IN` against the index-backed
+    (reporter_id, target_type, target_id) filter, and none of the report rows
+    themselves (which carry the encrypted snapshot) are read.
+
+    Deliberately not filtered by decision: a report that has been ruled on is
+    still a report this user filed, and un-marking the message once a
+    moderator decides would invite her to file it again.
+    """
+    if not message_ids:
+        return set()
+    rows = (
+        db.query(Report.target_id)
+        .filter(
+            Report.reporter_id == current_user.id,
+            Report.target_type == ReportTargetType.DIRECT_MESSAGE,
+            Report.target_id.in_(message_ids),
+        )
+        .all()
+    )
+    return {row[0] for row in rows}
+
+
+def get_received_message(
+    db: Session, current_user: User, message_id: str
+) -> DirectMessage:
+    """
+    Load the message with this id, provided `current_user` is the one who
+    RECEIVED it. Anything else raises the same generic 403 as the rest of the
+    DM surface.
+
+    Ownership of a private message is a DM rule, so it is answered here rather
+    than in whichever caller needs it — report_service.file_report() is the
+    first, and any later one inherits the same denial instead of writing its
+    own.
+
+    "Received", not "took part in": the sender of a message is not entitled to
+    act on it through this path. It is what makes "report a message you were
+    sent" unable to become "report a message you sent" — and, on the reporting
+    side, what keeps a user from filing a report against herself.
+
+    A message that does not exist and a message belonging to someone else's
+    conversation are indistinguishable to the caller — same status, same key,
+    same audit entry — because a 404 on one and a 403 on the other would
+    answer "does this conversation exist?" to anybody willing to guess ids.
+    The denial is logged for the same reason _authorize_conversation_access()
+    logs its own (§9.3).
+    """
+    message = (
+        db.query(DirectMessage)
+        .options(joinedload(DirectMessage.sender), joinedload(DirectMessage.recipient))
+        .filter(DirectMessage.id == message_id)
+        .first()
+    )
+    if (
+        message is None
+        or current_user.role != UserRole.USER
+        or message.recipient_id != current_user.id
+    ):
+        log_action(
+            db,
+            actor=current_user,
+            action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
+            entity_type="DirectMessage",
+            entity_id=message_id,
+            details={"reason": "not_recipient"},
+        )
+        raise HTTPException(status_code=403, detail=_DM_FORBIDDEN_MESSAGE)
+    return message
 
 
 def get_inbox(

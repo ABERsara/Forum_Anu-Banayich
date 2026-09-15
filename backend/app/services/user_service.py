@@ -24,9 +24,11 @@ from enum import StrEnum
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.constants import AccountStatus, AuditAction, UserRole
+from app.core.i18n import translate
 from app.core.security import get_password_hash
 from app.models.user import User
 from app.schemas.user import (
@@ -36,7 +38,8 @@ from app.schemas.user import (
     ProfessionalCreateRequest,
     ProfessionalUpdateRequest,
 )
-from app.services.audit_service import log_action
+from app.services import retention_service
+from app.services.audit_service import build_entry, log_action
 from app.services.email_service import (
     send_approval_email,
     send_rejection_email,
@@ -68,6 +71,30 @@ def get_user_by_id(db: Session, user_id: str) -> User | None:
     return db.query(User).filter(User.id == user_id).first()
 
 
+def cell_match_filter(cells: list[dict[str, str]]) -> ColumnElement[bool]:
+    """
+    Build an OR-of-ANDs filter matching User.user_type/sector against a
+    moderator's list of {"group", "sector"} cells (spec §4.3).
+
+    Lives here rather than beside either caller because what it filters is
+    `User`: report_service scopes a report queue with it, restriction_service
+    scopes a list of restricted members, and a second copy of the expression
+    is a second place for "which cells is she responsible for" to be answered
+    differently.
+
+    Note what it does *not* handle: an empty `cells` list. An empty or_() is
+    a SQL no-op that matches every row — the exact opposite of "responsible
+    for nothing" — so every caller special-cases that before calling, and
+    there is no safe default this function could pick on their behalf.
+    """
+    return or_(
+        *(
+            and_(User.user_type == cell["group"], User.sector == cell["sector"])
+            for cell in cells
+        )
+    )
+
+
 def ensure_account_active(user: User) -> None:
     """
     Business rule: only ACTIVE accounts may proceed.
@@ -75,7 +102,92 @@ def ensure_account_active(user: User) -> None:
     Raises 403 otherwise (e.g. suspended/pending/cancelled accounts).
     """
     if user.account_status != AccountStatus.ACTIVE:
-        raise HTTPException(status_code=403, detail="החשבון אינו פעיל.")
+        raise HTTPException(status_code=403, detail=translate("users.account_inactive"))
+
+
+#: What every deleted account's identity fields become. A fixed placeholder
+#: rather than blanking to "" — "" would collide on the login form's
+#: first_name display and, for email, would collide with every other
+#: deleted account against the column's UNIQUE constraint.
+DELETED_ACCOUNT_FIRST_NAME = "משתמש/ת"
+DELETED_ACCOUNT_LAST_NAME = "שנמחק/ה"
+
+
+def delete_own_account(db: Session, user: User) -> None:
+    """
+    Self-service account deletion (spec §9.4/UC-08, ABF-117).
+
+    The row is not deleted, for the same reason remove_moderator() keeps its
+    row: audit entries, reports and any content the account touched all
+    reference its id (NOT NULL foreign keys, none of them nullable), and a
+    hard delete would fail on those references or orphan them. Instead the
+    account is anonymised in place — identity fields scrubbed,
+    account_status set to CANCELLED (ensure_account_active then refuses it,
+    same as any other non-ACTIVE status) — and the id survives, so a forum
+    post's author_id or a report's reporter_id keeps pointing at a real,
+    now-anonymous row rather than a dangling one.
+
+    Private messages are the one thing that does not follow that pattern:
+    spec §9.4 has them fully deleted, not anonymised, unlike a forum post.
+    purge_user_direct_messages() does that (and closes out any report it
+    leaves dangling); its entries and this function's own USER_CANCELLED
+    entry are committed together in the one transaction below, so an account
+    can never end up half-deleted with a trail that does not say so.
+
+    No OTP step and no admin-approval queue: UC-08's diagram shows both, but
+    neither exists anywhere in this codebase today (there was nothing for
+    this ticket to "connect to" — DELETE /users/me was an empty stub), and
+    building a full request/approval workflow is out of ABF-117's scope.
+    """
+    locked_user = db.query(User).filter(User.id == user.id).with_for_update().first()
+    if not locked_user:
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
+    user = locked_user
+    if user.account_status == AccountStatus.CANCELLED:
+        raise HTTPException(status_code=400, detail=translate("users.already_deleted"))
+
+    message_result, message_entries = retention_service.purge_user_direct_messages(
+        db, user
+    )
+
+    user.first_name = DELETED_ACCOUNT_FIRST_NAME
+    user.last_name = DELETED_ACCOUNT_LAST_NAME
+    user.email = f"deleted-{user.id}@deleted.local"
+    user.password_hash = get_password_hash(secrets.token_urlsafe(32))
+    user.google_uid = None
+    user.phone = None
+    user.id_number = None
+    user.face_image_url = None
+    user.birth_date = None
+    user.otp_code = None
+    user.otp_expires_at = None
+    user.account_status = AccountStatus.CANCELLED
+
+    # Role-specific fields that would otherwise keep routing content or
+    # duties to an account nobody controls anymore — same clearing
+    # remove_moderator() does for a removed moderator.
+    if user.role == UserRole.MODERATOR:
+        user.moderator_cells = []
+        user.alert_email = None
+    elif user.role == UserRole.PROFESSIONAL:
+        user.is_active_professional = False
+
+    db.add_all(
+        [
+            *message_entries,
+            build_entry(
+                actor=user,
+                action=AuditAction.USER_CANCELLED,
+                entity_type="User",
+                entity_id=user.id,
+                details={
+                    "deleted_message_count": len(message_result["deleted_message_ids"]),
+                    "closed_report_count": len(message_result["closed_report_ids"]),
+                },
+            ),
+        ]
+    )
+    db.commit()
 
 
 def get_pending_registrations(db: Session) -> list[User]:
@@ -113,9 +225,11 @@ def get_registration(db: Session, user_id: str) -> User:
         .first()
     )
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.account_status not in AWAITING_APPROVAL_STATUSES:
-        raise HTTPException(status_code=403, detail="ההרשמה אינה ממתינה לאישור")
+        raise HTTPException(
+            status_code=403, detail=translate("users.registration_not_pending")
+        )
 
     return user
 
@@ -229,11 +343,13 @@ def approve_registration(db: Session, user_id: str, admin: User) -> User:
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.account_status not in AWAITING_APPROVAL_STATUSES:
-        raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
+        raise HTTPException(
+            status_code=400, detail=translate("users.registration_not_pending")
+        )
     if user.first_approver_id == admin.id:
-        raise HTTPException(status_code=400, detail="לא ניתן לאשר את אותה הרשמה פעמיים")
+        raise HTTPException(status_code=400, detail=translate("users.already_approved"))
 
     previous_status = user.account_status
 
@@ -251,9 +367,11 @@ def reject_registration(db: Session, user_id: str, admin: User, reason: str) -> 
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.account_status not in AWAITING_APPROVAL_STATUSES:
-        raise HTTPException(status_code=400, detail="ההרשמה אינה ממתינה לאישור")
+        raise HTTPException(
+            status_code=400, detail=translate("users.registration_not_pending")
+        )
 
     previous_status = user.account_status
     user.account_status = AccountStatus.REJECTED
@@ -282,11 +400,15 @@ def suspend_user(
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.role != UserRole.USER:
-        raise HTTPException(status_code=400, detail="ניתן להשעות רק משתמשים רגילים")
+        raise HTTPException(
+            status_code=400, detail=translate("users.suspend_members_only")
+        )
     if user.account_status != AccountStatus.ACTIVE:
-        raise HTTPException(status_code=400, detail="ניתן להשעות רק משתמש פעיל")
+        raise HTTPException(
+            status_code=400, detail=translate("users.suspend_active_only")
+        )
 
     user.is_suspended = True
     user.suspended_until = datetime.now(UTC) + timedelta(hours=hours)
@@ -384,7 +506,7 @@ def create_professional(
     5); until then the account exists in the catalog but cannot be signed into.
     """
     if db.query(User).filter(User.email == data.email).first():
-        raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
+        raise HTTPException(status_code=409, detail=translate("auth.email_taken"))
 
     professional = User(
         email=data.email,
@@ -454,9 +576,11 @@ def update_professional(
     """
     professional = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not professional:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if professional.role != UserRole.PROFESSIONAL:
-        raise HTTPException(status_code=400, detail="ניתן לערוך אנשי מקצוע בלבד")
+        raise HTTPException(
+            status_code=400, detail=translate("users.professionals_only")
+        )
 
     changed = _apply_professional_updates(
         professional, data.model_dump(exclude_unset=True)
@@ -522,11 +646,13 @@ def _load_moderator(db: Session, user_id: str) -> User:
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="משתמש לא נמצא")
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
     if user.role != UserRole.MODERATOR:
-        raise HTTPException(status_code=400, detail="ניתן לערוך ממונים בלבד")
+        raise HTTPException(status_code=400, detail=translate("users.moderators_only"))
     if user.account_status == AccountStatus.CANCELLED:
-        raise HTTPException(status_code=400, detail="הממונה כבר הוסר מהמערכת")
+        raise HTTPException(
+            status_code=400, detail=translate("users.moderator_already_removed")
+        )
     return user
 
 
@@ -568,7 +694,7 @@ def _reinstate_moderator(
         existing.role == UserRole.MODERATOR
         and existing.account_status == AccountStatus.CANCELLED
     ):
-        raise HTTPException(status_code=409, detail="כתובת המייל כבר רשומה במערכת")
+        raise HTTPException(status_code=409, detail=translate("auth.email_taken"))
 
     existing.first_name = data.first_name
     existing.last_name = data.last_name

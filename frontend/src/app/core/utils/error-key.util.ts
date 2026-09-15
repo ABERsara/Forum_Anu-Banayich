@@ -1,24 +1,22 @@
 /**
- * Server errors come back as a translation key in the response body's
+ * Some server errors come back as a translation key in the response body's
  * `detail` field (see forum_service.py's _DM_FORBIDDEN_MESSAGE /
  * _INVALID_CURSOR_MESSAGE / InvalidTag handling) — any other detail (network
  * failure, an unrecognized key) falls back to a message of ours rather than
  * showing the raw backend value.
+ *
+ * Only *some*: since ABF-137 most of the backend raises through
+ * `translate()`, which resolves the key against the request's Accept-Language
+ * and puts the finished sentence in `detail`. There is nothing for this list
+ * to recognise in those — the reporting errors included, which is why no
+ * `reports.*` name appears below. What is left here is the older shape, where
+ * the server names a key and the client renders it.
  */
-const KNOWN_ERROR_KEYS = [
+export const KNOWN_ERROR_KEYS = [
   'errors.dm_forbidden',
+  'errors.dm_restricted',
   'errors.invalid_cursor',
   'errors.internal_server_error',
-  // AI agent (ABF-122). Registered by the ticket that made the API send these,
-  // not by the screen that will show them (ABF-123): a key missing from this
-  // list fails nowhere — it silently becomes `errors.generic`, so "this agent
-  // is not available" and "you have reached today's limit" would both read
-  // "something went wrong", with no failing test to say why.
-  'errors.agent_domain_not_found',
-  'errors.agent_conversation_not_found',
-  'errors.agent_conversation_forbidden',
-  'errors.agent_rate_limited',
-  'errors.agent_unavailable',
 ];
 
 /**

@@ -1,8 +1,8 @@
 """add AGENT_CONVERSATION to auditaction
 
 Revision ID: c73690be0286
-Revises: 3a7c1f9b2d64
-Create Date: 2026-09-03 00:00:00.000000
+Revises: 037332dbf22d
+Create Date: 2026-09-08 00:00:00.000000
 
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c73690be0286"
-down_revision: str | Sequence[str] | None = "3a7c1f9b2d64"
+down_revision: str | Sequence[str] | None = "037332dbf22d"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

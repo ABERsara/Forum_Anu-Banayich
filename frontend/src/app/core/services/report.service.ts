@@ -2,7 +2,6 @@
  * Report service.
  *
  * TODO list for junior developer:
- *   [ ] implement decideReport() – moderator use
  *   [ ] implement getAuditLog() – admin use
  */
 
@@ -10,16 +9,36 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, throwError } from 'rxjs';
 
 import { ReportTargetType } from '../constants';
-import { Report, ReportCreate, ReportDecideRequest, ReportList } from '../models';
+import {
+  Report,
+  ReportCreate,
+  ReportDecideRequest,
+  ReportHistoryList,
+  ReportList,
+  RestrictionList,
+  SuspendUserRequest,
+  UserModerationCard,
+} from '../models';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })
 export class ReportService {
   private readonly api = inject(ApiService);
 
+  /**
+   * File a report on one piece of content.
+   *
+   * The route is derived from the target type rather than passed in: each
+   * content type is reported to the endpoint that owns it, and a caller that
+   * had to name the URL could aim a private-message report at the forum route
+   * — which the server rejects, but only after the mistake has been made.
+   */
   fileReport(data: ReportCreate): Observable<Report> {
     if (data.target_type === ReportTargetType.FORUM_POST) {
       return this.api.post<Report>(`/forum/posts/${data.target_id}/report`, data);
+    }
+    if (data.target_type === ReportTargetType.DIRECT_MESSAGE) {
+      return this.api.post<Report>(`/messages/${data.target_id}/report`, data);
     }
     return throwError(
       () => new Error(`Reporting ${data.target_type} content is not supported yet.`),
@@ -30,14 +49,36 @@ export class ReportService {
     return this.api.get<ReportList>('/moderator/reports');
   }
 
+  /** Reports this moderator's cells already decided, newest first. Paginated. */
+  getReportHistory(page = 1): Observable<ReportHistoryList> {
+    return this.api.get<ReportHistoryList>(`/moderator/reports/history?page=${page}`);
+  }
+
   decideReport(reportId: string, data: ReportDecideRequest): Observable<Report> {
-    void reportId;
-    void data;
-    /**
-     * TODO: (moderator role)
-     *   return this.api.post<Report>(`/moderator/reports/${reportId}/decide`, data);
-     */
-    throw new Error('decideReport() not yet implemented');
+    return this.api.post<Report>(`/moderator/reports/${reportId}/decide`, data);
+  }
+
+  /**
+   * The automatic restrictions in force right now in this moderator's cells
+   * (ABF-116). Unpaginated: it is a picture of the situation now, and it
+   * shrinks by itself as restrictions expire.
+   */
+  getActiveRestrictions(): Observable<RestrictionList> {
+    return this.api.get<RestrictionList>('/moderator/restrictions');
+  }
+
+  /** One user's moderation history, scoped to the moderator's own cells. */
+  getUserCard(userId: string): Observable<UserModerationCard> {
+    return this.api.get<UserModerationCard>(`/moderator/users/${userId}/card`);
+  }
+
+  /**
+   * Suspend a user by hand from their card. Answers with the card as it now
+   * stands, so the page does not have to fetch it again.
+   */
+  suspendUser(userId: string, hours: number, reason: string): Observable<UserModerationCard> {
+    const body: SuspendUserRequest = { hours, reason };
+    return this.api.post<UserModerationCard>(`/moderator/users/${userId}/suspend`, body);
   }
 
   // Admin

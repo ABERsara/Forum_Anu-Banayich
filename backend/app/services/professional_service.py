@@ -30,6 +30,7 @@ from app.core.constants import (
     UserRole,
     UserType,
 )
+from app.core.i18n import translate
 from app.models.professional import ProfessionalQuery
 from app.models.user import User
 from app.schemas.professional import (
@@ -300,13 +301,19 @@ def answer_query(
         .first()
     )
     if query is None:
-        raise HTTPException(status_code=404, detail="השאלה לא נמצאה.")
+        raise HTTPException(
+            status_code=404, detail=translate("professionals.query_not_found")
+        )
 
     if not _professional_may_answer(query, professional):
-        raise HTTPException(status_code=403, detail="אין לך הרשאה לענות על שאלה זו.")
+        raise HTTPException(
+            status_code=403, detail=translate("professionals.answer_forbidden")
+        )
 
     if query.status != QueryStatus.OPEN:
-        raise HTTPException(status_code=409, detail="השאלה כבר נענתה.")
+        raise HTTPException(
+            status_code=409, detail=translate("professionals.query_already_answered")
+        )
 
     query.answer = data.answer
     query.status = QueryStatus.ANSWERED

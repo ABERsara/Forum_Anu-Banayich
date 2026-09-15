@@ -238,7 +238,47 @@ export enum ReportDecision {
   PENDING = 'pending',
   INVALID = 'invalid',
   VALID = 'valid',
+  // System-closed (ABF-117): the reported-on user deleted their account, so
+  // the private message the report pointed at was deleted with it.
+  CLOSED_ACCOUNT_DELETED = 'closed_account_deleted',
 }
+
+/**
+ * The eleventh shared label map, and the only one ABF-127 did not migrate —
+ * it did not exist yet. It holds keys like the other ten, for the same reason:
+ * the moderator history renders it, and a hardcoded Hebrew value here would be
+ * a Hebrew word left on an English screen that no module could fix without
+ * editing this file.
+ */
+export const REPORT_DECISION_LABELS: Record<ReportDecision, LabelKey> = {
+  [ReportDecision.PENDING]: 'constants.report_decision.pending',
+  [ReportDecision.INVALID]: 'constants.report_decision.invalid',
+  [ReportDecision.VALID]: 'constants.report_decision.valid',
+  [ReportDecision.CLOSED_ACCOUNT_DELETED]: 'constants.report_decision.closed_account_deleted',
+};
+
+// ---------------------------------------------------------------------------
+// Automatic restrictions (ABF-116)
+// ---------------------------------------------------------------------------
+
+/**
+ * What an automatic restriction takes away (SPEC §5.3 מה"ק, §7.2).
+ *
+ * Neither value is a suspension — a restricted member still logs in and still
+ * reads everything she could read before. Mirrors
+ * `backend/app/core/constants.py::RestrictionType`.
+ */
+export enum RestrictionType {
+  /** Sending private messages. Reading a conversation is untouched. */
+  MESSAGING = 'messaging',
+  /** Reporting beyond a daily allowance. Reporting itself is not withdrawn. */
+  REPORTING = 'reporting',
+}
+
+export const RESTRICTION_TYPE_LABELS: Record<RestrictionType, LabelKey> = {
+  [RestrictionType.MESSAGING]: 'constants.restriction_type.messaging',
+  [RestrictionType.REPORTING]: 'constants.restriction_type.reporting',
+};
 
 // ---------------------------------------------------------------------------
 // Likes
@@ -266,6 +306,19 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, LabelKey> = {
   [DocumentType.ID_CARD]: 'constants.document_type.id_card',
   [DocumentType.PASSPORT]: 'constants.document_type.passport',
 };
+
+// ---------------------------------------------------------------------------
+// AI agent
+// ---------------------------------------------------------------------------
+
+// AgentDomain (backend AgentDomain) has no mirror here: it is a database table
+// with free-form rows (name, description, group/sector visibility), not a fixed
+// enum. The frontend gets the domains a user may see from GET /api/v1/agents.
+
+export enum AgentMessageRole {
+  USER = 'user', // המשתמש ששוחח עם הסוכן
+  AGENT = 'agent', // תשובת סוכן ה-AI
+}
 
 // ---------------------------------------------------------------------------
 // Helpers

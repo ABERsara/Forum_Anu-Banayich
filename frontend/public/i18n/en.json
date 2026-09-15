@@ -13,7 +13,8 @@
     "logout": "Log out",
     "login": "Log in",
     "register": "Sign up",
-    "messages": "Messages"
+    "messages": "Messages",
+    "profile": "My profile"
   },
   "admin": {
     "back_to_dashboard": "Back to the dashboard",
@@ -206,7 +207,7 @@
       "unlike_aria": "Unlike — {{count}}"
     },
     "qa_feed": {
-      "back_link": "← Back to professional advice",
+      "back_link": "Back to professional advice",
       "title": "Community Q&A",
       "domain_filter_label": "Filter by domain:",
       "domain_filter_all": "All",
@@ -394,18 +395,75 @@
   },
   "moderator": {
     "reports": {
-      "title": "Moderator dashboard – pending reports",
+      "title": "Moderator dashboard",
+      "hint": "Every decision needs a written note. The note is kept with the report, and once the content itself is gone it is the only record of why the decision was made.",
+      "tabs_aria": "Reports",
+      "tab_pending": "Pending reports",
+      "tab_history": "History",
       "loading": "Loading reports...",
       "empty": "No pending reports. Nice work!",
       "report_count": "{{count}} reports",
-      "reason_label": "Reason:",
-      "description_label": "Description:",
-      "content_status_label": "Content status:",
+      "reason_label": "Report reason",
+      "description_label": "What the reporter wrote",
+      "created_at_label": "Report date",
+      "content_status_label": "Message status",
       "decide_valid": "Delete the message (valid)",
-      "decide_invalid": "Dismiss the report (invalid)"
+      "decide_invalid": "Dismiss the report (invalid)",
+      "decide_valid_aria": "Delete the message “{{title}}”",
+      "decide_invalid_aria": "Dismiss the report about “{{title}}”",
+      "user_card_link": "User card",
+      "user_card_aria": "Card of the user who wrote “{{title}}”",
+      "history_loading": "Loading history...",
+      "history_empty": "No decisions have been made yet in the cells you oversee.",
+      "decided_at_label": "Decision date",
+      "note_label": "Moderator's note",
+      "pager_aria": "History pagination",
+      "previous_page": "Previous",
+      "next_page": "Next",
+      "page_of": "Page {{page}} of {{count}}",
+      "confirm_valid_title": "Delete the message",
+      "confirm_valid_message": "The report will be marked valid, the message will be removed from the forum, and its author will be notified.",
+      "confirm_invalid_title": "Dismiss the report",
+      "confirm_invalid_message": "The report will be marked invalid. A message hidden automatically after two reports will be shown in the forum again.",
+      "note_input_label": "Moderator's note (required)",
+      "note_placeholder": "For example: the content includes an offensive remark about another user",
+      "tab_restrictions": "Active restrictions"
+    },
+    "restrictions": {
+      "hint": "Restrictions applied automatically by the thresholds in the spec, in the cells you oversee. Each one ends by itself on the date shown.",
+      "loading": "Loading restrictions...",
+      "empty": "No restrictions are in force in the cells you oversee.",
+      "expires_label": "In force until",
+      "applied_label": "Applied on",
+      "reason_label": "Reason",
+      "reason_value_messaging": "{{count}} reports about her were upheld in the last {{days}} days",
+      "reason_value_reporting": "{{count}} reports she filed were dismissed in the last {{days}} days"
+    },
+    "user_card": {
+      "back_to_reports": "Back to the dashboard",
+      "title": "User card",
+      "hint": "The history below is the basis for a suspension decision. The counts are for the user themselves — including reports filed in other cells.",
+      "loading": "Loading user card...",
+      "suspended_until": "Suspended until {{date}}",
+      "not_suspended": "The account is not suspended.",
+      "reports_section": "Report history",
+      "reports_against_total": "Reports against this user",
+      "reports_against_valid": "Of those, found valid",
+      "reports_against_invalid": "Of those, found invalid",
+      "reports_filed_total": "Reports this user filed",
+      "false_reports_filed": "Of those, found false",
+      "actions_section": "Actions",
+      "suspend": "Suspend the user",
+      "suspend_message": "Suspend {{name}} for the number of hours you choose. They will be notified with the reason, and the action will be recorded in the audit log.",
+      "suspend_confirm": "Suspend"
     },
     "errors": {
-      "load_reports_failed": "Something went wrong loading the reports."
+      "load_reports_failed": "Something went wrong loading the reports. Try refreshing the page.",
+      "load_history_failed": "Something went wrong loading the history. Try refreshing the page.",
+      "decide_failed": "Something went wrong saving the decision. Please try again.",
+      "load_restrictions_failed": "Something went wrong loading the restrictions. Try refreshing the page.",
+      "load_user_card_failed": "Something went wrong loading the user card. Try refreshing the page.",
+      "suspend_failed": "Something went wrong suspending the user. Please try again."
     }
   },
   "profile": {
@@ -414,7 +472,27 @@
     "email_label": "Email:",
     "group_label": "Group:",
     "sector_label": "Sector:",
-    "status_label": "Status:"
+    "status_label": "Status:",
+    "retention": {
+      "title": "Private message retention",
+      "description": "Private messages are kept for up to 3 years and then deleted automatically and permanently. You can download a copy of all your private messages at any time.",
+      "export_button": "Export my messages",
+      "export_loading": "Exporting your messages...",
+      "export_success": "Your messages file has been downloaded."
+    },
+    "delete_account": {
+      "title": "Delete account",
+      "description": "Deleting your account removes your personal details and permanently deletes all your private messages. This action cannot be undone.",
+      "button": "Delete account",
+      "confirm_title": "Permanently delete your account?",
+      "confirm_message": "Your personal details will be removed and all your private messages will be permanently deleted. This cannot be undone.",
+      "confirm_button": "Yes, delete my account",
+      "deleting": "Deleting your account..."
+    },
+    "errors": {
+      "export_failed": "Couldn't export your messages. Please try again later.",
+      "delete_account_failed": "Couldn't delete your account. Please try again later."
+    }
   },
   "shared": {
     "confirm_dialog": {
@@ -433,10 +511,15 @@
       "submitted": "Your report was sent, thank you.",
       "dialog_title": "Report content",
       "reason_label": "Reason for the report",
+      "reason_placeholder": "Choose a reason",
+      "reason_required": "Choose a reason to send the report.",
+      "sending": "Sending report...",
+      "disclosure_direct_message": "Note: confirming will reveal this message alone to the responsible moderator. The rest of the conversation stays private.",
       "description_label": "Details (optional)",
       "submit": "Send report",
       "error_duplicate": "You have already reported this content.",
-      "error_generic": "Something went wrong sending the report. Please try again."
+      "error_generic": "Something went wrong sending the report. Please try again.",
+      "error_rate_limited": "You have reached today's reporting limit. You can report again tomorrow."
     },
     "file_upload": {
       "choose_file": "Choose file",
@@ -454,11 +537,7 @@
     "invalid_cursor": "The request for older messages was not valid. Please refresh the page.",
     "internal_server_error": "Internal server error. Please try again later.",
     "generic": "Something went wrong. Please try again.",
-    "agent_domain_not_found": "This agent is not available.",
-    "agent_conversation_not_found": "The conversation was not found.",
-    "agent_conversation_forbidden": "You don't have permission to view this conversation.",
-    "agent_rate_limited": "You have reached the daily message limit for the agent. Please try again later, or reach a human professional through the advice module.",
-    "agent_unavailable": "The agent is unavailable right now. Please try again in a few moments."
+    "dm_restricted": "Sending private messages is temporarily restricted following reports that were upheld. You can still read your conversations."
   },
   "messages": {
     "inbox": {
@@ -483,7 +562,7 @@
       "search_no_results": "No matching members found in your cell."
     },
     "chat": {
-      "back_to_inbox": "← Back to inbox",
+      "back_to_inbox": "Back to inbox",
       "title_fallback": "Conversation",
       "loading": "Loading messages...",
       "empty": "No messages yet. Write a message to get started.",
@@ -505,7 +584,10 @@
       "send": "Send",
       "send_failed": "The message was not sent. Please try again.",
       "pruned_notice": "This conversation reached its {{limit}}-message limit, so the oldest message was deleted to make room.",
-      "pruned_notice_many": "This conversation reached its {{limit}}-message limit, so the {{count}} oldest messages were deleted to make room."
+      "pruned_notice_many": "This conversation reached its {{limit}}-message limit, so the {{count}} oldest messages were deleted to make room.",
+      "report_message": "Report the message from {{name}} at {{time}}",
+      "restricted_notice": "Sending private messages is restricted until {{until}}, following reports that were upheld. You can still read this conversation, and write again once the restriction ends.",
+      "restricted_placeholder": "You cannot send messages while the restriction is in force"
     }
   },
   "constants": {
@@ -565,6 +647,16 @@
       "offensive": "Offensive content",
       "spam": "Spam",
       "other": "Other"
+    },
+    "report_decision": {
+      "pending": "Pending",
+      "invalid": "Report dismissed",
+      "valid": "Report upheld",
+      "closed_account_deleted": "Closed — account deleted"
+    },
+    "restriction_type": {
+      "messaging": "Sending private messages",
+      "reporting": "Daily reporting allowance"
     },
     "document_type": {
       "death_certificate": "Death certificate",

@@ -9,12 +9,28 @@ exported to the rest of the codebase and nothing else:
   typed. See SYSTEM_PROMPT_TEMPLATE below.
 * ``get_provider()`` – the configured LLMProvider.
 
+Generation, not retrieval. ``rag_service`` (ABF-121) owns the other half of
+the Gemini surface — embeddings — and the two are kept apart on purpose: they
+are different models on different deprecation schedules behind different
+settings (``GEMINI_MODEL`` / ``GEMINI_EMBED_MODEL``,
+``LLM_TIMEOUT_SECONDS`` / ``GEMINI_TIMEOUT_SECONDS``), and only this half is
+meant to be swapped for another vendor.
+
 **Swapping providers is a settings change, not a code change.** Callers never
 name a provider class: they call ``get_provider()``, which looks up
 ``settings.LLM_PROVIDER`` in a registry. Adding Anthropic later (out of scope
 for ABF-122) means writing a class with a ``generate()`` and one
 ``register_provider("anthropic", ...)`` line at the bottom of this module —
 agent_service does not change, and neither does the endpoint.
+
+Why Gemini, when SPEC §12.1 names Claude Haiku and GPT-4o-mini. The SPEC line
+is "the developers will choose — both are cheap and suitable", not a
+commitment to either, and ABF-121 had already chosen Gemini for the embedding
+side: one vendor, one key, one account to provision, and the key was in the
+environment before this ticket started. Generation follows retrieval rather
+than adding a second vendor for one call. The registry below is what keeps
+§12.1's choice genuinely open — moving to Claude is a class and a settings
+value, and `TestProviderSwap` in tests/test_agent_chat.py is the proof.
 
 Nothing here logs a prompt, a question or an answer. Conversation content
 never leaves the DB row it was written to (SPEC §9.3), so the logging in this
@@ -74,10 +90,13 @@ class LLMUnavailableError(LLMError):
 class ContextChunk:
     """One retrieved passage, as the prompt sees it.
 
-    Deliberately not the AgentKnowledgeEntry ORM row: a provider has no
-    business holding a DB object, and this is the shape a future provider
-    that reads from somewhere else would still be handed. agent_service does
-    the mapping.
+    Almost, but deliberately not, ``rag_service.RetrievedChunk``. That one
+    carries a ``score`` as well, which is retrieval's own business: a provider
+    that were handed it could start weighting passages by it, and how one
+    embedding model's cosine distances are distributed is not something a
+    prompt should encode. agent_service maps one to the other in a single
+    function (``_to_context_chunk``), which is also what keeps this module
+    importable without rag_service, pgvector or a database.
 
     Provenance is two fields because ABF-120's schema stores it as two —
     ``source_name`` is what a person reads ("ביטוח לאומי"), ``source_url`` is
@@ -139,9 +158,15 @@ class LLMProvider(Protocol):
 # What the agent is allowed to say
 # ---------------------------------------------------------------------------
 
-#: Fixed legal disclaimer. Appended by agent_service to every answer rather
-#: than requested from the model, because a model is free to drop a sentence
-#: it was asked to add and this one is not optional (SPEC §12).
+#: Fixed legal disclaimer — SPEC §12's "המידע הוא כללי בלבד ואינו מהווה ייעוץ
+#: מקצועי מחייב", said at more length and with the referral attached. Appended
+#: by agent_service to every answer rather than requested from the model,
+#: because a model is free to drop a sentence it was asked to add and this one
+#: is not optional.
+#:
+#: SPEC puts the disclaimer "in the interface". It is here as well, and on
+#: purpose: the interface is ABF-123's, and an answer read through the API, an
+#: export, or the audit trail would otherwise arrive without it.
 #:
 #: Hebrew, not a translation key, unlike the HTTP error details in
 #: agent_service: this is not chrome the client renders around an answer, it

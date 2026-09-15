@@ -142,61 +142,146 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
 
     # ------------------------------------------------------------------
-    # AI agent – LLM provider (ABF-122)
-    #
-    # GEMINI_API_KEY is required for POST /agents/{domain_id}/chat to answer a
-    # question its knowledge base covers: without it that request is a 503,
-    # deliberately, rather than a quiet fallback to "I have no information" —
-    # a missing key must look like a fault, not like an answer. A question the
-    # knowledge base does *not* cover still works with no key at all, because
-    # no provider is called for it.
+    # Gemini embeddings (agent knowledge base retrieval)
     # ------------------------------------------------------------------
+    # Deliberately defaulted to empty rather than guarded like SECRET_KEY
+    # above: an absent key must not stop the API from starting, because every
+    # part of the system other than knowledge-base indexing works without it.
+    # rag_service validates it at the point of the call instead, so the failure
+    # names the missing key rather than surfacing as a 401 from Google.
     GEMINI_API_KEY: str = ""
 
-    # Which llm_service provider serves generation. Swapping this to another
-    # registered name (see llm_service.register_provider) is the whole change
-    # needed to move off Gemini – no caller touches a provider class.
+    # Bound to the vector(768) column the migration creates. This model's own
+    # default is 3072, so rag_service asks for 768 explicitly on every request;
+    # a model that cannot produce 768 at all needs a migration and a re-index of
+    # every existing entry, not just a new value here.
+    #
+    # A model name belongs in config precisely because these are retired on a
+    # schedule: embedding-001 went on 2025-10-30 and text-embedding-004 on
+    # 2026-01-14. This one has no announced shutdown date yet, which is not the
+    # same as never. See https://ai.google.dev/gemini-api/docs/deprecations
+    # before changing it.
+    GEMINI_EMBED_MODEL: str = "gemini-embedding-001"
+
+    # One embedding call sits inside a request the professional is waiting on,
+    # so it fails fast rather than holding the worker open.
+    GEMINI_TIMEOUT_SECONDS: int = 10
+
+    # ------------------------------------------------------------------
+    # AI agent – answer generation (ABF-122)
+    # ------------------------------------------------------------------
+    # Which llm_service provider generates the agent's answers. Swapping this
+    # to another registered name (see llm_service.register_provider) is the
+    # whole change needed to move off Gemini — no caller names a provider
+    # class, so nothing else has to be edited or redeployed.
     LLM_PROVIDER: str = "gemini"
 
-    # Gemini model used for generation. Configurable so a model deprecation
-    # is an environment change, not a deploy.
+    # The Gemini model that writes the answer, as distinct from
+    # GEMINI_EMBED_MODEL above, which only turns text into vectors. Two
+    # settings because they are two model families on two deprecation
+    # schedules: retrieval keeps working when the chat model is retired, and
+    # the reverse.
     GEMINI_MODEL: str = "gemini-2.0-flash"
 
     # Hard ceiling on one generation call. A chat request holds a worker for
     # its whole duration, so this is what stops a slow provider from taking
-    # the API down with it.
+    # the API down with it. Longer than GEMINI_TIMEOUT_SECONDS because
+    # generating paragraphs is genuinely slower than embedding a sentence.
     LLM_TIMEOUT_SECONDS: float = 20.0
 
     # ------------------------------------------------------------------
     # AI agent – conversation limits (can be tuned without code changes)
     # ------------------------------------------------------------------
-    # Messages one user may send to the agents in a rolling 24 hours,
-    # counted across every domain rather than per agent: the cost being
-    # capped is the provider bill, and that is one bill.
+    # Messages one user may send to the agents in a rolling 24 hours, counted
+    # across every domain rather than per agent: the cost being capped is the
+    # provider bill, and that is one bill.
     AGENT_RATE_LIMIT_PER_DAY: int = 30
 
     # Longest question accepted, in characters. Enforced by the Pydantic
     # schema (422), not by the provider's token limit.
     AGENT_MAX_MESSAGE_LENGTH: int = 1000
 
+    # How close a passage has to be to the question before it is allowed to
+    # ground an answer. rag_service.retrieve() ranks and returns the k nearest
+    # chunks whatever the question was — it has no notion of "near enough" —
+    # so without a floor here, "מה תחזית מזג האוויר מחר?" comes back with the
+    # five least-unrelated paragraphs in a housing-rights knowledge base and
+    # the agent's refusal to answer off-topic questions rests entirely on the
+    # model obeying rule 2 of its prompt. With a floor it is a property of the
+    # code: nothing clears it, the provider is never called, and the reader is
+    # sent to human advice (agent_service._retrieve_for).
+    #
+    # The scale is RetrievedChunk.score — 1 - cosine distance, so 1.0 is
+    # identical, 0.0 unrelated, negative actively contrary.
+    #
+    # A setting rather than a constant because the right number is a property
+    # of the deployment's own content and of GEMINI_EMBED_MODEL, not of this
+    # code: it has to be calibrated once the knowledge base is real, and
+    # re-calibrated if the embedding model changes. Both failure directions
+    # are visible, which is what makes tuning it safe — too high and the agent
+    # refers questions it could have answered, too low and it quotes
+    # paragraphs about something else. 0.35 is deliberately a low floor: it
+    # rejects the plainly unrelated and leaves the marginal calls to the
+    # prompt, because the expensive mistake at this stage is refusing a widow
+    # an answer the association wrote for her.
+    AGENT_MIN_RELEVANCE_SCORE: float = 0.35
+
     # How many of the conversation's most recent *turns* – a question and the
     # answer it got – are replayed into the prompt, so "ומה לגבי הילדים שלי"
     # resolves against what came before it. 3 turns is at most 6 messages.
-    # Costs tokens on every request, which is why it is tunable without a
-    # deploy: raise it if follow-ups lose the thread, lower it if the bill
-    # grows faster than usage.
+    # Costs tokens on every request, which is why the ticket asks for an
+    # environment variable rather than a constant: raise it if follow-ups lose
+    # the thread, lower it if the bill grows faster than usage — no deploy.
     AGENT_HISTORY_TURNS: int = 3
 
     # ------------------------------------------------------------------
     # Moderation thresholds (can be tuned without code changes)
     # ------------------------------------------------------------------
     AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide
-    AUTO_SUSPEND_VALID_REPORTS: int = 3  # Valid reports in 7 days → suspend
+    #: §7.2's third row ("אירוע חוזר משמעותי") reads 2+ upheld incidents in 7
+    #: days; this default still holds the 3 it was written with. Nothing reads
+    #: it yet — the rule is report_service._check_auto_suspension(), which is
+    #: still a stub — so the two numbers are reconciled there, against this
+    #: setting rather than against a literal, when it is implemented. Left at
+    #: 3 here on purpose: re-pointing a threshold nothing enforces belongs to
+    #: the ticket that enforces it, not to ABF-116.
+    AUTO_SUSPEND_VALID_REPORTS: int = 3
     AUTO_SUSPEND_DAYS_WINDOW: int = 7
     AUTO_SUSPEND_HOURS: int = 48
+
+    # ------------------------------------------------------------------
+    # Automatic restrictions (spec §5.3 מה"ק, §7.2) — ABF-116
+    #
+    # Every number below is read through `settings` at the moment a
+    # threshold is evaluated, never inlined at the call site, because the
+    # ticket's own note is that these have to be re-calibrated after the
+    # first real run. Inlining is the mistake FINDINGS M-01 records for
+    # AUTO_HIDE_REPORT_COUNT: a setting nothing reads looks tunable and is
+    # not.
+    #
+    # Direction A — the repeatedly-reported sender. Upheld (VALID) reports
+    # only: a report that a moderator dismissed is not evidence of anything,
+    # and CLOSED_ACCOUNT_DELETED is the system closing a report, not a
+    # finding against anyone.
+    # ------------------------------------------------------------------
+    DM_BLOCK_AFTER_REPORTS: int = 3  # Upheld reports in the window → restrict
+    DM_BLOCK_DAYS_WINDOW: int = 30
+    #: How long the sending restriction lasts. 48 hours to match
+    #: AUTO_SUSPEND_HOURS above — the platform's one stated duration for a
+    #: temporary automatic measure, and §5.3 gives none of its own.
+    DM_BLOCK_HOURS: int = 48
+
+    # ------------------------------------------------------------------
+    # Direction B — the member whose reports keep being dismissed. Not a
+    # ban on reporting: §7.2 asks for a daily allowance, so she can still
+    # report the thing that happens to her today.
+    # ------------------------------------------------------------------
     FALSE_REPORT_LIMIT: int = 5  # False reports in 30 days → restrict
     FALSE_REPORT_DAYS_WINDOW: int = 30
-    DM_BLOCK_AFTER_REPORTS: int = 3  # DM reports before auto-block
+    #: Reports still allowed per day while the restriction is in force.
+    RESTRICTED_REPORTS_PER_DAY: int = 3
+    #: How long the reporting allowance lasts, in days.
+    FALSE_REPORT_RESTRICTION_DAYS: int = 30
 
     # ------------------------------------------------------------------
     # Private messaging storage cap (spec section 5.3)
@@ -208,6 +293,11 @@ class Settings(BaseSettings):
     # actually changes behaviour (the mistake FINDINGS M-01 records for
     # AUTO_HIDE_REPORT_COUNT).
     MAX_MESSAGES_PER_CONVERSATION: int = 1000
+
+    # How long a private message is kept before the scheduled retention job
+    # deletes it (spec §5.3/§9.4: "ניקוי אוטומטי לשיחה אחר 3 שנים"). See
+    # retention_service.purge_expired_direct_messages() (ABF-117).
+    DIRECT_MESSAGE_RETENTION_DAYS: int = 1095  # 3 years
 
     # ------------------------------------------------------------------
     # Validation

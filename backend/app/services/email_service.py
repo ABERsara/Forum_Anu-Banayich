@@ -19,6 +19,7 @@ import logging
 import smtplib
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from html import escape
@@ -206,10 +207,79 @@ def send_moderator_alert(
     # TODO: send real email
 
 
+def send_direct_message_report_alert(moderator_email: str, report_id: str) -> None:
+    """
+    Notify a moderator that a private message was reported to her (ABF-112).
+
+    Deliberately no content_preview parameter, unlike send_moderator_alert():
+    a reported private message is readable only through the moderator view,
+    and a signature that cannot accept the text is what stops a future caller
+    from putting it in an email. The report id is enough to find it there.
+    """
+    logger.info(
+        f"[EMAIL] Direct-message report alert for report {report_id} "
+        f"→ {moderator_email}"
+    )
+    # TODO: send real email
+
+
 def send_urgent_moderator_alert(moderator_email: str, report_id: str) -> None:
     """Urgent notification – content auto-hidden after 2nd report."""
     logger.info(
         f"[EMAIL] URGENT moderator alert for report {report_id} → {moderator_email}"
+    )
+    # TODO: send real email
+
+
+def send_content_removed_notification(email: str, report_id: str) -> None:
+    """
+    Notify the author that a report on their content was upheld and the
+    content was removed (SPEC §7.1, "מדווח-עליו מקבל הודעת מערכת").
+
+    The moderator's note is deliberately not passed in — it is internal
+    documentation, and the author is told what happened, not what was
+    written about them.
+    """
+    logger.info(f"[EMAIL] Content removed after report {report_id} → {email}")
+    # TODO: send real email
+
+
+def send_sending_restriction_alert(
+    recipient_email: str, user_id: str, expires_at: datetime
+) -> None:
+    """
+    Tell a moderator or an admin that §7.2's threshold restricted a member
+    from sending private messages (ABF-116).
+
+    Ids and an end date — the same signature discipline as
+    send_direct_message_report_alert(): no parameter can carry the reports it
+    was triggered by, and none can carry their content, because one of them
+    may be a private message. Whoever reads this opens the moderator
+    dashboard to see the rest.
+    """
+    logger.info(
+        f"[EMAIL] Messaging restriction applied to user {user_id} "
+        f"until {expires_at.isoformat()} → {recipient_email}"
+    )
+    # TODO: send real email
+
+
+def send_reporting_restriction_alert(
+    moderator_email: str, user_id: str, expires_at: datetime
+) -> None:
+    """
+    Tell a moderator that §7.2's threshold dropped a member's reporting to a
+    daily allowance (ABF-116).
+
+    Separate from send_sending_restriction_alert() despite the identical
+    signature: the two say opposite things about the member — one keeps being
+    found against, the other keeps being wrong about other people — and a
+    single function with a `kind` argument is one call-site mistake away from
+    telling a moderator the wrong one.
+    """
+    logger.info(
+        f"[EMAIL] Reporting restriction applied to user {user_id} "
+        f"until {expires_at.isoformat()} → {moderator_email}"
     )
     # TODO: send real email
 
