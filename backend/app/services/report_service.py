@@ -22,7 +22,7 @@ TODO list for junior developer:
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from cryptography.exceptions import InvalidTag
 from fastapi import HTTPException
@@ -389,6 +389,18 @@ def decide_report(
     # user_service.escalate_overdue_registrations().
     report.decided_at = datetime.now(UTC).replace(tzinfo=None)
 
+    # Declared once, up front: the two branches below come from different
+    # functions with different Literal return types, and this is where they
+    # converge into the one value log_action() records.
+    content_action: Literal[
+        "already_deleted",
+        "deleted",
+        "restored",
+        "unchanged",
+        "target_gone",
+        "hidden",
+        "already_hidden",
+    ]
     if report.target_type == ReportTargetType.FORUM_POST:
         # Row-level lock, same reasoning as the report's own: the decision
         # rewrites the post's status too. Loaded here rather than by
@@ -526,7 +538,9 @@ def _admin_alert_emails(db: Session) -> list[str]:
     return [admin.alert_email for admin in admins if admin.alert_email]
 
 
-def _apply_content_decision(post: ForumPost, decision: ReportDecision) -> str:
+def _apply_content_decision(
+    post: ForumPost, decision: ReportDecision
+) -> Literal["already_deleted", "deleted", "restored", "unchanged"]:
     """
     Apply a decision to the reported post, and name what it did so the audit
     entry can say so. Mutates in memory only — decide_report() owns the commit.
@@ -548,7 +562,7 @@ def _apply_content_decision(post: ForumPost, decision: ReportDecision) -> str:
 
 def _apply_direct_message_decision(
     db: Session, report: Report, decision: ReportDecision
-) -> str:
+) -> Literal["unchanged", "target_gone", "already_hidden", "hidden"]:
     """
     Apply a decision to the reported message, and name what it did so the
     audit entry can say so. Mutates in memory only — decide_report() owns
