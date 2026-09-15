@@ -140,7 +140,7 @@
               </div>
 
               @if (report.target_type === targetTypes.FORUM_POST) {
-                <p class="reports__content">{{ previewOf(report.content_text!) }}</p>
+                <p class="reports__content">{{ previewOf(report.content_text) }}</p>
               } @else {
                 <!-- No content preview here, ever — ABF-113, spec §9.1/§9.3:
                      a private message is read only through this audited
@@ -167,7 +167,7 @@
                 @if (report.target_type === targetTypes.FORUM_POST) {
                   <div>
                     <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
-                    <dd>{{ postStatusLabels[report.content_status!] | transloco }}</dd>
+                    <dd>{{ postStatusLabels[report.content_status] | transloco }}</dd>
                   </div>
                 }
               </dl>
@@ -230,7 +230,7 @@
               </div>
 
               @if (report.target_type === targetTypes.FORUM_POST) {
-                <p class="reports__content">{{ previewOf(report.content_text!) }}</p>
+                <p class="reports__content">{{ previewOf(report.content_text) }}</p>
               } @else if (report.decision === decisions.CLOSED_ACCOUNT_DELETED) {
                 <!-- Closed, not decided — the reported-on account is gone.
                      No content, ever, even to the moderator who would have
@@ -257,7 +257,7 @@
                 @if (report.target_type === targetTypes.FORUM_POST) {
                   <div>
                     <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
-                    <dd>{{ postStatusLabels[report.content_status!] | transloco }}</dd>
+                    <dd>{{ postStatusLabels[report.content_status] | transloco }}</dd>
                   </div>
                 }
                 <div class="reports__note">

@@ -28,10 +28,14 @@ import {
   ReportTargetType,
   RestrictionType,
 } from '../../../core/constants';
-import type { ReportHistoryList, ReportWithContent, RestrictionList } from '../../../core/models';
+import type { ForumPostReport, ReportHistoryList, RestrictionList } from '../../../core/models';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
-function makeReport(overrides: Partial<ReportWithContent> = {}): ReportWithContent {
+// Partial<ForumPostReport>, not Partial<ReportWithContent>: the latter is a
+// discriminated union, and Partial<A | B> collapses to the fields A and B
+// share — it would silently stop allowing overrides of content_text etc.
+// This builder only ever returns the FORUM_POST shape anyway.
+function makeReport(overrides: Partial<ForumPostReport> = {}): ForumPostReport {
   return {
     id: 'report-1',
     reporter_id: 'user-1',
@@ -61,7 +65,7 @@ function makeReport(overrides: Partial<ReportWithContent> = {}): ReportWithConte
  * to the `HEBREW` sweeps below keeps them pointed at our own copy, which is
  * the thing they are meant to guard.
  */
-function makeLatinReport(overrides: Partial<ReportWithContent> = {}): ReportWithContent {
+function makeLatinReport(overrides: Partial<ForumPostReport> = {}): ForumPostReport {
   return makeReport({
     content_title: 'A post about the paperwork',
     content_text: 'Body text',

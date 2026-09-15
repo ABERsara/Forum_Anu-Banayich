@@ -496,21 +496,22 @@ export interface Report {
 }
 
 /**
- * A report enriched with the reported content, returned by moderator views.
+ * A FORUM_POST report enriched with the reported post.
  *
- * One shape for both target types — a pending/history list mixes them
- * (SPEC §7.3) — so every field below is populated for its own target_type
- * only and left undefined for the other; check `target_type` before reading
- * either group.
+ * A post is never hard-deleted (only its status changes), so every field
+ * here is always present — on a pending row and a history row alike.
  */
-export interface ReportWithContent extends Report {
-  // FORUM_POST only.
-  content_title?: string;
-  content_text?: string;
-  content_status?: PostStatus;
-  report_count?: number;
+export interface ForumPostReport extends Report {
+  target_type: ReportTargetType.FORUM_POST;
+  content_title: string;
+  content_text: string;
+  content_status: PostStatus;
+  report_count: number;
+}
 
-  // DIRECT_MESSAGE only.
+/** A DIRECT_MESSAGE report enriched with the reported message. */
+export interface DirectMessageReport extends Report {
+  target_type: ReportTargetType.DIRECT_MESSAGE;
   /**
    * The decrypted message. Present only on the single report fetched by
    * `GET /moderator/reports/{id}` (an audited read, ABF-113, spec §9.3) —
@@ -519,6 +520,17 @@ export interface ReportWithContent extends Report {
    */
   message_content?: string | null;
 }
+
+/**
+ * A report enriched with the reported content, returned by moderator views.
+ *
+ * One shape for a pending/history list mixes both target types (SPEC §7.3),
+ * so this is a discriminated union rather than one interface with optional
+ * fields either target_type may leave unset: narrowing on `target_type`
+ * (`report.target_type === ReportTargetType.FORUM_POST`) lets TypeScript
+ * prove which fields exist in that branch, rather than trusting a comment.
+ */
+export type ReportWithContent = ForumPostReport | DirectMessageReport;
 
 /**
  * A moderator's decision on a report. `decision` is VALID or INVALID —

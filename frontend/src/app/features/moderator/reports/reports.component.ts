@@ -37,7 +37,7 @@ import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { ReportWithContent, RestrictionWithMember } from '../../../core/models';
+import { DirectMessageReport, ReportWithContent, RestrictionWithMember } from '../../../core/models';
 import {
   POST_STATUS_LABELS,
   REPORT_DECISION_LABELS,
@@ -158,7 +158,7 @@ export class ModeratorReportsComponent implements OnInit {
    * a view of) content nobody asked to read yet.
    */
   readonly openReportId = signal<string | null>(null);
-  readonly openReportContent = signal<ReportWithContent | null>(null);
+  readonly openReportContent = signal<DirectMessageReport | null>(null);
   readonly isContentLoading = signal(false);
   readonly contentError = signal<ScreenError>(NO_ERROR);
 
@@ -254,9 +254,9 @@ export class ModeratorReportsComponent implements OnInit {
    * then goes stale across a language switch (CONTRIBUTING §6, ABF-128).
    */
   reportTitle(report: ReportWithContent): string {
-    return (
-      report.content_title ?? this.labels.label('moderator.reports.direct_message_title')
-    );
+    return report.target_type === ReportTargetType.FORUM_POST
+      ? report.content_title
+      : this.labels.label('moderator.reports.direct_message_title');
   }
 
   // ---------------------------------------------------------------------------
@@ -275,7 +275,7 @@ export class ModeratorReportsComponent implements OnInit {
    * §9.1/§9.3) — nothing before this point ever saw the plaintext, including
    * the list this report came from.
    */
-  viewContent(report: ReportWithContent): void {
+  viewContent(report: DirectMessageReport): void {
     this.openReportId.set(report.id);
     this.openReportContent.set(null);
     this.isContentLoading.set(true);
@@ -288,7 +288,14 @@ export class ModeratorReportsComponent implements OnInit {
         if (!this.isOpen(report.id)) {
           return;
         }
-        this.openReportContent.set(full);
+        // The endpoint's response shape follows the id requested, and this
+        // method is only ever called with a DIRECT_MESSAGE report's own id
+        // (see dmContentViewer in the template) — so this always holds, but
+        // it is what lets openReportContent stay typed as DirectMessageReport
+        // rather than back to the general union.
+        if (full.target_type === ReportTargetType.DIRECT_MESSAGE) {
+          this.openReportContent.set(full);
+        }
         this.isContentLoading.set(false);
       },
       error: (err: unknown) => {
