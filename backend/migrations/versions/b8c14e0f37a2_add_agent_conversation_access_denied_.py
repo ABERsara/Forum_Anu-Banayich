@@ -4,15 +4,13 @@ Revision ID: b8c14e0f37a2
 Revises: d4a1c7e93b52
 Create Date: 2026-09-15 00:00:00.000000
 
-ABF-122 owns this value. ABF-148 added AGENT_CONVERSATION (the successful
-exchange); the refusal is a separate action written by agent_service._deny(),
-and nothing before this ticket emitted it. Shape copied from c73690be0286 —
-same enum type, same dialect guard.
+ABF-122 owns this value. ABF-147 added AGENT_CONVERSATION (the successful
+exchange) in c73690be0286; the refusal is a separate action written by
+agent_service._deny(), and nothing before this ticket emitted it. Shape copied
+from that migration — same enum type, same dialect guard.
 
-Sitting on ABF-121's agent_knowledge_chunks migration (d4a1c7e93b52) rather
-than on main's head: this branch is stacked on
-feat/ABF-121-agent-rag-knowledge, whose own migration is the tip there. One
-head stays one head, and the stack lands in the order it was written in.
+Sits on ABF-121's agent_knowledge_chunks migration (d4a1c7e93b52), which is
+main's head now that ABF-121 has merged (PR #135). One head stays one head.
 
 A separate migration rather than an edit to 91c4a53eec32_initial.py, per
 CONTRIBUTING §2 ("אין לשנות migration קיים"):
