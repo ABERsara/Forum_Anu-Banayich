@@ -5,9 +5,10 @@ Copy this checklist into every pull request description.
 ---
 
 ## General
-- [ ] Branch name follows pattern: `feat/`, `fix/`, `chore/`, `docs/` —
-      or the bare `ABF-NNN-slug` form, approved for the i18n
-      series (ABF-127…ABF-137). See CONTRIBUTING §8.
+- [ ] Branch name uses one of the two accepted forms — a type prefix
+      (`feat/`, `fix/`, `chore/`, `docs/`) or the bare `ABF-NNN-slug`.
+      Both are policy; the prefix is preferred where the ticket clearly
+      fits one of the four types. See CONTRIBUTING §8.
 - [ ] Commit messages are clear and descriptive
 - [ ] No console.log / print debug statements left in code
 - [ ] No hardcoded secrets, tokens, or API keys
