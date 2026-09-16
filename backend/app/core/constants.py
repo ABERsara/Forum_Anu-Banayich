@@ -83,6 +83,21 @@ class PostStatus(enum.StrEnum):
     DELETED = "deleted"  # מחוק (מנהל/מבקר מחק)
 
 
+class PostType(enum.StrEnum):
+    """
+    What kind of content a forum post carries.
+
+    TEXT is what every post written by a member is, and what every post that
+    existed before ABF-156 is backfilled to. MEETING is the announcement a
+    professional's scheduled Google Meet creates — read-only content whose
+    real payload (time, join link) lives on the Meeting row the post points
+    at, not in its body.
+    """
+
+    TEXT = "text"  # פוסט רגיל
+    MEETING = "meeting"  # הכרזה על פגישה מתוזמנת
+
+
 class ProfessionalDomain(enum.StrEnum):
     """Area of expertise for Professional users."""
 
@@ -205,6 +220,10 @@ class AuditAction(enum.StrEnum):
     # one, and Postgres cannot remove an enum value once it exists.
     USER_RESTRICTED = "user_restricted"
     AGENT_CONVERSATION = "agent_conversation"
+    # A professional scheduling a Google Meet (ABF-156). Audited on the same
+    # grounds as BROADCAST_SENT: it creates an event on an external service
+    # and publishes a join link to a whole cell at once.
+    MEETING_CREATED = "meeting_created"
 
 
 # ---------------------------------------------------------------------------

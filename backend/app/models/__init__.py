@@ -14,7 +14,9 @@ from app.models.agent import (
 from app.models.audit import AuditLog
 from app.models.document import Document
 from app.models.forum import DirectMessage, ForumPost
+from app.models.google_calendar_credential import GoogleCalendarCredential
 from app.models.like import Like
+from app.models.meeting import Meeting
 from app.models.professional import ProfessionalQuery
 from app.models.report import Report
 from app.models.restriction import UserRestriction
@@ -28,6 +30,8 @@ __all__ = [
     "Report",
     "UserRestriction",
     "Like",
+    "Meeting",
+    "GoogleCalendarCredential",
     "Document",
     "AuditLog",
     "AgentDomain",
