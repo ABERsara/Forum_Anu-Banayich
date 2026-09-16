@@ -222,6 +222,10 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "רק המחבר יכול לערוך הודעה זו.",
         ENGLISH: "Only the author can edit this post.",
     },
+    "forum.meeting_post_read_only": {
+        HEBREW: "לא ניתן לערוך הכרזה על פגישה.",
+        ENGLISH: "A meeting announcement cannot be edited.",
+    },
     # -- Reports ----------------------------------------------------------
     "reports.target_type_unsupported": {
         HEBREW: "סוג תוכן זה אינו נתמך לדיווח כרגע.",
@@ -288,6 +292,71 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
     "likes.answered_only": {
         HEBREW: "ניתן לסמן לייק רק לשאלה שנענתה.",
         ENGLISH: "Only a question that has been answered can be liked.",
+    },
+    "likes.meeting_post_read_only": {
+        HEBREW: "לא ניתן לסמן לייק על הכרזה של פגישה.",
+        ENGLISH: "A meeting announcement cannot be liked.",
+    },
+    # -- Meetings (Google Meet, ABF-156) ----------------------------------
+    "meetings.scheduled_in_past": {
+        HEBREW: "יש לבחור מועד עתידי לפגישה.",
+        ENGLISH: "Choose a time in the future for the meeting.",
+    },
+    "meetings.visibility_must_be_one_cell": {
+        HEBREW: "יש לבחור קבוצה ומגזר מסוימים לפגישה.",
+        ENGLISH: "A meeting must be scheduled for one specific group and sector.",
+    },
+    "meetings.cell_forbidden": {
+        HEBREW: "לא ניתן לתזמן פגישה לתא שאינו בתחום האחריות שלך.",
+        ENGLISH: "You cannot schedule a meeting for a cell outside your assignment.",
+    },
+    "meetings.inactive_professional": {
+        HEBREW: "רק איש מקצוע פעיל יכול לתזמן פגישה.",
+        ENGLISH: "Only an active professional can schedule a meeting.",
+    },
+    # The signal the scheduling form acts on: it sends her to the Google
+    # consent screen and lets her submit again afterwards. Distinct from
+    # calendar_consent_expired below, which describes an authorisation that
+    # existed and stopped working.
+    "meetings.calendar_not_connected": {
+        HEBREW: "יש לחבר את יומן Google לפני תזמון פגישה.",
+        ENGLISH: "Connect your Google Calendar before scheduling a meeting.",
+    },
+    "meetings.calendar_consent_expired": {
+        HEBREW: "ההרשאה ליומן Google פגה. יש לחבר את היומן מחדש.",
+        ENGLISH: "Access to your Google Calendar has expired. Connect it again.",
+    },
+    "meetings.calendar_scope_missing": {
+        HEBREW: "ההרשאה ליומן Google לא אושרה. יש לאשר אותה כדי לתזמן פגישה.",
+        ENGLISH: "The Google Calendar permission was not granted. Approve it to schedule a meeting.",
+    },
+    "meetings.calendar_no_refresh_token": {
+        HEBREW: "חיבור יומן Google לא הושלם. יש לנסות לחבר שוב.",
+        ENGLISH: "Connecting your Google Calendar did not complete. Try connecting again.",
+    },
+    "meetings.calendar_state_invalid": {
+        HEBREW: "בקשת החיבור ליומן אינה תקפה או שפג תוקפה. יש להתחיל מחדש.",
+        ENGLISH: "This calendar connection request is invalid or has expired. Start again.",
+    },
+    "meetings.calendar_not_configured": {
+        HEBREW: "תזמון פגישות אינו זמין כרגע.",
+        ENGLISH: "Meeting scheduling is not available right now.",
+    },
+    "meetings.google_unavailable": {
+        HEBREW: "שירות Google אינו זמין כרגע. יש לנסות שוב בעוד מספר דקות.",
+        ENGLISH: "Google is unavailable right now. Try again in a few minutes.",
+    },
+    "meetings.google_timeout": {
+        HEBREW: "התגובה מ-Google מתעכבת. יש לנסות שוב.",
+        ENGLISH: "Google is taking too long to respond. Try again.",
+    },
+    "meetings.google_no_meet_link": {
+        HEBREW: "לא התקבל קישור לפגישה מ-Google. יש לנסות שוב.",
+        ENGLISH: "Google did not return a meeting link. Try again.",
+    },
+    "meetings.creation_failed": {
+        HEBREW: "הפגישה לא נשמרה. יש לנסות שוב.",
+        ENGLISH: "The meeting could not be saved. Try again.",
     },
     # -- AI agents --------------------------------------------------------
     "agents.domain_not_found": {
