@@ -142,6 +142,54 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
 
     # ------------------------------------------------------------------
+    # Google Calendar / Meet (ABF-156)
+    #
+    # A different grant from FIREBASE_PROJECT_ID above. That one verifies an
+    # ID token — it proves who the caller is and carries no authority to do
+    # anything in the user's Google account. Creating a Meet means creating a
+    # Calendar event on the professional's behalf, which is an OAuth
+    # authorisation-code flow with its own consent screen, its own client
+    # secret, and a refresh token stored per professional.
+    #
+    # Defaulted to empty rather than guarded like SECRET_KEY: an unconfigured
+    # deployment must still start and serve everything else. The failure is
+    # raised where the meeting is scheduled (google_meet_service), so it names
+    # the missing setting instead of arriving as a 401 from Google.
+    # ------------------------------------------------------------------
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+
+    # calendar.events, not the full calendar scope: this integration creates
+    # events and never reads the professional's existing calendar. Asking for
+    # less is also what the consent screen shows her.
+    GOOGLE_CALENDAR_SCOPE: str = "https://www.googleapis.com/auth/calendar.events"
+
+    # Where Google sends the browser back after consent. This is the API's own
+    # callback (GET /meetings/calendar/callback), not an Angular route: the
+    # return trip is a plain browser navigation with no Authorization header,
+    # so the caller is identified by the signed `state` instead — and the
+    # authorisation code and client secret never pass through the frontend.
+    # Must match a redirect URI registered in the Google Cloud console exactly.
+    GOOGLE_REDIRECT_URI_MEET: str = (
+        "http://localhost:8000/api/v1/meetings/calendar/callback"
+    )
+
+    # Where that callback sends the professional once the calendar is linked
+    # (or once linking failed) — a page in the Angular app, which reads the
+    # outcome from the query string it arrives with.
+    GOOGLE_CALENDAR_RETURN_URL: str = "http://localhost:4200/meetings"
+
+    # Google Calendar needs an end time; the form asks only for a start
+    # (ABF-156 leaves choosing a duration to a later ticket). Each meeting
+    # stores the value it was created with — see Meeting.duration_minutes.
+    MEETING_DEFAULT_DURATION_MINUTES: int = 60
+
+    # The token and event calls sit inside a request the professional is
+    # waiting on, so they fail fast rather than holding the worker open —
+    # same reasoning as GEMINI_TIMEOUT_SECONDS below.
+    GOOGLE_CALENDAR_TIMEOUT_SECONDS: int = 10
+
+    # ------------------------------------------------------------------
     # Gemini embeddings (agent knowledge base retrieval)
     # ------------------------------------------------------------------
     # Deliberately defaulted to empty rather than guarded like SECRET_KEY
