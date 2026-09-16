@@ -252,6 +252,18 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "הגעת למכסת הדיווחים היומית. אפשר לדווח שוב מחר.",
         ENGLISH: "You have reached today's reporting limit. You can report again tomorrow.",
     },
+    # §7.2's second row at its hardened end (ABF-154): a member whose reports
+    # have been dismissed FALSE_REPORT_LIMIT times can no longer file one.
+    # Says that the ability was withdrawn and who can give it back, and — unlike
+    # `daily_limit_reached` above — does not promise it returns tomorrow,
+    # because nothing expires this one.
+    "reports.reporter_restricted": {
+        HEBREW: "הגישה לדיווח הוגבלה בעקבות דיווחים שנמצאו לא מוצדקים. לפנייה בנושא יש ליצור קשר עם מנהל המערכת.",
+        ENGLISH: (
+            "Your access to reporting has been restricted following reports that "
+            "were not upheld. Please contact an administrator about it."
+        ),
+    },
     "reports.user_outside_your_cells": {
         HEBREW: "המשתמש אינו בתא שבאחריותך.",
         ENGLISH: "This member is not in a cell you are responsible for.",
