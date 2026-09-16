@@ -594,7 +594,8 @@
       "submit": "Send report",
       "error_duplicate": "You have already reported this content.",
       "error_generic": "Something went wrong sending the report. Please try again.",
-      "error_rate_limited": "You have reached today's reporting limit. You can report again tomorrow."
+      "error_rate_limited": "You have reached today's reporting limit. You can report again tomorrow.",
+      "error_restricted": "Your access to reporting has been restricted following reports that were not upheld. Please contact an administrator about it."
     },
     "file_upload": {
       "choose_file": "Choose file",

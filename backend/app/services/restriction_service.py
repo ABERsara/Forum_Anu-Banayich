@@ -29,7 +29,7 @@ What is deliberately not here
   ticket for one yet.
 * No counters on `users`. The counts come from `reports` on every
   evaluation, so there is no second copy of the truth to drift from the
-  first — see `_decided_report_count`.
+  first — see `decided_report_count`.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -100,7 +100,7 @@ def active_restriction(
     )
 
 
-def _decided_report_count(
+def decided_report_count(
     db: Session,
     *,
     subject: InstrumentedAttribute[str] | InstrumentedAttribute[str | None],
@@ -111,6 +111,15 @@ def _decided_report_count(
     """
     How many reports about (or from) `user_id` were decided `decision` inside
     the last `window_days`.
+
+    Public since ABF-154, which measures §7.2's third row — upheld reports
+    against a member inside AUTO_SUSPEND_DAYS_WINDOW — over exactly this
+    query. That rule ends in a suspension and so lives in report_service (this
+    module deliberately never suspends anyone; see the module docstring), but
+    "how many decided reports name this person" is one question and there is
+    one answer to it here. A second copy in report_service.py is how the two
+    thresholds would eventually come to disagree about whether a PENDING row
+    or a re-decided one counts.
 
     `subject` is the column that names the person — `Report.reported_user_id`
     for direction A, `Report.reporter_id` for direction B. Passed in rather
@@ -261,7 +270,7 @@ def _restrict_repeatedly_upheld_sender(
         return None
 
     window_days = settings.DM_BLOCK_DAYS_WINDOW
-    count = _decided_report_count(
+    count = decided_report_count(
         db,
         subject=Report.reported_user_id,
         user_id=report.reported_user_id,
@@ -310,7 +319,7 @@ def _restrict_frequent_false_reporter(
         return None
 
     window_days = settings.FALSE_REPORT_DAYS_WINDOW
-    count = _decided_report_count(
+    count = decided_report_count(
         db,
         subject=Report.reporter_id,
         user_id=report.reporter_id,

@@ -239,12 +239,16 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide
     #: §7.2's third row ("אירוע חוזר משמעותי") reads 2+ upheld incidents in 7
-    #: days; this default still holds the 3 it was written with. Nothing reads
-    #: it yet — the rule is report_service._check_auto_suspension(), which is
-    #: still a stub — so the two numbers are reconciled there, against this
-    #: setting rather than against a literal, when it is implemented. Left at
-    #: 3 here on purpose: re-pointing a threshold nothing enforces belongs to
-    #: the ticket that enforces it, not to ABF-116.
+    #: days; this default holds the 3 it was written with, and ABF-154 — the
+    #: ticket that enforces it, through report_service._check_auto_suspension()
+    #: — settles the two numbers on 3 rather than re-pointing this one at 2.
+    #:
+    #: Because the measure is the heaviest of the three. DM_BLOCK_AFTER_REPORTS
+    #: withdraws one action for 48 hours and FALSE_REPORT_LIMIT withdraws
+    #: another; this one takes the account away, and it should not be the rule
+    #: with the lowest bar. Read through `settings` at the moment the threshold
+    #: is evaluated, never inlined at the call site (FINDINGS M-01), so a first
+    #: real run can move it in either direction without a deploy.
     AUTO_SUSPEND_VALID_REPORTS: int = 3
     AUTO_SUSPEND_DAYS_WINDOW: int = 7
     AUTO_SUSPEND_HOURS: int = 48

@@ -9,15 +9,22 @@ Rules:
   3+ upheld reports on a USER in 30 days → she cannot send private messages
       for 48h + notify her cell's moderator and the admin (§7.2, ABF-116)
   5+ dismissed reports from the same USER in 30 days → her reporting drops
-      to 3 a day + notify her cell's moderator (§7.2, ABF-116)
-  2+ upheld incidents in 7 days → auto-suspend 48h + notify admin
+      to 3 a day + notify her cell's moderator (§7.2, ABF-116), and the
+      reporting itself is withdrawn until an admin restores it (§7.2, ABF-154)
+  3+ upheld reports on a USER in 7 days → auto-suspend 48h (§7.2, ABF-154)
 
-The threshold rules themselves live in `restriction_service`; this module is
-where a decision is recorded and where the people who need to hear about one
-are worked out.
-
-TODO list for junior developer:
-  [ ] implement _check_auto_suspension()          – §7.2's third row, still open
+Where each of those lives
+-------------------------
+The two *bounded* measures — a restriction that lapses on a date — are
+`restriction_service`'s, and this module only decides who hears about one.
+The two ABF-154 added are here, because both reach for something that module
+holds itself apart from: `_check_auto_suspension()` needs
+`user_service.suspend_user()`, and importing user_service from
+restriction_service would close the cycle it was kept outside of;
+`_check_frequent_false_reporter()` writes a column on `users`, which that
+module has none of by design. Both still count through
+`restriction_service.decided_report_count()`, so all three thresholds agree
+on what a decided report is.
 """
 
 import logging
@@ -29,6 +36,7 @@ from fastapi import HTTPException
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Query, Session
 
+from app.core.config import settings
 from app.core.constants import (
     AccountStatus,
     AuditAction,
@@ -60,6 +68,25 @@ from app.services.user_service import cell_match_filter
 
 logger = logging.getLogger(__name__)
 
+#: Why an automatic suspension was applied — stored on the USER_SUSPENDED audit
+#: entry and read out to the member in her notification (§7.2, ABF-154).
+#:
+#: A fixed sentence rather than anything taken from the decision that triggered
+#: it. The moderator's note is free text written about a bereaved user and the
+#: reported content can be a private message; neither belongs in an email or in
+#: a log line, which is the rule `_notify_restriction()` and the audit details
+#: in `decide_report()` already follow.
+#:
+#: Hebrew here rather than a `messages.py` key, and not an exception to
+#: ABF-137: `translate()` resolves against the *requesting* moderator's
+#: Accept-Language, and this string is read by the suspended member, days
+#: later, out of a stored row and an email — the one place ABF-137 defers whole.
+#: It names no count, so re-tuning AUTO_SUSPEND_VALID_REPORTS cannot make it
+#: false.
+AUTO_SUSPENSION_REASON = (
+    "השעיה אוטומטית בעקבות דיווחים חוזרים שנמצאו מוצדקים כנגד החשבון."
+)
+
 
 def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     """
@@ -77,13 +104,29 @@ def file_report(db: Session, data: ReportCreate, reporter: User) -> Report:
     What they share — one report per user per target, and who gets told —
     stays shared.
 
-    The daily allowance is checked first, before either path and before
-    anything is looked up. §7.2's limit applies to reporting itself, not to
-    reporting a particular thing, and checking it here means a member who is
-    over it gets the same answer whatever id she names — a check made after
-    the lookup would answer 404 for an id that does not exist and 429 for one
-    that does, which is a probe for other people's content.
+    The reporter's own standing is checked first, before either path and
+    before anything is looked up. §7.2's measures apply to reporting itself,
+    not to reporting a particular thing, and checking them here means a member
+    who is under one gets the same answer whatever id she names — a check made
+    after the lookup would answer 404 for an id that does not exist and 403 or
+    429 for one that does, which is a probe for other people's content.
+
+    Two measures, in ascending order of weight. `is_report_restricted` is
+    §7.2's second row at its hardened end (ABF-154): the reporting was taken
+    away, nothing expires it, and no allowance is left to spend — so it is
+    asked first and answers 403. Only a member who still *has* the ability
+    reaches assert_may_file_report(), which is about how much of it she may
+    use today and answers 429.
     """
+    if reporter.is_report_restricted:
+        # 403 rather than 429, for the same reason assert_may_send_direct_
+        # message() raises 403: a rate limit is something a slower caller
+        # passes, and this is a withdrawn permission. Unlike that one it also
+        # has no end date to name, which is why the message points at an
+        # administrator instead of at a clock.
+        raise HTTPException(
+            status_code=403, detail=translate("reports.reporter_restricted")
+        )
     restriction_service.assert_may_file_report(db, reporter)
 
     if data.target_type == ReportTargetType.DIRECT_MESSAGE:
@@ -455,22 +498,48 @@ def decide_report(
     restriction = restriction_service.evaluate_after_decision(db, report, moderator)
     db.refresh(report)
 
+    # ABF-154's two rules, on the same footing as the two above and for the
+    # same reason: both are state, and neither is wrapped. Each hangs off the
+    # decision that can produce it and nothing else — an upheld report is
+    # evidence about the person reported on, a dismissed one is evidence about
+    # the person who filed it, and §7.2 never crosses the two. Named
+    # explicitly rather than written as an `else`, so
+    # CLOSED_ACCOUNT_DELETED — the system closing a report whose subject
+    # deleted her account (§9.4), not a finding against anybody — falls
+    # through both, which is what evaluate_after_decision() does with it too.
+    #
+    # The reported-on user is resolved here rather than in the notification
+    # block below, because both the suspension and the email need her and one
+    # lookup answers both. Via reported_user_id rather than
+    # post.author/message.sender — set at filing time either way (ABF-112),
+    # and unlike message.sender it still resolves if the DirectMessage row
+    # itself is gone by decision time (pruned, or purged with its sender's own
+    # account). None only if she was gone by decision time — theoretical (a
+    # User row is never hard-deleted, only anonymised), and both callers below
+    # treat it as nothing to do.
+    reported_user: User | None = None
+    if data.decision == ReportDecision.VALID:
+        reported_user = user_service.get_user_by_id(db, report.reported_user_id)
+        _check_auto_suspension(db, reported_user, moderator)
+    elif data.decision == ReportDecision.INVALID:
+        # `reporter_id` is nullable since ABF-112 — §9.4 keeps a closed
+        # account's reports and drops the name off them — so a report with no
+        # reporter restricts nobody, and there is nobody to look up either.
+        reporter = (
+            user_service.get_user_by_id(db, report.reporter_id)
+            if report.reporter_id is not None
+            else None
+        )
+        _check_frequent_false_reporter(db, reporter, moderator)
+    # Both rules commit through log_action(), which expires every object in the
+    # session — including the report this function returns.
+    db.refresh(report)
+
     # Strictly after the commit, and never fatal: the decision is already
     # recorded, and a notification that fails must not turn it into a failed
-    # request – same policy as file_report()'s moderator alerts. Looked up
-    # only on this branch, not unconditionally above: INVALID never sends
-    # this notification, so every dismissed report — most of them — was
-    # paying for a query whose result it never read.
+    # request – same policy as file_report()'s moderator alerts. Sent only on
+    # this branch: INVALID never sends this notification.
     if data.decision == ReportDecision.VALID:
-        # The reported-on user's own current email, via reported_user_id
-        # rather than post.author/message.sender — set at filing time either
-        # way (ABF-112), and unlike message.sender it still resolves if the
-        # DirectMessage row itself is gone by decision time (pruned, or
-        # purged with its sender's own account). None only if reported_user
-        # itself was gone by decision time — theoretical (a User row is
-        # never hard-deleted, only anonymised), but there is no address to
-        # notify either way.
-        reported_user = user_service.get_user_by_id(db, report.reported_user_id)
         author_email = reported_user.email if reported_user else None
         if author_email:
             try:
@@ -947,30 +1016,148 @@ def suspend_user_for_moderator(
     return _card_for(db, suspended)
 
 
-def _check_auto_suspension(db: Session, reported_user: User) -> None:
+def _check_auto_suspension(
+    db: Session, reported_user: User | None, moderator: User
+) -> None:
     """
-    Check if the reported user should be automatically suspended.
+    §7.2's third row (ABF-154): a member found against
+    AUTO_SUSPEND_VALID_REPORTS times inside AUTO_SUSPEND_DAYS_WINDOW days is
+    suspended for AUTO_SUSPEND_HOURS.
 
-    Rule: §7.2's third row — 2+ upheld incidents in 7 days → temporary
-    automatic suspension (48h) + notify admin.
+    The heavy end of the automatic measures, and the only one that touches the
+    account rather than a single action. ABF-116 built the other two
+    deliberately short of this (restriction_service's module docstring says so
+    in as many words); this is the rule that takes the step, and it is why
+    `restriction_service` still never does — a suspension needs
+    `user_service.suspend_user()`, which sends the member her notification and
+    writes the USER_SUSPENDED entry §9.3 wants, and importing that module from
+    restriction_service would close the import cycle report_service was kept
+    on the outside of.
 
-    Still open, and deliberately not what ABF-116 built. That ticket
-    implements §7.2's *first two* rows, both of which restrict one action and
-    leave the account alone; this one takes the account away, which is a
-    heavier measure on a different window and count. decide_report() calls
-    restriction_service.evaluate_after_decision() where this would also hook
-    in.
+    The count comes from restriction_service.decided_report_count() rather
+    than a query of its own, so "what counts as a decided report" is settled
+    in one place for all three thresholds: upheld only, `decided_at` rather
+    than `created_at` (a threshold is about findings, not accusations, and
+    filtering on it drops PENDING rows for free), and CLOSED_ACCOUNT_DELETED
+    — the system closing a report whose subject deleted her account (§9.4) —
+    counting as neither.
 
-    TODO:
-      1. Count reports with decision=VALID against reported_user inside
-         settings.AUTO_SUSPEND_DAYS_WINDOW
-      2. If >= settings.AUTO_SUSPEND_VALID_REPORTS and not already suspended:
-         call user_service.suspend_user()
+    §7.2 reads "2+" and `AUTO_SUSPEND_VALID_REPORTS` has held 3 since it was
+    written. ABF-116 left that unreconciled on the grounds that re-pointing a
+    threshold nothing enforces belongs to the ticket that enforces it. This is
+    that ticket, and it settles on 3, which is what ABF-154 asks for and what
+    the setting already says: 48 hours off the platform is a heavier measure
+    than either restriction beside it, and it should not be the one with the
+    lowest bar. The number stays in `settings` either way, so a first real run
+    can move it without a deploy.
 
-    Read the count from the setting, not from a literal — and note that the
-    setting still holds 3 while §7.2 reads 2. Settling that is this rule's
-    job; ABF-116 left the value alone rather than re-pointing a threshold
-    nothing enforces.
+    Three ways out before anything is counted, none of them an error — this
+    runs on an already-committed decision, and a protection rule that cannot
+    apply must not turn a recorded decision into a failed request:
+
+      * the account is gone (§9.4 anonymises the member and keeps the report);
+      * she is not a member — `suspend_user()` refuses a moderator, an admin
+        or a professional with a 400, and a reported forum post can have any
+        of the four as its author;
+      * she is not ACTIVE, which is the "no double suspension" criterion. An
+        already-suspended account is `AccountStatus.SUSPENDED`, and a second
+        call would be the same 400. Nothing is extended and nothing is
+        re-sent: the measure answers a pattern that is already being answered,
+        the same rule `_restrict_repeatedly_upheld_sender()` applies to a live
+        restriction.
     """
-    # TODO: implement this function
-    pass
+    if reported_user is None:
+        return
+    if reported_user.role != UserRole.USER:
+        return
+    if reported_user.account_status != AccountStatus.ACTIVE:
+        return
+
+    count = restriction_service.decided_report_count(
+        db,
+        subject=Report.reported_user_id,
+        user_id=reported_user.id,
+        decision=ReportDecision.VALID,
+        window_days=settings.AUTO_SUSPEND_DAYS_WINDOW,
+    )
+    if count < settings.AUTO_SUSPEND_VALID_REPORTS:
+        return
+
+    # `moderator` as the actor, not "the system": the rule fired by itself, but
+    # it fired on her decision, and an audit trail whose actor is nobody is one
+    # nobody can be asked about. Same reasoning apply_restriction() spells out.
+    user_service.suspend_user(
+        db,
+        reported_user.id,
+        moderator,
+        settings.AUTO_SUSPEND_HOURS,
+        AUTO_SUSPENSION_REASON,
+    )
+
+
+def _check_frequent_false_reporter(
+    db: Session, reporter: User | None, moderator: User
+) -> None:
+    """
+    §7.2's second row at its hardened end (ABF-154): a member whose reports
+    have been dismissed FALSE_REPORT_LIMIT times inside
+    FALSE_REPORT_DAYS_WINDOW days stops being able to file them.
+
+    This rule and ABF-116's `_restrict_frequent_false_reporter()` read the
+    same two settings and therefore cross on the same decision, on purpose —
+    they are one rule, recorded twice because they are two measures. ABF-116's
+    `user_restrictions` row is what the moderator dashboard lists, what the
+    §7.2 alert is sent about and what carries the end date; this flag is what
+    the refusal in file_report() is made of. A member who crosses gets both:
+    the row says a measure is running and when it lapses, the flag says the
+    reporting itself is gone until an admin gives it back (backlog B1).
+
+    It is written here and not in restriction_service for the reason that
+    module's docstring gives for having no columns on `users` — everything it
+    writes is a bounded row, and this is a decision with no expiry.
+
+    Idempotent. A sixth dismissal inside the window finds the flag already
+    set and returns before writing a second audit entry: §9.3 wants a record
+    of the measure, which is one event, not a row per decision after it.
+
+    `reporter` is None for a report §9.4 anonymised (ABF-112). Those must not
+    aggregate into a single phantom over-reporter, which is the same guard
+    `_restrict_frequent_false_reporter()` opens with.
+    """
+    if reporter is None or reporter.is_report_restricted:
+        return
+
+    window_days = settings.FALSE_REPORT_DAYS_WINDOW
+    count = restriction_service.decided_report_count(
+        db,
+        subject=Report.reporter_id,
+        user_id=reporter.id,
+        decision=ReportDecision.INVALID,
+        window_days=window_days,
+    )
+    if count < settings.FALSE_REPORT_LIMIT:
+        return
+
+    reporter.is_report_restricted = True
+    # USER_RESTRICTED rather than a new AuditAction member, which is what
+    # constants.py asks for in as many words: the details say which measure was
+    # applied, and Postgres cannot remove an enum value once it exists. The
+    # `measure` key is what tells this entry apart from the `restriction_type`
+    # one apply_restriction() writes on the same decision.
+    #
+    # log_action() commits, which is what persists the flag as well — one
+    # transaction, so the refusal in file_report() can never be in force with
+    # nothing in the log saying why.
+    log_action(
+        db,
+        actor=moderator,
+        action=AuditAction.USER_RESTRICTED,
+        entity_type="User",
+        entity_id=reporter.id,
+        details={
+            "measure": "report_restricted",
+            "report_count": count,
+            "window_days": window_days,
+            "automatic": True,
+        },
+    )

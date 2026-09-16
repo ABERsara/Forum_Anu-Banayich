@@ -20,6 +20,7 @@ from sqlalchemy import (
     ForeignKey,
     String,
     Text,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -125,6 +126,28 @@ class User(Base):
     # ------------------------------------------------------------------
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
     suspended_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: §7.2's second row, hardened (ABF-154): a member whose reports keep
+    #: being dismissed stops being able to file them at all.
+    #:
+    #: A stored flag rather than a `user_restrictions` row, unlike everything
+    #: else ABF-116 writes, because this measure has no end date — nothing
+    #: expires it and nothing lifts it yet (the admin control is backlog B1).
+    #: `active_restriction()` answers "in force right now" by comparing
+    #: `expires_at`, and a row that must never lapse has no honest value to
+    #: put there.
+    #:
+    #: Not a counter: the count it is derived from is still read from
+    #: `reports` on every evaluation. This holds the *decision* that was
+    #: taken, which is the one thing recomputing cannot recover once an
+    #: admin lifts it by hand.
+    #:
+    #: `server_default` as well as `default`, so the rows that already exist
+    #: when the migration runs come out False rather than NULL — a NULL here
+    #: is neither restricted nor unrestricted, and `if user.is_report_restricted`
+    #: would read it as the former.
+    is_report_restricted: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
 
     # ------------------------------------------------------------------
     # Timestamps

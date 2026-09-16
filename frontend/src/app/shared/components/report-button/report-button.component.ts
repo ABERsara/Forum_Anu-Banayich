@@ -65,8 +65,22 @@ const DISCLOSURE_KEYS: Partial<Record<ReportTargetType, string>> = {
  * being dismissed still gets three a day, and the fourth says so rather than
  * failing as "something went wrong" — a generic error would read as a broken
  * dialog and be retried.
+ *
+ * 403 is ABF-154's end of the same rule: once five of her reports have been
+ * dismissed the reporting is withdrawn, and nothing gives it back on its own.
+ * It needs its own message for the reason 429 does, and more so — a limit that
+ * lifts tomorrow is worth retrying and this is not, so "something went wrong"
+ * would leave her reopening a dialog that can never succeed.
+ *
+ * The other 403 the API can raise here is forum_service.get_received_message()
+ * refusing a private message the caller did not receive. That one is not
+ * reachable from a correctly rendered dialog — the button is only on messages
+ * she received — whereas the restriction is reachable from every one of them,
+ * on both content types, because report_service.file_report() checks it before
+ * it looks at anything else.
  */
 function errorKeyForStatus(status: number): string {
+  if (status === 403) return 'shared.report.error_restricted';
   if (status === 409) return 'shared.report.error_duplicate';
   if (status === 429) return 'shared.report.error_rate_limited';
   return 'shared.report.error_generic';

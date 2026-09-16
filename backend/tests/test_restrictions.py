@@ -317,14 +317,22 @@ class TestSingleReportDoesNotRestrict:
 
 
 class TestCrossingTheThresholdRestricts:
-    def _cross(self, db_session, moderator, offender, reporter) -> None:
-        """Fill the window to one short of the threshold, then decide one more."""
+    def _cross(
+        self, db_session, moderator, offender, reporter, *, decided_at=None
+    ) -> None:
+        """
+        Fill the window to one short of the threshold, then decide one more.
+
+        `decided_at` places the earlier findings, for the one test that needs
+        them inside this threshold's window and outside ABF-154's shorter one.
+        """
         for index in range(settings.DM_BLOCK_AFTER_REPORTS - 1):
             _decided_report(
                 db_session,
                 reporter=reporter,
                 reported_user=offender,
                 decision=ReportDecision.VALID,
+                decided_at=decided_at,
                 target_id=f"old-{index}",
             )
         report = _pending_report(
@@ -376,9 +384,23 @@ class TestCrossingTheThresholdRestricts:
         """
         §7.2's second row asks for an alert and for a *human* to consider a
         suspension. A restriction is not one, and must not quietly become one.
+
+        The earlier findings are placed inside DM_BLOCK_DAYS_WINDOW and outside
+        AUTO_SUSPEND_DAYS_WINDOW, so this decision crosses the messaging
+        threshold on its own. §7.2's *third* row does suspend on the same kind
+        of evidence — ABF-154 implements it, on a shorter window and through
+        report_service — and without that offset this test would be asserting
+        that nothing ever suspends rather than that this restriction does not.
+        Which rule reached the account is exactly what it is here to pin.
         """
         reporter = _make_user(db_session, "reporter@example.com")
-        self._cross(db_session, moderator, offender, reporter)
+        self._cross(
+            db_session,
+            moderator,
+            offender,
+            reporter,
+            decided_at=_now() - timedelta(days=settings.AUTO_SUSPEND_DAYS_WINDOW + 1),
+        )
 
         db_session.refresh(offender)
         assert offender.is_suspended is False
