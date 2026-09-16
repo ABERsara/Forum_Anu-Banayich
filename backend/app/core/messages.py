@@ -307,10 +307,10 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "רק איש מקצוע פעיל יכול לתזמן פגישה.",
         ENGLISH: "Only an active professional can schedule a meeting.",
     },
-    # The signal the scheduling form acts on: it sends her to the Google
-    # consent screen and lets her submit again afterwards. Distinct from
+    # For a professional who never linked her calendar. Distinct from
     # calendar_consent_expired below, which describes an authorisation that
-    # existed and stopped working.
+    # existed and stopped working. The client decides whether to send her to
+    # consent from GET /meetings/calendar/status, not from this text.
     "meetings.calendar_not_connected": {
         HEBREW: "יש לחבר את יומן Google לפני תזמון פגישה.",
         ENGLISH: "Connect your Google Calendar before scheduling a meeting.",

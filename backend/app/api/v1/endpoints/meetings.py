@@ -39,10 +39,13 @@ def create_meeting(
     """
     Schedule a Google Meet for one cell and publish its announcement.
 
-    403 with `meetings.calendar_not_connected` is the expected first answer
-    for a professional who has never linked her calendar — the form reads it
-    as "send her through consent, then let her submit again", which is why it
-    is that key rather than the generic forbidden message.
+    A professional who has never linked her calendar, or whose grant was
+    revoked or expired, gets a 403. So does a cell outside her assignment, and
+    the detail is translated text rather than a key, so a client cannot tell
+    these 403s apart from the response body. GET /meetings/calendar/status is
+    the signal instead: the form asks it before submitting, and again after a
+    403 — a revoked grant has been deleted by then, so it reports
+    `connected: false`.
     """
     meeting = meeting_service.create_meeting(db, data, current_user)
     return MeetingResponse.model_validate(meeting)

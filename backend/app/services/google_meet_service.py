@@ -320,8 +320,9 @@ def _access_token(db: Session, user: User) -> str:
     _require_configuration()
     credential = get_credential(db, user.id)
     if credential is None:
-        # The signal the scheduling form acts on: send her through consent
-        # first, then let her submit again.
+        # Tells her to connect her calendar first. Not something a client can
+        # branch on — the detail is translated text, and other refusals are
+        # 403s too — which is what GET /meetings/calendar/status is for.
         raise HTTPException(
             status_code=403, detail=translate("meetings.calendar_not_connected")
         )
