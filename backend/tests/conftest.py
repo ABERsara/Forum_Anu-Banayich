@@ -147,6 +147,11 @@ def make_user(db_session):
         role: UserRole = UserRole.USER,
         account_status: AccountStatus = AccountStatus.PENDING_OTP,
         professional_domain: ProfessionalDomain | None = None,
+        # Which cells a PROFESSIONAL is assigned to. Default None, matching the
+        # column: a professional with no assignment reaches nobody, and
+        # ABF-156 reads these to decide which cells she may convene.
+        professional_groups: list[str] | None = None,
+        professional_sectors: list[str] | None = None,
     ) -> User:
         user = User(
             email=email,
@@ -158,6 +163,8 @@ def make_user(db_session):
             sector=sector,
             account_status=account_status,
             professional_domain=professional_domain,
+            professional_groups=professional_groups,
+            professional_sectors=professional_sectors,
         )
         db_session.add(user)
         db_session.commit()
