@@ -343,6 +343,14 @@ export interface DirectMessage {
    * sent: only its recipient can report one.
    */
   reported_by_me: boolean;
+  /**
+   * A moderator upheld a report on this message (ABF-113).
+   *
+   * `content` is already empty when this is true — the server never
+   * decrypts a hidden message — so this is what tells the screen to render
+   * a placeholder instead of an empty bubble.
+   */
+  hidden: boolean;
 }
 
 /**
@@ -380,6 +388,8 @@ export interface ConversationSummary {
   last_message_preview: string;
   last_message_at: string;
   unread_count: number;
+  /** A moderator upheld a report on the last message (ABF-113). last_message_preview is already empty when this is true. */
+  hidden: boolean;
 }
 
 export interface ConversationList {
@@ -485,13 +495,46 @@ export interface Report {
   created_at: string;
 }
 
-/** A report enriched with the reported content, returned by moderator views. */
-export interface ReportWithContent extends Report {
-  content_title: string;
-  content_text: string;
-  content_status: PostStatus;
-  report_count: number;
+/**
+ * A FORUM_POST report enriched with the reported post.
+ *
+ * A post is never hard-deleted today (only its status changes), so these
+ * are populated on every row in practice — but the backend's own defensive
+ * branch for a post that is somehow gone (moderator.py's
+ * _to_reports_with_content()) sends this same target_type with all four
+ * left out, so they stay optional here too rather than claim a guarantee
+ * the backend doesn't actually make.
+ */
+export interface ForumPostReport extends Report {
+  target_type: ReportTargetType.FORUM_POST;
+  content_title?: string;
+  content_text?: string;
+  content_status?: PostStatus;
+  report_count?: number;
 }
+
+/** A DIRECT_MESSAGE report enriched with the reported message. */
+export interface DirectMessageReport extends Report {
+  target_type: ReportTargetType.DIRECT_MESSAGE;
+  /**
+   * The decrypted message. Present only on the single report fetched by
+   * `GET /moderator/reports/{id}` (an audited read, ABF-113, spec §9.3) —
+   * never on a list row, and never (even there) once the report is
+   * CLOSED_ACCOUNT_DELETED.
+   */
+  message_content?: string | null;
+}
+
+/**
+ * A report enriched with the reported content, returned by moderator views.
+ *
+ * One shape for a pending/history list mixes both target types (SPEC §7.3),
+ * so this is a discriminated union rather than one interface with optional
+ * fields either target_type may leave unset: narrowing on `target_type`
+ * (`report.target_type === ReportTargetType.FORUM_POST`) lets TypeScript
+ * prove which fields exist in that branch, rather than trusting a comment.
+ */
+export type ReportWithContent = ForumPostReport | DirectMessageReport;
 
 /**
  * A moderator's decision on a report. `decision` is VALID or INVALID —

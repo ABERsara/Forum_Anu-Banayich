@@ -22,8 +22,9 @@ TODO list for junior developer:
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
+from cryptography.exceptions import InvalidTag
 from fastapi import HTTPException
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Query, Session
@@ -37,6 +38,7 @@ from app.core.constants import (
     RestrictionType,
     UserRole,
 )
+from app.core.encryption import decrypt_message
 from app.core.i18n import translate
 from app.models.forum import DirectMessage, ForumPost
 from app.models.report import Report
@@ -349,26 +351,31 @@ def decide_report(
     Record a moderator's decision on a pending report and act on the content
     (SPEC §7.1, "החלטת מבקר").
 
-    VALID   → the report stands: the post is deleted (status = DELETED) and
-              its author gets a system notification.
-    INVALID → the report does not stand: a post the 2-report rule auto-hid
-              goes back to VISIBLE. A post that is already DELETED stays
-              deleted — its author or another moderator removed it on other
-              grounds, and dismissing this report is not a reason to
-              republish it.
+    VALID   → the report stands, and its author gets a system notification.
+              A ForumPost is deleted (status = DELETED). A DIRECT_MESSAGE is
+              hidden (hidden_at set) — see _apply_direct_message_decision().
+    INVALID → the report does not stand.
+              A ForumPost the 2-report rule auto-hid goes back to VISIBLE; one
+              already DELETED stays deleted — its author or another moderator
+              removed it on other grounds, and dismissing this report is not
+              a reason to republish it.
+              A DIRECT_MESSAGE is never auto-hidden at filing time (spec
+              §7.1 — see _notify_direct_message_moderators()), so there is
+              nothing to restore: the message is simply left as it was.
 
     Either way the report leaves the pending queue with the decision, the
     deciding moderator, the timestamp and the note recorded on it, and the
     whole thing is written to the audit log (SPEC §9.3).
 
-    Raises 404 if the report or its content is gone, 403 if the report falls
-    outside the moderator's cells, 409 if it was already decided.
+    Raises 404 if the report is gone, 403 if it falls outside the moderator's
+    cells, 409 if it was already decided.
     """
     # for_update: two moderators sharing a cell can have the same report open.
     # The lock makes the "still PENDING?" check below settle which of them
-    # wins, instead of both writing a decision over each other. It covers the
-    # reported post too — the decision rewrites its status.
-    report, post = get_report_for_moderator(db, report_id, moderator, for_update=True)
+    # wins, instead of both writing a decision over each other.
+    report = get_report_for_moderator(
+        db, report_id, moderator, for_update=True, context="decide"
+    )
 
     if report.decision != ReportDecision.PENDING:
         raise HTTPException(
@@ -384,13 +391,40 @@ def decide_report(
     # user_service.escalate_overdue_registrations().
     report.decided_at = datetime.now(UTC).replace(tzinfo=None)
 
-    content_action = _apply_content_decision(post, data.decision)
-    # Read before the commit below expires `post`; the notification needs it.
-    author_email = post.author.email
+    # Declared once, up front: the two branches below come from different
+    # functions with different Literal return types, and this is where they
+    # converge into the one value log_action() records.
+    content_action: Literal[
+        "already_deleted",
+        "deleted",
+        "restored",
+        "unchanged",
+        "target_gone",
+        "hidden",
+        "already_hidden",
+    ]
+    if report.target_type == ReportTargetType.FORUM_POST:
+        # Row-level lock, same reasoning as the report's own: the decision
+        # rewrites the post's status too. Loaded here rather than by
+        # get_report_for_moderator() — that function answers one question
+        # ("is this moderator allowed to see this report"), shared by every
+        # caller, and content only some of them need.
+        post = (
+            db.query(ForumPost)
+            .filter(ForumPost.id == report.target_id)
+            .with_for_update()
+            .first()
+        )
+        content_action = (
+            _apply_content_decision(post, data.decision) if post else "target_gone"
+        )
+    else:
+        content_action = _apply_direct_message_decision(db, report, data.decision)
 
     # log_action() commits internally, which persists the report fields and
-    # the post's new status along with the audit entry – one transaction, so
-    # a decision can never land without its content change, or the reverse.
+    # the content's new state along with the audit entry – one transaction,
+    # so a decision can never land without its content change, or the
+    # reverse.
     log_action(
         db,
         actor=moderator,
@@ -423,12 +457,28 @@ def decide_report(
 
     # Strictly after the commit, and never fatal: the decision is already
     # recorded, and a notification that fails must not turn it into a failed
-    # request – same policy as file_report()'s moderator alerts.
+    # request – same policy as file_report()'s moderator alerts. Looked up
+    # only on this branch, not unconditionally above: INVALID never sends
+    # this notification, so every dismissed report — most of them — was
+    # paying for a query whose result it never read.
     if data.decision == ReportDecision.VALID:
-        try:
-            send_content_removed_notification(author_email, report.id)
-        except Exception:
-            logger.exception("Failed to notify the author about report %s", report.id)
+        # The reported-on user's own current email, via reported_user_id
+        # rather than post.author/message.sender — set at filing time either
+        # way (ABF-112), and unlike message.sender it still resolves if the
+        # DirectMessage row itself is gone by decision time (pruned, or
+        # purged with its sender's own account). None only if reported_user
+        # itself was gone by decision time — theoretical (a User row is
+        # never hard-deleted, only anonymised), but there is no address to
+        # notify either way.
+        reported_user = user_service.get_user_by_id(db, report.reported_user_id)
+        author_email = reported_user.email if reported_user else None
+        if author_email:
+            try:
+                send_content_removed_notification(author_email, report.id)
+            except Exception:
+                logger.exception(
+                    "Failed to notify the author about report %s", report.id
+                )
 
     if restriction is not None:
         try:
@@ -495,7 +545,9 @@ def _admin_alert_emails(db: Session) -> list[str]:
     return [admin.alert_email for admin in admins if admin.alert_email]
 
 
-def _apply_content_decision(post: ForumPost, decision: ReportDecision) -> str:
+def _apply_content_decision(
+    post: ForumPost, decision: ReportDecision
+) -> Literal["already_deleted", "deleted", "restored", "unchanged"]:
     """
     Apply a decision to the reported post, and name what it did so the audit
     entry can say so. Mutates in memory only — decide_report() owns the commit.
@@ -515,15 +567,119 @@ def _apply_content_decision(post: ForumPost, decision: ReportDecision) -> str:
     return "unchanged"
 
 
+def _apply_direct_message_decision(
+    db: Session, report: Report, decision: ReportDecision
+) -> Literal["unchanged", "target_gone", "already_hidden", "hidden"]:
+    """
+    Apply a decision to the reported message, and name what it did so the
+    audit entry can say so. Mutates in memory only — decide_report() owns
+    the commit.
+
+    VALID hides the message (DirectMessage.hidden_at) for both participants.
+    INVALID leaves it exactly as it was: unlike a ForumPost, a DIRECT_MESSAGE
+    is never auto-hidden at filing time (see _notify_direct_message_
+    moderators()), so there is no earlier hide for INVALID to undo.
+
+    The message can legitimately be gone by decision time — pruned by the
+    3-year cap the moment its report stopped protecting it from that, or
+    purged along with its sender's own account (in which case the report
+    would already be CLOSED_ACCOUNT_DELETED and never reach here, but a
+    message deleted for the *recipient's* account-deletion reason, spec
+    §9.4, still can). `report.reported_content` is what a moderator actually
+    read to reach this decision, so a missing live row here is not an error.
+    """
+    if decision != ReportDecision.VALID:
+        return "unchanged"
+
+    message = (
+        db.query(DirectMessage).filter(DirectMessage.id == report.target_id).first()
+    )
+    if message is None:
+        return "target_gone"
+    if message.hidden_at is not None:
+        return "already_hidden"
+
+    message.hidden_at = datetime.now(UTC).replace(tzinfo=None)
+    return "hidden"
+
+
+def decrypt_reported_message(
+    db: Session, report: Report, moderator: User
+) -> str | None:
+    """
+    Decrypt a DIRECT_MESSAGE report's snapshot for the moderator opening it,
+    and audit the read (spec §9.1/§9.3, ABF-113).
+
+    This is the one moment anywhere in the system the message exists as
+    plaintext — it is never decrypted while filing a report (ABF-112 copies
+    ciphertext byte for byte) or while deciding one (the decision only sets
+    hidden_at, see _apply_direct_message_decision()). Without logging this
+    exact moment there would be no way to confirm afterwards that §9.1's
+    promise — private messages are not accessible to a moderator except
+    through this one consented-to path — actually held.
+
+    None once the report is CLOSED_ACCOUNT_DELETED: the reported-on account
+    is gone, and §9.4 keeps the report but not, from here on, its content —
+    even though the ciphertext is still physically sitting on the row.
+    Deliberately checked here rather than left to the caller: this is the
+    only function that ever calls decrypt_message() on a report's snapshot,
+    so it is the one place that guard has to live.
+
+    Caller's responsibility: only call this for a DIRECT_MESSAGE report.
+    reported_content/reported_content_key_version are nullable on the model
+    because a FORUM_POST report never sets them (models/report.py) — not
+    because a DIRECT_MESSAGE one might skip them; _file_direct_message_report()
+    always writes both together, so the check below is not expected to ever
+    fail in practice. It raises the same clean, translated 500 as InvalidTag
+    just below rather than a bare `assert`: an assert is compiled away
+    entirely under `python -O`, and this is the one function in the app
+    that ever touches this ciphertext at all.
+    """
+    if report.decision == ReportDecision.CLOSED_ACCOUNT_DELETED:
+        return None
+
+    if report.reported_content is None or report.reported_content_key_version is None:
+        raise HTTPException(status_code=500, detail="errors.internal_server_error")
+    # InvalidTag means the stored ciphertext failed authentication (DB
+    # corruption, tampering, or a key_version whose key no longer matches) —
+    # surfaced as a generic 500 rather than propagating, same policy as
+    # forum_service._to_response_dict()'s identical call.
+    try:
+        content = decrypt_message(
+            report.reported_content, report.reported_content_key_version
+        )
+    except InvalidTag as exc:
+        raise HTTPException(
+            status_code=500, detail="errors.internal_server_error"
+        ) from exc
+
+    log_action(
+        db,
+        actor=moderator,
+        action=AuditAction.DIRECT_MESSAGE_REPORT_VIEWED,
+        entity_type="Report",
+        entity_id=report.id,
+        # The message id only — never the content just decrypted above.
+        details={"message_id": report.target_id},
+    )
+    return content
+
+
 def _scoped_report_query(db: Session, moderator: User) -> Query[Any] | None:
     """
-    Base query for the reports a moderator is responsible for: FORUM_POST
-    reports joined to the reported user and to the reported post, matched on
-    the reported user's (user_type, sector) against moderator.moderator_cells.
+    Base query for the reports a moderator is responsible for, matched on the
+    reported user's (user_type, sector) against moderator.moderator_cells.
 
-    The ForumPost is selected alongside each Report (rather than just the
-    Report) so callers — namely the moderator endpoints — never need their
-    own follow-up query to render the reported content.
+    Works unchanged for FORUM_POST and DIRECT_MESSAGE reports alike:
+    Report.reported_user_id is set at filing time to whoever authored the
+    reported content either way — the post's author, or the message's sender
+    (ABF-112) — so the cell match never needs to know which.
+
+    Selects Report alone, not paired with its content: a DIRECT_MESSAGE
+    report has no ForumPost to pair with, and content is read by whichever
+    caller actually needs it (moderator.py's _to_report_with_content(),
+    decide_report()) — the one thing every caller shares is "is this
+    moderator allowed to see this report", which is all this answers.
 
     ADMIN is unscoped (spec §3.2 — admin has "הכל" for report handling;
     MODERATOR is scoped to "אחריותו" only).
@@ -531,19 +687,8 @@ def _scoped_report_query(db: Session, moderator: User) -> Query[Any] | None:
     Returns None for a MODERATOR with no cells assigned, meaning "responsible
     for nothing". That cannot be expressed as a filter: an empty or_() is a
     SQL no-op that matches every row, i.e. the exact opposite.
-
-    Query[Any] rather than the row type: SQLAlchemy gives a two-entity query
-    its own class, and how that class is parameterised changed between 2.0
-    and 2.1 — pyproject asks only for ">=2.0", so naming it here would make
-    mypy pass on one and fail on the other. The two callers annotate the rows
-    they get back instead, which is where the pairs are actually read.
     """
-    query = (
-        db.query(Report, ForumPost)
-        .join(User, Report.reported_user_id == User.id)
-        .join(ForumPost, Report.target_id == ForumPost.id)
-        .filter(Report.target_type == ReportTargetType.FORUM_POST)
-    )
+    query = db.query(Report).join(User, Report.reported_user_id == User.id)
 
     if moderator.role == UserRole.ADMIN:
         return query
@@ -554,25 +699,47 @@ def _scoped_report_query(db: Session, moderator: User) -> Query[Any] | None:
     return query.filter(cell_match_filter(cells))
 
 
-def get_pending_reports(db: Session, moderator: User) -> list[tuple[Report, ForumPost]]:
+def get_pending_reports(db: Session, moderator: User) -> list[Report]:
     """
     Return the reports still awaiting a decision in the moderator's cells,
-    most-reported content first (SPEC §7.3), each paired with the post it is
-    about so the endpoint needs no follow-up query.
+    sorted by report count descending (spec §7.3, "ממוינים לפי מספר
+    דיווחים") — a work queue meant to be emptied, so it is not paginated the
+    way get_decided_reports() is.
 
-    This is a work queue meant to be emptied, so it is not paginated —
-    get_decided_reports() is, because history only grows.
+    A DIRECT_MESSAGE report has no ForumPost.report_count to read — but it
+    cannot have more than one report on it either: only a message's
+    recipient may ever file one (forum_service.get_received_message()
+    refuses the sender), and _ensure_not_duplicate_report() refuses a second
+    one from the same reporter — so at most one Report row exists per
+    message, structurally. The LEFT JOIN below treats that missing count as
+    1, which puts a DIRECT_MESSAGE report exactly where a once-reported
+    ForumPost already sorts. Ties (every DIRECT_MESSAGE report included)
+    then break oldest-first.
     """
     query = _scoped_report_query(db, moderator)
     if query is None:
         return []
 
-    rows: list[tuple[Report, ForumPost]] = (
-        query.filter(Report.decision == ReportDecision.PENDING)
-        .order_by(ForumPost.report_count.desc())
+    report_count = func.coalesce(ForumPost.report_count, 1)
+    return (
+        # target_type in the join condition itself, not left implicit: a
+        # DIRECT_MESSAGE report's target_id is a DirectMessage id, not a
+        # ForumPost one, and the two only don't collide because both are
+        # UUIDs drawn from the same effectively-infinite space — nothing
+        # actually enforces that they can't. Without this, a coincidence
+        # there would join a DM report to an unrelated post and sort it by
+        # that post's report_count instead of falling back to 1.
+        query.outerjoin(
+            ForumPost,
+            and_(
+                Report.target_id == ForumPost.id,
+                Report.target_type == ReportTargetType.FORUM_POST,
+            ),
+        )
+        .filter(Report.decision == ReportDecision.PENDING)
+        .order_by(report_count.desc(), Report.created_at.asc())
         .all()
     )
-    return [(report, post) for report, post in rows]
 
 
 def get_decided_reports(
@@ -580,11 +747,11 @@ def get_decided_reports(
     moderator: User,
     page: int = 1,
     page_size: int = 20,
-) -> tuple[list[tuple[Report, ForumPost]], int]:
+) -> tuple[list[Report], int]:
     """
     Return one page of the decisions already made in the moderator's cells,
-    newest first, each paired with the post it is about, together with the
-    total across all pages (SPEC §7.3, "היסטוריית דיווחים").
+    newest first, together with the total across all pages (SPEC §7.3,
+    "היסטוריית דיווחים").
 
     Scoped to the cells, not to who decided: a moderator sharing a cell with
     another needs to see what was already handled there, otherwise the same
@@ -597,7 +764,7 @@ def get_decided_reports(
     query = query.filter(Report.decision != ReportDecision.PENDING)
     total = query.count()
 
-    rows: list[tuple[Report, ForumPost]] = (
+    rows = (
         # Report.id as a tiebreaker: two decisions can share a timestamp, and
         # without a total order a row can repeat across pages or be skipped.
         query.order_by(Report.decided_at.desc(), Report.id)
@@ -605,7 +772,7 @@ def get_decided_reports(
         .limit(page_size)
         .all()
     )
-    return [(report, post) for report, post in rows], total
+    return rows, total
 
 
 def get_report_for_moderator(
@@ -614,19 +781,29 @@ def get_report_for_moderator(
     moderator: User,
     *,
     for_update: bool = False,
-) -> tuple[Report, ForumPost]:
+    context: Literal["view", "decide"] = "view",
+) -> Report:
     """
-    Load a single report and its reported post, enforcing that the moderator
-    is responsible for its cell (ADMIN bypasses this check — see require_role
-    on the router).
+    Load a single report, enforcing that the moderator is responsible for its
+    cell (ADMIN bypasses this check — see require_role on the router).
 
-    for_update takes a row-level lock on both rows, for callers that go on to
-    write to them — decide_report() rewrites the report and the post's status
-    together. No-op on SQLite (dev), enforced on PostgreSQL (production) —
-    same pattern as forum_service.delete_post().
+    Loads only the Report, not its reported content — a FORUM_POST report's
+    ForumPost and a DIRECT_MESSAGE report's decrypted snapshot are each
+    fetched by whichever caller actually needs one (moderator.py's
+    _to_report_with_content(), decide_report()), not here.
 
-    Raises 404 if the report or its post doesn't exist, 403 if the
-    moderator's cells don't cover it.
+    for_update takes a row-level lock on the report, for callers that go on
+    to write to it. No-op on SQLite (dev), enforced on PostgreSQL
+    (production) — same pattern as forum_service.delete_post().
+
+    Raises 404 if the report doesn't exist, 403 if the moderator's cells
+    don't cover it — and for a DIRECT_MESSAGE report, audits the denial
+    itself (spec §9.3: a refused attempt at private content is as
+    reportable as a granted one — see decrypt_reported_message() for the
+    granted side). `context` names what was actually being attempted —
+    decide_report() passes "decide", since a moderator refused there was
+    never granted so much as a look at the content either, and the audit
+    trail should say which one was refused.
     """
     query = db.query(Report).filter(Report.id == report_id)
     if for_update:
@@ -635,16 +812,6 @@ def get_report_for_moderator(
     report = query.first()
     if report is None:
         raise HTTPException(status_code=404, detail=translate("reports.not_found"))
-
-    post_query = db.query(ForumPost).filter(ForumPost.id == report.target_id)
-    if for_update:
-        post_query = post_query.with_for_update()
-
-    post = post_query.first()
-    if post is None:
-        raise HTTPException(
-            status_code=404, detail=translate("reports.target_not_found")
-        )
 
     if moderator.role == UserRole.MODERATOR:
         cells = moderator.moderator_cells or []
@@ -659,11 +826,20 @@ def get_report_for_moderator(
             is not None
         )
         if not covered:
+            if report.target_type == ReportTargetType.DIRECT_MESSAGE:
+                log_action(
+                    db,
+                    actor=moderator,
+                    action=AuditAction.DIRECT_MESSAGE_ACCESS_DENIED,
+                    entity_type="Report",
+                    entity_id=report.id,
+                    details={"context": f"moderator_report_{context}"},
+                )
             raise HTTPException(
                 status_code=403, detail=translate("reports.view_forbidden")
             )
 
-    return report, post
+    return report
 
 
 # ---------------------------------------------------------------------------

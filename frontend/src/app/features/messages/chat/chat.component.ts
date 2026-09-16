@@ -95,6 +95,14 @@ export interface ChatMessage {
    * have to reload to see that it was.
    */
   reported: boolean;
+  /**
+   * A moderator upheld a report on this message (ABF-113).
+   *
+   * `content` is already empty when this is true — the server never sends
+   * a hidden message's real text — so this is what the template checks to
+   * render a placeholder instead.
+   */
+  hidden: boolean;
 }
 
 /** What the storage cap cost the conversation on the last send. */
@@ -325,6 +333,7 @@ export class ChatComponent implements OnInit {
         pending: true,
         // Her own message, so there is nothing to report and nothing to mark.
         reported: false,
+        hidden: false,
       },
     ]);
     this.draft.set('');
@@ -424,6 +433,7 @@ export class ChatComponent implements OnInit {
       readAt: message.read_at,
       pending: false,
       reported: message.reported_by_me,
+      hidden: message.hidden,
     };
   }
 

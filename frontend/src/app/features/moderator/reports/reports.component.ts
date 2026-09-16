@@ -33,19 +33,25 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { ReportWithContent, RestrictionWithMember } from '../../../core/models';
+import {
+  DirectMessageReport,
+  ReportWithContent,
+  RestrictionWithMember,
+} from '../../../core/models';
 import {
   POST_STATUS_LABELS,
   REPORT_DECISION_LABELS,
   REPORT_REASON_LABELS,
   RESTRICTION_TYPE_LABELS,
   ReportDecision,
+  ReportTargetType,
   RestrictionType,
 } from '../../../core/constants';
+import { LabelService } from '../../../core/i18n/label.service';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { ReportService } from '../../../core/services/report.service';
 import { utcIso } from '../../../core/utils/utc-date.util';
@@ -102,6 +108,7 @@ interface PendingDecision {
   standalone: true,
   imports: [
     DatePipe,
+    NgTemplateOutlet,
     RouterLink,
     TranslocoPipe,
     ConfirmDialogComponent,
@@ -114,6 +121,7 @@ interface PendingDecision {
 })
 export class ModeratorReportsComponent implements OnInit {
   private readonly reportService = inject(ReportService);
+  private readonly labels = inject(LabelService);
 
   readonly activeTab = signal<Tab>('pending');
 
@@ -148,6 +156,16 @@ export class ModeratorReportsComponent implements OnInit {
   /** Held as a key or a server sentence, never as translated text (ABF-132). */
   readonly actionError = signal<ScreenError>(NO_ERROR);
 
+  /**
+   * The DIRECT_MESSAGE report currently expanded, if any (ABF-113) — one at
+   * a time, deliberately: fetching several at once would decrypt (and audit
+   * a view of) content nobody asked to read yet.
+   */
+  readonly openReportId = signal<string | null>(null);
+  readonly openReportContent = signal<DirectMessageReport | null>(null);
+  readonly isContentLoading = signal(false);
+  readonly contentError = signal<ScreenError>(NO_ERROR);
+
   readonly reasonLabels = REPORT_REASON_LABELS;
   readonly decisionLabels = REPORT_DECISION_LABELS;
   readonly postStatusLabels = POST_STATUS_LABELS;
@@ -155,6 +173,7 @@ export class ModeratorReportsComponent implements OnInit {
   readonly minNoteLength = MIN_NOTE_LENGTH;
   readonly emptyValue = EMPTY_VALUE;
   readonly decisions = ReportDecision;
+  readonly targetTypes = ReportTargetType;
 
   readonly hasPreviousPage = computed(() => this.historyPage() > 1);
   readonly hasNextPage = computed(() => this.historyPage() < this.historyPageCount());
@@ -226,6 +245,80 @@ export class ModeratorReportsComponent implements OnInit {
       : contentText;
   }
 
+  /**
+   * A display title for the card's heading and its aria-labels alike.
+   *
+   * A plain string, not a template pipe: `[attr.aria-label]` interpolates
+   * this into another translated string (e.g. "moderator.reports.decide_
+   * valid_aria"), and a `| transloco` result can't itself be a param to a
+   * second `| transloco` in the template — so the DIRECT_MESSAGE fallback is
+   * resolved here, once (ABF-113: a DM report has no content_title at all,
+   * unlike a FORUM_POST one). Through LabelService, not a bare
+   * `TranslocoService.translate()` — that returns the right text once and
+   * then goes stale across a language switch (CONTRIBUTING §6, ABF-128).
+   */
+  reportTitle(report: ReportWithContent): string {
+    if (report.target_type === ReportTargetType.FORUM_POST) {
+      return report.content_title ?? this.labels.label('moderator.reports.content_gone_title');
+    }
+    return this.labels.label('moderator.reports.direct_message_title');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Viewing a DIRECT_MESSAGE report's content (ABF-113)
+  // ---------------------------------------------------------------------------
+
+  /** Whether this report is the one currently expanded. */
+  isOpen(reportId: string): boolean {
+    return this.openReportId() === reportId;
+  }
+
+  /**
+   * Fetch and expand one DIRECT_MESSAGE report's decrypted content.
+   *
+   * The server decrypts and audits the read on this exact call (spec
+   * §9.1/§9.3) — nothing before this point ever saw the plaintext, including
+   * the list this report came from.
+   */
+  viewContent(report: DirectMessageReport): void {
+    this.openReportId.set(report.id);
+    this.openReportContent.set(null);
+    this.isContentLoading.set(true);
+    this.contentError.set(NO_ERROR);
+
+    this.reportService.getReport(report.id).subscribe({
+      next: (full) => {
+        // A second click may have moved on to another report while this was
+        // in flight; that report's own response is what belongs on screen.
+        if (!this.isOpen(report.id)) {
+          return;
+        }
+        // The endpoint's response shape follows the id requested, and this
+        // method is only ever called with a DIRECT_MESSAGE report's own id
+        // (see dmContentViewer in the template) — so this always holds, but
+        // it is what lets openReportContent stay typed as DirectMessageReport
+        // rather than back to the general union.
+        if (full.target_type === ReportTargetType.DIRECT_MESSAGE) {
+          this.openReportContent.set(full);
+        }
+        this.isContentLoading.set(false);
+      },
+      error: (err: unknown) => {
+        if (!this.isOpen(report.id)) {
+          return;
+        }
+        this.contentError.set(screenErrorFrom(err, 'moderator.errors.content_load_failed'));
+        this.isContentLoading.set(false);
+      },
+    });
+  }
+
+  closeContent(): void {
+    this.openReportId.set(null);
+    this.openReportContent.set(null);
+    this.contentError.set(NO_ERROR);
+  }
+
   // ---------------------------------------------------------------------------
   // Deciding
   // ---------------------------------------------------------------------------
@@ -258,6 +351,10 @@ export class ModeratorReportsComponent implements OnInit {
           // A decision is what applies a restriction, so whatever this tab
           // last showed may already be out of date.
           this.areRestrictionsFresh.set(false);
+          // Whatever content was open belongs to a report that just changed
+          // decision — closing it means the next look, in History, is a
+          // fresh audited fetch rather than this stale one replayed for free.
+          this.closeContent();
           this.pendingDecision.set(null);
         },
         error: (err: unknown) => {
