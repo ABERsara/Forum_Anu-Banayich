@@ -83,6 +83,26 @@ describe('InboxComponent', () => {
     expect(el.querySelector('.inbox__badge')?.textContent?.trim()).toBe('3');
   });
 
+  /**
+   * ABF-113: a moderator upholding a report on the conversation's last
+   * message sets `hidden` on the conversation — the preview must not go on
+   * showing the very content a moderator just ruled should be hidden.
+   */
+  it('shows a placeholder instead of a hidden conversation’s preview', () => {
+    forumServiceMock = {
+      getInbox: vi
+        .fn()
+        .mockReturnValue(
+          of(makeList([makeConversation({ last_message_preview: 'תוכן שהוסר', hidden: true })])),
+        ),
+    };
+    setup();
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a.inbox__item');
+    expect(link?.textContent).toContain('הודעה זו הוסרה בעקבות דיווח');
+    expect(link?.textContent).not.toContain('תוכן שהוסר');
+  });
+
   it('gives each conversation link an accessible name that mentions the unread count', () => {
     forumServiceMock = {
       getInbox: vi.fn().mockReturnValue(of(makeList([makeConversation({ unread_count: 2 })]))),

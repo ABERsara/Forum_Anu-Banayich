@@ -287,6 +287,22 @@ describe('ChatComponent', () => {
     expect(queryAll('.chat__message--theirs').length).toBe(1);
   });
 
+  /**
+   * ABF-113: a moderator upholding a report on this exact message is what
+   * sets `hidden` — the bubble stays (who, when, which side), but its text
+   * is replaced everywhere, not left blank or (worse) showing what a
+   * moderator just ruled should not be shown again.
+   */
+  it('shows a placeholder instead of a hidden message’s content', () => {
+    forumServiceMock.getConversation.mockReturnValue(
+      of(makePage([makeMessage({ content: 'תוכן שהוסר', hidden: true })])),
+    );
+    setup();
+
+    expect(text()).toContain('הודעה זו הוסרה בעקבות דיווח');
+    expect(text()).not.toContain('תוכן שהוסר');
+  });
+
   it('reads the zone-less timestamps the server sends as the UTC they are', () => {
     forumServiceMock.getConversation.mockReturnValue(
       of(makePage([makeMessage({ created_at: '2026-08-01T10:00:00' })])),
