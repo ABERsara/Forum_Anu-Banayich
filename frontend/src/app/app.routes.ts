@@ -241,6 +241,15 @@ export const routes: Routes = [
             (m) => m.ModeratorReportsComponent,
           ),
       },
+      // Declared after 'reports' for reading order only: the two paths cannot
+      // both match, so neither swallows the other.
+      {
+        path: 'reports/:id',
+        loadComponent: () =>
+          import('./features/moderator/report-detail/report-detail.component').then(
+            (m) => m.ModeratorReportDetailComponent,
+          ),
+      },
       {
         path: 'users/:userId',
         loadComponent: () =>

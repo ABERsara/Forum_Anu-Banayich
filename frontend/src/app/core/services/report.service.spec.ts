@@ -141,6 +141,25 @@ describe('ReportService', () => {
     req.flush({ items: [], total: 0, pending_count: 0 });
   });
 
+  it('getReport GETs one report with the content it was filed about', () => {
+    const detail: ReportWithContent = {
+      ...MOCK_REPORT,
+      content_title: 'כותרת ההודעה',
+      content_text: 'תוכן ההודעה שדווחה',
+      content_status: PostStatus.HIDDEN,
+      report_count: 2,
+    };
+    let result: ReportWithContent | undefined;
+
+    service.getReport('report-1').subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/moderator/reports/report-1`);
+    expect(req.request.method).toBe('GET');
+
+    req.flush(detail);
+    expect(result).toEqual(detail);
+  });
+
   it('decideReport POSTs the decision and the note to the decide endpoint', () => {
     const decided: Report = {
       ...MOCK_REPORT,

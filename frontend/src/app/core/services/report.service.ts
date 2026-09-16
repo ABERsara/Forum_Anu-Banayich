@@ -15,6 +15,7 @@ import {
   ReportDecideRequest,
   ReportHistoryList,
   ReportList,
+  ReportWithContent,
   RestrictionList,
   SuspendUserRequest,
   UserModerationCard,
@@ -47,6 +48,17 @@ export class ReportService {
 
   getPendingReports(): Observable<ReportList> {
     return this.api.get<ReportList>('/moderator/reports');
+  }
+
+  /**
+   * One report with the content it was filed about, for the detail screen.
+   *
+   * Scoped server-side exactly like the queue above: 403 for a report outside
+   * this moderator's cells, 404 for one that does not exist — so an id typed
+   * into the address bar reaches no further than the queue would have.
+   */
+  getReport(reportId: string): Observable<ReportWithContent> {
+    return this.api.get<ReportWithContent>(`/moderator/reports/${reportId}`);
   }
 
   /** Reports this moderator's cells already decided, newest first. Paginated. */
