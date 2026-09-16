@@ -173,16 +173,52 @@ class TestListAgentDomains:
         assert response.status_code == 200
         assert response.json() == []
 
-    async def test_response_items_expose_only_id_name_description(
+    async def test_response_items_expose_only_the_catalog_fields(
         self, client, db_session: Session, as_user
     ) -> None:
+        """The catalog is a whitelist, not "the row minus a few columns".
+
+        `professional_domain` joined it in ABF-123, which needs the discipline
+        to hand a member on to a human advisor. The visibility columns stayed
+        out: which members an agent is for is the filter this endpoint already
+        applied, not a fact it owes the member who passed it.
+        """
         user = _make_user(db_session, "widow@example.com")
         _make_domain(db_session, "d", GroupVisibility.ALL, SectorVisibility.ALL)
         as_user(user)
 
         body = (await client.get(BASE)).json()
 
-        assert set(body[0].keys()) == {"id", "name", "description"}
+        assert set(body[0].keys()) == {
+            "id",
+            "name",
+            "description",
+            "professional_domain",
+        }
+
+    async def test_response_carries_the_domain_discipline(
+        self, client, db_session: Session, as_user
+    ) -> None:
+        """The value, not just the key — the referral is built out of it.
+
+        Asserted as the enum's wire value: the client matches it against its own
+        `ProfessionalDomain` copy, so the string is the contract.
+        """
+        user = _make_user(db_session, "widow@example.com")
+        domain = AgentDomain(
+            name="single-parent rights",
+            description="תיאור",
+            group_visibility=GroupVisibility.ALL,
+            sector_visibility=SectorVisibility.ALL,
+            professional_domain=ProfessionalDomain.LAWYER,
+        )
+        db_session.add(domain)
+        db_session.commit()
+        as_user(user)
+
+        body = (await client.get(BASE)).json()
+
+        assert body[0]["professional_domain"] == "lawyer"
 
     async def test_domains_are_ordered_by_name(
         self, client, db_session: Session, as_user

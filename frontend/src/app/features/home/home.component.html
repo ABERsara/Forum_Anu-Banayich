@@ -27,6 +27,20 @@
           </app-card>
         </a>
 
+        <!-- SPEC §12 puts the agents alongside human advice, so the card sits
+             next to it. header.component carries no feature links — the cards
+             on this page are how a member reaches anything — so without this
+             one /agents exists and is unreachable. -->
+        <a routerLink="/agents" class="home__card-link">
+          <app-card
+            [title]="'home.agents.title' | transloco"
+            [subtitle]="'home.agents.subtitle' | transloco"
+            [elevated]="true"
+          >
+            {{ 'home.agents.body' | transloco }}
+          </app-card>
+        </a>
+
         <a routerLink="/messages" class="home__card-link">
           <app-card title="הודעות" subtitle="שיחה פרטית עם חברי התא שלך" [elevated]="true">
             תקשורת פרטית ומוצפנת עם חברי התא שלך.

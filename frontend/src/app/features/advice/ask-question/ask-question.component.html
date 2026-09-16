@@ -9,6 +9,10 @@
     <h1 class="ask-question-title">{{ 'advice.ask.title' | transloco }}</h1>
     @if (professionalId) {
       <p class="ask-question-hint">{{ 'advice.ask.hint_professional' | transloco }}</p>
+    } @else if (cameWithDomain) {
+      <!-- Referred here with the field already chosen — say so, and say it can
+           be changed, rather than asking for something that is already done. -->
+      <p class="ask-question-hint">{{ 'advice.ask.hint_domain_preselected' | transloco }}</p>
     } @else {
       <p class="ask-question-hint">{{ 'advice.ask.hint_domain' | transloco }}</p>
     }

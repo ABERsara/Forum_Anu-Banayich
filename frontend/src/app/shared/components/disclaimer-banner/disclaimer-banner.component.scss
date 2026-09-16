@@ -1,0 +1,27 @@
+@use '../../../../styles/variables' as *;
+
+// No `direction` and no physical side: the banner inherits its direction from
+// <html dir>, and the icon sits on the reading-start edge because flex order
+// turns with the page (CONTRIBUTING §6, core/i18n/direction.spec.ts).
+//
+// Warning colours rather than danger: this is a standing condition of using an
+// agent, not something that went wrong. `app-error-display` owns red.
+.disclaimer-banner {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  background-color: rgba($color-warning, 0.08);
+  border: 1px solid rgba($color-warning, 0.3);
+  border-radius: $radius-md;
+  color: $color-text;
+  font-size: $font-size-sm;
+  margin: 0;
+}
+
+.disclaimer-banner__icon {
+  color: $color-warning;
+  font-size: $font-size-lg;
+  // The glyph must not shrink when the sentence wraps on a narrow screen.
+  flex: 0 0 auto;
+}

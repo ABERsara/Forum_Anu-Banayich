@@ -14,7 +14,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.config import settings
-from app.core.constants import AgentMessageRole
+from app.core.constants import AgentMessageRole, ProfessionalDomain
 from app.core.i18n import translate
 
 # Mirrors the column widths on AgentKnowledgeEntry, so an over-long title comes
@@ -25,11 +25,29 @@ SOURCE_URL_MAX_LENGTH = 1024
 
 
 class AgentDomainResponse(BaseModel):
-    """GET /agents – one agent domain in the catalog visible to the user."""
+    """GET /agents – one agent domain in the catalog visible to the user.
+
+    `professional_domain` is the discipline the domain belongs to — the same
+    column ABF-120 added to decide who may *edit* a knowledge base. It is here
+    because ABF-123 needs it to *read*: the chat screen's "ask a human instead"
+    button opens `/advice/ask` with the discipline pre-selected, and an agent
+    domain id is a uuid that no ProfessionalDomain can be inferred from. Without
+    it the button can only drop the member on an empty form and ask them to
+    guess which profession they were just talking to about.
+
+    Safe to expose: the enum is already public on the advice catalog
+    (`ProfessionalProfile.professional_domain`), and it says which subject the
+    agent covers, not who maintains it.
+
+    The visibility columns stay off this schema. Which members an agent is for
+    is the server's filter, not a fact the catalog owes the one member who
+    passed it.
+    """
 
     id: str
     name: str
     description: str
+    professional_domain: ProfessionalDomain
 
     model_config = {"from_attributes": True}
 

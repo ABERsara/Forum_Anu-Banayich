@@ -11,6 +11,7 @@
 
 import {
   AccountStatus,
+  AgentMessageRole,
   DocumentType,
   GroupVisibility,
   ProfessionalDomain,
@@ -605,6 +606,101 @@ export interface RestrictionWithMember {
 export interface RestrictionList {
   items: RestrictionWithMember[];
   total: number;
+}
+
+// ---------------------------------------------------------------------------
+// AI agents (backend/app/schemas/agent.py)
+// ---------------------------------------------------------------------------
+
+/**
+ * One agent in the catalog — GET /agents.
+ *
+ * `id` is an agent_domains row id (uuid), not an enum: since ABF-120 an agent
+ * is a table row an admin can add, gated by group/sector like a forum post.
+ * The list a member gets back is already filtered to what they may see, so
+ * there is nothing here to filter again on the client.
+ *
+ * `name` and `description` are written by the association, in Hebrew, and are
+ * shown as they came — content, not UI, so they carry no translation key
+ * (CONTRIBUTING §6, the rule a professional's own description follows).
+ *
+ * `professional_domain` is the discipline behind the agent, and the one field
+ * the chat screen needs in order to hand the member on to a human: it is what
+ * `/advice/ask` pre-selects.
+ */
+export interface AgentDomain {
+  id: string;
+  name: string;
+  description: string;
+  professional_domain: ProfessionalDomain;
+}
+
+/**
+ * One turn of a conversation, from either side.
+ *
+ * `content` arrives decrypted — agent_messages.content is AES-256-GCM at rest
+ * and the service decrypts on the way out, so nothing on this side knows about
+ * ciphertext.
+ *
+ * An agent turn ends in the association's standing disclaimer, which the
+ * backend concatenates onto every answer rather than asking the model for it
+ * (agent_service, "the disclaimer is always there"). It is part of the stored
+ * row and is rendered with the rest of it.
+ */
+export interface AgentMessage {
+  id: string;
+  role: AgentMessageRole;
+  /** Naive-UTC ISO timestamp, like every other date this API returns. */
+  created_at: string;
+  content: string;
+}
+
+/**
+ * A knowledge base document an answer was drawn from.
+ *
+ * One per source, not per retrieved passage — the server collapses them. Both
+ * provenance fields are optional, because some material is written in-house by
+ * the association and has neither a publisher nor a link.
+ */
+export interface AgentSource {
+  title: string;
+  source_name: string | null;
+  source_url: string | null;
+}
+
+/** POST /agents/{domain_id}/chat — omit `conversation_id` to start a thread. */
+export interface AgentChatRequest {
+  message: string;
+  conversation_id?: string;
+}
+
+/**
+ * One exchange: both rows the server wrote, and what the answer rests on.
+ *
+ * The question comes back rather than being kept by the client, because its
+ * `id` and `created_at` are the server's.
+ */
+export interface AgentChatResponse {
+  conversation_id: string;
+  question: AgentMessage;
+  answer: AgentMessage;
+  sources: AgentSource[];
+}
+
+/**
+ * GET /agents/{domain_id}/conversations/{id} — a whole thread, in order.
+ *
+ * No `sources`: provenance belongs to the exchange that produced it and is not
+ * stored per message, so a thread re-opened later shows the answers without
+ * the document names that were listed under them at the time.
+ */
+export interface AgentConversation {
+  id: string;
+  domain_id: string;
+  /** Naive-UTC ISO timestamps, like every other date this API returns. */
+  started_at: string;
+  last_message_at: string;
+  messages: AgentMessage[];
 }
 
 // ---------------------------------------------------------------------------
