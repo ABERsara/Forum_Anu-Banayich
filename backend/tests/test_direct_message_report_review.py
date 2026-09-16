@@ -27,7 +27,7 @@ from app.models.audit import AuditLog
 from app.models.forum import DirectMessage
 from app.models.report import Report
 from app.models.user import User
-from app.schemas.forum import DirectMessageCreate
+from app.schemas.forum import DirectMessageCreate, DirectMessageResponse
 from app.schemas.report import ReportCreate
 from app.services import forum_service, report_service
 
@@ -382,3 +382,36 @@ class TestPermissionMatrix:
         response = await client.get(f"{BASE}/reports")
 
         assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# DirectMessage.hidden — the ORM-side property DirectMessageResponse's
+# from_attributes mode reads. forum_service._to_response_dict() already
+# computes this correctly into a plain dict, which is the only path any
+# endpoint takes today — these two exercise the property directly, the one
+# path that would otherwise silently fall back to hidden's False default.
+# ---------------------------------------------------------------------------
+
+
+class TestDirectMessageHiddenProperty:
+    async def test_true_once_the_message_is_hidden(
+        self, client, make_user, as_user, db_session
+    ):
+        as_user(_make_moderator(db_session, make_user))
+        sender, recipient = _pair(db_session, make_user)
+        message = _send_message(db_session, sender, recipient, "תוכן")
+        report = _file_dm_report(db_session, message, recipient)
+
+        await client.post(
+            f"{BASE}/reports/{report.id}/decide",
+            json=_decide_body(ReportDecision.VALID),
+        )
+        db_session.refresh(message)
+
+        assert DirectMessageResponse.model_validate(message).hidden is True
+
+    def test_false_while_untouched(self, db_session, make_user):
+        sender, recipient = _pair(db_session, make_user)
+        message = _send_message(db_session, sender, recipient, "תוכן")
+
+        assert DirectMessageResponse.model_validate(message).hidden is False

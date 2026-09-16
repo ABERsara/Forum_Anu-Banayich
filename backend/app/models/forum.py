@@ -166,6 +166,18 @@ class DirectMessage(Base):
     # that; it is just a timestamp.
     hidden_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    @property
+    def hidden(self) -> bool:
+        """
+        DirectMessageResponse.hidden reads this through model_validate()'s
+        from_attributes mode — a Pydantic default hides a missing attribute
+        rather than erroring, so without this property a caller that ever
+        validates a DirectMessage row directly (forum_service._to_response_
+        dict() instead builds its own dict, computing this the same way)
+        would silently get hidden=False for a message a moderator hid.
+        """
+        return self.hidden_at is not None
+
     # ------------------------------------------------------------------
     # Relationships
     # ------------------------------------------------------------------
