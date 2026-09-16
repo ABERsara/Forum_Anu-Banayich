@@ -433,6 +433,7 @@
     "report_detail": {
       "back_to_reports": "Back to the dashboard",
       "title": "Report details",
+      "open_aria": "Details of the report about “{{title}}”",
       "hint": "The reported content in full, the context the decision rests on, and the decision itself, on one screen.",
       "loading": "Loading the report...",
       "content_section": "The reported content",

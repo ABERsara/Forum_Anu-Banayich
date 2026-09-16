@@ -257,6 +257,18 @@ describe('ModeratorReportsComponent', () => {
       expect(text()).not.toContain('user-1');
     });
 
+    /**
+     * ABF-155. A row is a preview: the post is cut at 200 characters and the
+     * decision record is not on it at all. Without this link the screen that
+     * holds the rest was reachable only by typing its URL.
+     */
+    it('opens the way through to the report in full', () => {
+      const link: HTMLAnchorElement = root().querySelector('.reports__detail-link')!;
+
+      expect(link.getAttribute('href')).toBe('/moderator/reports/report-1');
+      expect(link.getAttribute('aria-label')).toContain('כותרת ההודעה');
+    });
+
     it('opens the way through to the card of the reported user', () => {
       const link: HTMLAnchorElement = root().querySelector('.reports__card-link')!;
 
@@ -497,6 +509,15 @@ describe('ModeratorReportsComponent', () => {
       expect(reportServiceMock.getReportHistory).not.toHaveBeenCalled();
     });
 
+    /** A decided report is read back on the same screen, decision and all. */
+    it('opens a decided report in full too', () => {
+      component.showTab('history');
+      fixture.detectChanges();
+      const link: HTMLAnchorElement = root().querySelector('.reports__detail-link')!;
+
+      expect(link.getAttribute('href')).toBe('/moderator/reports/report-9');
+    });
+
     it('reports an empty history rather than showing nothing', () => {
       reportServiceMock.getReportHistory.mockReturnValue(
         of(makeHistoryPage({ items: [], total: 0 })),
@@ -735,6 +756,7 @@ describe('ModeratorReportsComponent', () => {
         'מצב ההודעה: גלוי',
       ]);
       expect(actionLabels()).toEqual([
+        'פרטי דיווח',
         'מחיקת ההודעה (מוצדק)',
         'ביטול הדיווח (שגוי)',
         'כרטיס המשתמש/ת',
@@ -754,6 +776,7 @@ describe('ModeratorReportsComponent', () => {
         'Message status: Visible',
       ]);
       expect(actionLabels()).toEqual([
+        'Report details',
         'Delete the message (valid)',
         'Dismiss the report (invalid)',
         'User card',
@@ -772,6 +795,7 @@ describe('ModeratorReportsComponent', () => {
 
       expect(ariaLabels()).toEqual([
         'דיווחים',
+        'פרטי הדיווח על ״A post about the paperwork״',
         'מחיקת ההודעה ״A post about the paperwork״',
         'ביטול הדיווח על ״A post about the paperwork״',
         'כרטיס המשתמש/ת שכתב/ה את ״A post about the paperwork״',
@@ -781,6 +805,7 @@ describe('ModeratorReportsComponent', () => {
 
       expect(ariaLabels()).toEqual([
         'Reports',
+        'Details of the report about “A post about the paperwork”',
         'Delete the message “A post about the paperwork”',
         'Dismiss the report about “A post about the paperwork”',
         'Card of the user who wrote “A post about the paperwork”',
