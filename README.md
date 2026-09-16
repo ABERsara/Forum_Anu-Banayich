@@ -581,14 +581,16 @@ git fetch origin main
 git merge origin/main   # merge, לא rebase
 
 # 2. צרי branch חדש לכל פיצ'ר
-git checkout -b feature/forum-list
+#    שתי הצורות מקובלות — feat/ABF-41-forum-list או ABF-41-forum-list.
+#    הכלל המלא ב-CONTRIBUTING §8. שימי לב: feat/ ולא feature/
+git checkout -b feat/ABF-41-forum-list
 
 # 3. עבדי, commit קטנים וברורים
 git add frontend/src/app/features/forum/forum-list/
 git commit -m "feat: add forum list component with post cards"
 
 # 4. כשסיימת – פתחי Pull Request ל-main
-git push origin feature/forum-list
+git push origin feat/ABF-41-forum-list
 ```
 
 ### כינויי Commit
