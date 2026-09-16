@@ -11,6 +11,15 @@
  * bar gets no further than the queue would have. The `roleGuard` on the route
  * is what keeps the wrong role out; this screen assumes neither.
  *
+ * **A private message is read here, and the read is audited.** `getReport()`
+ * is the one call that ever returns a DIRECT_MESSAGE report's plaintext, and
+ * the server records the read as a view (ABF-113, spec §9.1/§9.3). The queue
+ * asks for it behind an explicit "view content" button because a row does not
+ * otherwise need it; this screen cannot, since the same call is where its
+ * reason, its dates and its decision come from. Opening the page *is* the
+ * read — so the page says so, rather than letting a moderator find out from
+ * the audit log.
+ *
  * **Two requests, and why.** The report carries the content and the report's
  * own fields. It does not carry the reported member's name or what was decided
  * about her before — that is `UserModerationCard`, which the user card screen
@@ -57,7 +66,9 @@ import {
   REPORT_DECISION_LABELS,
   REPORT_REASON_LABELS,
   ReportDecision,
+  ReportTargetType,
 } from '../../../core/constants';
+import { LabelService } from '../../../core/i18n/label.service';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { ReportService } from '../../../core/services/report.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -98,6 +109,7 @@ export class ModeratorReportDetailComponent implements OnInit {
   readonly id = input.required<string>();
 
   private readonly reportService = inject(ReportService);
+  private readonly labels = inject(LabelService);
 
   readonly report = signal<ReportWithContent | null>(null);
   readonly isLoading = signal(false);
@@ -120,9 +132,10 @@ export class ModeratorReportDetailComponent implements OnInit {
   readonly reasonLabels = REPORT_REASON_LABELS;
   readonly decisionLabels = REPORT_DECISION_LABELS;
   readonly postStatusLabels = POST_STATUS_LABELS;
+  readonly targetTypes = ReportTargetType;
+  readonly decisions = ReportDecision;
   readonly minNoteLength = MIN_NOTE_LENGTH;
   readonly emptyValue = EMPTY_VALUE;
-  readonly decisions = ReportDecision;
 
   /**
    * Only a report still waiting is decided here. The server answers 409 to a
@@ -131,6 +144,36 @@ export class ModeratorReportDetailComponent implements OnInit {
    * has already been decided is read back.
    */
   readonly isPending = computed(() => this.report()?.decision === ReportDecision.PENDING);
+
+  /** A private message was read to draw this page — see the class comment. */
+  readonly isDirectMessage = computed(
+    () => this.report()?.target_type === ReportTargetType.DIRECT_MESSAGE,
+  );
+
+  /**
+   * What to call the thing that was reported.
+   *
+   * A DIRECT_MESSAGE report has no title at all, so it takes a generic one;
+   * a FORUM_POST report has the title its author wrote, unless the row behind
+   * it is gone. Both keys are the queue's — it answers the same question one
+   * row at a time, and two screens naming the same thing differently is how
+   * they start to drift (ABF-113 established both).
+   *
+   * Resolved here rather than in the template because it is also a *parameter*
+   * of two translated `aria-label`s, and a `| transloco` result cannot be the
+   * argument of a second one. Through `LabelService`, so it still follows a
+   * language switch — `translate()` would freeze it (CONTRIBUTING §6).
+   */
+  readonly reportTitle = computed(() => {
+    const report = this.report();
+    if (!report) {
+      return '';
+    }
+    if (report.target_type === ReportTargetType.FORUM_POST) {
+      return report.content_title ?? this.labels.label('moderator.reports.content_gone_title');
+    }
+    return this.labels.label('moderator.reports.direct_message_title');
+  });
 
   /** The reported member's name, once her card has arrived. */
   readonly reportedUserName = computed(() => {
@@ -223,13 +266,17 @@ export class ModeratorReportDetailComponent implements OnInit {
     this.reportService.decideReport(this.id(), { decision, note }).subscribe({
       next: () => {
         this.pendingDecision.set(null);
-        // The reply carries the report's own fields and not the post's, and
-        // the decision changed both — VALID deletes the post, INVALID puts a
-        // post the two-report rule auto-hid back on the forum. Which status it
-        // lands on is the server's rule and not this screen's, so the report
-        // is loaded again rather than patched from the reply. That reload
-        // brings the card with it, because a decision is exactly what moves
-        // the counts below.
+        // The reply carries the report's own fields and not the content's, and
+        // the decision changed both — VALID removes what was reported, INVALID
+        // puts a post the two-report rule auto-hid back on the forum. What the
+        // content ends up as is the server's rule and not this screen's, so the
+        // report is loaded again rather than patched from the reply. That
+        // reload brings the card with it, because a decision is exactly what
+        // moves the counts below.
+        //
+        // On a DIRECT_MESSAGE report that second load is a second audited read
+        // (ABF-113) — by the moderator who has just decided on the message she
+        // was reading, which is what the audit log should say happened.
         this.loadReport();
       },
       error: (err: unknown) => {

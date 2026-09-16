@@ -188,6 +188,7 @@
       "title": "Professional question",
       "hint_professional": "Your question will be sent to the professional you chose.",
       "hint_domain": "Choose a field — your question will be sent to every professional in it.",
+      "hint_domain_preselected": "Your question will be sent to the professionals in the field you came from. You can choose a different one.",
       "domain_label": "Field",
       "domain_placeholder": "Choose a field",
       "domain_error": "Please choose a field",
@@ -242,6 +243,40 @@
       "load_my_questions_failed": "Something went wrong loading your questions.",
       "load_pending_failed": "Something went wrong loading the pending questions.",
       "answer_failed": "Something went wrong sending the answer."
+    }
+  },
+  "agents": {
+    "list": {
+      "title": "AI agents",
+      "intro": "An AI agent answers general questions from a knowledge base the association maintains. For a personal question you can always reach a professional.",
+      "empty": "No agents are available to you right now.",
+      "open": "Open a conversation",
+      "field_label": "Field"
+    },
+    "chat": {
+      "back_to_list": "Back to AI agents",
+      "log_label": "The conversation with the agent",
+      "loading_conversation": "Loading the conversation...",
+      "empty": "You can ask the agent your first question.",
+      "thinking": "The agent is writing an answer...",
+      "speaker_me": "You:",
+      "speaker_agent": "The agent:",
+      "new_message_label": "Your question for the agent",
+      "placeholder": "What would you like to ask?",
+      "send": "Send",
+      "char_count": "{{count}} of {{max}} characters",
+      "limit_reached": "You have reached the maximum question length ({{max}} characters).",
+      "sources_title": "From the knowledge base:",
+      "source_link": "To the source",
+      "refer_title": "Need a binding answer?",
+      "refer_hint": "The agent gives general information. For a personal question you can reach a professional in this field.",
+      "refer_button": "Refer me to human advice"
+    },
+    "errors": {
+      "load_domains_failed": "Something went wrong loading the agents list. Please try again later.",
+      "domain_unavailable": "This agent is not available to you.",
+      "load_conversation_failed": "Something went wrong loading the previous conversation. You can start a new one.",
+      "send_failed": "Something went wrong sending your question to the agent. Please try again."
     }
   },
   "auth": {
@@ -378,6 +413,11 @@
       "subtitle": "Reach out to a professional",
       "body": "Personal, professional advice on whatever is on your mind."
     },
+    "agents": {
+      "title": "AI agents",
+      "subtitle": "General information, right away",
+      "body": "Ask an AI agent about rights and procedures, from a knowledge base the association maintains."
+    },
     "admin": {
       "title": "Administration",
       "subtitle": "Admin dashboard",
@@ -408,6 +448,14 @@
       "description_label": "What the reporter wrote",
       "created_at_label": "Report date",
       "content_status_label": "Message status",
+      "content_unavailable": "The reported content is no longer available.",
+      "content_gone_title": "Unavailable content",
+      "direct_message_title": "Private message",
+      "view_content": "Show message content",
+      "view_content_aria": "Show the content of “{{title}}”",
+      "hide_content": "Hide content",
+      "content_loading": "Loading content...",
+      "closed_account_deleted_note": "This report was closed because the account was deleted. There is no content to show.",
       "decide_valid": "Delete the message (valid)",
       "decide_invalid": "Dismiss the report (invalid)",
       "decide_valid_aria": "Delete the message “{{title}}”",
@@ -437,6 +485,7 @@
       "hint": "The reported content in full, the context the decision rests on, and the decision itself, on one screen.",
       "loading": "Loading the report...",
       "content_section": "The reported content",
+      "audited_read_note": "Opening this page included reading the private message, and that read was recorded in the audit log.",
       "report_section": "About the report",
       "report_count_label": "Reports on this content",
       "reporter_label": "Who filed the report",
@@ -483,6 +532,7 @@
       "load_report_failed": "Something went wrong loading the report. Try refreshing the page.",
       "load_history_failed": "Something went wrong loading the history. Try refreshing the page.",
       "decide_failed": "Something went wrong saving the decision. Please try again.",
+      "content_load_failed": "Something went wrong loading the content. Please try again.",
       "load_restrictions_failed": "Something went wrong loading the restrictions. Try refreshing the page.",
       "load_user_card_failed": "Something went wrong loading the user card. Try refreshing the page.",
       "suspend_failed": "Something went wrong suspending the user. Please try again."
@@ -520,6 +570,9 @@
     "confirm_dialog": {
       "title": "Are you sure?",
       "confirm": "Confirm"
+    },
+    "disclaimer": {
+      "agent": "This information is general only and is not binding professional advice."
     },
     "suspend_dialog": {
       "title": "Suspend user",
@@ -599,6 +652,7 @@
       "receipt_sending": "Sending...",
       "receipt_sent": "Sent",
       "receipt_read": "Read",
+      "content_hidden": "This message was removed following a report",
       "new_message_label": "New message",
       "placeholder": "Write a message...",
       "char_count": "{{count}} of {{max}} characters",

@@ -16,7 +16,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { NEVER, of, throwError } from 'rxjs';
+import { NEVER, of, Subject, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ModeratorReportsComponent } from './reports.component';
@@ -28,10 +28,19 @@ import {
   ReportTargetType,
   RestrictionType,
 } from '../../../core/constants';
-import type { ReportHistoryList, ReportWithContent, RestrictionList } from '../../../core/models';
+import type {
+  DirectMessageReport,
+  ForumPostReport,
+  ReportHistoryList,
+  RestrictionList,
+} from '../../../core/models';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
-function makeReport(overrides: Partial<ReportWithContent> = {}): ReportWithContent {
+// Partial<ForumPostReport>, not Partial<ReportWithContent>: the latter is a
+// discriminated union, and Partial<A | B> collapses to the fields A and B
+// share — it would silently stop allowing overrides of content_text etc.
+// This builder only ever returns the FORUM_POST shape anyway.
+function makeReport(overrides: Partial<ForumPostReport> = {}): ForumPostReport {
   return {
     id: 'report-1',
     reporter_id: 'user-1',
@@ -61,13 +70,33 @@ function makeReport(overrides: Partial<ReportWithContent> = {}): ReportWithConte
  * to the `HEBREW` sweeps below keeps them pointed at our own copy, which is
  * the thing they are meant to guard.
  */
-function makeLatinReport(overrides: Partial<ReportWithContent> = {}): ReportWithContent {
+function makeLatinReport(overrides: Partial<ForumPostReport> = {}): ForumPostReport {
   return makeReport({
     content_title: 'A post about the paperwork',
     content_text: 'Body text',
     description: 'The author is swearing',
     ...overrides,
   });
+}
+
+function makeDirectMessageReport(
+  overrides: Partial<DirectMessageReport> = {},
+): DirectMessageReport {
+  return {
+    id: 'report-dm-1',
+    reporter_id: 'user-3',
+    reported_user_id: 'user-4',
+    target_type: ReportTargetType.DIRECT_MESSAGE,
+    target_id: 'message-1',
+    reason: ReportReason.HARASSMENT,
+    description: null,
+    decision: ReportDecision.PENDING,
+    moderator_id: null,
+    moderator_note: null,
+    decided_at: null,
+    created_at: '2026-07-15T09:30:00',
+    ...overrides,
+  };
 }
 
 function makeRestrictions(overrides: Partial<RestrictionList> = {}): RestrictionList {
@@ -153,24 +182,33 @@ describe('ModeratorReportsComponent', () => {
     getPendingReports: ReturnType<typeof vi.fn>;
     getReportHistory: ReturnType<typeof vi.fn>;
     getActiveRestrictions: ReturnType<typeof vi.fn>;
+    getReport: ReturnType<typeof vi.fn>;
     decideReport: ReturnType<typeof vi.fn>;
   };
 
   /**
-   * Builds the screen; `pending`, `history` and `restrictions` override the
-   * default fixtures.
+   * Builds the screen; `pending`, `history`, `restrictions` and `content`
+   * (the response GET /reports/{id} — a DIRECT_MESSAGE report's decrypted
+   * content — hands back) override the default fixtures.
    */
   async function render({
     pending = of({ items: [makeReport()], total: 1, pending_count: 1 }),
     history = of(makeHistoryPage()),
     restrictions = of(makeRestrictions()),
-  }: { pending?: unknown; history?: unknown; restrictions?: unknown } = {}): Promise<void> {
+    content = of(makeDirectMessageReport({ message_content: 'תוכן ההודעה המפוענח' })),
+  }: {
+    pending?: unknown;
+    history?: unknown;
+    restrictions?: unknown;
+    content?: unknown;
+  } = {}): Promise<void> {
     TestBed.resetTestingModule();
 
     reportServiceMock = {
       getPendingReports: vi.fn().mockReturnValue(pending),
       getReportHistory: vi.fn().mockReturnValue(history),
       getActiveRestrictions: vi.fn().mockReturnValue(restrictions),
+      getReport: vi.fn().mockReturnValue(content),
       decideReport: vi.fn().mockReturnValue(of(makeReport({ decision: ReportDecision.VALID }))),
     };
 
@@ -223,6 +261,15 @@ describe('ModeratorReportsComponent', () => {
   function actionLabels(): string[] {
     return [...root().querySelectorAll('.reports__actions > *')].map((action) =>
       action.textContent!.replace(/\s+/g, ' ').trim(),
+    );
+  }
+
+  /** A button inside `container` whose visible text matches exactly. */
+  function findButton(container: HTMLElement, label: string): HTMLButtonElement | null {
+    return (
+      [...container.querySelectorAll('button')].find(
+        (button) => button.textContent!.replace(/\s+/g, ' ').trim() === label,
+      ) ?? null
     );
   }
 
@@ -396,6 +443,187 @@ describe('ModeratorReportsComponent', () => {
       fixture.detectChanges();
 
       expect(root().querySelector('app-confirm-dialog')!.textContent).toContain('תוצג שוב');
+    });
+  });
+
+  /**
+   * ABF-113: a moderator can open one DIRECT_MESSAGE report and read the
+   * decrypted content, through the same viewer the pending queue and the
+   * history tab both pull in via dmContentViewer. Unlike a FORUM_POST row,
+   * a DM report never carries its content in the list itself — only this
+   * one audited fetch, triggered by hand, ever decrypts it.
+   */
+  describe('viewing a DIRECT_MESSAGE report’s content', () => {
+    async function renderWithPendingDm(...reports: DirectMessageReport[]): Promise<HTMLElement[]> {
+      await render({
+        pending: of({ items: reports, total: reports.length, pending_count: reports.length }),
+      });
+      fixture.detectChanges();
+      return cards();
+    }
+
+    it('shows no content preview in the list, only a button to fetch it', async () => {
+      const [card] = await renderWithPendingDm(makeDirectMessageReport());
+
+      expect(card.textContent).not.toContain('תוכן ההודעה המפוענח');
+      expect(reportServiceMock.getReport).not.toHaveBeenCalled();
+      expect(findButton(card, 'הצג תוכן ההודעה')).toBeTruthy();
+    });
+
+    it('falls back to a generic title — a DM report has none of its own', async () => {
+      const [card] = await renderWithPendingDm(makeDirectMessageReport());
+
+      expect(card.querySelector('.reports__title')!.textContent!.trim()).toBe('הודעה פרטית');
+    });
+
+    it('fetches and shows the decrypted content on request', async () => {
+      const [card] = await renderWithPendingDm(makeDirectMessageReport({ id: 'report-dm-1' }));
+
+      findButton(card, 'הצג תוכן ההודעה')!.click();
+      fixture.detectChanges();
+
+      expect(reportServiceMock.getReport).toHaveBeenCalledWith('report-dm-1');
+      expect(card.textContent).toContain('תוכן ההודעה המפוענח');
+      expect(findButton(card, 'הסתר תוכן')).toBeTruthy();
+      expect(findButton(card, 'הצג תוכן ההודעה')).toBeNull();
+    });
+
+    it('shows a spinner while the content is in flight', async () => {
+      await render({
+        pending: of({ items: [makeDirectMessageReport()], total: 1, pending_count: 1 }),
+        content: NEVER,
+      });
+      const [card] = cards();
+
+      findButton(card, 'הצג תוכן ההודעה')!.click();
+      fixture.detectChanges();
+
+      expect(component.isContentLoading()).toBe(true);
+      expect(card.querySelector('app-loading-spinner')).toBeTruthy();
+    });
+
+    it('shows an error, and no content, when the fetch fails', async () => {
+      await render({
+        pending: of({ items: [makeDirectMessageReport()], total: 1, pending_count: 1 }),
+        content: throwError(() => ({ error: null })),
+      });
+      const [card] = cards();
+
+      findButton(card, 'הצג תוכן ההודעה')!.click();
+      fixture.detectChanges();
+
+      expect(card.querySelector('app-error-display')).toBeTruthy();
+      expect(component.isContentLoading()).toBe(false);
+      expect(card.textContent).not.toContain('תוכן ההודעה המפוענח');
+    });
+
+    it('closes the content and returns to the "view" button', async () => {
+      const [card] = await renderWithPendingDm(makeDirectMessageReport());
+      findButton(card, 'הצג תוכן ההודעה')!.click();
+      fixture.detectChanges();
+
+      findButton(card, 'הסתר תוכן')!.click();
+      fixture.detectChanges();
+
+      expect(component.openReportId()).toBeNull();
+      expect(findButton(card, 'הצג תוכן ההודעה')).toBeTruthy();
+      expect(card.textContent).not.toContain('תוכן ההודעה המפוענח');
+    });
+
+    /**
+     * A second click may move on to another report before the first request
+     * resolves. That request's own response belongs to the report it was
+     * fetched for — not to whichever report happens to be open once it
+     * lands (viewContent()'s isOpen() guard, copied from the same race this
+     * screen already had to close on the pending list itself).
+     */
+    it('ignores a stale response for a report that is no longer open', async () => {
+      const firstRequest = new Subject<DirectMessageReport>();
+      const [firstCard, secondCard] = await renderWithPendingDm(
+        makeDirectMessageReport({ id: 'report-dm-1' }),
+        makeDirectMessageReport({ id: 'report-dm-2', target_id: 'message-2' }),
+      );
+      reportServiceMock.getReport.mockReturnValueOnce(firstRequest);
+
+      findButton(firstCard, 'הצג תוכן ההודעה')!.click();
+      fixture.detectChanges();
+      findButton(secondCard, 'הצג תוכן ההודעה')!.click();
+      fixture.detectChanges();
+
+      firstRequest.next(
+        makeDirectMessageReport({ id: 'report-dm-1', message_content: 'לא אמור להיות מוצג' }),
+      );
+      fixture.detectChanges();
+
+      expect(text()).not.toContain('לא אמור להיות מוצג');
+      expect(secondCard.textContent).toContain('תוכן ההודעה המפוענח');
+    });
+
+    it('closes any open content once a decision is confirmed', async () => {
+      const [card] = await renderWithPendingDm(makeDirectMessageReport());
+      findButton(card, 'הצג תוכן ההודעה')!.click();
+      fixture.detectChanges();
+
+      component.decide(makeDirectMessageReport(), ReportDecision.INVALID);
+      component.confirmDecision('הדיווח אינו מוצדק');
+
+      expect(component.openReportId()).toBeNull();
+      expect(component.openReportContent()).toBeNull();
+    });
+
+    describe('in the history tab', () => {
+      it('shows a fixed note when the account was deleted, and no view button', async () => {
+        await render({
+          history: of({
+            items: [
+              makeDirectMessageReport({
+                id: 'report-dm-9',
+                decision: ReportDecision.CLOSED_ACCOUNT_DELETED,
+              }),
+            ],
+            total: 1,
+            page: 1,
+            page_size: 20,
+          }),
+        });
+        component.showTab('history');
+        fixture.detectChanges();
+        const [card] = cards();
+
+        expect(card.textContent).toContain('הדיווח נסגר עקב מחיקת חשבון');
+        expect(findButton(card, 'הצג תוכן ההודעה')).toBeNull();
+        expect(reportServiceMock.getReport).not.toHaveBeenCalled();
+      });
+
+      it('still lets the content be viewed for a decided DM report', async () => {
+        await render({
+          history: of({
+            items: [
+              makeDirectMessageReport({
+                id: 'report-dm-8',
+                decision: ReportDecision.VALID,
+                decided_at: '2026-07-16T10:00:00',
+                moderator_note: 'תוכן פוגעני',
+              }),
+            ],
+            total: 1,
+            page: 1,
+            page_size: 20,
+          }),
+          content: of(
+            makeDirectMessageReport({ id: 'report-dm-8', message_content: 'ההודעה שהוסרה' }),
+          ),
+        });
+        component.showTab('history');
+        fixture.detectChanges();
+        const [card] = cards();
+
+        findButton(card, 'הצג תוכן ההודעה')!.click();
+        fixture.detectChanges();
+
+        expect(reportServiceMock.getReport).toHaveBeenCalledWith('report-dm-8');
+        expect(card.textContent).toContain('ההודעה שהוסרה');
+      });
     });
   });
 

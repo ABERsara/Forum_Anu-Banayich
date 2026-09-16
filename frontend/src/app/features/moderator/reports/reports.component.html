@@ -74,6 +74,43 @@
     </button>
   </div>
 
+  <!--
+    A DIRECT_MESSAGE report's content viewer/toggle — identical whether the
+    report is still pending or already decided, so it is defined once here
+    and pulled into both @for loops below by ngTemplateOutlet, rather than
+    copied into each. `report` arrives through the outlet's context, since
+    it is the one thing that differs per call site; everything else here
+    (openReportId, viewContent, …) already belongs to this component.
+  -->
+  <ng-template #dmContentViewer let-report="report" let-title="title">
+    @if (openReportId() === report.id) {
+      @if (isContentLoading()) {
+        <app-loading-spinner
+          size="sm"
+          [message]="'moderator.reports.content_loading' | transloco"
+        />
+      } @else if (contentError().text; as text) {
+        <app-error-display [message]="text" />
+      } @else if (contentError().key; as key) {
+        <app-error-display [message]="key | transloco" />
+      } @else if (openReportContent(); as full) {
+        <p class="reports__content">{{ full.message_content }}</p>
+      }
+      <button type="button" class="btn" (click)="closeContent()">
+        {{ 'moderator.reports.hide_content' | transloco }}
+      </button>
+    } @else {
+      <button
+        type="button"
+        class="btn"
+        [attr.aria-label]="'moderator.reports.view_content_aria' | transloco: { title: title }"
+        (click)="viewContent(report)"
+      >
+        {{ 'moderator.reports.view_content' | transloco }}
+      </button>
+    }
+  </ng-template>
+
   <!-- ───────────────────── דיווחים ממתינים ───────────────────── -->
   @if (activeTab() === 'pending') {
     <section id="panel-pending" role="tabpanel" aria-labelledby="tab-pending">
@@ -87,16 +124,42 @@
         <ul class="reports">
           @for (report of pendingReports(); track report.id) {
             <li class="reports__item">
+              <!-- FORUM_POST: what she wrote (ABF-130). DIRECT_MESSAGE: no
+                   title exists — reportTitle() falls back to a generic one.
+                   Computed once per row rather than once per use: it also
+                   feeds three aria-labels below and the shared content
+                   viewer, and those can't nest a second | transloco. -->
+              @let title = reportTitle(report);
               <div class="reports__head">
-                <!-- The reported post's title and body are what a user wrote:
-                     shown as they were written, in either UI language (ABF-130). -->
-                <h2 class="reports__title">{{ report.content_title }}</h2>
-                <span class="badge badge--alert">{{
-                  'moderator.reports.report_count' | transloco: { count: report.report_count }
-                }}</span>
+                <h2 class="reports__title">{{ title }}</h2>
+                @if (report.target_type === targetTypes.FORUM_POST) {
+                  <span class="badge badge--alert">{{
+                    'moderator.reports.report_count' | transloco: { count: report.report_count }
+                  }}</span>
+                }
               </div>
 
-              <p class="reports__content">{{ previewOf(report.content_text) }}</p>
+              @if (report.target_type === targetTypes.FORUM_POST) {
+                @if (report.content_text; as text) {
+                  <p class="reports__content">{{ previewOf(text) }}</p>
+                } @else {
+                  <!-- The theoretical branch, currently unreachable: nothing
+                       today hard-deletes a ForumPost row, but the backend's
+                       own defensive code still allows for it — see
+                       ForumPostReport in core/models. -->
+                  <p class="reports__content">
+                    {{ 'moderator.reports.content_unavailable' | transloco }}
+                  </p>
+                }
+              } @else {
+                <!-- No content preview here, ever — ABF-113, spec §9.1/§9.3:
+                     a private message is read only through this audited
+                     single-report view, never from the list itself. -->
+                <ng-container
+                  [ngTemplateOutlet]="dmContentViewer"
+                  [ngTemplateOutletContext]="{ report: report, title: title }"
+                />
+              }
 
               <dl class="reports__meta">
                 <div>
@@ -111,10 +174,18 @@
                   <dt>{{ 'moderator.reports.created_at_label' | transloco }}</dt>
                   <dd>{{ report.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
                 </div>
-                <div>
-                  <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
-                  <dd>{{ postStatusLabels[report.content_status] | transloco }}</dd>
-                </div>
+                @if (report.target_type === targetTypes.FORUM_POST) {
+                  <div>
+                    <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
+                    <dd>
+                      {{
+                        report.content_status
+                          ? (postStatusLabels[report.content_status] | transloco)
+                          : emptyValue
+                      }}
+                    </dd>
+                  </div>
+                }
               </dl>
 
               <div class="reports__actions">
@@ -132,7 +203,7 @@
                   class="reports__detail-link"
                   [routerLink]="['/moderator/reports', report.id]"
                   [attr.aria-label]="
-                    'moderator.report_detail.open_aria' | transloco: { title: report.content_title }
+                    'moderator.report_detail.open_aria' | transloco: { title: title }
                   "
                 >
                   {{ 'moderator.report_detail.title' | transloco }}
@@ -141,8 +212,7 @@
                   type="button"
                   class="btn btn--danger"
                   [attr.aria-label]="
-                    'moderator.reports.decide_valid_aria'
-                      | transloco: { title: report.content_title }
+                    'moderator.reports.decide_valid_aria' | transloco: { title: title }
                   "
                   (click)="decide(report, decisions.VALID)"
                 >
@@ -152,8 +222,7 @@
                   type="button"
                   class="btn"
                   [attr.aria-label]="
-                    'moderator.reports.decide_invalid_aria'
-                      | transloco: { title: report.content_title }
+                    'moderator.reports.decide_invalid_aria' | transloco: { title: title }
                   "
                   (click)="decide(report, decisions.INVALID)"
                 >
@@ -163,7 +232,7 @@
                   class="reports__card-link"
                   [routerLink]="['/moderator/users', report.reported_user_id]"
                   [attr.aria-label]="
-                    'moderator.reports.user_card_aria' | transloco: { title: report.content_title }
+                    'moderator.reports.user_card_aria' | transloco: { title: title }
                   "
                 >
                   {{ 'moderator.reports.user_card_link' | transloco }}
@@ -189,12 +258,39 @@
         <ul class="reports">
           @for (report of history(); track report.id) {
             <li class="reports__item">
+              <!-- Computed once per row — see the same @let in the pending
+                   tab above for why. -->
+              @let title = reportTitle(report);
               <div class="reports__head">
-                <h2 class="reports__title">{{ report.content_title }}</h2>
+                <h2 class="reports__title">{{ title }}</h2>
                 <span class="badge">{{ decisionLabels[report.decision] | transloco }}</span>
               </div>
 
-              <p class="reports__content">{{ previewOf(report.content_text) }}</p>
+              @if (report.target_type === targetTypes.FORUM_POST) {
+                @if (report.content_text; as text) {
+                  <p class="reports__content">{{ previewOf(text) }}</p>
+                } @else {
+                  <!-- The theoretical branch, currently unreachable: nothing
+                       today hard-deletes a ForumPost row, but the backend's
+                       own defensive code still allows for it — see
+                       ForumPostReport in core/models. -->
+                  <p class="reports__content">
+                    {{ 'moderator.reports.content_unavailable' | transloco }}
+                  </p>
+                }
+              } @else if (report.decision === decisions.CLOSED_ACCOUNT_DELETED) {
+                <!-- Closed, not decided — the reported-on account is gone.
+                     No content, ever, even to the moderator who would have
+                     ruled on it (spec §9.4, ABF-113). -->
+                <p class="reports__content">
+                  {{ 'moderator.reports.closed_account_deleted_note' | transloco }}
+                </p>
+              } @else {
+                <ng-container
+                  [ngTemplateOutlet]="dmContentViewer"
+                  [ngTemplateOutletContext]="{ report: report, title: title }"
+                />
+              }
 
               <dl class="reports__meta">
                 <div>
@@ -205,10 +301,18 @@
                   <dt>{{ 'moderator.reports.decided_at_label' | transloco }}</dt>
                   <dd>{{ report.decided_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
                 </div>
-                <div>
-                  <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
-                  <dd>{{ postStatusLabels[report.content_status] | transloco }}</dd>
-                </div>
+                @if (report.target_type === targetTypes.FORUM_POST) {
+                  <div>
+                    <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
+                    <dd>
+                      {{
+                        report.content_status
+                          ? (postStatusLabels[report.content_status] | transloco)
+                          : emptyValue
+                      }}
+                    </dd>
+                  </div>
+                }
                 <div class="reports__note">
                   <dt>{{ 'moderator.reports.note_label' | transloco }}</dt>
                   <!-- The moderator's own words: content, not copy (ABF-130). -->
@@ -221,7 +325,7 @@
                   class="reports__detail-link"
                   [routerLink]="['/moderator/reports', report.id]"
                   [attr.aria-label]="
-                    'moderator.report_detail.open_aria' | transloco: { title: report.content_title }
+                    'moderator.report_detail.open_aria' | transloco: { title: title }
                   "
                 >
                   {{ 'moderator.report_detail.title' | transloco }}
@@ -230,7 +334,7 @@
                   class="reports__card-link"
                   [routerLink]="['/moderator/users', report.reported_user_id]"
                   [attr.aria-label]="
-                    'moderator.reports.user_card_aria' | transloco: { title: report.content_title }
+                    'moderator.reports.user_card_aria' | transloco: { title: title }
                   "
                 >
                   {{ 'moderator.reports.user_card_link' | transloco }}

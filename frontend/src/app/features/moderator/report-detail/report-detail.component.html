@@ -28,9 +28,10 @@
   } @else if (report(); as report) {
     <article class="report">
       <header class="report__head">
-        <!-- The reported post's title is what a member wrote: shown as it was
-             written, in either UI language (ABF-130). -->
-        <h2 class="report__title">{{ report.content_title }}</h2>
+        <!-- A FORUM_POST report's title is what a member wrote: shown as it was
+             written, in either UI language (ABF-130). A DIRECT_MESSAGE report
+             has no title at all and takes a generic one (ABF-113). -->
+        <h2 class="report__title">{{ reportTitle() }}</h2>
         <!-- role="status" so the outcome is announced after a decision: the
              button that caused it is gone by then, and this is the line that
              says what happened. -->
@@ -40,9 +41,51 @@
       <h3 class="report__section">
         {{ 'moderator.report_detail.content_section' | transloco }}
       </h3>
-      <!-- In full, and not the queue's 200-character preview: reading the whole
-           of what was written is what this screen is for. -->
-      <p class="report__content">{{ report.content_text }}</p>
+
+      @if (report.target_type === targetTypes.FORUM_POST) {
+        @if (report.content_text; as text) {
+          <!-- In full, and not the queue's 200-character preview: reading the
+               whole of what was written is what this screen is for. -->
+          <p class="report__content">{{ text }}</p>
+        } @else {
+          <!-- The theoretical branch, currently unreachable: nothing today
+               hard-deletes a ForumPost row, but the backend's own defensive
+               code still allows for it — see ForumPostReport in core/models. -->
+          <p class="report__content">
+            {{ 'moderator.reports.content_unavailable' | transloco }}
+          </p>
+        }
+      } @else {
+        <!-- Nested rather than a third @else if: the branches below read
+             `message_content`, which only exists once `target_type` has been
+             narrowed, and a sibling @else if testing `decision` does not carry
+             that narrowing with it. -->
+        @if (report.decision === decisions.CLOSED_ACCOUNT_DELETED) {
+          <!-- Closed, not decided — the reported-on account is gone. No
+               content, ever, even to the moderator who would have ruled on it
+               (spec §9.4, ABF-113). -->
+          <p class="report__content">
+            {{ 'moderator.reports.closed_account_deleted_note' | transloco }}
+          </p>
+        } @else if (report.message_content; as message) {
+          <p class="report__content">{{ message }}</p>
+        } @else {
+          <p class="report__content">{{ 'moderator.reports.content_unavailable' | transloco }}</p>
+        }
+      }
+
+      @if (isDirectMessage()) {
+        <!--
+          Opening this page is what decrypted the message, and the server
+          recorded the read (ABF-113, spec §9.3). The queue puts that behind a
+          button because a row does not need the plaintext; here the same call
+          is where everything else on the page came from, so there is nothing
+          to put behind a button — only a moderator to tell.
+        -->
+        <p class="report__audited">
+          {{ 'moderator.report_detail.audited_read_note' | transloco }}
+        </p>
+      }
 
       <h3 class="report__section">{{ 'moderator.report_detail.report_section' | transloco }}</h3>
       <dl class="report__meta">
@@ -54,14 +97,22 @@
           <dt>{{ 'moderator.reports.created_at_label' | transloco }}</dt>
           <dd>{{ report.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
         </div>
-        <div>
-          <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
-          <dd>{{ postStatusLabels[report.content_status] | transloco }}</dd>
-        </div>
-        <div>
-          <dt>{{ 'moderator.report_detail.report_count_label' | transloco }}</dt>
-          <dd>{{ report.report_count }}</dd>
-        </div>
+        @if (report.target_type === targetTypes.FORUM_POST) {
+          <div>
+            <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
+            <dd>
+              {{
+                report.content_status
+                  ? (postStatusLabels[report.content_status] | transloco)
+                  : emptyValue
+              }}
+            </dd>
+          </div>
+          <div>
+            <dt>{{ 'moderator.report_detail.report_count_label' | transloco }}</dt>
+            <dd>{{ report.report_count ?? emptyValue }}</dd>
+          </div>
+        }
         <div class="report__wide">
           <dt>{{ 'moderator.reports.description_label' | transloco }}</dt>
           <!-- The reporter's own words: content, not copy (ABF-130). -->
@@ -81,7 +132,7 @@
               class="report__card-link"
               [routerLink]="['/moderator/users', report.reported_user_id]"
               [attr.aria-label]="
-                'moderator.reports.user_card_aria' | transloco: { title: report.content_title }
+                'moderator.reports.user_card_aria' | transloco: { title: reportTitle() }
               "
             >
               {{ 'moderator.reports.user_card_link' | transloco }}
@@ -100,7 +151,7 @@
             type="button"
             class="btn btn--danger"
             [attr.aria-label]="
-              'moderator.reports.decide_valid_aria' | transloco: { title: report.content_title }
+              'moderator.reports.decide_valid_aria' | transloco: { title: reportTitle() }
             "
             (click)="decide(decisions.VALID)"
           >
@@ -110,7 +161,7 @@
             type="button"
             class="btn"
             [attr.aria-label]="
-              'moderator.reports.decide_invalid_aria' | transloco: { title: report.content_title }
+              'moderator.reports.decide_invalid_aria' | transloco: { title: reportTitle() }
             "
             (click)="decide(decisions.INVALID)"
           >

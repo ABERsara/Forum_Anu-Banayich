@@ -38,10 +38,14 @@ import {
   Sector,
   UserType,
 } from '../../../core/constants';
-import type { ReportWithContent, UserModerationCard } from '../../../core/models';
+import type {
+  DirectMessageReport,
+  ForumPostReport,
+  UserModerationCard,
+} from '../../../core/models';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
-function makeReport(overrides: Partial<ReportWithContent> = {}): ReportWithContent {
+function makeReport(overrides: Partial<ForumPostReport> = {}): ForumPostReport {
   return {
     id: 'report-1',
     reporter_id: 'user-1',
@@ -70,7 +74,7 @@ function makeReport(overrides: Partial<ReportWithContent> = {}): ReportWithConte
  * — never translated (ABF-130) — so they would fail the `HEBREW` sweeps below
  * for the one reason those sweeps are not meant to catch.
  */
-function makeLatinReport(overrides: Partial<ReportWithContent> = {}): ReportWithContent {
+function makeLatinReport(overrides: Partial<ForumPostReport> = {}): ForumPostReport {
   return makeReport({
     content_title: 'A post about the paperwork',
     content_text: 'Body text',
@@ -86,6 +90,33 @@ const DECIDED = {
   decided_at: '2026-07-16T10:00:00',
   content_status: PostStatus.DELETED,
 };
+
+/**
+ * A report about a private message (ABF-113).
+ *
+ * It carries no title, no post status and no report count — nothing about a
+ * forum post exists on it — and `message_content` is the decrypted text that
+ * only `getReport()` ever returns, on the call this screen makes to draw
+ * itself.
+ */
+function makeDmReport(overrides: Partial<DirectMessageReport> = {}): DirectMessageReport {
+  return {
+    id: 'report-1',
+    reporter_id: 'user-1',
+    reported_user_id: 'user-2',
+    target_type: ReportTargetType.DIRECT_MESSAGE,
+    target_id: 'msg-1',
+    reason: ReportReason.HARASSMENT,
+    description: 'התבטאות פוגענית',
+    decision: ReportDecision.PENDING,
+    moderator_id: null,
+    moderator_note: null,
+    decided_at: null,
+    created_at: '2026-07-15T09:30:00',
+    message_content: 'תוכן ההודעה הפרטית',
+    ...overrides,
+  };
+}
 
 function makeCard(overrides: Partial<UserModerationCard> = {}): UserModerationCard {
   return {
@@ -283,6 +314,77 @@ describe('ModeratorReportDetailComponent', () => {
       expect(component.isLoading()).toBe(false);
       expect(text()).toContain('אירעה שגיאה בטעינת הדיווח');
       expect(root().querySelector('.report')).toBeNull();
+    });
+  });
+
+  /**
+   * ABF-113 landed while this screen was being built, and it changed what a
+   * report can be: a report about a private message carries no title, no post
+   * status and no report count, and its plaintext exists only on the call this
+   * screen makes to draw itself. These pin the branch, and the sentence that
+   * tells the moderator her read was recorded.
+   */
+  describe('a report about a private message', () => {
+    it('shows the decrypted message this screen’s own load returned', async () => {
+      await render({ report: of(makeDmReport()) });
+
+      expect(component.isDirectMessage()).toBe(true);
+      expect(root().querySelector('.report__content')!.textContent!.trim()).toBe(
+        'תוכן ההודעה הפרטית',
+      );
+    });
+
+    /** No post exists, so neither row has anything true to say. */
+    it('drops the rows that only a forum post has', async () => {
+      await render({ report: of(makeDmReport()) });
+
+      const terms = fields().map((row) => row.split(':')[0]);
+      expect(terms).not.toContain('מצב ההודעה');
+      expect(terms).not.toContain('מספר הדיווחים על התוכן');
+      expect(terms).toContain('סיבת הדיווח');
+    });
+
+    it('takes a generic title, since a private message has none', async () => {
+      await render({ report: of(makeDmReport()) });
+
+      expect(component.reportTitle()).toBe('הודעה פרטית');
+    });
+
+    /**
+     * The queue asks before it decrypts, because a row does not need the
+     * plaintext. This screen cannot — the same call is where its reason, its
+     * dates and its decision came from — so the read has already happened by
+     * the time the page is drawn, and §9.3 says the moderator should know.
+     */
+    it('says out loud that the read was recorded in the audit log', async () => {
+      await render({ report: of(makeDmReport()) });
+
+      expect(text()).toContain('נרשמה ביומן הביקורת');
+    });
+
+    it('says nothing of the kind for a forum post, which is not decrypted', () => {
+      expect(component.isDirectMessage()).toBe(false);
+      expect(root().querySelector('.report__audited')).toBeNull();
+    });
+
+    /**
+     * §9.4: the reported-on account is gone and the message went with it. The
+     * report is kept, and there is no content to show even to the moderator
+     * who would have ruled on it.
+     */
+    it('explains a report closed because the account was deleted', async () => {
+      await render({
+        report: of(
+          makeDmReport({
+            decision: ReportDecision.CLOSED_ACCOUNT_DELETED,
+            message_content: null,
+          }),
+        ),
+      });
+
+      expect(text()).toContain('הדיווח נסגר עקב מחיקת חשבון');
+      expect(text()).not.toContain('תוכן ההודעה הפרטית');
+      expect(decideButtons()).toEqual([]);
     });
   });
 

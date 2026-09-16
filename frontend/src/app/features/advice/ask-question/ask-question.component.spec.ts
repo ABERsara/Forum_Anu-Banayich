@@ -10,9 +10,19 @@ import { ProfessionalDomain, QueryStatus } from '../../../core/constants';
 import type { ProfessionalQuery } from '../../../core/models';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
-function makeActivatedRoute(professionalId: string | null): ActivatedRoute {
+/**
+ * The screen is reachable two ways, and the route is what says which: with a
+ * `professionalId` from the advice catalog, or with a `domain` from the AI
+ * agent chat's referral button (ABF-123).
+ */
+function makeActivatedRoute(professionalId: string | null, domain?: string): ActivatedRoute {
   return {
-    snapshot: { queryParamMap: convertToParamMap(professionalId ? { professionalId } : {}) },
+    snapshot: {
+      queryParamMap: convertToParamMap({
+        ...(professionalId ? { professionalId } : {}),
+        ...(domain === undefined ? {} : { domain }),
+      }),
+    },
   } as unknown as ActivatedRoute;
 }
 
@@ -38,7 +48,7 @@ describe('AskQuestionComponent', () => {
   let professionalServiceMock: { askQuestion: ReturnType<typeof vi.fn> };
   let router: Router;
 
-  async function setup(professionalId: string | null = null): Promise<void> {
+  async function setup(professionalId: string | null = null, domain?: string): Promise<void> {
     professionalServiceMock = { askQuestion: vi.fn().mockReturnValue(of(RESPONSE)) };
 
     await TestBed.configureTestingModule({
@@ -46,7 +56,7 @@ describe('AskQuestionComponent', () => {
       providers: [
         provideRouter([]),
         { provide: ProfessionalService, useValue: professionalServiceMock },
-        { provide: ActivatedRoute, useValue: makeActivatedRoute(professionalId) },
+        { provide: ActivatedRoute, useValue: makeActivatedRoute(professionalId, domain) },
       ],
     }).compileComponents();
 
@@ -287,6 +297,85 @@ describe('AskQuestionComponent', () => {
 
       expect(fixture.nativeElement.querySelector('.ask-question-page').hasAttribute('dir')).toBe(
         false,
+      );
+    });
+  });
+
+  /**
+   * Arriving from the AI agent chat (ABF-123).
+   *
+   * The agent knows which profession it covers; asking the member to name it
+   * again on the very next screen is the step the referral exists to remove.
+   * Pre-selected, never forced — a member referred about the wrong subject can
+   * change it here rather than going back.
+   */
+  describe('referred here by an agent', () => {
+    function selectedDomain(): string | null | undefined {
+      return (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>(
+        'select[formControlName="domain"]',
+      )?.value;
+    }
+
+    it('pre-selects the discipline named in the URL', async () => {
+      await setup(null, ProfessionalDomain.LAWYER);
+
+      expect(component.form.controls.domain.value).toBe(ProfessionalDomain.LAWYER);
+      expect(component.cameWithDomain).toBe(true);
+      expect(component.form.controls.domain.valid).toBe(true);
+    });
+
+    it('says the field was chosen for them, and that it can be changed', async () => {
+      await setup(null, ProfessionalDomain.LAWYER);
+
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('אפשר לבחור תחום אחר');
+      expect(selectedDomain()).toBeTruthy();
+    });
+
+    it('leaves the select open so a wrong referral can be corrected', async () => {
+      await setup(null, ProfessionalDomain.LAWYER);
+
+      component.form.controls.domain.setValue(ProfessionalDomain.RABBI);
+      fixture.detectChanges();
+
+      expect(component.form.controls.domain.value).toBe(ProfessionalDomain.RABBI);
+    });
+
+    /**
+     * A URL is user input. An unrecognised value set on the control would be a
+     * select showing nothing that the required validator nonetheless considers
+     * filled — so it is ignored, and the member is asked as usual.
+     */
+    it('ignores a discipline that is not one of ours', async () => {
+      await setup(null, 'astrologer');
+
+      expect(component.form.controls.domain.value).toBeNull();
+      expect(component.cameWithDomain).toBe(false);
+      expect(component.form.controls.domain.valid).toBe(false);
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('בחר/י תחום');
+    });
+
+    /**
+     * `professionalId` addresses one named advisor and hides the select
+     * altogether, so a `domain` alongside it has nothing to select.
+     */
+    it('leaves a named professional in charge when both are in the URL', async () => {
+      await setup('pro-1', ProfessionalDomain.LAWYER);
+
+      expect(component.professionalId).toBe('pro-1');
+      expect(component.cameWithDomain).toBe(false);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('select[formControlName="domain"]'),
+      ).toBeNull();
+    });
+
+    it('sends the pre-selected discipline through to the API', async () => {
+      await setup(null, ProfessionalDomain.LAWYER);
+
+      component.form.controls.content.setValue('זוהי שאלה תקינה עם תוכן מספיק');
+      component.onSubmit();
+
+      expect(professionalServiceMock.askQuestion).toHaveBeenCalledWith(
+        expect.objectContaining({ domain: ProfessionalDomain.LAWYER }),
       );
     });
   });

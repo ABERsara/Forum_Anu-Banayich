@@ -1,0 +1,260 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+// No `direction` here and no physical side. The page inherits its direction
+// from <html dir>, which LocaleService sets from the active language, and the
+// bubbles are placed with flex-start / flex-end, which are direction-relative
+// and mirror on their own (CONTRIBUTING §6, core/i18n/direction.spec.ts).
+.agent-chat {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  // app-root renders <app-header> (64px, see header.component.scss's
+  // .header__inner) above <router-outlet> in normal document flow, not as an
+  // overlay — so 100dvh here would overflow the viewport by 64px and push the
+  // composer below the fold. 100dvh over 100vh: correct on mobile when the
+  // browser chrome shows and hides.
+  height: calc(100dvh - 64px);
+  padding: $spacing-md;
+
+  &__sr-only {
+    @include visually-hidden;
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    h1 {
+      margin: 0;
+      font-size: $font-size-lg;
+    }
+  }
+
+  &__back {
+    color: $color-primary;
+    font-size: $font-size-sm;
+    text-decoration: none;
+    // The link is its own line above the heading, so it should not stretch
+    // across the page and turn the whole row into a hit target.
+    align-self: flex-start;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__log {
+    flex: 1;
+    overflow-y: auto;
+    padding: $spacing-md 0;
+    border-block: 1px solid $color-border;
+  }
+
+  &__empty {
+    color: $color-text-muted;
+    text-align: center;
+  }
+
+  &__turns {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+  }
+
+  &__turn {
+    display: flex;
+
+    // flex-start / flex-end are direction-relative, so this flips correctly
+    // with <html dir> — the member's own questions always land on the trailing
+    // edge, matching the direct-message screen's convention.
+    &--mine {
+      justify-content: flex-end;
+
+      .agent-chat__bubble {
+        background: $color-primary;
+        color: $color-white;
+      }
+    }
+
+    &--agent {
+      justify-content: flex-start;
+
+      .agent-chat__bubble {
+        background: $color-bg-subtle;
+        color: $color-text;
+      }
+    }
+  }
+
+  &__bubble {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    max-width: 75%;
+    padding: $spacing-sm $spacing-md;
+    border-radius: $radius-lg;
+
+    // A question still in flight is outlined, not dimmed: opacity blends the
+    // text towards the background as well, and white on a faded $color-primary
+    // falls under the 4.5:1 this screen has to hold (WCAG 1.4.3). The outline
+    // is the same trade the direct-message composer already makes.
+    &--pending {
+      outline: 2px dashed rgba($color-primary, 0.5);
+      outline-offset: 2px;
+    }
+  }
+
+  &__speaker {
+    @include visually-hidden;
+  }
+
+  &__text {
+    margin: 0;
+    // The answer arrives as paragraphs, and the association's standing
+    // disclaimer is the last of them. pre-line keeps those breaks without
+    // turning a long line into a horizontal scroll.
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+
+  &__sources {
+    border-top: 1px solid rgba($color-text-muted, 0.3);
+    padding-top: $spacing-xs;
+    font-size: $font-size-xs;
+
+    ul {
+      margin: 0;
+      // Logical, so the bullets sit on the reading-start edge in both
+      // directions.
+      padding-inline-start: $spacing-md;
+    }
+  }
+
+  &__sources-title {
+    margin: 0 0 $spacing-xs;
+    font-weight: $font-weight-medium;
+  }
+
+  &__source-name {
+    color: $color-text-muted;
+  }
+
+  &__time {
+    font-size: $font-size-xs;
+    opacity: 0.75;
+    align-self: flex-end;
+  }
+
+  &__thinking {
+    // Rendered even when empty, so the region exists before its content
+    // changes; the height keeps the log from jumping when the spinner arrives.
+    min-height: $spacing-xl;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  &__referral {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid rgba($color-secondary, 0.3);
+    background: rgba($color-secondary, 0.06);
+    border-radius: $radius-md;
+  }
+
+  &__referral-title {
+    margin: 0;
+    font-weight: $font-weight-medium;
+    font-size: $font-size-sm;
+  }
+
+  &__referral-hint {
+    margin: 0;
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+  }
+
+  &__referral-link {
+    align-self: flex-start;
+    padding: $spacing-xs $spacing-md;
+    border-radius: $radius-md;
+    background: $color-secondary;
+    color: $color-white;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    text-decoration: none;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__composer {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+  }
+
+  &__composer-row {
+    display: flex;
+    gap: $spacing-sm;
+
+    textarea {
+      flex: 1;
+      padding: $spacing-sm $spacing-md;
+      border: 1px solid $color-border;
+      border-radius: $radius-md;
+      font-family: inherit;
+      font-size: $font-size-base;
+      resize: vertical;
+
+      &:focus-visible {
+        @include focus-ring;
+      }
+    }
+
+    button {
+      padding: $spacing-sm $spacing-lg;
+      border: none;
+      border-radius: $radius-md;
+      background: $color-primary;
+      color: $color-white;
+      font-size: $font-size-base;
+      font-weight: $font-weight-medium;
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        background: $color-primary-dark;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      &:focus-visible {
+        @include focus-ring;
+      }
+    }
+  }
+
+  &__counter {
+    margin: 0;
+    align-self: flex-end;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  &__limit {
+    margin: 0;
+    font-size: $font-size-xs;
+    color: $color-warning;
+  }
+}

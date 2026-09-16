@@ -125,6 +125,14 @@
     gap: $spacing-sm;
   }
 
+  // The line that tells a moderator the read she just made was recorded.
+  // Muted like the hints, not an alert: it reports a fact, it does not warn.
+  &__audited {
+    margin: $spacing-sm 0 0;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
   &__unavailable {
     color: $color-text-muted;
     font-size: $font-size-sm;

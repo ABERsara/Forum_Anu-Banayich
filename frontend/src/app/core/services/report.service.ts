@@ -50,17 +50,6 @@ export class ReportService {
     return this.api.get<ReportList>('/moderator/reports');
   }
 
-  /**
-   * One report with the content it was filed about, for the detail screen.
-   *
-   * Scoped server-side exactly like the queue above: 403 for a report outside
-   * this moderator's cells, 404 for one that does not exist — so an id typed
-   * into the address bar reaches no further than the queue would have.
-   */
-  getReport(reportId: string): Observable<ReportWithContent> {
-    return this.api.get<ReportWithContent>(`/moderator/reports/${reportId}`);
-  }
-
   /** Reports this moderator's cells already decided, newest first. Paginated. */
   getReportHistory(page = 1): Observable<ReportHistoryList> {
     return this.api.get<ReportHistoryList>(`/moderator/reports/history?page=${page}`);
@@ -68,6 +57,17 @@ export class ReportService {
 
   decideReport(reportId: string, data: ReportDecideRequest): Observable<Report> {
     return this.api.post<Report>(`/moderator/reports/${reportId}/decide`, data);
+  }
+
+  /**
+   * A single report with full content — for a DIRECT_MESSAGE report, this is
+   * the one call that ever returns its decrypted text, and the server audits
+   * it as a view (ABF-113, spec §9.1/§9.3). Never call this to build a list;
+   * getPendingReports()/getReportHistory() already carry everything a list
+   * needs without decrypting anything.
+   */
+  getReport(reportId: string): Observable<ReportWithContent> {
+    return this.api.get<ReportWithContent>(`/moderator/reports/${reportId}`);
   }
 
   /**

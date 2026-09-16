@@ -23,9 +23,10 @@ from app.core.constants import (
 )
 from app.core.messages import HEBREW, MESSAGES
 from app.models.audit import AuditLog
-from app.models.forum import ForumPost
+from app.models.forum import DirectMessage, ForumPost
 from app.models.report import Report
 from app.models.user import User
+from app.schemas.forum import DirectMessageCreate
 from app.schemas.report import ReportCreate, ReportDecideRequest
 from app.schemas.user import SuspendUserRequest
 from app.services import forum_service, report_service, user_service
@@ -78,6 +79,21 @@ def _make_post(
     db_session.add(post)
     db_session.commit()
     return post
+
+
+def _make_direct_message(
+    db_session: Session, sender: User, recipient: User
+) -> DirectMessage:
+    result = forum_service.send_direct_message(
+        db_session,
+        DirectMessageCreate(recipient_id=recipient.id, content="test message content"),
+        sender,
+    )
+    return (
+        db_session.query(DirectMessage)
+        .filter(DirectMessage.id == result["message"]["id"])
+        .one()
+    )
 
 
 def _report_data(
@@ -494,7 +510,7 @@ class TestGetPendingReports:
 
         results = report_service.get_pending_reports(db_session, moderator)
 
-        assert [r.id for r, _ in results] == [in_cell_report.id]
+        assert [r.id for r in results] == [in_cell_report.id]
 
     def test_admin_sees_all_pending_reports_unscoped(self, db_session: Session) -> None:
         """Admin has no moderator_cells but must still see every cell's reports."""
@@ -525,7 +541,7 @@ class TestGetPendingReports:
 
         results = report_service.get_pending_reports(db_session, admin)
 
-        assert {r.id for r, _ in results} == {report_a.id, report_b.id}
+        assert {r.id for r in results} == {report_a.id, report_b.id}
 
     def test_sorted_by_report_count_descending(self, db_session: Session) -> None:
         moderator = _make_user(
@@ -561,8 +577,57 @@ class TestGetPendingReports:
         # Both reports on more_reported_post (report_count=2) sort before the
         # single report on less_reported_post (report_count=1); order between
         # the tied pair is unspecified.
-        assert {r.id for r, _ in results[:2]} == {more_report_a.id, more_report_b.id}
-        assert results[2][0].id == less_report.id
+        assert {r.id for r in results[:2]} == {more_report_a.id, more_report_b.id}
+        assert results[2].id == less_report.id
+
+    def test_direct_message_report_sorts_as_report_count_one(
+        self, db_session: Session
+    ) -> None:
+        """
+        ABF-113: a DIRECT_MESSAGE report has no ForumPost.report_count to
+        read, but only one such report can ever exist per message (only the
+        recipient may file one, and only once) — so it sorts alongside a
+        once-reported ForumPost, ahead of nothing, behind a twice-reported
+        one.
+        """
+        moderator = _make_moderator(db_session)
+        recipient = _make_user(
+            db_session,
+            "recipient@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        sender = _make_user(
+            db_session,
+            "sender@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        message = _make_direct_message(db_session, sender, recipient)
+        dm_report = report_service.file_report(
+            db_session,
+            _report_data(message.id, ReportTargetType.DIRECT_MESSAGE),
+            recipient,
+        )
+
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        twice_reported_post = _make_post(db_session, author)
+        for i in range(2):
+            reporter = _make_user(db_session, f"post-reporter{i}@example.com")
+            report_service.file_report(
+                db_session, _report_data(twice_reported_post.id), reporter
+            )
+
+        results = report_service.get_pending_reports(db_session, moderator)
+
+        # The twice-reported post (report_count=2) sorts ahead of the DM
+        # report, which is treated as report_count=1.
+        assert results[-1].id == dm_report.id
 
     def test_excludes_already_decided_reports(self, db_session: Session) -> None:
         moderator = _make_user(
@@ -604,12 +669,11 @@ class TestGetReportForModerator:
         post = _make_post(db_session, author)
         report = report_service.file_report(db_session, _report_data(post.id), reporter)
 
-        result_report, result_post = report_service.get_report_for_moderator(
+        result_report = report_service.get_report_for_moderator(
             db_session, report.id, moderator
         )
 
         assert result_report.id == report.id
-        assert result_post.id == post.id
 
     def test_moderator_cannot_view_report_outside_their_cell(
         self, db_session: Session
@@ -674,12 +738,11 @@ class TestGetReportForModerator:
         post = _make_post(db_session, author)
         report = report_service.file_report(db_session, _report_data(post.id), reporter)
 
-        result_report, result_post = report_service.get_report_for_moderator(
+        result_report = report_service.get_report_for_moderator(
             db_session, report.id, admin
         )
 
         assert result_report.id == report.id
-        assert result_post.id == post.id
 
     def test_404_for_nonexistent_report(self, db_session: Session) -> None:
         moderator = _make_user(
@@ -1059,7 +1122,7 @@ class TestGetDecidedReports:
         self, db_session: Session
     ) -> None:
         moderator = _make_moderator(db_session)
-        post, report = _make_reported_post(db_session)
+        _, report = _make_reported_post(db_session)
         report_service.decide_report(
             db_session, report.id, _decision(ReportDecision.VALID), moderator
         )
@@ -1067,10 +1130,7 @@ class TestGetDecidedReports:
         rows, total = report_service.get_decided_reports(db_session, moderator)
 
         assert total == 1
-        assert [r.id for r, _ in rows] == [report.id]
-        # The post comes back with its report, so the endpoint needs no
-        # follow-up query to render the content that was decided on.
-        assert [p.id for _, p in rows] == [post.id]
+        assert [r.id for r in rows] == [report.id]
 
     def test_excludes_reports_still_awaiting_a_decision(
         self, db_session: Session
@@ -1143,7 +1203,7 @@ class TestGetDecidedReports:
         rows, total = report_service.get_decided_reports(db_session, admin)
 
         assert total == 2
-        assert {r.id for r, _ in rows} == {in_cell.id, out_of_cell.id}
+        assert {r.id for r in rows} == {in_cell.id, out_of_cell.id}
 
     def test_paginates_and_reports_the_full_total(self, db_session: Session) -> None:
         moderator = _make_moderator(db_session)
@@ -1174,7 +1234,7 @@ class TestGetDecidedReports:
         assert len(second_page) == 1
         # No row may show up on two pages – hence the id tiebreaker in the
         # ORDER BY, since these decisions can share a timestamp.
-        assert {r.id for r, _ in first_page}.isdisjoint({r.id for r, _ in second_page})
+        assert {r.id for r in first_page}.isdisjoint({r.id for r in second_page})
 
 
 # ---------------------------------------------------------------------------
