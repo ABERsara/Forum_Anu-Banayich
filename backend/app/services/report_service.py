@@ -722,7 +722,20 @@ def get_pending_reports(db: Session, moderator: User) -> list[Report]:
 
     report_count = func.coalesce(ForumPost.report_count, 1)
     return (
-        query.outerjoin(ForumPost, Report.target_id == ForumPost.id)
+        # target_type in the join condition itself, not left implicit: a
+        # DIRECT_MESSAGE report's target_id is a DirectMessage id, not a
+        # ForumPost one, and the two only don't collide because both are
+        # UUIDs drawn from the same effectively-infinite space — nothing
+        # actually enforces that they can't. Without this, a coincidence
+        # there would join a DM report to an unrelated post and sort it by
+        # that post's report_count instead of falling back to 1.
+        query.outerjoin(
+            ForumPost,
+            and_(
+                Report.target_id == ForumPost.id,
+                Report.target_type == ReportTargetType.FORUM_POST,
+            ),
+        )
         .filter(Report.decision == ReportDecision.PENDING)
         .order_by(report_count.desc(), Report.created_at.asc())
         .all()
