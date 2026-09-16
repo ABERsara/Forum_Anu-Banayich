@@ -210,6 +210,7 @@ class AuditAction(enum.StrEnum):
     # one, and Postgres cannot remove an enum value once it exists.
     USER_RESTRICTED = "user_restricted"
     AGENT_CONVERSATION = "agent_conversation"
+    AGENT_CONVERSATION_ACCESS_DENIED = "agent_conversation_access_denied"
 
 
 # ---------------------------------------------------------------------------

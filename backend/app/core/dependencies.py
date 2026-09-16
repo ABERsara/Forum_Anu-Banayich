@@ -27,6 +27,7 @@ from app.core.constants import UserRole
 from app.core.i18n import translate
 from app.core.security import decode_access_token
 from app.db.session import SessionLocal
+from app.services import agent_service
 from app.services.user_service import ensure_account_active, get_user_by_id
 
 if TYPE_CHECKING:
@@ -98,3 +99,48 @@ def require_role(*roles: UserRole) -> Callable[..., "User"]:
         return current_user
 
     return _check
+
+
+def rate_limit_chat(
+    current_user: "User" = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> "User":
+    """
+    Enforce settings.AGENT_RATE_LIMIT_PER_DAY on the AI agent chat, and return
+    the caller.
+
+    A dependency rather than a check inside the endpoint, and one that returns
+    the caller: the chat endpoint depends on this *instead of* on
+    get_current_active_user, so there is no way to wire the endpoint up and
+    leave the limit off. It runs before the endpoint body does, which is what
+    keeps an over-quota request from reaching retrieval or the provider — the
+    two steps that cost money.
+
+    The window is rolling — see agent_service.messages_left_today().
+
+    The configured number is in the message. A reader told only that they have
+    reached the limit cannot tell whether to come back in an hour or tomorrow;
+    the quota is not a secret, it is the thing they are being asked to live
+    within. It is interpolated through the catalogue rather than written into
+    both translations, which is what keeps the two languages quoting the same
+    setting.
+
+    `agent_service` is imported at module scope, not inside the function: it
+    reaches config, constants, models, schemas and the llm/rag/audit services,
+    and none of those import `dependencies` back. Should that ever change, the
+    fix is to move this import into the function body rather than to invert
+    the dependency.
+
+    Usage:
+        @router.post("/agents/{domain_id}/chat")
+        def chat(user = Depends(rate_limit_chat)):
+            ...
+    """
+    if agent_service.messages_left_today(db, current_user) <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=translate(
+                "agents.rate_limited", limit=settings.AGENT_RATE_LIMIT_PER_DAY
+            ),
+        )
+    return current_user
