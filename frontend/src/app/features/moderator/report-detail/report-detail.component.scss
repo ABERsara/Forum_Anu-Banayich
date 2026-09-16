@@ -1,0 +1,226 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+.page {
+  padding: $spacing-md;
+
+  &__back {
+    display: inline-block;
+    margin-bottom: $spacing-sm;
+    color: $color-primary-dark;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__hint {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-md;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The report itself
+// ---------------------------------------------------------------------------
+
+.report {
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  background: $color-bg;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $spacing-sm;
+  }
+
+  &__title {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    margin: 0;
+    // A single unbroken title must not widen the card past the viewport.
+    overflow-wrap: anywhere;
+  }
+
+  &__section {
+    font-size: $font-size-base;
+    font-weight: $font-weight-bold;
+    margin: $spacing-lg 0 $spacing-sm;
+  }
+
+  &__hint {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: 0 0 $spacing-sm;
+  }
+
+  &__content {
+    // The reported text is quoted, so it is set apart from the report's own
+    // metadata rather than reading as the moderator's words — the same
+    // treatment it gets in the queue, at full length.
+    border-inline-start: 3px solid $color-border;
+    padding-inline-start: $spacing-sm;
+    margin: 0;
+    color: $color-text;
+    // Paragraph breaks are part of what the member wrote.
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  &__meta {
+    display: grid;
+    gap: $spacing-sm $spacing-md;
+    margin: 0;
+
+    @include responsive(md) {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    dt {
+      color: $color-text-muted;
+      font-size: $font-size-xs;
+    }
+
+    dd {
+      margin: $spacing-xs 0 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  // Rows whose value is a sentence rather than a word, given the full width.
+  &__wide {
+    @include responsive(md) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  &__member {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: $spacing-sm;
+  }
+
+  // The way through to the reported member's moderation history. A link, not
+  // a button: it navigates, and deciding on the report is what the buttons
+  // below it are for.
+  &__card-link {
+    color: $color-primary-dark;
+    font-size: $font-size-sm;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  // The line that tells a moderator the read she just made was recorded.
+  // Muted like the hints, not an alert: it reports a fact, it does not warn.
+  &__audited {
+    margin: $spacing-sm 0 0;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  &__unavailable {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// What was already decided about this member
+// ---------------------------------------------------------------------------
+
+.stats {
+  display: grid;
+  gap: $spacing-sm $spacing-md;
+  margin: 0;
+
+  @include responsive(md) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  &__item {
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $spacing-sm $spacing-md;
+    background: $color-bg-subtle;
+
+    dt {
+      color: $color-text-muted;
+      font-size: $font-size-xs;
+    }
+
+    dd {
+      margin: $spacing-xs 0 0;
+      font-size: $font-size-lg;
+      font-weight: $font-weight-bold;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The decision status chip
+// ---------------------------------------------------------------------------
+
+.badge {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  white-space: nowrap;
+  background: rgba($color-primary, 0.12);
+  color: $color-primary-dark;
+}
+
+// ---------------------------------------------------------------------------
+// Buttons
+// ---------------------------------------------------------------------------
+
+.btn {
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: $color-bg;
+  color: $color-text;
+  font-size: $font-size-base;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover:not(:disabled) {
+    background: $color-bg-subtle;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &--danger {
+    border-color: $color-danger;
+    color: $color-danger;
+
+    &:hover:not(:disabled) {
+      background: rgba($color-danger, 0.08);
+    }
+  }
+}

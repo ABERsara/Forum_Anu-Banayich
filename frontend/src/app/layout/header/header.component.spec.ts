@@ -5,6 +5,7 @@ import { TranslocoService } from '@jsverse/transloco';
 import { vi } from 'vitest';
 
 import { HeaderComponent } from './header.component';
+import { UserRole } from '../../core/constants';
 import { AuthService } from '../../core/services/auth.service';
 import { LocaleService, type AppLang } from '../../core/services/locale.service';
 import { HEBREW, translocoTesting } from '../../../testing/transloco-testing';
@@ -18,8 +19,15 @@ describe('HeaderComponent', () => {
    * `translocoTesting()` replaces the HTTP loader ABF-126's version of this
    * spec provided: the header now renders text of its own, so the spec has to
    * assert against the real he/en files rather than an empty dictionary.
+   *
+   * The signed-in role is one argument rather than a flag per link (ABF-155).
+   * The header now gates on three of `AuthService`'s role signals and a
+   * fourth link would have meant a fourth boolean — of which only one may be
+   * true, which the caller had to keep straight by hand. Naming the role
+   * makes that impossible to get wrong, and it is what the real service
+   * derives all four from.
    */
-  function setup(isLoggedIn: boolean, isUser = false): void {
+  function setup(isLoggedIn: boolean, role: UserRole | null = null): void {
     langSignal = signal<AppLang>('he');
     toggleLangSpy = vi.fn();
 
@@ -27,7 +35,15 @@ describe('HeaderComponent', () => {
       imports: [HeaderComponent, translocoTesting()],
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { isLoggedIn: () => isLoggedIn, isUser: () => isUser } },
+        {
+          provide: AuthService,
+          useValue: {
+            isLoggedIn: () => isLoggedIn,
+            isUser: () => role === UserRole.USER,
+            isModerator: () => role === UserRole.MODERATOR,
+            isAdmin: () => role === UserRole.ADMIN,
+          },
+        },
         { provide: LocaleService, useValue: { lang: langSignal, toggleLang: toggleLangSpy } },
       ],
     });
@@ -56,6 +72,10 @@ describe('HeaderComponent', () => {
 
   function logoText(): string {
     return fixture.nativeElement.querySelector('.header__logo').textContent.trim();
+  }
+
+  function reportsLink(): HTMLAnchorElement | null {
+    return fixture.nativeElement.querySelector('.header__reports');
   }
 
   it('isHebrew() reflects LocaleService.lang()', () => {
@@ -129,7 +149,7 @@ describe('HeaderComponent', () => {
      * of the nav rather than left as the Hebrew literal it came in as.
      */
     it('shows the messages link to a regular user, in both languages', () => {
-      setup(true, true);
+      setup(true, UserRole.USER);
 
       expect(headerText()).toContain('הודעות');
 
@@ -140,7 +160,7 @@ describe('HeaderComponent', () => {
     });
 
     it('hides the messages link from a role that is not a plain user', () => {
-      setup(true, false);
+      setup(true, UserRole.PROFESSIONAL);
 
       expect(fixture.nativeElement.querySelector('.header__messages')).toBeNull();
     });
@@ -151,7 +171,7 @@ describe('HeaderComponent', () => {
      * not role-gated, since every role can view their own profile.
      */
     it('shows the profile link to every signed-in role, in both languages', () => {
-      setup(true, false);
+      setup(true, UserRole.PROFESSIONAL);
 
       expect(headerText()).toContain('הפרופיל שלי');
 
@@ -159,6 +179,51 @@ describe('HeaderComponent', () => {
 
       expect(headerText()).toContain('My profile');
       expect(headerText()).not.toMatch(HEBREW);
+    });
+
+    /**
+     * ABF-155. Until this, the report queue had no way in from anywhere in
+     * the app: a moderator who did not know `/moderator/reports` by heart
+     * could not reach the screen her role exists for.
+     *
+     * The link is gated on exactly the pair of roles the `/moderator` routes
+     * already admit, and gated in the same shape as the messages link above.
+     * It is not a security control and these tests are not testing one — the
+     * route guard is what refuses the URL. What a missing link costs is the
+     * screen, not the data.
+     */
+    it('shows the reports link to a moderator, in both languages', () => {
+      setup(true, UserRole.MODERATOR);
+
+      expect(reportsLink()!.getAttribute('href')).toBe('/moderator/reports');
+      expect(reportsLink()!.textContent!.trim()).toBe('דיווחים');
+
+      switchToEnglish();
+
+      expect(reportsLink()!.textContent!.trim()).toBe('Reports');
+      expect(headerText()).not.toMatch(HEBREW);
+    });
+
+    /** An admin oversees every cell, and the same routes let her in. */
+    it('shows the reports link to an admin too', () => {
+      setup(true, UserRole.ADMIN);
+
+      expect(reportsLink()!.getAttribute('href')).toBe('/moderator/reports');
+    });
+
+    it.each([
+      ['a regular user', UserRole.USER],
+      ['a professional', UserRole.PROFESSIONAL],
+    ])('hides the reports link from %s', (_role, role) => {
+      setup(true, role);
+
+      expect(reportsLink()).toBeNull();
+    });
+
+    it('hides the reports link from a visitor who is not signed in', () => {
+      setup(false);
+
+      expect(reportsLink()).toBeNull();
     });
   });
 });

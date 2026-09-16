@@ -141,9 +141,10 @@
     gap: $spacing-sm;
   }
 
-  // The way through to the reported user's moderation history. A link, not
-  // a button: it navigates, and deciding on the report is what the buttons
-  // beside it are for.
+  // The way through to the report in full (ABF-155) and to the reported
+  // user's moderation history. Links, not buttons: they navigate, and
+  // deciding on the report is what the buttons beside them are for.
+  &__detail-link,
   &__card-link {
     color: $color-primary-dark;
     font-size: $font-size-sm;

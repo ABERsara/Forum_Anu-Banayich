@@ -15,10 +15,12 @@ import {
   UserType,
 } from '../constants';
 import type {
+  DirectMessageReport,
   ForumPostReport,
   Report,
   ReportCreate,
   ReportHistoryList,
+  ReportWithContent,
   RestrictionList,
   UserModerationCard,
 } from '../models';
@@ -139,6 +141,49 @@ describe('ReportService', () => {
     const req = httpMock.expectOne(`${environment.apiUrl}/moderator/reports`);
     expect(req.request.method).toBe('GET');
     req.flush({ items: [], total: 0, pending_count: 0 });
+  });
+
+  it('getReport GETs one report with the content it was filed about', () => {
+    const detail: ForumPostReport = {
+      ...MOCK_REPORT,
+      target_type: ReportTargetType.FORUM_POST,
+      content_title: 'כותרת ההודעה',
+      content_text: 'תוכן ההודעה שדווחה',
+      content_status: PostStatus.HIDDEN,
+      report_count: 2,
+    };
+    let result: ReportWithContent | undefined;
+
+    service.getReport('report-1').subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/moderator/reports/report-1`);
+    expect(req.request.method).toBe('GET');
+
+    req.flush(detail);
+    expect(result).toEqual(detail);
+  });
+
+  /**
+   * The same call is the only one that ever returns a private message's
+   * plaintext, and the server audits the read (ABF-113, spec §9.1/§9.3). Same
+   * path, same verb — what differs is the shape that comes back, and the
+   * caller narrows on `target_type` to reach it.
+   */
+  it('getReport carries a private message report’s decrypted content back', () => {
+    const detail: DirectMessageReport = {
+      ...MOCK_REPORT,
+      target_type: ReportTargetType.DIRECT_MESSAGE,
+      target_id: 'msg-1',
+      message_content: 'תוכן ההודעה הפרטית',
+    };
+    let result: ReportWithContent | undefined;
+
+    service.getReport('report-1').subscribe((res) => (result = res));
+
+    httpMock.expectOne(`${environment.apiUrl}/moderator/reports/report-1`).flush(detail);
+
+    expect(result?.target_type).toBe(ReportTargetType.DIRECT_MESSAGE);
+    expect(result).toEqual(detail);
   });
 
   it('decideReport POSTs the decision and the note to the decide endpoint', () => {

@@ -14,6 +14,7 @@
     "login": "Log in",
     "register": "Sign up",
     "messages": "Messages",
+    "reports": "Reports",
     "profile": "My profile"
   },
   "admin": {
@@ -477,6 +478,27 @@
       "note_placeholder": "For example: the content includes an offensive remark about another user",
       "tab_restrictions": "Active restrictions"
     },
+    "report_detail": {
+      "back_to_reports": "Back to the dashboard",
+      "title": "Report details",
+      "open_aria": "Details of the report about “{{title}}”",
+      "hint": "The reported content in full, the context the decision rests on, and the decision itself, on one screen.",
+      "loading": "Loading the report...",
+      "content_section": "The reported content",
+      "audited_read_note": "Opening this page included reading the private message, and that read was recorded in the audit log.",
+      "report_section": "About the report",
+      "report_count_label": "Reports on this content",
+      "reporter_label": "Who filed the report",
+      "reporter_withheld": "Not named here. The decision rests on the content and on what the report says.",
+      "reporter_anonymized": "The account this report was filed from has been closed. The report is kept without it.",
+      "reported_user_label": "The reported member",
+      "decision_section": "Decision",
+      "decided_section": "The decision taken",
+      "history_section": "Previous decisions",
+      "history_hint": "Earlier reports about this member that have already been decided — including ones filed in other cells.",
+      "history_loading": "Loading previous decisions...",
+      "history_unavailable": "Previous decisions could not be loaded right now. The report above is unaffected."
+    },
     "restrictions": {
       "hint": "Restrictions applied automatically by the thresholds in the spec, in the cells you oversee. Each one ends by itself on the date shown.",
       "loading": "Loading restrictions...",
@@ -507,6 +529,7 @@
     },
     "errors": {
       "load_reports_failed": "Something went wrong loading the reports. Try refreshing the page.",
+      "load_report_failed": "Something went wrong loading the report. Try refreshing the page.",
       "load_history_failed": "Something went wrong loading the history. Try refreshing the page.",
       "decide_failed": "Something went wrong saving the decision. Please try again.",
       "content_load_failed": "Something went wrong loading the content. Please try again.",
