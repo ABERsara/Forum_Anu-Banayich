@@ -187,6 +187,7 @@
       "title": "שאלה מקצועית",
       "hint_professional": "השאלה תישלח לאיש המקצוע הנבחר.",
       "hint_domain": "בחר/י תחום — השאלה תישלח לכל אנשי המקצוע בתחום זה.",
+      "hint_domain_preselected": "השאלה תישלח לאנשי המקצוע בתחום שהגעת ממנו. אפשר לבחור תחום אחר.",
       "domain_label": "תחום",
       "domain_placeholder": "בחר/י תחום",
       "domain_error": "נא לבחור תחום",
@@ -241,6 +242,40 @@
       "load_my_questions_failed": "שגיאה בטעינת השאלות שלך.",
       "load_pending_failed": "שגיאה בטעינת השאלות הממתינות.",
       "answer_failed": "שגיאה בשליחת התשובה."
+    }
+  },
+  "agents": {
+    "list": {
+      "title": "סוכני AI",
+      "intro": "סוכן AI עונה על שאלות כלליות מתוך בסיס ידע שהעמותה מתחזקת. לשאלה אישית אפשר תמיד לפנות לאיש מקצוע.",
+      "empty": "אין כרגע סוכנים זמינים עבורך.",
+      "open": "כניסה לשיחה",
+      "field_label": "תחום"
+    },
+    "chat": {
+      "back_to_list": "חזרה לסוכני AI",
+      "log_label": "השיחה עם הסוכן",
+      "loading_conversation": "טוען את השיחה...",
+      "empty": "אפשר לשאול את הסוכן שאלה ראשונה.",
+      "thinking": "הסוכן מנסח תשובה...",
+      "speaker_me": "את/ה:",
+      "speaker_agent": "הסוכן:",
+      "new_message_label": "השאלה שלך לסוכן",
+      "placeholder": "מה תרצה/י לשאול?",
+      "send": "שליחה",
+      "char_count": "{{count}} מתוך {{max}} תווים",
+      "limit_reached": "הגעת לאורך המרבי של שאלה ({{max}} תווים).",
+      "sources_title": "מתוך בסיס הידע:",
+      "source_link": "למקור",
+      "refer_title": "צריכים תשובה מחייבת?",
+      "refer_hint": "הסוכן נותן מידע כללי. לשאלה אישית אפשר לפנות לאיש מקצוע בתחום הזה.",
+      "refer_button": "הפניה לייעוץ אנושי"
+    },
+    "errors": {
+      "load_domains_failed": "שגיאה בטעינת רשימת הסוכנים. נסו שוב מאוחר יותר.",
+      "domain_unavailable": "הסוכן הזה אינו זמין עבורך.",
+      "load_conversation_failed": "שגיאה בטעינת השיחה הקודמת. אפשר להתחיל שיחה חדשה.",
+      "send_failed": "שגיאה בשליחת השאלה לסוכן. נסו שוב."
     }
   },
   "auth": {
@@ -377,6 +412,11 @@
       "subtitle": "פנייה לאיש מקצוע",
       "body": "קבלת ייעוץ אישי ומקצועי בנושאים שמעסיקים אתכם."
     },
+    "agents": {
+      "title": "סוכני AI",
+      "subtitle": "מידע כללי, מיד",
+      "body": "שאלה לסוכן AI על זכויות ונהלים, מתוך בסיס ידע שהעמותה מתחזקת."
+    },
     "admin": {
       "title": "ניהול",
       "subtitle": "לוח בקרה למנהלים",
@@ -407,6 +447,14 @@
       "description_label": "פירוט המדווח/ת",
       "created_at_label": "תאריך הדיווח",
       "content_status_label": "מצב ההודעה",
+      "content_unavailable": "התוכן שדווח עליו כבר לא זמין.",
+      "content_gone_title": "תוכן שאינו זמין",
+      "direct_message_title": "הודעה פרטית",
+      "view_content": "הצג תוכן ההודעה",
+      "view_content_aria": "הצג את תוכן ״{{title}}״",
+      "hide_content": "הסתר תוכן",
+      "content_loading": "טוען תוכן...",
+      "closed_account_deleted_note": "הדיווח נסגר עקב מחיקת חשבון. אין תוכן להצגה.",
       "decide_valid": "מחיקת ההודעה (מוצדק)",
       "decide_invalid": "ביטול הדיווח (שגוי)",
       "decide_valid_aria": "מחיקת ההודעה ״{{title}}״",
@@ -461,6 +509,7 @@
       "load_reports_failed": "אירעה שגיאה בטעינת הדיווחים. נסי לרענן את הדף.",
       "load_history_failed": "אירעה שגיאה בטעינת ההיסטוריה. נסי לרענן את הדף.",
       "decide_failed": "אירעה שגיאה בשמירת ההחלטה. נסי שוב.",
+      "content_load_failed": "אירעה שגיאה בטעינת התוכן. נסי שוב.",
       "load_restrictions_failed": "אירעה שגיאה בטעינת ההגבלות. נסי לרענן את הדף.",
       "load_user_card_failed": "אירעה שגיאה בטעינת כרטיס המשתמש. נסי לרענן את הדף.",
       "suspend_failed": "אירעה שגיאה בהשעיית המשתמש. נסי שוב."
@@ -498,6 +547,9 @@
     "confirm_dialog": {
       "title": "האם לאשר?",
       "confirm": "אישור"
+    },
+    "disclaimer": {
+      "agent": "המידע הוא כללי בלבד ואינו מהווה ייעוץ מקצועי מחייב."
     },
     "suspend_dialog": {
       "title": "השעיית משתמש",
@@ -577,6 +629,7 @@
       "receipt_sending": "בשליחה...",
       "receipt_sent": "נשלח",
       "receipt_read": "נקרא",
+      "content_hidden": "הודעה זו הוסרה בעקבות דיווח",
       "new_message_label": "הודעה חדשה",
       "placeholder": "כתבו הודעה...",
       "char_count": "{{count}} מתוך {{max}} תווים",

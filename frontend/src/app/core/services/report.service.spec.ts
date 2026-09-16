@@ -15,10 +15,10 @@ import {
   UserType,
 } from '../constants';
 import type {
+  ForumPostReport,
   Report,
   ReportCreate,
   ReportHistoryList,
-  ReportWithContent,
   RestrictionList,
   UserModerationCard,
 } from '../models';
@@ -208,8 +208,9 @@ describe('ReportService', () => {
   });
 
   it('getReportHistory asks for the requested page', () => {
-    const decided: ReportWithContent = {
+    const decided: ForumPostReport = {
       ...MOCK_REPORT,
+      target_type: ReportTargetType.FORUM_POST,
       decision: ReportDecision.INVALID,
       content_title: 'כותרת',
       content_text: 'תוכן',

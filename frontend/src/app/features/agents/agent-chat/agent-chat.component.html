@@ -1,0 +1,190 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="agent-chat">
+  <header class="agent-chat__header">
+    <!-- '‹' carries Bidi_Mirrored, so it turns with the page on its own —
+         '←' would point into the page in Hebrew (core/i18n/direction.spec.ts). -->
+    <a class="agent-chat__back" routerLink="/agents"
+      ><span aria-hidden="true">‹</span> {{ 'agents.chat.back_to_list' | transloco }}</a
+    >
+    <!-- The agent's name is written by the association and shown as it came,
+         in either language; the page has no name of its own to fall back on
+         until the catalog answers. -->
+    <h1>{{ domain()?.name }}</h1>
+  </header>
+
+  <!--
+    First in the reading order, above the log, and never inside a branch: the
+    notice SPEC §12 requires is on screen before the first answer, while the
+    agent is thinking, and after the last one. It is rendered even when the
+    agent could not be opened at all, because a member who reached this screen
+    is owed it either way.
+  -->
+  <app-disclaimer-banner />
+
+  @if (loadError().text; as text) {
+    <!-- The API's own `detail` is a finished sentence and is shown as it came;
+         our fallback is a key, so it follows a language switch. -->
+    <app-error-display [message]="text" />
+  } @else if (loadError().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
+
+  <section class="agent-chat__log" [attr.aria-label]="'agents.chat.log_label' | transloco">
+    <div class="agent-chat__states" aria-live="polite" [attr.aria-busy]="isLoading()">
+      @if (isLoading()) {
+        <app-loading-spinner [message]="'agents.chat.loading_conversation' | transloco" />
+      } @else if (isReady() && turns().length === 0) {
+        <p class="agent-chat__empty">{{ 'agents.chat.empty' | transloco }}</p>
+      }
+    </div>
+
+    @if (turns().length > 0) {
+      <ol class="agent-chat__turns">
+        @for (turn of turns(); track turn.id) {
+          <li
+            class="agent-chat__turn"
+            [class.agent-chat__turn--mine]="turn.role === roles.USER"
+            [class.agent-chat__turn--agent]="turn.role === roles.AGENT"
+          >
+            <div class="agent-chat__bubble" [class.agent-chat__bubble--pending]="turn.pending">
+              <!--
+                Who is speaking, in words. On screen the side and the colour of
+                the bubble say it; neither survives being read aloud, and WCAG
+                1.4.1 does not accept colour as the only carrier.
+              -->
+              <span class="agent-chat__speaker">{{
+                (turn.role === roles.USER ? 'agents.chat.speaker_me' : 'agents.chat.speaker_agent')
+                  | transloco
+              }}</span>
+              <!--
+                white-space: pre-line in the stylesheet, not <br>: an answer
+                arrives as paragraphs, and the association's standing
+                disclaimer is the last of them — part of the stored row, shown
+                exactly as it will be read back months from now.
+              -->
+              <p class="agent-chat__text">{{ turn.content }}</p>
+
+              @if (turn.sources.length > 0) {
+                <!--
+                  What the answer was drawn from, so it can be seen to be
+                  grounded — and so a question the agent could not settle can
+                  be taken to a professional with the document name in hand.
+                  Only on answers received in this session: provenance belongs
+                  to the exchange, and a thread loaded back carries none.
+                -->
+                <div class="agent-chat__sources">
+                  <p class="agent-chat__sources-title">
+                    {{ 'agents.chat.sources_title' | transloco }}
+                  </p>
+                  <ul>
+                    @for (source of turn.sources; track source.title) {
+                      <li>
+                        <span>{{ source.title }}</span>
+                        @if (source.source_name) {
+                          <span class="agent-chat__source-name"> — {{ source.source_name }}</span>
+                        }
+                        @if (source.source_url; as url) {
+                          <!-- rel on an outbound link: the knowledge base cites
+                               sites the association does not control. -->
+                          <a [href]="url" target="_blank" rel="noopener noreferrer">
+                            {{ 'agents.chat.source_link' | transloco }}
+                          </a>
+                        }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+
+              <time class="agent-chat__time" [attr.datetime]="turn.createdAt">{{
+                turn.createdAt | date: 'shortTime'
+              }}</time>
+            </div>
+          </li>
+        }
+      </ol>
+    }
+
+    <!--
+      The wait, which is the whole reason this screen needs a loading state:
+      there is no streaming and the answer takes 3–8 seconds. The region is
+      rendered empty and filled when the send starts, because a live region has
+      to exist before its content changes for the change to be noticed at all.
+    -->
+    <div class="agent-chat__thinking" role="status">
+      @if (isSending()) {
+        <app-loading-spinner size="sm" [message]="'agents.chat.thinking' | transloco" />
+      }
+    </div>
+  </section>
+
+  @if (isReady()) {
+    <!--
+      The referral SPEC §12 asks for: the agent is an addition to human advice,
+      never a replacement. A link rather than a button — it opens a page — and
+      it carries the discipline this agent covers, so the advice form arrives
+      with the field already chosen.
+    -->
+    <aside class="agent-chat__referral">
+      <p class="agent-chat__referral-title">{{ 'agents.chat.refer_title' | transloco }}</p>
+      <p class="agent-chat__referral-hint">{{ 'agents.chat.refer_hint' | transloco }}</p>
+      <a
+        class="agent-chat__referral-link"
+        routerLink="/advice/ask"
+        [queryParams]="referralParams()"
+      >
+        {{ 'agents.chat.refer_button' | transloco }}
+      </a>
+    </aside>
+
+    <form class="agent-chat__composer" (submit)="$event.preventDefault(); send()">
+      @if (sendError().text; as text) {
+        <app-error-display [message]="text" />
+      } @else if (sendError().key; as key) {
+        <app-error-display [message]="key | transloco" />
+      }
+
+      <label class="agent-chat__sr-only" for="agent-question">{{
+        'agents.chat.new_message_label' | transloco
+      }}</label>
+      <div class="agent-chat__composer-row">
+        <textarea
+          id="agent-question"
+          name="question"
+          rows="2"
+          [ngModel]="draft()"
+          (ngModelChange)="draft.set($event)"
+          (keydown.enter)="onEnter($event)"
+          [placeholder]="'agents.chat.placeholder' | transloco"
+          [attr.maxlength]="maxLength"
+          [disabled]="isSending()"
+          aria-describedby="agent-char-count"
+        ></textarea>
+        <button type="submit" [disabled]="!canSend()">
+          {{ 'agents.chat.send' | transloco }}
+        </button>
+      </div>
+
+      <!--
+        Described-by rather than a live region: the counter changes on every
+        keystroke, and a polite region that re-reads "1 of 1000, 2 of 1000" is
+        worse than no announcement. Reaching the limit is a one-off event, so
+        that one does announce.
+      -->
+      <p class="agent-chat__counter" id="agent-char-count">
+        {{
+          'agents.chat.char_count'
+            | transloco: { count: draft().length | number, max: maxLength | number }
+        }}
+      </p>
+      <div class="agent-chat__live" role="status">
+        @if (atLimit()) {
+          <p class="agent-chat__limit">
+            {{ 'agents.chat.limit_reached' | transloco: { max: maxLength | number } }}
+          </p>
+        }
+      </div>
+    </form>
+  }
+</div>

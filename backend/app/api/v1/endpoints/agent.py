@@ -3,28 +3,48 @@ AI agent endpoints.
 
 GET    /agents                                            – list the agent domains
                                                             visible to the current user
+POST   /agents/{domain_id}/chat                           – ask an agent a question
+GET    /agents/{domain_id}/conversations/{id}             – read a whole conversation
 POST   /agents/{domain_id}/knowledge-entries              – add knowledge base content
 PATCH  /agents/{domain_id}/knowledge-entries/{entry_id}   – edit it
 DELETE /agents/{domain_id}/knowledge-entries/{entry_id}   – remove it
 
-The three knowledge base routes are for the people who maintain a domain, not
-for the members who ask it questions, and each one refuses in three stages:
+Two audiences in one router, and they resolve `{domain_id}` through two
+different functions on purpose.
+
+The **member-facing** routes — the catalog and the chat — go through
+`agent_service.get_visible_domain()`, which answers one 404 for every reason a
+member may not use an agent. `domain_id` is an agent_domains row id (uuid), not
+an enum: since ABF-120 an agent is a table row an admin can add, gated by
+group/sector like a forum post, so an unknown or invisible agent cannot be
+rejected by path coercion.
+
+The three **knowledge base** routes are for the people who maintain a domain,
+not for the members who ask it questions, and each one refuses in three stages:
 the role (a member never reaches the database at all), then the domain (404 if
 it does not exist), then the discipline (403 if it is not theirs).
 
-Those three refusals are all these handlers do. The writes themselves, and the
-decision of when an edit is worth re-indexing, live in agent_service — so a
-later ticket that needs to create an entry outside of HTTP calls the same code
-rather than a copy of it.
+Those refusals are all these handlers do. The writes themselves, the decision
+of when an edit is worth re-indexing, and the whole of the chat flow live in
+agent_service — so a later ticket that needs to create an entry or answer a
+question outside of HTTP calls the same code rather than a copy of it.
 """
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.constants import UserRole
-from app.core.dependencies import get_current_active_user, get_db, require_role
+from app.core.dependencies import (
+    get_current_active_user,
+    get_db,
+    rate_limit_chat,
+    require_role,
+)
 from app.models.user import User
 from app.schemas.agent import (
+    AgentChatRequest,
+    AgentChatResponse,
+    AgentConversationResponse,
     AgentDomainResponse,
     AgentKnowledgeEntryCreate,
     AgentKnowledgeEntryResponse,
@@ -59,6 +79,53 @@ def list_agent_domains(
         AgentDomainResponse.model_validate(domain)
         for domain in agent_service.get_visible_domains(db, current_user)
     ]
+
+
+# USER only as well, and for a stronger reason than the catalog: writing a turn
+# into a conversation means being its owner, and only a USER row carries the
+# group/sector an agent is gated on. An ADMIN reads conversations (below) but
+# never adds to one.
+@router.post(
+    "/{domain_id}/chat",
+    response_model=AgentChatResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_role(UserRole.USER))],
+)
+def chat(
+    domain_id: str,
+    data: AgentChatRequest,
+    # rate_limit_chat implies get_current_active_user and returns the same
+    # user, so depending on it is what applies the daily quota (429). Taking
+    # the caller from it rather than from get_current_active_user is what
+    # makes the limit impossible to wire up and leave off.
+    current_user: User = Depends(rate_limit_chat),
+    db: Session = Depends(get_db),
+) -> AgentChatResponse:
+    """
+    Ask the agent a question and get an answer grounded in its knowledge base.
+
+    Writes two AgentMessage rows (the question and the answer) and one
+    AuditLog entry. Omit `conversation_id` to start a thread; send it back to
+    ask a follow-up that sees what came before.
+    """
+    return agent_service.chat(db, current_user, domain_id, data)
+
+
+# Not require_role(UserRole.USER): an ADMIN has to be able to open a
+# conversation the audit trail points at. Owner-or-ADMIN, and the domain's own
+# visibility, are decided in the service — see agent_service.get_conversation().
+@router.get(
+    "/{domain_id}/conversations/{conversation_id}",
+    response_model=AgentConversationResponse,
+)
+def get_conversation(
+    domain_id: str,
+    conversation_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> AgentConversationResponse:
+    """Return one conversation's messages in chronological order."""
+    return agent_service.get_conversation(db, current_user, domain_id, conversation_id)
 
 
 @router.post(

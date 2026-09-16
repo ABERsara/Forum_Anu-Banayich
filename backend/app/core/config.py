@@ -216,6 +216,73 @@ class Settings(BaseSettings):
     GEMINI_TIMEOUT_SECONDS: int = 10
 
     # ------------------------------------------------------------------
+    # AI agent – answer generation (ABF-122)
+    # ------------------------------------------------------------------
+    # Which llm_service provider generates the agent's answers. Swapping this
+    # to another registered name (see llm_service.register_provider) is the
+    # whole change needed to move off Gemini — no caller names a provider
+    # class, so nothing else has to be edited or redeployed.
+    LLM_PROVIDER: str = "gemini"
+
+    # The Gemini model that writes the answer, as distinct from
+    # GEMINI_EMBED_MODEL above, which only turns text into vectors. Two
+    # settings because they are two model families on two deprecation
+    # schedules: retrieval keeps working when the chat model is retired, and
+    # the reverse.
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
+    # Hard ceiling on one generation call. A chat request holds a worker for
+    # its whole duration, so this is what stops a slow provider from taking
+    # the API down with it. Longer than GEMINI_TIMEOUT_SECONDS because
+    # generating paragraphs is genuinely slower than embedding a sentence.
+    LLM_TIMEOUT_SECONDS: float = 20.0
+
+    # ------------------------------------------------------------------
+    # AI agent – conversation limits (can be tuned without code changes)
+    # ------------------------------------------------------------------
+    # Messages one user may send to the agents in a rolling 24 hours, counted
+    # across every domain rather than per agent: the cost being capped is the
+    # provider bill, and that is one bill.
+    AGENT_RATE_LIMIT_PER_DAY: int = 30
+
+    # Longest question accepted, in characters. Enforced by the Pydantic
+    # schema (422), not by the provider's token limit.
+    AGENT_MAX_MESSAGE_LENGTH: int = 1000
+
+    # How close a passage has to be to the question before it is allowed to
+    # ground an answer. rag_service.retrieve() ranks and returns the k nearest
+    # chunks whatever the question was — it has no notion of "near enough" —
+    # so without a floor here, "מה תחזית מזג האוויר מחר?" comes back with the
+    # five least-unrelated paragraphs in a housing-rights knowledge base and
+    # the agent's refusal to answer off-topic questions rests entirely on the
+    # model obeying rule 2 of its prompt. With a floor it is a property of the
+    # code: nothing clears it, the provider is never called, and the reader is
+    # sent to human advice (agent_service._retrieve_for).
+    #
+    # The scale is RetrievedChunk.score — 1 - cosine distance, so 1.0 is
+    # identical, 0.0 unrelated, negative actively contrary.
+    #
+    # A setting rather than a constant because the right number is a property
+    # of the deployment's own content and of GEMINI_EMBED_MODEL, not of this
+    # code: it has to be calibrated once the knowledge base is real, and
+    # re-calibrated if the embedding model changes. Both failure directions
+    # are visible, which is what makes tuning it safe — too high and the agent
+    # refers questions it could have answered, too low and it quotes
+    # paragraphs about something else. 0.35 is deliberately a low floor: it
+    # rejects the plainly unrelated and leaves the marginal calls to the
+    # prompt, because the expensive mistake at this stage is refusing a widow
+    # an answer the association wrote for her.
+    AGENT_MIN_RELEVANCE_SCORE: float = 0.35
+
+    # How many of the conversation's most recent *turns* – a question and the
+    # answer it got – are replayed into the prompt, so "ומה לגבי הילדים שלי"
+    # resolves against what came before it. 3 turns is at most 6 messages.
+    # Costs tokens on every request, which is why the ticket asks for an
+    # environment variable rather than a constant: raise it if follow-ups lose
+    # the thread, lower it if the bill grows faster than usage — no deploy.
+    AGENT_HISTORY_TURNS: int = 3
+
+    # ------------------------------------------------------------------
     # Moderation thresholds (can be tuned without code changes)
     # ------------------------------------------------------------------
     AUTO_HIDE_REPORT_COUNT: int = 2  # Reports before auto-hide

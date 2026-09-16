@@ -45,23 +45,20 @@ Not in here, on purpose
   single string built from both maps, so moving one would render it half in
   each language.
 
-Was in here, and is not any more
---------------------------------
-The `agent.*` keys — the AI agent's "conversation not found", "forbidden",
-"unavailable" and rate-limit messages — lived here until `main` reverted
-ABF-122 (the agent conversation schema collided). Their only two callers,
-`services/agent_service.py` and `dependencies.rate_limit_chat`, went with it,
-and `test_i18n_catalogue.py::test_every_key_in_the_catalogue_is_used` is what
-made leaving them behind impossible. When ABF-122 lands again the agent's
-messages come back as keys, not as the Hebrew literals they were before —
-`test_no_message_is_raised_in_hebrew` walks the whole of `app/`, so the
-returning module is held to this rule the day it arrives.
+Was in here, and is back
+------------------------
+The agent's "conversation not found", "forbidden", "unavailable" and rate-limit
+messages left with `main`'s revert of ABF-122 and return with it, under the
+`agents.` prefix ABF-121 gave this domain rather than the `agent.` they had
+before. `agents.rate_limited` is again the catalogue's only entry with a
+`{placeholder}` — the daily quota is a setting, so it cannot be written into
+either translation.
 
-`agent.rate_limited` was also the catalogue's only entry with a `{placeholder}`.
-`TestCatalogue::test_placeholders_match_across_languages` now passes over an
-empty set and stays for the next one; the rendering itself is still exercised,
-against a catalogue entry the test defines, by
-`test_i18n.py::TestTranslate::test_placeholders_are_filled`.
+Not here, and not an exception to the rule above: `ANSWER_DISCLAIMER` and
+`NO_CONTEXT_ANSWER` in `services/llm_service.py`. Those are not messages
+*about* a request — they are part of the agent's answer, stored encrypted in an
+`agent_messages` row and read again months later, and a stored row cannot
+follow a later reader's `Accept-Language`.
 """
 
 from typing import Final
@@ -239,10 +236,6 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "הדיווח לא נמצא.",
         ENGLISH: "The report was not found.",
     },
-    "reports.target_not_found": {
-        HEBREW: "התוכן המדווח לא נמצא.",
-        ENGLISH: "The reported content was not found.",
-    },
     "reports.view_forbidden": {
         HEBREW: "אין הרשאה לצפות בדיווח זה.",
         ENGLISH: "You do not have permission to view this report.",
@@ -370,6 +363,29 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
     "agents.knowledge_entry_not_found": {
         HEBREW: "פריט הידע המבוקש לא נמצא בתחום זה.",
         ENGLISH: "The requested knowledge entry was not found in this domain.",
+    },
+    "agents.conversation_not_found": {
+        HEBREW: "השיחה המבוקשת לא נמצאה אצל סוכן זה.",
+        ENGLISH: "The requested conversation was not found for this agent.",
+    },
+    "agents.conversation_forbidden": {
+        HEBREW: "אין לך הרשאה לצפות בשיחה זו או להמשיך אותה.",
+        ENGLISH: "You do not have permission to read or continue this conversation.",
+    },
+    "agents.unavailable": {
+        HEBREW: "הסוכן אינו זמין כרגע. אפשר לנסות שוב בעוד מספר רגעים.",
+        ENGLISH: "The agent is unavailable right now. Please try again in a few moments.",
+    },
+    # The only entry in the catalogue with a placeholder. The number is
+    # configuration (AGENT_RATE_LIMIT_PER_DAY), so it cannot be written into
+    # either translation — and a reader told "you have reached the limit" with
+    # no number has no way to know whether to come back in an hour or tomorrow.
+    "agents.rate_limited": {
+        HEBREW: "הגעת למכסת ההודעות היומית לסוכנים ({limit} ביממה). אפשר להמשיך מחר.",
+        ENGLISH: (
+            "You have reached the daily message limit for the agents "
+            "({limit} per day). You can continue tomorrow."
+        ),
     },
     # -- Cross-cutting ----------------------------------------------------
     "errors.unauthenticated": {

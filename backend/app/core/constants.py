@@ -214,12 +214,18 @@ class AuditAction(enum.StrEnum):
     DIRECT_MESSAGE_ACCESS_DENIED = "direct_message_access_denied"
     DIRECT_MESSAGE_PRUNED = "direct_message_pruned"
     DIRECT_MESSAGE_REPORTED = "direct_message_reported"
+    # A moderator decrypted a reported message's content (ABF-113, spec §9.3).
+    # DIRECT_MESSAGE_ACCESS_DENIED (above) already covers a *refused* attempt
+    # to reach one — reused for a moderator's own denial too, distinguished by
+    # `details`, rather than adding a second "denied" member here.
+    DIRECT_MESSAGE_REPORT_VIEWED = "direct_message_report_viewed"
     # One member value for both directions of ABF-116's automatic restriction:
     # the details payload names which RestrictionType was applied. A second
     # enum member per direction would have to be added again for every future
     # one, and Postgres cannot remove an enum value once it exists.
     USER_RESTRICTED = "user_restricted"
     AGENT_CONVERSATION = "agent_conversation"
+    AGENT_CONVERSATION_ACCESS_DENIED = "agent_conversation_access_denied"
     # A professional scheduling a Google Meet (ABF-156). Audited on the same
     # grounds as BROADCAST_SENT: it creates an event on an external service
     # and publishes a join link to a whole cell at once.

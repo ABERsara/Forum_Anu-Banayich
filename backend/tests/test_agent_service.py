@@ -1,11 +1,41 @@
 """
-Unit tests for agent_service.get_visible_domains().
+Unit tests for agent_service.
+
+The catalog half (get_visible_domains, ABF-120) is the first section; the
+conversation half (ABF-122) follows from TestGetVisibleDomain onwards.
+
+test_agent_chat.py drives the ABF-122 code through the HTTP routes. What is
+here instead are the decisions that are awkward to reach from a request,
+because each one needs rows planted at a particular time or a particular
+shape:
+
+  - **The single-domain IDOR guard.** get_visible_domain() answers one 404 for
+    four different reasons, and an ADMIN reaches a domain no member can.
+  - **The quota window.** messages_left_today() counts a rolling 24 hours, so
+    what matters is a message that has just aged out of it — and no endpoint
+    can write a message dated yesterday.
+  - **The history window.** _recent_turns() takes the newest turns, in the
+    order they were said, decrypted, with the fixed disclaimer taken back off.
+  - **The relevance floor and the retrieval fallback.** _retrieve() drops what
+    is not near enough to quote and _retrieve_for() widens a follow-up with the
+    question before it, but only when the follow-up found nothing itself. Both
+    are asserted against a stubbed rag_service.retrieve() — the real one needs
+    pgvector and a paid embedding call (see test_agent_chat.py's docstring).
+
+The DB is real (in-memory), per CONTRIBUTING §9.
 """
 
+import base64
+import os
+from datetime import timedelta
+
 import pytest
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.constants import (
+    AgentMessageRole,
     GroupVisibility,
     ProfessionalDomain,
     Sector,
@@ -13,9 +43,10 @@ from app.core.constants import (
     UserRole,
     UserType,
 )
-from app.models.agent import AgentDomain
+from app.core.encryption import encrypt_message
+from app.models.agent import AgentConversation, AgentDomain, AgentMessage
 from app.models.user import User
-from app.services import agent_service
+from app.services import agent_service, llm_service, rag_service
 
 
 def _make_domain(
@@ -333,3 +364,652 @@ class TestPrecondition:
 
         with pytest.raises(ValueError):
             agent_service.get_visible_domains(db_session, admin)
+
+
+# ===========================================================================
+# ABF-122 — the conversation flow
+# ===========================================================================
+
+HOUSING_TITLE = "סיוע בדיור למשפחות חד-הוריות"
+CHILDREN_TITLE = "קצבה עבור הילדים במשפחה חד-הורית"
+HOUSING_QUESTION = "האם מגיע לי סיוע בדיור?"
+PRONOUN_FOLLOW_UP = "וכמה זה בערך?"
+
+
+@pytest.fixture
+def member(db_session: Session) -> User:
+    return _make_user(
+        db_session,
+        email="asker@example.com",
+        user_type=UserType.WIDOW,
+        sector=Sector.HASIDIC,
+    )
+
+
+@pytest.fixture
+def domain(db_session: Session) -> AgentDomain:
+    return _make_domain(db_session, "הסוכן")
+
+
+@pytest.fixture
+def conversation(
+    db_session: Session, member: User, domain: AgentDomain
+) -> AgentConversation:
+    row = AgentConversation(user_id=member.id, domain_id=domain.id)
+    db_session.add(row)
+    db_session.commit()
+    return row
+
+
+def _say(
+    db_session: Session,
+    conversation: AgentConversation,
+    role: AgentMessageRole,
+    content: str,
+    minutes_ago: float = 0,
+) -> AgentMessage:
+    """Write one turn — encrypted, as the service does — optionally backdated."""
+    ciphertext, key_version = encrypt_message(content)
+    message = AgentMessage(
+        conversation_id=conversation.id,
+        role=role,
+        content=ciphertext,
+        key_version=key_version,
+        created_at=agent_service._utc_now() - timedelta(minutes=minutes_ago),
+    )
+    db_session.add(message)
+    db_session.commit()
+    return message
+
+
+def _chunk(
+    title: str, score: float, content: str = "תוכן"
+) -> rag_service.RetrievedChunk:
+    return rag_service.RetrievedChunk(
+        title=title,
+        content=content,
+        source_name="ביטוח לאומי",
+        source_url=None,
+        score=score,
+    )
+
+
+@pytest.fixture
+def ranking(monkeypatch):
+    """Answer rag_service.retrieve() from a script, and record what it was asked.
+
+    The real one embeds the question with Gemini and ranks with pgvector; what
+    these tests are about is what agent_service does with a ranking once it has
+    one, so the ranking is supplied. A callable per query, consumed in order,
+    so a test can say "the first search finds nothing near enough, the second
+    finds the housing passage" without owning a scoring function.
+    """
+
+    class Script:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+            self.results: list[list[rag_service.RetrievedChunk]] = []
+
+        def returns(self, *results: list[rag_service.RetrievedChunk]) -> None:
+            self.results = list(results)
+
+        def retrieve(self, db, domain_id, query, k=5):
+            self.queries.append(query)
+            if not self.results:
+                return []
+            return self.results.pop(0)
+
+    script = Script()
+    monkeypatch.setattr(rag_service, "retrieve", script.retrieve)
+    return script
+
+
+# ---------------------------------------------------------------------------
+# get_visible_domain() — the IDOR guard
+# ---------------------------------------------------------------------------
+
+
+class TestGetVisibleDomain:
+    """One agent by id. ABF-120 shipped only the plural form; without this a
+    `{domain_id}` in a URL would be trusted exactly as it arrived."""
+
+    def test_returns_a_domain_the_member_may_use(
+        self, db_session: Session, member: User
+    ) -> None:
+        row = _make_domain(
+            db_session, "mine", GroupVisibility.WIDOWS, SectorVisibility.HASIDIC
+        )
+
+        assert agent_service.get_visible_domain(db_session, member, row.id).id == row.id
+
+    @pytest.mark.parametrize(
+        ("group", "sector", "is_active"),
+        [
+            (GroupVisibility.ORPHANS_MALE, SectorVisibility.ALL, True),
+            (GroupVisibility.ALL, SectorVisibility.SEPHARDIC, True),
+            (GroupVisibility.ALL, SectorVisibility.ALL, False),
+        ],
+        ids=["another-group", "another-sector", "deactivated"],
+    )
+    def test_a_domain_the_member_may_not_use_is_404(
+        self, db_session: Session, member: User, group, sector, is_active
+    ) -> None:
+        row = _make_domain(db_session, "not-mine", group, sector, is_active=is_active)
+
+        with pytest.raises(HTTPException) as exc:
+            agent_service.get_visible_domain(db_session, member, row.id)
+
+        assert exc.value.status_code == 404
+
+    def test_an_id_that_does_not_exist_is_the_same_404(
+        self, db_session: Session, member: User
+    ) -> None:
+        """The point of the guard: "no such agent" and "an agent for another
+        group" have to be indistinguishable, or the status pair becomes a way
+        to enumerate which agents exist for which sector."""
+        hidden = _make_domain(
+            db_session, "hidden", GroupVisibility.ORPHANS_MALE, SectorVisibility.ALL
+        )
+
+        with pytest.raises(HTTPException) as for_hidden:
+            agent_service.get_visible_domain(db_session, member, hidden.id)
+        with pytest.raises(HTTPException) as for_missing:
+            agent_service.get_visible_domain(db_session, member, "no-such-domain")
+
+        assert for_hidden.value.status_code == for_missing.value.status_code == 404
+        assert for_hidden.value.detail == for_missing.value.detail
+
+    def test_an_admin_reaches_a_domain_no_member_of_that_group_could(
+        self, db_session: Session
+    ) -> None:
+        """The audit trail is admin-visible and points at conversations; an
+        admin has no user_type/sector to be filtered by."""
+        admin = _make_user(
+            db_session,
+            email="admin@example.com",
+            user_type=None,
+            sector=None,
+            role=UserRole.ADMIN,
+        )
+        row = _make_domain(
+            db_session,
+            "orphans",
+            GroupVisibility.ORPHANS_MALE,
+            SectorVisibility.HASIDIC,
+        )
+
+        assert agent_service.get_visible_domain(db_session, admin, row.id).id == row.id
+
+    def test_an_admin_reaches_a_deactivated_domain_too(
+        self, db_session: Session
+    ) -> None:
+        """An AuditLog row pointing into a since-retired agent still has to open."""
+        admin = _make_user(
+            db_session,
+            email="admin@example.com",
+            user_type=None,
+            sector=None,
+            role=UserRole.ADMIN,
+        )
+        row = _make_domain(db_session, "retired", is_active=False)
+
+        assert agent_service.get_visible_domain(db_session, admin, row.id).id == row.id
+
+    @pytest.mark.parametrize("role", [UserRole.MODERATOR, UserRole.PROFESSIONAL])
+    def test_other_staff_roles_get_the_same_404_as_a_stranger(
+        self, db_session: Session, role: UserRole
+    ) -> None:
+        """Not a 500 from the missing user_type, and not access either: a
+        moderator has no business inside a member's agent thread (SPEC §9.3).
+
+        A professional is refused here too, and that is not in tension with
+        their editing rights: the knowledge base routes resolve the domain
+        through get_manageable_domain(), which asks about their discipline.
+        This function answers a different question — may this person *use* the
+        agent — and the answer for a professional is no.
+        """
+        actor = _make_user(
+            db_session,
+            email=f"{role.value}@example.com",
+            user_type=None,
+            sector=None,
+            role=role,
+        )
+        row = _make_domain(db_session, "open-to-members")
+
+        with pytest.raises(HTTPException) as exc:
+            agent_service.get_visible_domain(db_session, actor, row.id)
+
+        assert exc.value.status_code == 404
+
+    def test_a_member_row_without_group_or_sector_is_404_not_a_crash(
+        self, db_session: Session
+    ) -> None:
+        """USER rows always carry both today; if one ever did not, building the
+        filter would raise ValueError and surface as a 500."""
+        broken = _make_user(
+            db_session, email="broken@example.com", user_type=None, sector=None
+        )
+        row = _make_domain(db_session, "open-to-members")
+
+        with pytest.raises(HTTPException) as exc:
+            agent_service.get_visible_domain(db_session, broken, row.id)
+
+        assert exc.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# messages_left_today()
+# ---------------------------------------------------------------------------
+
+
+class TestMessagesLeftToday:
+    def test_an_untouched_quota_is_the_configured_one(
+        self, db_session: Session, member: User
+    ) -> None:
+        assert agent_service.messages_left_today(db_session, member) == (
+            settings.AGENT_RATE_LIMIT_PER_DAY
+        )
+
+    def test_each_question_spends_one(
+        self, db_session: Session, member: User, conversation: AgentConversation
+    ) -> None:
+        _say(db_session, conversation, AgentMessageRole.USER, "question")
+
+        assert agent_service.messages_left_today(db_session, member) == (
+            settings.AGENT_RATE_LIMIT_PER_DAY - 1
+        )
+
+    def test_the_agents_own_replies_are_free(
+        self, db_session: Session, member: User, conversation: AgentConversation
+    ) -> None:
+        """Two rows are written per exchange; counting both would silently
+        halve the quota the user was promised."""
+        _say(db_session, conversation, AgentMessageRole.AGENT, "answer")
+
+        assert agent_service.messages_left_today(db_session, member) == (
+            settings.AGENT_RATE_LIMIT_PER_DAY
+        )
+
+    def test_a_message_just_inside_the_window_still_counts(
+        self, db_session: Session, member: User, conversation: AgentConversation
+    ) -> None:
+        _say(
+            db_session,
+            conversation,
+            AgentMessageRole.USER,
+            "question",
+            minutes_ago=23 * 60,
+        )
+
+        assert agent_service.messages_left_today(db_session, member) == (
+            settings.AGENT_RATE_LIMIT_PER_DAY - 1
+        )
+
+    def test_a_message_that_has_aged_out_does_not(
+        self, db_session: Session, member: User, conversation: AgentConversation
+    ) -> None:
+        """The window rolls rather than resetting at midnight — which is what
+        stops a user spending two days' budget either side of it."""
+        _say(
+            db_session,
+            conversation,
+            AgentMessageRole.USER,
+            "question",
+            minutes_ago=25 * 60,
+        )
+
+        assert agent_service.messages_left_today(db_session, member) == (
+            settings.AGENT_RATE_LIMIT_PER_DAY
+        )
+
+    def test_another_users_questions_are_not_counted(
+        self, db_session: Session, member: User, conversation: AgentConversation
+    ) -> None:
+        _say(db_session, conversation, AgentMessageRole.USER, "question")
+        other = _make_user(db_session, email="other@example.com")
+
+        assert agent_service.messages_left_today(db_session, other) == (
+            settings.AGENT_RATE_LIMIT_PER_DAY
+        )
+
+    def test_the_quota_is_shared_across_every_agent(
+        self, db_session: Session, member: User, domain: AgentDomain
+    ) -> None:
+        """The cost being capped is one provider bill, not one agent's — so a
+        second domain does not hand the member a second allowance."""
+        other_domain = _make_domain(db_session, "second agent")
+        for target in (domain, other_domain):
+            row = AgentConversation(user_id=member.id, domain_id=target.id)
+            db_session.add(row)
+            db_session.commit()
+            _say(db_session, row, AgentMessageRole.USER, "question")
+
+        assert agent_service.messages_left_today(db_session, member) == (
+            settings.AGENT_RATE_LIMIT_PER_DAY - 2
+        )
+
+    def test_the_quota_never_reads_as_negative(
+        self,
+        db_session: Session,
+        monkeypatch,
+        member: User,
+        conversation: AgentConversation,
+    ) -> None:
+        monkeypatch.setattr(settings, "AGENT_RATE_LIMIT_PER_DAY", 1)
+        _say(db_session, conversation, AgentMessageRole.USER, "one")
+        _say(db_session, conversation, AgentMessageRole.USER, "two")
+
+        assert agent_service.messages_left_today(db_session, member) == 0
+
+
+# ---------------------------------------------------------------------------
+# _recent_turns()
+# ---------------------------------------------------------------------------
+
+
+class TestRecentTurns:
+    def test_a_conversation_that_has_not_started_has_no_history(
+        self, db_session: Session
+    ) -> None:
+        assert agent_service._recent_turns(db_session, None) == []
+
+    def test_turns_come_back_oldest_first_and_decrypted(
+        self, db_session: Session, conversation: AgentConversation
+    ) -> None:
+        """Stored rows are ciphertext; what a prompt gets is plaintext."""
+        first = _say(
+            db_session, conversation, AgentMessageRole.USER, "first", minutes_ago=2
+        )
+        _say(db_session, conversation, AgentMessageRole.AGENT, "answer", minutes_ago=1)
+
+        history = agent_service._recent_turns(db_session, conversation)
+
+        assert first.content != "first"  # the stored row really is encrypted
+        assert [turn.content for turn in history] == ["first", "answer"]
+        assert history[0].role == AgentMessageRole.USER
+
+    def test_only_the_newest_turns_survive_the_cap(
+        self, db_session: Session, monkeypatch, conversation: AgentConversation
+    ) -> None:
+        """A turn is a question and its answer, so N turns is up to 2N rows."""
+        monkeypatch.setattr(settings, "AGENT_HISTORY_TURNS", 1)
+        _say(db_session, conversation, AgentMessageRole.USER, "old-q", minutes_ago=4)
+        _say(db_session, conversation, AgentMessageRole.AGENT, "old-a", minutes_ago=3)
+        _say(db_session, conversation, AgentMessageRole.USER, "new-q", minutes_ago=2)
+        _say(db_session, conversation, AgentMessageRole.AGENT, "new-a", minutes_ago=1)
+
+        history = agent_service._recent_turns(db_session, conversation)
+
+        assert [turn.content for turn in history] == ["new-q", "new-a"]
+
+    def test_history_can_be_switched_off_entirely(
+        self, db_session: Session, monkeypatch, conversation: AgentConversation
+    ) -> None:
+        monkeypatch.setattr(settings, "AGENT_HISTORY_TURNS", 0)
+        _say(db_session, conversation, AgentMessageRole.USER, "question")
+
+        assert agent_service._recent_turns(db_session, conversation) == []
+
+    def test_the_disclaimer_does_not_go_back_into_the_prompt(
+        self, db_session: Session, conversation: AgentConversation
+    ) -> None:
+        stored = (
+            f"answer{agent_service.DISCLAIMER_SEPARATOR}{llm_service.ANSWER_DISCLAIMER}"
+        )
+        _say(db_session, conversation, AgentMessageRole.AGENT, stored)
+
+        (turn,) = agent_service._recent_turns(db_session, conversation)
+
+        assert turn.content == "answer"
+
+    def test_a_disclaimer_quoted_mid_answer_is_left_alone(self) -> None:
+        """Only the paragraph _compose_answer() appended comes off — matched as
+        a suffix, so an answer that happens to mention it keeps its text."""
+        quoted = f"{llm_service.ANSWER_DISCLAIMER} — וזה מה שכתוב בהמשך."
+
+        assert agent_service._without_disclaimer(quoted) == quoted
+
+
+# ---------------------------------------------------------------------------
+# _retrieve() — the relevance floor
+# ---------------------------------------------------------------------------
+
+
+class TestRelevanceFloor:
+    """rag_service.retrieve() ranks; it never refuses.
+
+    Cosine distance is defined for every pair of vectors, so the k nearest
+    chunks come back for any question at all. "Near enough to quote" is decided
+    here, and deciding it in code rather than in the prompt is what makes the
+    referral to human advice a guarantee instead of a request.
+    """
+
+    def test_a_passage_below_the_floor_is_dropped(
+        self, db_session: Session, domain: AgentDomain, ranking, monkeypatch
+    ) -> None:
+        monkeypatch.setattr(settings, "AGENT_MIN_RELEVANCE_SCORE", 0.5)
+        ranking.returns([_chunk(HOUSING_TITLE, 0.8), _chunk(CHILDREN_TITLE, 0.49)])
+
+        chunks = agent_service._retrieve(db_session, domain, HOUSING_QUESTION)
+
+        assert [chunk.title for chunk in chunks] == [HOUSING_TITLE]
+
+    def test_a_passage_exactly_at_the_floor_is_kept(
+        self, db_session: Session, domain: AgentDomain, ranking, monkeypatch
+    ) -> None:
+        """The comparison is `>=`. Named in a test because the boundary is the
+        one thing a reader cannot infer from the setting's name."""
+        monkeypatch.setattr(settings, "AGENT_MIN_RELEVANCE_SCORE", 0.5)
+        ranking.returns([_chunk(HOUSING_TITLE, 0.5)])
+
+        assert len(agent_service._retrieve(db_session, domain, HOUSING_QUESTION)) == 1
+
+    def test_nothing_near_enough_reads_as_nothing_at_all(
+        self, db_session: Session, domain: AgentDomain, ranking, monkeypatch
+    ) -> None:
+        """The whole point: a ranking full of near-misses has to arrive at
+        _answer_body() as an empty list, or the model is asked to answer out of
+        material about something else."""
+        monkeypatch.setattr(settings, "AGENT_MIN_RELEVANCE_SCORE", 0.5)
+        ranking.returns([_chunk(HOUSING_TITLE, 0.2), _chunk(CHILDREN_TITLE, 0.1)])
+
+        assert agent_service._retrieve(db_session, domain, HOUSING_QUESTION) == []
+
+    def test_an_embedding_failure_is_not_swallowed_as_an_empty_result(
+        self, db_session: Session, domain: AgentDomain, monkeypatch
+    ) -> None:
+        """An outage must not read as "the knowledge base has nothing on
+        that" — that answer would be stored in the member's thread as if it
+        were true. chat() turns this into a 503."""
+
+        def _boom(db, domain_id, query, k=5):
+            raise rag_service.EmbeddingError("GEMINI_API_KEY is not set")
+
+        monkeypatch.setattr(rag_service, "retrieve", _boom)
+
+        with pytest.raises(rag_service.EmbeddingError):
+            agent_service._retrieve(db_session, domain, HOUSING_QUESTION)
+
+
+# ---------------------------------------------------------------------------
+# _retrieve_for()
+# ---------------------------------------------------------------------------
+
+
+class TestRetrieveFor:
+    def test_a_question_that_stands_alone_is_searched_as_written(
+        self, db_session: Session, domain: AgentDomain, ranking
+    ) -> None:
+        ranking.returns([_chunk(HOUSING_TITLE, 0.8)])
+
+        chunks = agent_service._retrieve_for(db_session, domain, HOUSING_QUESTION, [])
+
+        assert [chunk.title for chunk in chunks] == [HOUSING_TITLE]
+        assert ranking.queries == [HOUSING_QUESTION]
+
+    def test_a_follow_up_borrows_the_words_of_the_question_before_it(
+        self, db_session: Session, domain: AgentDomain, ranking
+    ) -> None:
+        ranking.returns([], [_chunk(HOUSING_TITLE, 0.8)])
+        history = [
+            llm_service.HistoryTurn(
+                role=AgentMessageRole.USER, content=HOUSING_QUESTION
+            ),
+            llm_service.HistoryTurn(role=AgentMessageRole.AGENT, content="כן, בתנאים."),
+        ]
+
+        chunks = agent_service._retrieve_for(
+            db_session, domain, PRONOUN_FOLLOW_UP, history
+        )
+
+        assert [chunk.title for chunk in chunks] == [HOUSING_TITLE]
+        assert ranking.queries == [
+            PRONOUN_FOLLOW_UP,
+            f"{HOUSING_QUESTION} {PRONOUN_FOLLOW_UP}",
+        ]
+
+    def test_with_nothing_behind_it_a_bare_follow_up_finds_nothing(
+        self, db_session: Session, domain: AgentDomain, ranking
+    ) -> None:
+        """The widening is a fallback for a follow-up, not a second attempt for
+        every question: an opening message has nothing to widen with, and the
+        second embedding call is not paid for."""
+        ranking.returns([])
+
+        assert (
+            agent_service._retrieve_for(db_session, domain, PRONOUN_FOLLOW_UP, []) == []
+        )
+        assert ranking.queries == [PRONOUN_FOLLOW_UP]
+
+    def test_only_the_users_own_words_are_borrowed(
+        self, db_session: Session, domain: AgentDomain, ranking
+    ) -> None:
+        """The agent's replies are its words, not a statement of what is being
+        asked about — widening with them would search the answer, not the
+        question."""
+        ranking.returns([])
+        history = [
+            llm_service.HistoryTurn(
+                role=AgentMessageRole.AGENT, content=f"לפי {HOUSING_TITLE}, כן."
+            )
+        ]
+
+        assert (
+            agent_service._retrieve_for(db_session, domain, PRONOUN_FOLLOW_UP, history)
+            == []
+        )
+        assert ranking.queries == [PRONOUN_FOLLOW_UP]
+
+    def test_the_most_recent_question_is_the_one_borrowed(
+        self, db_session: Session, domain: AgentDomain, ranking
+    ) -> None:
+        """A conversation that has wandered should be widened with what it is
+        about *now*, not with how it opened."""
+        ranking.returns([], [])
+        history = [
+            llm_service.HistoryTurn(role=AgentMessageRole.USER, content="שאלה ראשונה"),
+            llm_service.HistoryTurn(role=AgentMessageRole.AGENT, content="תשובה"),
+            llm_service.HistoryTurn(
+                role=AgentMessageRole.USER, content=HOUSING_QUESTION
+            ),
+            llm_service.HistoryTurn(role=AgentMessageRole.AGENT, content="תשובה שנייה"),
+        ]
+
+        agent_service._retrieve_for(db_session, domain, PRONOUN_FOLLOW_UP, history)
+
+        assert ranking.queries[-1] == f"{HOUSING_QUESTION} {PRONOUN_FOLLOW_UP}"
+
+
+# ---------------------------------------------------------------------------
+# _to_sources()
+# ---------------------------------------------------------------------------
+
+
+class TestSources:
+    def test_one_entry_that_gave_several_chunks_is_named_once(self) -> None:
+        """Retrieval works on chunks; the reader is being shown documents."""
+        sources = agent_service._to_sources(
+            [
+                _chunk(HOUSING_TITLE, 0.9, content="פסקה ראשונה"),
+                _chunk(HOUSING_TITLE, 0.7, content="פסקה שנייה"),
+            ]
+        )
+
+        assert [source.title for source in sources] == [HOUSING_TITLE]
+
+    def test_sources_keep_retrieval_order(self) -> None:
+        """Which is relevance order, so the passage that answered the question
+        is the first source listed."""
+        sources = agent_service._to_sources(
+            [_chunk(CHILDREN_TITLE, 0.9), _chunk(HOUSING_TITLE, 0.6)]
+        )
+
+        assert [source.title for source in sources] == [CHILDREN_TITLE, HOUSING_TITLE]
+
+    def test_two_entries_sharing_a_heading_stay_two_sources(self) -> None:
+        """Deduplicated on the whole provenance triple, not on the title: two
+        documents can carry the same heading and cite different places, and
+        collapsing them would credit one for what the other said."""
+        first = rag_service.RetrievedChunk(
+            title="זכאות",
+            content="א",
+            source_name="ביטוח לאומי",
+            source_url=None,
+            score=0.9,
+        )
+        second = rag_service.RetrievedChunk(
+            title="זכאות",
+            content="ב",
+            source_name="משרד הבינוי והשיכון",
+            source_url=None,
+            score=0.8,
+        )
+
+        sources = agent_service._to_sources([first, second])
+
+        assert [source.source_name for source in sources] == [
+            "ביטוח לאומי",
+            "משרד הבינוי והשיכון",
+        ]
+
+    def test_nothing_retrieved_is_no_sources(self) -> None:
+        assert agent_service._to_sources([]) == []
+
+
+# ---------------------------------------------------------------------------
+# _plaintext()
+# ---------------------------------------------------------------------------
+
+
+class TestDecryption:
+    def test_a_row_that_fails_authentication_is_a_generic_500(
+        self, db_session: Session, conversation: AgentConversation
+    ) -> None:
+        """AES-GCM authenticates as well as encrypts, so a tampered or
+        corrupted row is caught rather than decoded into garbage. What the
+        caller learns is only that the server failed — not that it failed
+        *decrypting*, which would tell an attacker their edit landed.
+
+        Base64 that decodes cleanly but authenticates as nothing: this is the
+        InvalidTag path, not a malformed-input path.
+        """
+        message = _say(db_session, conversation, AgentMessageRole.AGENT, "answer")
+        message.content = base64.b64encode(os.urandom(48)).decode("ascii")
+        db_session.commit()
+
+        with pytest.raises(HTTPException) as exc:
+            agent_service._plaintext(message)
+
+        assert exc.value.status_code == 500
+        assert exc.value.detail == "errors.internal_server_error"
+        assert "decrypt" not in str(exc.value.detail).lower()
+
+    def test_a_readable_row_round_trips(
+        self, db_session: Session, conversation: AgentConversation
+    ) -> None:
+        message = _say(
+            db_session, conversation, AgentMessageRole.USER, HOUSING_QUESTION
+        )
+
+        assert agent_service._plaintext(message) == HOUSING_QUESTION

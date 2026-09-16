@@ -1,0 +1,88 @@
+@use '../../../../styles/variables' as *;
+
+// No `direction` here and no physical side: the page inherits its direction
+// from <html dir>, which LocaleService sets from the active language, and
+// everything below is written on the logical axis so the grid mirrors on its
+// own when the language flips (CONTRIBUTING §6, core/i18n/direction.spec.ts).
+:host {
+  display: block;
+  padding: $spacing-lg;
+}
+
+.agent-list__title {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $color-text;
+  margin-bottom: $spacing-sm;
+}
+
+.agent-list__intro {
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+  max-width: 60ch;
+  margin-bottom: $spacing-lg;
+}
+
+.agent-list__empty {
+  color: $color-text-muted;
+}
+
+.agent-list__cards {
+  display: grid;
+  // auto-fill rather than a fixed column count: the catalog is a handful of
+  // rows an admin adds to, and the grid should not need editing when it grows.
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: $spacing-md;
+  list-style: none;
+  padding: 0;
+  margin: $spacing-md 0 0;
+}
+
+.agent-card {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  background: $color-bg;
+  box-shadow: $shadow-sm;
+  padding: $spacing-md;
+}
+
+.agent-card__name {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+  color: $color-text;
+  margin: 0;
+}
+
+.agent-card__field {
+  font-size: $font-size-xs;
+  color: $color-text-muted;
+  margin: 0;
+}
+
+.agent-card__description {
+  color: $color-text;
+  font-size: $font-size-sm;
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.agent-card__open {
+  // align-self on the inline axis inside a column flex container, so the link
+  // sits at the reading-end edge in both directions without naming a side.
+  align-self: flex-end;
+  margin-top: $spacing-sm;
+  padding: $spacing-xs $spacing-md;
+  border-radius: $radius-md;
+  background: $color-primary;
+  color: $color-white;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  text-decoration: none;
+
+  &:hover {
+    background: $color-primary-dark;
+  }
+}
