@@ -142,7 +142,32 @@
       "removed": "{{name}} was removed from the moderator roster."
     },
     "audit_log": {
-      "title": "Audit log"
+      "title": "Audit log",
+      "hint": "Every sensitive action on the platform is recorded here and kept for seven years, with no way to edit or delete it. The actor and the entity are shown by id — that is what keeps an entry true after the account that made it is gone.",
+      "filters_legend": "Filters",
+      "filter_actor_label": "Actor ID",
+      "filter_action_label": "Action",
+      "filter_action_any": "Any action",
+      "filter_entity_type_label": "Entity type",
+      "filter_entity_id_label": "Entity ID",
+      "filter_date_from_label": "From date",
+      "filter_date_to_label": "To date",
+      "filter_apply": "Apply filters",
+      "filter_reset": "Clear filters",
+      "table_caption": "Audit log entries",
+      "column_actor": "Who",
+      "column_action": "What",
+      "column_timestamp": "When",
+      "column_entity": "Entity",
+      "sort_ascending_aria": "Sort by when — oldest first",
+      "sort_descending_aria": "Sort by when — newest first",
+      "results_count": "{{count}} entries",
+      "empty": "The audit log is empty — no action has been recorded yet.",
+      "empty_filtered": "No entries match the filters you chose.",
+      "pager_aria": "Audit log pages",
+      "previous_page": "Previous",
+      "next_page": "Next",
+      "page_of": "Page {{page}} of {{count}}"
     },
     "broadcast": {
       "title": "Broadcast to all users",
@@ -171,7 +196,8 @@
       "toggle_professional_failed": "Something went wrong updating the status. Please try again.",
       "load_moderators_failed": "Something went wrong loading the moderators. Please refresh the page.",
       "save_moderator_failed": "Something went wrong saving the moderator. Please try again.",
-      "remove_moderator_failed": "Something went wrong removing the moderator. Please try again."
+      "remove_moderator_failed": "Something went wrong removing the moderator. Please try again.",
+      "load_audit_log_failed": "Something went wrong loading the audit log. Please refresh the page."
     }
   },
   "advice": {
@@ -740,6 +766,31 @@
       "selfie": "Identity photo",
       "id_card": "ID card",
       "passport": "Passport"
+    },
+    "audit_action": {
+      "user_approved": "Registration approved",
+      "user_partially_approved": "Registration partially approved",
+      "user_rejected": "Registration rejected",
+      "user_suspended": "User suspended",
+      "user_cancelled": "Account cancelled",
+      "post_deleted": "Post deleted",
+      "broadcast_sent": "Broadcast sent",
+      "report_decided": "Report decided",
+      "professional_added": "Professional added",
+      "professional_updated": "Professional updated",
+      "moderator_assigned": "Moderator appointed",
+      "moderator_updated": "Moderator updated",
+      "moderator_removed": "Moderator removed",
+      "data_exported": "Data exported",
+      "user_login": "Signed in",
+      "user_logout": "Signed out",
+      "direct_message_access_denied": "Private message access denied",
+      "direct_message_pruned": "Old private messages pruned",
+      "direct_message_reported": "Private message reported",
+      "direct_message_report_viewed": "Reported message content viewed",
+      "user_restricted": "Automatic restriction applied",
+      "agent_conversation": "AI agent conversation",
+      "agent_conversation_access_denied": "Agent conversation access denied"
     }
   }
 }

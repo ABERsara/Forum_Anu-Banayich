@@ -12,6 +12,8 @@
 import {
   AccountStatus,
   AgentMessageRole,
+  AuditAction,
+  AuditSortField,
   DocumentType,
   GroupVisibility,
   ProfessionalDomain,
@@ -22,6 +24,7 @@ import {
   RestrictionType,
   Sector,
   SectorVisibility,
+  SortDirection,
   PostStatus,
   UserRole,
   UserType,
@@ -701,6 +704,77 @@ export interface AgentConversation {
   started_at: string;
   last_message_at: string;
   messages: AgentMessage[];
+}
+
+// ---------------------------------------------------------------------------
+// Audit log (ABF-152)
+// ---------------------------------------------------------------------------
+
+/**
+ * One row of the audit log, as GET /admin/audit-log returns it.
+ *
+ * The six fields of the frozen contract, and no seventh. In particular **no
+ * `ip_address`**: the column exists on the server and is populated, and the
+ * decision on ABF-152 is that it reaches no screen under any parameter. It is
+ * absent here so that a component cannot reference a field the API will never
+ * send, and a reviewer reading this interface sees the same contract the
+ * backend's `schemas/audit.py` declares.
+ *
+ * No actor *name* either, for a reason worth keeping in view: `actor_id` has
+ * no foreign key on the server, so that logs outlive the accounts they
+ * describe. A name resolved at read time would come back blank for exactly
+ * the rows that matter most — the ones about an admin who is gone.
+ */
+export interface AuditLogEntry {
+  id: string;
+  actor_id: string;
+  /** `action_type` on the wire; the server's column is called `action`. */
+  action_type: AuditAction;
+  /** Free-form on the server — "User", "ForumPost", "AgentConversation". */
+  entity_type: string;
+  entity_id: string;
+  /** Naive UTC, like every other timestamp this API returns — see utcIso(). */
+  timestamp: string;
+  /**
+   * Context the logging service attached, never PII (CONTRIBUTING §4). Read
+   * by the single-entry view (Task 2); the list does not render it.
+   */
+  details: Record<string, unknown> | null;
+}
+
+/**
+ * One page of the audit log.
+ *
+ * Not `PaginatedResponse<AuditLogEntry>`: the frozen contract names the count
+ * `total_count`, where every other list in this API calls it `total`. Aliasing
+ * the generic would have meant renaming the field on the wire, and the
+ * contract is the thing that cannot move.
+ */
+export interface AuditLogList {
+  items: AuditLogEntry[];
+  total_count: number;
+  page: number;
+  page_size: number;
+}
+
+/**
+ * What the audit log screen is asking for. Every field optional: an absent one
+ * is a filter not applied, which is how the service decides what to put in the
+ * query string — `actor_id=` with nothing after it is a filter on the empty
+ * string, not the absence of a filter.
+ */
+export interface AuditLogQuery {
+  actor_id?: string;
+  action_type?: AuditAction;
+  entity_type?: string;
+  entity_id?: string;
+  /** `YYYY-MM-DD`. Inclusive, as is `date_to` — both name whole days. */
+  date_from?: string;
+  date_to?: string;
+  sort?: AuditSortField;
+  direction?: SortDirection;
+  page?: number;
+  page_size?: number;
 }
 
 // ---------------------------------------------------------------------------

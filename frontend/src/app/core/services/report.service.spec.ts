@@ -6,15 +6,19 @@ import { ReportService } from './report.service';
 import { environment } from '../../../environments/environment';
 import {
   AccountStatus,
+  AuditAction,
+  AuditSortField,
   PostStatus,
   ReportDecision,
   ReportReason,
   ReportTargetType,
   RestrictionType,
   Sector,
+  SortDirection,
   UserType,
 } from '../constants';
 import type {
+  AuditLogList,
   DirectMessageReport,
   ForumPostReport,
   Report,
@@ -298,5 +302,116 @@ describe('ReportService', () => {
 
     req.flush(restrictions);
     expect(result).toEqual(restrictions);
+  });
+
+  // ---------------------------------------------------------------------------
+  // The audit log (ABF-152)
+  // ---------------------------------------------------------------------------
+
+  describe('getAuditLog', () => {
+    const PAGE: AuditLogList = {
+      items: [
+        {
+          id: 'entry-1',
+          actor_id: 'admin-1',
+          action_type: AuditAction.USER_APPROVED,
+          entity_type: 'User',
+          entity_id: 'user-9',
+          timestamp: '2026-09-01T12:00:00',
+          details: null,
+        },
+      ],
+      total_count: 1,
+      page: 1,
+      page_size: 50,
+    };
+
+    it('GETs the admin audit log and returns the page', () => {
+      let result: AuditLogList | undefined;
+
+      service.getAuditLog().subscribe((res) => (result = res));
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/admin/audit-log`);
+      expect(req.request.method).toBe('GET');
+
+      req.flush(PAGE);
+      expect(result).toEqual(PAGE);
+    });
+
+    it('sends no query string at all when nothing is being filtered', () => {
+      service.getAuditLog().subscribe();
+
+      // Not `?` with nothing after it: an empty query string is a URL the
+      // test would have to match twice over, and the server sees a different
+      // request than the one the caller described.
+      const req = httpMock.expectOne(`${environment.apiUrl}/admin/audit-log`);
+      req.flush(PAGE);
+    });
+
+    /** The query string of the one request that was made, parsed back. */
+    function requestedParams(): URLSearchParams {
+      const req = httpMock.expectOne((r) =>
+        r.url.startsWith(`${environment.apiUrl}/admin/audit-log`),
+      );
+      const query = req.request.url.split('?')[1] ?? '';
+      req.flush(PAGE);
+      return new URLSearchParams(query);
+    }
+
+    it('puts every filter it was given into the query string', () => {
+      service
+        .getAuditLog({
+          actor_id: 'admin-1',
+          action_type: AuditAction.POST_DELETED,
+          entity_type: 'ForumPost',
+          entity_id: 'post-3',
+          date_from: '2026-09-01',
+          date_to: '2026-09-30',
+          sort: AuditSortField.TIMESTAMP,
+          direction: SortDirection.ASC,
+          page: 2,
+          page_size: 25,
+        })
+        .subscribe();
+
+      const params = requestedParams();
+      expect(params.get('actor_id')).toBe('admin-1');
+      expect(params.get('action_type')).toBe('post_deleted');
+      expect(params.get('entity_type')).toBe('ForumPost');
+      expect(params.get('entity_id')).toBe('post-3');
+      expect(params.get('date_from')).toBe('2026-09-01');
+      expect(params.get('date_to')).toBe('2026-09-30');
+      expect(params.get('sort')).toBe('timestamp');
+      expect(params.get('direction')).toBe('asc');
+      expect(params.get('page')).toBe('2');
+      expect(params.get('page_size')).toBe('25');
+    });
+
+    /**
+     * An admin who clears a box means "stop filtering by this". Sent as
+     * `actor_id=`, the server filters on the empty string and answers with
+     * nothing — an empty screen that looks exactly like a log with no
+     * matching rows, for a filter the reader believes they removed.
+     */
+    it('leaves an emptied box out of the query string entirely', () => {
+      service
+        .getAuditLog({ actor_id: '', entity_type: '', action_type: AuditAction.USER_LOGIN })
+        .subscribe();
+
+      const params = requestedParams();
+      expect(params.has('actor_id')).toBe(false);
+      expect(params.has('entity_type')).toBe(false);
+      expect(params.get('action_type')).toBe('user_login');
+    });
+
+    it('encodes a value that would otherwise break the URL', () => {
+      service.getAuditLog({ entity_id: 'a&b=c d' }).subscribe();
+
+      const params = requestedParams();
+      // Read back as one value, not split into several parameters by its own
+      // `&` — which is what a template literal would have produced.
+      expect(params.get('entity_id')).toBe('a&b=c d');
+      expect([...params.keys()]).toEqual(['entity_id']);
+    });
   });
 });

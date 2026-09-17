@@ -321,6 +321,96 @@ export enum AgentMessageRole {
 }
 
 // ---------------------------------------------------------------------------
+// Audit log (ABF-152)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every sensitive action the platform records (SPEC §9.3). Mirrors
+ * `backend/app/core/constants.py::AuditAction`, member for member.
+ *
+ * The audit log screen is the only place this is read, and it reads it twice:
+ * once for the options in its action filter, once for the `מה` column on each
+ * row. Both go through AUDIT_ACTION_LABELS below — the values here are wire
+ * values, and none of them is display text in either language.
+ *
+ * A value the backend adds and this enum has not caught up with does not break
+ * the screen: the table falls back to the raw value for a row it has no label
+ * for (see `audit-log.component.ts`), so an unrecognised action reads as
+ * `some_new_action` rather than as a blank cell. It will be missing from the
+ * filter dropdown until it is added here, which is the visible reminder.
+ */
+export enum AuditAction {
+  USER_APPROVED = 'user_approved',
+  USER_PARTIALLY_APPROVED = 'user_partially_approved',
+  USER_REJECTED = 'user_rejected',
+  USER_SUSPENDED = 'user_suspended',
+  USER_CANCELLED = 'user_cancelled',
+  POST_DELETED = 'post_deleted',
+  BROADCAST_SENT = 'broadcast_sent',
+  REPORT_DECIDED = 'report_decided',
+  PROFESSIONAL_ADDED = 'professional_added',
+  PROFESSIONAL_UPDATED = 'professional_updated',
+  MODERATOR_ASSIGNED = 'moderator_assigned',
+  MODERATOR_UPDATED = 'moderator_updated',
+  MODERATOR_REMOVED = 'moderator_removed',
+  DATA_EXPORTED = 'data_exported',
+  USER_LOGIN = 'user_login',
+  USER_LOGOUT = 'user_logout',
+  DIRECT_MESSAGE_ACCESS_DENIED = 'direct_message_access_denied',
+  DIRECT_MESSAGE_PRUNED = 'direct_message_pruned',
+  DIRECT_MESSAGE_REPORTED = 'direct_message_reported',
+  DIRECT_MESSAGE_REPORT_VIEWED = 'direct_message_report_viewed',
+  USER_RESTRICTED = 'user_restricted',
+  AGENT_CONVERSATION = 'agent_conversation',
+  AGENT_CONVERSATION_ACCESS_DENIED = 'agent_conversation_access_denied',
+}
+
+export const AUDIT_ACTION_LABELS: Record<AuditAction, LabelKey> = {
+  [AuditAction.USER_APPROVED]: 'constants.audit_action.user_approved',
+  [AuditAction.USER_PARTIALLY_APPROVED]: 'constants.audit_action.user_partially_approved',
+  [AuditAction.USER_REJECTED]: 'constants.audit_action.user_rejected',
+  [AuditAction.USER_SUSPENDED]: 'constants.audit_action.user_suspended',
+  [AuditAction.USER_CANCELLED]: 'constants.audit_action.user_cancelled',
+  [AuditAction.POST_DELETED]: 'constants.audit_action.post_deleted',
+  [AuditAction.BROADCAST_SENT]: 'constants.audit_action.broadcast_sent',
+  [AuditAction.REPORT_DECIDED]: 'constants.audit_action.report_decided',
+  [AuditAction.PROFESSIONAL_ADDED]: 'constants.audit_action.professional_added',
+  [AuditAction.PROFESSIONAL_UPDATED]: 'constants.audit_action.professional_updated',
+  [AuditAction.MODERATOR_ASSIGNED]: 'constants.audit_action.moderator_assigned',
+  [AuditAction.MODERATOR_UPDATED]: 'constants.audit_action.moderator_updated',
+  [AuditAction.MODERATOR_REMOVED]: 'constants.audit_action.moderator_removed',
+  [AuditAction.DATA_EXPORTED]: 'constants.audit_action.data_exported',
+  [AuditAction.USER_LOGIN]: 'constants.audit_action.user_login',
+  [AuditAction.USER_LOGOUT]: 'constants.audit_action.user_logout',
+  [AuditAction.DIRECT_MESSAGE_ACCESS_DENIED]: 'constants.audit_action.direct_message_access_denied',
+  [AuditAction.DIRECT_MESSAGE_PRUNED]: 'constants.audit_action.direct_message_pruned',
+  [AuditAction.DIRECT_MESSAGE_REPORTED]: 'constants.audit_action.direct_message_reported',
+  [AuditAction.DIRECT_MESSAGE_REPORT_VIEWED]: 'constants.audit_action.direct_message_report_viewed',
+  [AuditAction.USER_RESTRICTED]: 'constants.audit_action.user_restricted',
+  [AuditAction.AGENT_CONVERSATION]: 'constants.audit_action.agent_conversation',
+  [AuditAction.AGENT_CONVERSATION_ACCESS_DENIED]:
+    'constants.audit_action.agent_conversation_access_denied',
+};
+
+/**
+ * The columns `GET /admin/audit-log` may be sorted by. Mirrors
+ * `backend/app/core/constants.py::AuditSortField`.
+ *
+ * One member, because the frozen contract says `sort=timestamp` — and still an
+ * enum on this side too, so that a clickable header for a second column is a
+ * member added here rather than a string typed into a template.
+ */
+export enum AuditSortField {
+  TIMESTAMP = 'timestamp',
+}
+
+/** Which way a sorted list runs. Mirrors the backend's `SortDirection`. */
+export enum SortDirection {
+  ASC = 'asc',
+  DESC = 'desc',
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

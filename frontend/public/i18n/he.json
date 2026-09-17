@@ -142,7 +142,32 @@
       "removed": "{{name}} הוסר מרשימת הממונים."
     },
     "audit_log": {
-      "title": "יומן פעולות (Audit Log)"
+      "title": "יומן פעולות (Audit Log)",
+      "hint": "כל פעולה רגישה במערכת נרשמת כאן ונשמרת שבע שנים, ללא אפשרות עריכה או מחיקה. מבצע הפעולה והישות מוצגים לפי מזהה — כך הרשומה נשארת נכונה גם אחרי שהחשבון שביצע אותה נמחק.",
+      "filters_legend": "סינון",
+      "filter_actor_label": "מזהה מבצע/ת",
+      "filter_action_label": "סוג פעולה",
+      "filter_action_any": "כל הפעולות",
+      "filter_entity_type_label": "סוג ישות",
+      "filter_entity_id_label": "מזהה ישות",
+      "filter_date_from_label": "מתאריך",
+      "filter_date_to_label": "עד תאריך",
+      "filter_apply": "החל סינון",
+      "filter_reset": "ניקוי סינון",
+      "table_caption": "רשומות יומן הביקורת",
+      "column_actor": "מי",
+      "column_action": "מה",
+      "column_timestamp": "מתי",
+      "column_entity": "ישות",
+      "sort_ascending_aria": "מיון לפי מתי — מהישן לחדש",
+      "sort_descending_aria": "מיון לפי מתי — מהחדש לישן",
+      "results_count": "{{count}} רשומות",
+      "empty": "יומן הביקורת ריק — עדיין לא נרשמה אף פעולה.",
+      "empty_filtered": "אין רשומות התואמות את הסינון שבחרת.",
+      "pager_aria": "עימוד יומן הביקורת",
+      "previous_page": "הקודם",
+      "next_page": "הבא",
+      "page_of": "עמוד {{page}} מתוך {{count}}"
     },
     "broadcast": {
       "title": "שידור לכלל המשתמשים",
@@ -171,7 +196,8 @@
       "toggle_professional_failed": "אירעה שגיאה בעדכון הסטטוס. נסה שוב.",
       "load_moderators_failed": "אירעה שגיאה בטעינת הממונים. נסה לרענן את הדף.",
       "save_moderator_failed": "אירעה שגיאה בשמירת הממונה. נסה שוב.",
-      "remove_moderator_failed": "אירעה שגיאה בהסרת הממונה. נסה שוב."
+      "remove_moderator_failed": "אירעה שגיאה בהסרת הממונה. נסה שוב.",
+      "load_audit_log_failed": "אירעה שגיאה בטעינת יומן הביקורת. נסי לרענן את הדף."
     }
   },
   "advice": {
@@ -740,6 +766,31 @@
       "selfie": "תמונת זיהוי",
       "id_card": "תעודת זהות",
       "passport": "דרכון"
+    },
+    "audit_action": {
+      "user_approved": "אישור הרשמה",
+      "user_partially_approved": "אישור חלקי של הרשמה",
+      "user_rejected": "דחיית הרשמה",
+      "user_suspended": "השעיית משתמש/ת",
+      "user_cancelled": "ביטול חשבון",
+      "post_deleted": "מחיקת פוסט",
+      "broadcast_sent": "שליחת הודעת מערכת",
+      "report_decided": "הכרעה בדיווח",
+      "professional_added": "הוספת איש/אשת מקצוע",
+      "professional_updated": "עדכון איש/אשת מקצוע",
+      "moderator_assigned": "מינוי ממונה",
+      "moderator_updated": "עדכון ממונה",
+      "moderator_removed": "הסרת ממונה",
+      "data_exported": "ייצוא נתונים",
+      "user_login": "כניסה למערכת",
+      "user_logout": "יציאה מהמערכת",
+      "direct_message_access_denied": "גישה להודעה פרטית נדחתה",
+      "direct_message_pruned": "מחיקת הודעות פרטיות ישנות",
+      "direct_message_reported": "דיווח על הודעה פרטית",
+      "direct_message_report_viewed": "צפייה בתוכן הודעה שדווחה",
+      "user_restricted": "החלת הגבלה אוטומטית",
+      "agent_conversation": "שיחה עם סוכן AI",
+      "agent_conversation_access_denied": "גישה לשיחת סוכן נדחתה"
     }
   }
 }
