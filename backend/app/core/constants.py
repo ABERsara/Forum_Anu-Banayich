@@ -213,6 +213,35 @@ class AuditAction(enum.StrEnum):
     AGENT_CONVERSATION_ACCESS_DENIED = "agent_conversation_access_denied"
 
 
+class AuditSortField(enum.StrEnum):
+    """
+    The columns GET /admin/audit-log may be sorted by (ABF-152).
+
+    An enum rather than a free string, because the value reaches
+    `order_by()`: a string taken from the query string and handed to
+    SQLAlchemy is how an ORDER BY injection gets written. FastAPI rejects
+    anything outside these members with a 422 before the service ever runs.
+
+    One member today — the frozen contract says `sort=timestamp` — and it is
+    still an enum and still passed explicitly, so that adding `action_type`
+    to the contract later is a member here rather than a new code path.
+
+    Unlike the enums above, this one and `SortDirection` are *API* vocabulary,
+    not a DB column type: no table stores them and no migration creates them.
+    They live here because the frontend mirrors this file, and the audit log's
+    sortable column headers need the same words the API accepts.
+    """
+
+    TIMESTAMP = "timestamp"
+
+
+class SortDirection(enum.StrEnum):
+    """Which way a sorted list runs. `?direction=` on GET /admin/audit-log."""
+
+    ASC = "asc"
+    DESC = "desc"
+
+
 # ---------------------------------------------------------------------------
 # Human-readable Hebrew labels (useful for emails and admin UI)
 # ---------------------------------------------------------------------------

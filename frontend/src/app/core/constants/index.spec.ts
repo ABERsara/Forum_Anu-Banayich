@@ -11,6 +11,7 @@
 
 import {
   ACCOUNT_STATUS_LABELS,
+  AUDIT_ACTION_LABELS,
   DOCUMENT_TYPE_LABELS,
   GROUP_VISIBILITY_LABELS,
   LabelKey,
@@ -27,9 +28,10 @@ import {
 import { TRANSLATIONS } from '../../../testing/transloco-testing';
 
 /**
- * The ten maps this ticket moved onto translation keys, by their export name,
- * plus the two that were written straight onto keys afterwards
- * (REPORT_DECISION_LABELS, and RESTRICTION_TYPE_LABELS since ABF-116).
+ * The ten maps ABF-127 moved onto translation keys, by their export name, plus
+ * the three that were written straight onto keys afterwards
+ * (REPORT_DECISION_LABELS, RESTRICTION_TYPE_LABELS since ABF-116, and
+ * AUDIT_ACTION_LABELS since ABF-152).
  *
  * A map added here and left out of this object is not merely untested — the
  * "no orphaned translation" check below would then read its `constants.*`
@@ -38,6 +40,7 @@ import { TRANSLATIONS } from '../../../testing/transloco-testing';
  */
 const LABEL_MAPS: Record<string, Record<string, LabelKey>> = {
   ACCOUNT_STATUS_LABELS,
+  AUDIT_ACTION_LABELS,
   DOCUMENT_TYPE_LABELS,
   GROUP_VISIBILITY_LABELS,
   POST_STATUS_LABELS,
