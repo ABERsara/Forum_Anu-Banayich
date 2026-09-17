@@ -233,9 +233,12 @@ export const routes: Routes = [
   // ──────────────────────────────────────────────────────────
   // Professional routes
   // ──────────────────────────────────────────────────────────
+  // The role is decided per child rather than on the parent: the knowledge base
+  // screen (ABF-124) is for an admin as well — can_manage_knowledge lets an
+  // admin edit any domain — while the pending questions stay a professional's.
   {
     path: 'professional',
-    canActivate: [authGuard, roleGuard(UserRole.PROFESSIONAL)],
+    canActivate: [authGuard],
     children: [
       {
         path: '',
@@ -244,9 +247,18 @@ export const routes: Routes = [
       },
       {
         path: 'questions',
+        canActivate: [roleGuard(UserRole.PROFESSIONAL)],
         loadComponent: () =>
           import('./features/advice/pending-questions/pending-questions.component').then(
             (m) => m.PendingQuestionsComponent,
+          ),
+      },
+      {
+        path: 'knowledge',
+        canActivate: [roleGuard(UserRole.PROFESSIONAL, UserRole.ADMIN)],
+        loadComponent: () =>
+          import('./features/agents/agent-knowledge-admin/agent-knowledge-admin.component').then(
+            (m) => m.AgentKnowledgeAdminComponent,
           ),
       },
     ],
