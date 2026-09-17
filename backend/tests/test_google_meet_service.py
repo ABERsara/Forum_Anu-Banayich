@@ -138,7 +138,7 @@ class TestExchangingTheCode:
         )
 
         credential = google_meet_service.exchange_calendar_token(
-            db_session, "auth-code", self._state_for(professional)
+            db_session, "auth-code", self._state_for(professional), professional
         )
 
         assert credential.user_id == professional.id
@@ -157,13 +157,17 @@ class TestExchangingTheCode:
             {"refresh_token": REFRESH_TOKEN, "scope": settings.GOOGLE_CALENDAR_SCOPE},
         )
         state = self._state_for(professional)
-        google_meet_service.exchange_calendar_token(db_session, "code-1", state)
+        google_meet_service.exchange_calendar_token(
+            db_session, "code-1", state, professional
+        )
 
         _post_returning(
             monkeypatch,
             {"refresh_token": "1//second", "scope": settings.GOOGLE_CALENDAR_SCOPE},
         )
-        google_meet_service.exchange_calendar_token(db_session, "code-2", state)
+        google_meet_service.exchange_calendar_token(
+            db_session, "code-2", state, professional
+        )
 
         rows = db_session.query(GoogleCalendarCredential).all()
         assert len(rows) == 1
@@ -181,7 +185,7 @@ class TestExchangingTheCode:
 
         with pytest.raises(HTTPException) as exc_info:
             google_meet_service.exchange_calendar_token(
-                db_session, "auth-code", self._state_for(professional)
+                db_session, "auth-code", self._state_for(professional), professional
             )
 
         assert exc_info.value.status_code == 502
@@ -202,7 +206,7 @@ class TestExchangingTheCode:
 
         with pytest.raises(HTTPException) as exc_info:
             google_meet_service.exchange_calendar_token(
-                db_session, "auth-code", self._state_for(professional)
+                db_session, "auth-code", self._state_for(professional), professional
             )
 
         assert exc_info.value.status_code == 403
@@ -219,9 +223,43 @@ class TestExchangingTheCode:
         _post_returning(monkeypatch, {"refresh_token": REFRESH_TOKEN})
 
         with pytest.raises(HTTPException) as exc_info:
-            google_meet_service.exchange_calendar_token(db_session, "code", forged)
+            google_meet_service.exchange_calendar_token(
+                db_session, "code", forged, professional
+            )
 
         assert exc_info.value.status_code == 400
+
+    def test_a_state_issued_to_another_professional_is_rejected_unspent(
+        self, configured, db_session, professional, make_user, monkeypatch
+    ):
+        """
+        Her consent link, completed by someone else: their browser posts her
+        state under their own login. Refused before Google is called, so the
+        code they were given is never exchanged and no calendar is stored
+        against either account.
+        """
+        other = make_user(
+            email="other@example.com",
+            role=UserRole.PROFESSIONAL,
+            account_status=AccountStatus.ACTIVE,
+            professional_domain=ProfessionalDomain.LAWYER,
+        )
+        calls: list[dict[str, Any]] = []
+        _post_returning(
+            monkeypatch,
+            {"refresh_token": REFRESH_TOKEN, "scope": settings.GOOGLE_CALENDAR_SCOPE},
+            calls,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            google_meet_service.exchange_calendar_token(
+                db_session, "auth-code", self._state_for(professional), other
+            )
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == translate("meetings.calendar_state_invalid")
+        assert calls == []
+        assert db_session.query(GoogleCalendarCredential).count() == 0
 
     def test_an_access_token_is_not_a_state(
         self, configured, db_session, professional, monkeypatch
@@ -239,7 +277,9 @@ class TestExchangingTheCode:
         _post_returning(monkeypatch, {"refresh_token": REFRESH_TOKEN})
 
         with pytest.raises(HTTPException) as exc_info:
-            google_meet_service.exchange_calendar_token(db_session, "code", access)
+            google_meet_service.exchange_calendar_token(
+                db_session, "code", access, professional
+            )
 
         assert exc_info.value.status_code == 400
 
@@ -259,7 +299,7 @@ class TestExchangingTheCode:
 
         with pytest.raises(HTTPException) as exc_info:
             google_meet_service.exchange_calendar_token(
-                db_session, "used-code", self._state_for(professional)
+                db_session, "used-code", self._state_for(professional), professional
             )
 
         assert exc_info.value.status_code == 400

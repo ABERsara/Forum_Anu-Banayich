@@ -739,7 +739,7 @@ class TestCalendarConnection:
 
         assert r.status_code == 403
 
-    async def test_the_callback_stores_the_grant_and_returns_to_the_app(
+    async def test_connect_stores_the_grant_and_reports_it(
         self, client, db_session, make_user, configured, monkeypatch
     ):
         professional = _professional(make_user)
@@ -755,38 +755,55 @@ class TestCalendarConnection:
             },
         )
 
-        r = await client.get(
-            f"{BASE}/calendar/callback", params={"code": "auth-code", "state": state}
+        r = await client.post(
+            f"{BASE}/calendar/connect", json={"code": "auth-code", "state": state}
         )
 
-        assert r.status_code == 302
-        assert r.headers["location"].endswith("?calendar=connected")
+        assert r.status_code == 200
+        assert r.json()["connected"] is True
+        assert r.json()["connected_at"].endswith("Z")
         assert google_meet_service.get_credential(db_session, professional.id)
 
-    async def test_declining_consent_is_reported_as_a_choice(
-        self, client, db_session, make_user, configured
+    async def test_a_consent_link_completed_under_another_login_links_nothing(
+        self, client, db_session, make_user, configured, monkeypatch
     ):
-        r = await client.get(
-            f"{BASE}/calendar/callback", params={"error": "access_denied"}
-        )
-
-        assert r.status_code == 302
-        assert r.headers["location"].endswith("?calendar=denied")
-        assert db_session.query(Meeting).count() == 0
-
-    async def test_a_code_without_a_valid_state_links_nothing(
-        self, client, db_session, make_user, configured
-    ):
+        """
+        The attack the authenticated endpoint exists to stop: a professional
+        sends her consent link to someone else, who approves it and lands on
+        the return page logged in as themselves.
+        """
         from app.models.google_calendar_credential import GoogleCalendarCredential
 
-        r = await client.get(
-            f"{BASE}/calendar/callback",
-            params={"code": "auth-code", "state": "not-a-real-state"},
+        _login_as(_professional(make_user))
+        state = await self._state_from_status(client)
+
+        _login_as(_professional(make_user, email="other-pro@example.com"))
+        monkeypatch.setattr(
+            google_meet_service,
+            "_post_to_google",
+            lambda url, data: {
+                "refresh_token": "1//refresh",
+                "scope": google_meet_service.settings.GOOGLE_CALENDAR_SCOPE,
+            },
         )
 
-        assert r.status_code == 302
-        assert r.headers["location"].endswith("?calendar=error")
+        r = await client.post(
+            f"{BASE}/calendar/connect", json={"code": "auth-code", "state": state}
+        )
+
+        assert r.status_code == 400
         assert db_session.query(GoogleCalendarCredential).count() == 0
+
+    async def test_connect_is_not_a_member_facing_endpoint(
+        self, client, make_user, configured
+    ):
+        _login_as(_member(make_user))
+
+        r = await client.post(
+            f"{BASE}/calendar/connect", json={"code": "auth-code", "state": "state"}
+        )
+
+        assert r.status_code == 403
 
     async def _state_from_status(self, client) -> str:
         from urllib.parse import parse_qs, urlparse
