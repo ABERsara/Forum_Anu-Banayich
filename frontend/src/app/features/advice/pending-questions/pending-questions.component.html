@@ -4,7 +4,12 @@
   <a routerLink="/home"
     ><span aria-hidden="true">‹</span> {{ 'advice.pending.back_to_home' | transloco }}</a
   >
-  <h1 class="pending-questions__title">{{ 'advice.pending.title' | transloco }}</h1>
+  <div class="pending-questions__header">
+    <h1 class="pending-questions__title">{{ 'advice.pending.title' | transloco }}</h1>
+    <a routerLink="/professional/knowledge" class="pending-questions__knowledge-link">
+      {{ 'advice.pending.knowledge_link' | transloco }}
+    </a>
+  </div>
   <p class="pending-questions__intro">{{ 'advice.pending.intro' | transloco }}</p>
 
   <!-- The API's own `detail` is a finished sentence and is shown as it came;

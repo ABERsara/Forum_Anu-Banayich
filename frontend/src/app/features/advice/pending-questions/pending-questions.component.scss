@@ -13,11 +13,23 @@
 }
 
 .pending-questions {
+  &__header {
+    @include flex-between;
+
+    flex-wrap: wrap;
+    gap: $spacing-xs $spacing-md;
+    margin: $spacing-lg 0 $spacing-xs;
+  }
+
   &__title {
     font-size: $font-size-2xl;
     font-weight: $font-weight-bold;
     color: $color-text;
-    margin: $spacing-lg 0 $spacing-xs;
+    margin: 0;
+  }
+
+  &__knowledge-link {
+    font-size: $font-size-sm;
   }
 
   &__intro,

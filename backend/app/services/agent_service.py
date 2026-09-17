@@ -302,6 +302,50 @@ def get_manageable_domain(db: Session, domain_id: str, user: User) -> AgentDomai
     return domain
 
 
+def get_manageable_domains(db: Session, user: User) -> list[AgentDomain]:
+    """Every domain whose knowledge base `user` may maintain, by name.
+
+    Filtered through can_manage_knowledge() itself rather than a query that
+    restates it, so the list a screen offers and the writes the API accepts
+    cannot drift apart. The catalog is a handful of rows, one per subject, so
+    loading it whole costs nothing.
+
+    Inactive domains are included: retiring an agent hides it from members, not
+    from the people who maintain it, and the knowledge endpoints accept writes
+    to it either way.
+    """
+    domains = db.query(AgentDomain).order_by(AgentDomain.name, AgentDomain.id).all()
+    return [domain for domain in domains if can_manage_knowledge(user, domain)]
+
+
+def list_knowledge_entries(
+    db: Session,
+    domain_id: str,
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[AgentKnowledgeEntry], int]:
+    """One page of a domain's knowledge base, newest edit first, and the total.
+
+    Whether the caller may read it is get_manageable_domain()'s question, and is
+    settled before this is called.
+    """
+    query = db.query(AgentKnowledgeEntry).filter(
+        AgentKnowledgeEntry.domain_id == domain_id
+    )
+    total = query.count()
+
+    rows = (
+        # id as a tiebreaker: two entries saved in the same second share an
+        # updated_at, and without a total order a row can repeat across pages
+        # or be skipped.
+        query.order_by(AgentKnowledgeEntry.updated_at.desc(), AgentKnowledgeEntry.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return rows, total
+
+
 def get_entry_or_404(db: Session, domain_id: str, entry_id: str) -> AgentKnowledgeEntry:
     """Load an entry *of this domain*, or raise 404.
 

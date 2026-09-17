@@ -3,8 +3,11 @@ AI agent endpoints.
 
 GET    /agents                                            – list the agent domains
                                                             visible to the current user
+GET    /agents/manageable                                 – list the domains the current
+                                                            user maintains
 POST   /agents/{domain_id}/chat                           – ask an agent a question
 GET    /agents/{domain_id}/conversations/{id}             – read a whole conversation
+GET    /agents/{domain_id}/knowledge-entries              – list knowledge base content
 POST   /agents/{domain_id}/knowledge-entries              – add knowledge base content
 PATCH  /agents/{domain_id}/knowledge-entries/{entry_id}   – edit it
 DELETE /agents/{domain_id}/knowledge-entries/{entry_id}   – remove it
@@ -19,10 +22,12 @@ an enum: since ABF-120 an agent is a table row an admin can add, gated by
 group/sector like a forum post, so an unknown or invisible agent cannot be
 rejected by path coercion.
 
-The three **knowledge base** routes are for the people who maintain a domain,
-not for the members who ask it questions, and each one refuses in three stages:
-the role (a member never reaches the database at all), then the domain (404 if
-it does not exist), then the discipline (403 if it is not theirs).
+The **knowledge base** routes are for the people who maintain a domain, not for
+the members who ask it questions, and each one that names a domain refuses in
+three stages: the role (a member never reaches the database at all), then the
+domain (404 if it does not exist), then the discipline (403 if it is not
+theirs). `/agents/manageable` names none, and is how the screen that maintains
+a knowledge base (ABF-124) learns which domain ids it may use.
 
 Those refusals are all these handlers do. The writes themselves, the decision
 of when an edit is worth re-indexing, and the whole of the chat flow live in
@@ -30,7 +35,7 @@ agent_service — so a later ticket that needs to create an entry or answer a
 question outside of HTTP calls the same code rather than a copy of it.
 """
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.constants import UserRole
@@ -47,6 +52,7 @@ from app.schemas.agent import (
     AgentConversationResponse,
     AgentDomainResponse,
     AgentKnowledgeEntryCreate,
+    AgentKnowledgeEntryListResponse,
     AgentKnowledgeEntryResponse,
     AgentKnowledgeEntryUpdate,
 )
@@ -61,9 +67,9 @@ _knowledge_manager = require_role(UserRole.ADMIN, UserRole.PROFESSIONAL)
 
 
 # USER only, deliberately: ADMIN / MODERATOR / PROFESSIONAL get 403 here. This
-# is the member-facing catalog, filtered by the caller's group/sector. Catalog
-# management and a professional's "domains I maintain" view (SPEC §12.2) belong
-# to a later admin-tools ticket and need a different, unfiltered query. Widening
+# is the member-facing catalog, filtered by the caller's group/sector. A
+# professional's "domains I maintain" view (SPEC §12.2) is /agents/manageable
+# below; catalog management belongs to a later admin-tools ticket. Widening
 # this dependency later is backward-compatible.
 @router.get(
     "",
@@ -78,6 +84,22 @@ def list_agent_domains(
     return [
         AgentDomainResponse.model_validate(domain)
         for domain in agent_service.get_visible_domains(db, current_user)
+    ]
+
+
+@router.get(
+    "/manageable",
+    response_model=list[AgentDomainResponse],
+    dependencies=[Depends(_knowledge_manager)],
+)
+def list_manageable_domains(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> list[AgentDomainResponse]:
+    """Return the domains whose knowledge base the current user may maintain."""
+    return [
+        AgentDomainResponse.model_validate(domain)
+        for domain in agent_service.get_manageable_domains(db, current_user)
     ]
 
 
@@ -126,6 +148,31 @@ def get_conversation(
 ) -> AgentConversationResponse:
     """Return one conversation's messages in chronological order."""
     return agent_service.get_conversation(db, current_user, domain_id, conversation_id)
+
+
+@router.get(
+    "/{domain_id}/knowledge-entries",
+    response_model=AgentKnowledgeEntryListResponse,
+    dependencies=[Depends(_knowledge_manager)],
+)
+def list_knowledge_entries(
+    domain_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> AgentKnowledgeEntryListResponse:
+    """Return one page of a domain's knowledge base, most recently edited first."""
+    agent_service.get_manageable_domain(db, domain_id, current_user)
+    entries, total = agent_service.list_knowledge_entries(
+        db, domain_id, page, page_size
+    )
+    return AgentKnowledgeEntryListResponse(
+        items=[AgentKnowledgeEntryResponse.model_validate(e) for e in entries],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post(

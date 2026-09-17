@@ -1,0 +1,211 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+// No `direction` here: the page inherits it from <html dir>, which
+// LocaleService sets from the active language (CONTRIBUTING §6). Everything
+// below is direction-neutral, so the layout mirrors on its own.
+:host {
+  display: block;
+  padding: $spacing-lg;
+}
+
+.knowledge-admin {
+  &__header {
+    @include flex-between;
+
+    flex-wrap: wrap;
+    gap: $spacing-md;
+    margin-top: $spacing-lg;
+  }
+
+  &__title {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+    margin: 0;
+  }
+
+  &__intro,
+  &__empty {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: $spacing-xs 0 $spacing-lg;
+  }
+
+  &__domain {
+    color: $color-text-muted;
+    margin-bottom: $spacing-md;
+  }
+
+  &__domain-name {
+    color: $color-text;
+    font-weight: $font-weight-medium;
+  }
+
+  &__success {
+    color: $color-success;
+    font-weight: $font-weight-medium;
+    margin-bottom: $spacing-md;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Add / edit panel
+// ---------------------------------------------------------------------------
+
+.panel {
+  background: $color-bg-subtle;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+
+  &__title {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    margin-bottom: $spacing-md;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+    margin-top: $spacing-md;
+  }
+}
+
+.form-row {
+  display: grid;
+  gap: $spacing-md;
+
+  @include responsive(md) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin-bottom: $spacing-md;
+
+  // The picker is as wide as the agent names in it, not the whole page.
+  &--inline {
+    align-items: flex-start;
+  }
+
+  label {
+    font-weight: $font-weight-medium;
+  }
+
+  input,
+  select,
+  textarea {
+    padding: $spacing-sm;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    font-size: $font-size-base;
+    font-family: inherit;
+    background: $color-bg;
+    resize: vertical;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+}
+
+.field-error {
+  font-size: $font-size-xs;
+  color: $color-danger;
+}
+
+.source-group {
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  padding: $spacing-sm $spacing-md 0;
+
+  legend {
+    font-weight: $font-weight-medium;
+    padding-inline: $spacing-xs;
+  }
+
+  &__hint {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: 0 0 $spacing-sm;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Entries
+// ---------------------------------------------------------------------------
+
+.entries {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  // Stacked on a phone, the actions beside the text from md up.
+  &__item {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    margin-bottom: $spacing-sm;
+    background: $color-bg;
+
+    @include responsive(md) {
+      flex-direction: row;
+      justify-content: space-between;
+    }
+  }
+
+  &__main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-bold;
+    margin: 0 0 $spacing-xs;
+  }
+
+  // Line breaks are part of what the professional wrote. Long entries are cut
+  // to a few lines here; the whole text is one click away in the edit form.
+  &__content {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    overflow: hidden;
+    margin: 0 0 $spacing-xs;
+  }
+
+  &__meta {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-sm;
+  }
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+}

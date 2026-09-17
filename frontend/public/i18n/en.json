@@ -235,7 +235,8 @@
       "answer_error": "Please enter an answer of 10 to 5000 characters",
       "sending": "Sending answer...",
       "submit": "Send answer",
-      "success": "Your answer was sent, and the asker has been notified by email."
+      "success": "Your answer was sent, and the asker has been notified by email.",
+      "knowledge_link": "Manage the agent's knowledge base"
     },
     "errors": {
       "load_professionals_failed": "Something went wrong loading the professionals list. Please try again later.",
@@ -272,11 +273,55 @@
       "refer_hint": "The agent gives general information. For a personal question you can reach a professional in this field.",
       "refer_button": "Refer me to human advice"
     },
+    "knowledge": {
+      "back_to_questions": "Back to pending questions",
+      "title": "Manage the knowledge base",
+      "intro": "This is what the agent answers from. A change saved here affects the agent's answers right away.",
+      "loading_domains": "Loading agents...",
+      "no_domains": "No agent's knowledge base is assigned to you. To change that, contact a system administrator.",
+      "domain_label": "Agent",
+      "loading": "Loading the knowledge base...",
+      "empty": "This agent's knowledge base has no content yet.",
+      "add": "Add content",
+      "add_submit": "Add to the knowledge base",
+      "edit": "Edit",
+      "edit_title": "Edit \"{{title}}\"",
+      "edit_aria": "Edit {{title}}",
+      "delete": "Delete",
+      "delete_aria": "Delete {{title}}",
+      "delete_dialog_title": "Delete from the knowledge base",
+      "delete_dialog_message": "\"{{title}}\" will be deleted, and the agent will stop relying on it. This cannot be undone.",
+      "title_label": "Title",
+      "title_error": "Please enter a title (up to {{max}} characters)",
+      "content_label": "Content",
+      "content_error": "Please enter the content",
+      "source_legend": "Source (optional)",
+      "source_hint": "If the content was copied from an outside site, such as Kol Zchut or National Insurance, note where it came from.",
+      "source_name_label": "Source name",
+      "source_name_error": "The source name can be up to {{max}} characters",
+      "source_url_label": "Source link",
+      "source_url_error": "Please enter a full link starting with http:// or https:// (up to {{max}} characters)",
+      "saving": "Saving...",
+      "save_changes": "Save changes",
+      "updated_on": "Updated {{date}}",
+      "source_link": "To the source",
+      "created": "\"{{title}}\" was added to the knowledge base.",
+      "updated": "\"{{title}}\" was updated.",
+      "deleted": "\"{{title}}\" was deleted from the knowledge base.",
+      "pager_aria": "Knowledge base pages",
+      "previous_page": "Previous",
+      "next_page": "Next",
+      "page_of": "Page {{page}} of {{count}}"
+    },
     "errors": {
       "load_domains_failed": "Something went wrong loading the agents list. Please try again later.",
       "domain_unavailable": "This agent is not available to you.",
       "load_conversation_failed": "Something went wrong loading the previous conversation. You can start a new one.",
-      "send_failed": "Something went wrong sending your question to the agent. Please try again."
+      "send_failed": "Something went wrong sending your question to the agent. Please try again.",
+      "load_manageable_failed": "Something went wrong loading the agents you manage. Please try again later.",
+      "load_entries_failed": "Something went wrong loading the knowledge base. Please try again later.",
+      "save_entry_failed": "Something went wrong saving the content. Please try again.",
+      "delete_entry_failed": "Something went wrong deleting the content. Please try again."
     }
   },
   "auth": {

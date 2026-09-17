@@ -1,20 +1,24 @@
 """
 Integration tests for the knowledge base endpoints.
 
+GET    /agents/manageable
+GET    /agents/{domain_id}/knowledge-entries
 POST   /agents/{domain_id}/knowledge-entries
 PATCH  /agents/{domain_id}/knowledge-entries/{entry_id}
 DELETE /agents/{domain_id}/knowledge-entries/{entry_id}
 
-What these are about is who may write to a knowledge base, and what the API
-tells someone who may not. Indexing is stubbed throughout: it is tested against
-a real pgvector database in test_rag_service.py, and letting it run here would
-put a Gemini call inside an authorization test.
+What these are about is who may read and write a knowledge base, and what the
+API tells someone who may not. Indexing is stubbed throughout: it is tested
+against a real pgvector database in test_rag_service.py, and letting it run here
+would put a Gemini call inside an authorization test.
 
 The two refusals are deliberately different, and both are asserted:
 404 for a domain or an entry the caller cannot see, 403 only once the thing is
 known to exist and to not be theirs. A 403 on a domain id that does not exist
 would answer a question about the catalog that was never asked.
 """
+
+from datetime import datetime
 
 import pytest
 from sqlalchemy.orm import Session
@@ -519,3 +523,193 @@ class TestAnEntryOfAnotherDomain:
         )
 
         assert response.status_code == 404
+
+
+class TestList:
+    async def test_a_professional_sees_their_own_domain_newest_edit_first(
+        self, client, as_user, lawyer, lawyer_domain, db_session
+    ) -> None:
+        older = _add_entry(db_session, lawyer_domain.id, lawyer, title="ישן")
+        newer = _add_entry(db_session, lawyer_domain.id, lawyer, title="חדש")
+        older.updated_at = datetime(2026, 1, 1)
+        newer.updated_at = datetime(2026, 2, 1)
+        db_session.commit()
+        as_user(lawyer)
+
+        response = await client.get(_entries_url(lawyer_domain.id))
+
+        assert response.status_code == 200
+        body = response.json()
+        assert [item["title"] for item in body["items"]] == ["חדש", "ישן"]
+        assert body["total"] == 2
+        assert body["page"] == 1
+        assert body["page_size"] == 20
+
+    async def test_it_pages_and_reports_the_total_across_pages(
+        self, client, as_user, lawyer, lawyer_domain, db_session
+    ) -> None:
+        for day in range(1, 4):
+            entry = _add_entry(db_session, lawyer_domain.id, lawyer, title=f"ערך {day}")
+            entry.updated_at = datetime(2026, 1, day)
+        db_session.commit()
+        as_user(lawyer)
+
+        response = await client.get(
+            _entries_url(lawyer_domain.id), params={"page": 2, "page_size": 2}
+        )
+
+        body = response.json()
+        assert [item["title"] for item in body["items"]] == ["ערך 1"]
+        assert body["total"] == 3
+        assert body["page"] == 2
+        assert body["page_size"] == 2
+
+    @pytest.mark.parametrize(
+        "params", [{"page": 0}, {"page_size": 0}, {"page_size": 101}]
+    )
+    async def test_an_out_of_range_page_is_422(
+        self, client, as_user, lawyer, lawyer_domain, params: dict[str, int]
+    ) -> None:
+        as_user(lawyer)
+
+        response = await client.get(_entries_url(lawyer_domain.id), params=params)
+
+        assert response.status_code == 422
+
+    async def test_entries_of_another_domain_are_not_listed(
+        self, client, as_user, lawyer, lawyer_domain, make_agent_domain, db_session
+    ) -> None:
+        inheritance = make_agent_domain("ירושה", ProfessionalDomain.LAWYER)
+        _add_entry(db_session, lawyer_domain.id, lawyer, title="שלי")
+        _add_entry(db_session, inheritance.id, lawyer, title="של תחום אחר")
+        as_user(lawyer)
+
+        body = (await client.get(_entries_url(lawyer_domain.id))).json()
+
+        assert [item["title"] for item in body["items"]] == ["שלי"]
+        assert body["total"] == 1
+
+    async def test_a_professional_of_another_discipline_is_refused(
+        self, client, as_user, make_user, lawyer, lawyer_domain, db_session
+    ) -> None:
+        _add_entry(db_session, lawyer_domain.id, lawyer)
+        doctor = make_user(
+            "doctor@example.com",
+            role=UserRole.PROFESSIONAL,
+            professional_domain=ProfessionalDomain.MEDICINE,
+        )
+        as_user(doctor)
+
+        response = await client.get(_entries_url(lawyer_domain.id))
+
+        assert response.status_code == 403
+        assert "items" not in response.json()
+
+    async def test_an_admin_may_list_any_domain(
+        self, client, as_user, admin, lawyer, lawyer_domain, db_session
+    ) -> None:
+        _add_entry(db_session, lawyer_domain.id, lawyer)
+        as_user(admin)
+
+        response = await client.get(_entries_url(lawyer_domain.id))
+
+        assert response.status_code == 200
+        assert response.json()["total"] == 1
+
+    async def test_a_member_is_refused(
+        self, client, as_user, make_user, lawyer_domain
+    ) -> None:
+        member = make_user(
+            "member@example.com", user_type=UserType.WIDOW, sector=Sector.SEPHARDIC
+        )
+        as_user(member)
+
+        response = await client.get(_entries_url(lawyer_domain.id))
+
+        assert response.status_code == 403
+
+    async def test_a_domain_that_does_not_exist_is_404_not_403(
+        self, client, as_user, lawyer
+    ) -> None:
+        as_user(lawyer)
+
+        response = await client.get(
+            _entries_url("00000000-0000-0000-0000-000000000000")
+        )
+
+        assert response.status_code == 404
+
+    async def test_an_unauthenticated_request_is_401(
+        self, client, lawyer_domain
+    ) -> None:
+        response = await client.get(_entries_url(lawyer_domain.id))
+        assert response.status_code == 401
+
+
+class TestManageableDomains:
+    URL = f"{BASE}/manageable"
+
+    async def test_a_professional_gets_the_domains_of_their_discipline_only(
+        self, client, as_user, lawyer, lawyer_domain, make_agent_domain
+    ) -> None:
+        make_agent_domain("בריאות", ProfessionalDomain.MEDICINE)
+        inheritance = make_agent_domain("ירושה", ProfessionalDomain.LAWYER)
+        as_user(lawyer)
+
+        response = await client.get(self.URL)
+
+        assert response.status_code == 200
+        assert {d["id"] for d in response.json()} == {lawyer_domain.id, inheritance.id}
+
+    async def test_an_inactive_domain_is_still_listed_for_its_maintainer(
+        self, client, as_user, lawyer, make_agent_domain
+    ) -> None:
+        # Retiring an agent hides it from members; the knowledge endpoints
+        # still accept writes to it, so the screen must still offer it.
+        retired = make_agent_domain("ישן", ProfessionalDomain.LAWYER, is_active=False)
+        as_user(lawyer)
+
+        response = await client.get(self.URL)
+
+        assert [d["id"] for d in response.json()] == [retired.id]
+
+    async def test_an_admin_gets_every_domain(
+        self, client, as_user, admin, lawyer_domain, make_agent_domain
+    ) -> None:
+        medical = make_agent_domain("בריאות", ProfessionalDomain.MEDICINE)
+        as_user(admin)
+
+        response = await client.get(self.URL)
+
+        assert {d["id"] for d in response.json()} == {lawyer_domain.id, medical.id}
+
+    async def test_a_professional_with_no_discipline_set_gets_nothing(
+        self, client, as_user, make_user, lawyer_domain
+    ) -> None:
+        professional = make_user("pro@example.com", role=UserRole.PROFESSIONAL)
+        as_user(professional)
+
+        response = await client.get(self.URL)
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.parametrize("role", [UserRole.USER, UserRole.MODERATOR])
+    async def test_a_member_or_moderator_is_refused(
+        self, client, as_user, make_user, lawyer_domain, role: UserRole
+    ) -> None:
+        actor = make_user(
+            f"{role.value}@example.com",
+            role=role,
+            user_type=UserType.WIDOW,
+            sector=Sector.SEPHARDIC,
+        )
+        as_user(actor)
+
+        response = await client.get(self.URL)
+
+        assert response.status_code == 403
+
+    async def test_an_unauthenticated_request_is_401(self, client) -> None:
+        response = await client.get(self.URL)
+        assert response.status_code == 401
