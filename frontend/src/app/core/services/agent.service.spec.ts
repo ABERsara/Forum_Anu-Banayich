@@ -1,5 +1,6 @@
 /**
- * The three member-facing agent calls, against `HttpTestingController`.
+ * The agent calls — the three member-facing ones and the knowledge-base ones —
+ * against `HttpTestingController`.
  *
  * What is worth asserting here is the shape of the *request*, because that is
  * the half the backend contract fixes and the half a component cannot check:
@@ -15,7 +16,13 @@ import { TestBed } from '@angular/core/testing';
 import { AgentService } from './agent.service';
 import { environment } from '../../../environments/environment';
 import { AgentMessageRole, ProfessionalDomain } from '../constants';
-import type { AgentChatResponse, AgentConversation, AgentDomain } from '../models';
+import type {
+  AgentChatResponse,
+  AgentConversation,
+  AgentDomain,
+  AgentKnowledgeEntry,
+  PaginatedResponse,
+} from '../models';
 
 const DOMAIN: AgentDomain = {
   id: 'domain-1',
@@ -156,6 +163,90 @@ describe('AgentService', () => {
       };
       req.flush(conversation);
       expect(result).toEqual(conversation);
+    });
+  });
+
+  describe('knowledge base', () => {
+    const ENTRY: AgentKnowledgeEntry = {
+      id: 'e1',
+      domain_id: 'domain-1',
+      title: 'הנחה בארנונה',
+      content: 'משפחה חד-הורית זכאית להנחה בארנונה.',
+      source_name: 'כל זכות',
+      source_url: 'https://www.kolzchut.org.il/',
+      updated_by: 'u1',
+      created_at: '2026-09-15T10:00:00',
+      updated_at: '2026-09-15T10:00:00',
+    };
+
+    it('GETs the domains the caller maintains', () => {
+      let result: AgentDomain[] | undefined;
+      service.getManageableDomains().subscribe((res) => (result = res));
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/agents/manageable`);
+      expect(req.request.method).toBe('GET');
+
+      req.flush([DOMAIN]);
+      expect(result).toEqual([DOMAIN]);
+    });
+
+    it('GETs one page of a domain knowledge base', () => {
+      let result: PaginatedResponse<AgentKnowledgeEntry> | undefined;
+      service.listKnowledgeEntries('domain-1', 2, 10).subscribe((res) => (result = res));
+
+      const req = httpMock.expectOne(
+        `${environment.apiUrl}/agents/domain-1/knowledge-entries?page=2&page_size=10`,
+      );
+      expect(req.request.method).toBe('GET');
+
+      const page = { items: [ENTRY], total: 11, page: 2, page_size: 10 };
+      req.flush(page);
+      expect(result).toEqual(page);
+    });
+
+    it('asks for the first page of 20 by default', () => {
+      service.listKnowledgeEntries('domain-1').subscribe();
+
+      httpMock
+        .expectOne(`${environment.apiUrl}/agents/domain-1/knowledge-entries?page=1&page_size=20`)
+        .flush({ items: [], total: 0, page: 1, page_size: 20 });
+    });
+
+    it('POSTs a new entry to the domain in the path', () => {
+      const body = {
+        title: ENTRY.title,
+        content: ENTRY.content,
+        source_name: null,
+        source_url: null,
+      };
+      service.createKnowledgeEntry('domain-1', body).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/agents/domain-1/knowledge-entries`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(body);
+      req.flush(ENTRY);
+    });
+
+    /** PATCH, not POST: the body is partial, and only what is on it gets written. */
+    it('PATCHes an edit with exactly the fields it was given', () => {
+      service.updateKnowledgeEntry('domain-1', 'e1', { source_url: null }).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/agents/domain-1/knowledge-entries/e1`);
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ source_url: null });
+      req.flush({ ...ENTRY, source_url: null });
+    });
+
+    it('DELETEs an entry under its domain', () => {
+      let completed = false;
+      service.deleteKnowledgeEntry('domain-1', 'e1').subscribe({
+        complete: () => (completed = true),
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/agents/domain-1/knowledge-entries/e1`);
+      expect(req.request.method).toBe('DELETE');
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      expect(completed).toBe(true);
     });
   });
 });
