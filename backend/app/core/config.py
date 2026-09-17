@@ -164,20 +164,14 @@ class Settings(BaseSettings):
     # less is also what the consent screen shows her.
     GOOGLE_CALENDAR_SCOPE: str = "https://www.googleapis.com/auth/calendar.events"
 
-    # Where Google sends the browser back after consent. This is the API's own
-    # callback (GET /meetings/calendar/callback), not an Angular route: the
-    # return trip is a plain browser navigation with no Authorization header,
-    # so the caller is identified by the signed `state` instead — and the
-    # authorisation code and client secret never pass through the frontend.
+    # Where Google sends the browser back after consent: a page in the Angular
+    # app, not an API route. The page posts the code and state to
+    # POST /meetings/calendar/connect with the logged-in user's token, and the
+    # API refuses a state issued to anyone else — a plain navigation to the API
+    # carries no Authorization header to compare it with. The client secret
+    # still never leaves the API: the code is useless without it.
     # Must match a redirect URI registered in the Google Cloud console exactly.
-    GOOGLE_REDIRECT_URI_MEET: str = (
-        "http://localhost:8000/api/v1/meetings/calendar/callback"
-    )
-
-    # Where that callback sends the professional once the calendar is linked
-    # (or once linking failed) — a page in the Angular app, which reads the
-    # outcome from the query string it arrives with.
-    GOOGLE_CALENDAR_RETURN_URL: str = "http://localhost:4200/meetings"
+    GOOGLE_REDIRECT_URI_MEET: str = "http://localhost:4200/meetings/calendar/callback"
 
     # Google Calendar needs an end time; the form asks only for a start
     # (ABF-156 leaves choosing a duration to a later ticket). Each meeting

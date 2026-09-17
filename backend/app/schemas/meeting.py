@@ -125,6 +125,19 @@ class MeetingResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CalendarConnectRequest(BaseModel):
+    """
+    POST /meetings/calendar/connect – what Google handed the return page.
+
+    Both values are copied from the query string Google returned the browser
+    with. Neither is trusted: the state is verified against the logged-in
+    caller, and the code means nothing until Google accepts it.
+    """
+
+    code: str = Field(..., min_length=1, max_length=2048)
+    state: str = Field(..., min_length=1, max_length=2048)
+
+
 class CalendarStatusResponse(BaseModel):
     """
     GET /meetings/calendar/status – may this professional schedule yet?

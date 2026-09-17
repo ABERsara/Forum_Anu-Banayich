@@ -4,23 +4,22 @@ Meeting endpoints (ABF-156).
 POST /meetings                     – schedule a meeting (professional only)
 GET  /meetings                     – meetings still to come that you may see
 GET  /meetings/calendar/status     – is this professional's calendar linked
-GET  /meetings/calendar/callback   – where Google returns after consent
+POST /meetings/calendar/connect    – link the calendar Google just authorised
 """
 
-import logging
-
-from fastapi import APIRouter, Depends, Query
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.constants import UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
-from app.schemas.meeting import CalendarStatusResponse, MeetingCreate, MeetingResponse
+from app.schemas.meeting import (
+    CalendarConnectRequest,
+    CalendarStatusResponse,
+    MeetingCreate,
+    MeetingResponse,
+)
 from app.services import google_meet_service, meeting_service
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Meetings"])
 
@@ -93,39 +92,35 @@ def calendar_status(
     )
 
 
-@router.get("/meetings/calendar/callback", include_in_schema=False)
-def calendar_callback(
-    code: str | None = Query(None),
-    state: str | None = Query(None),
-    error: str | None = Query(None),
+@router.post(
+    "/meetings/calendar/connect",
+    response_model=CalendarStatusResponse,
+    dependencies=[Depends(require_role(UserRole.PROFESSIONAL))],
+)
+def calendar_connect(
+    data: CalendarConnectRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-) -> RedirectResponse:
+) -> CalendarStatusResponse:
     """
-    Where Google returns the browser after the consent screen.
+    Link the calendar Google just authorised, for the logged-in professional.
 
-    No authentication dependency, and there cannot be one: this is a
-    navigation Google triggers, with no Authorization header to read. The
-    signed `state` issued by /meetings/calendar/status is what identifies the
-    professional — see google_meet_service._user_from_state().
+    Google returns the browser to a page in the app (GOOGLE_REDIRECT_URI_MEET),
+    which posts the `code` and `state` it arrived with here. Authenticated on
+    purpose: the state must have been issued to this caller, which is what
+    stops a consent link from being completed by anyone else — see
+    google_meet_service._verify_state(). When she declines the consent screen
+    Google returns `error=access_denied` instead of a code, and the page has
+    nothing to post.
 
-    Every outcome ends as a redirect back into the app with the result in the
-    query string, because what arrives here is a browser, not a client that
-    can read a JSON error body. The detail of a failure is logged rather than
-    put in the URL: query strings end up in history and access logs.
+    Answers with the same body as GET /meetings/calendar/status, so the page
+    can show the result without asking again.
     """
-    outcome = "connected"
-    if error or not code or not state:
-        # Google sends ?error=access_denied when she declines the consent
-        # screen. Declining is a choice, not a fault — it is reported
-        # separately from a failure so the app can say so.
-        outcome = "denied" if error == "access_denied" else "error"
-    else:
-        try:
-            google_meet_service.exchange_calendar_token(db, code, state)
-        except Exception:
-            logger.exception("Calendar authorisation failed at the callback")
-            outcome = "error"
-
-    return RedirectResponse(
-        f"{settings.GOOGLE_CALENDAR_RETURN_URL}?calendar={outcome}", status_code=302
+    credential = google_meet_service.exchange_calendar_token(
+        db, data.code, data.state, current_user
+    )
+    return CalendarStatusResponse(
+        connected=True,
+        connected_at=credential.updated_at,
+        authorization_url=google_meet_service.build_authorization_url(current_user),
     )

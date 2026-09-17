@@ -35,7 +35,6 @@ from app.core.i18n import translate
 from app.core.security import ALGORITHM
 from app.models.google_calendar_credential import GoogleCalendarCredential
 from app.models.user import User
-from app.services.user_service import get_user_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -82,56 +81,38 @@ def _create_state(user: User) -> str:
     return str(jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM))
 
 
-def _user_from_state(db: Session, state: str) -> User:
-    """Resolve the professional the consent belongs to, from the signed state.
+def _verify_state(state: str, user: User) -> None:
+    """Refuse a state that was not issued to the professional presenting it.
 
-    This is the callback's *only* source of identity. Google returns the
-    browser to us by navigation, with no Authorization header to read.
+    Two checks, and the second is the one that matters. The signature proves
+    we issued the state, so nobody can attach their own calendar to another
+    account. The subject has to equal the logged-in caller as well: otherwise
+    a professional could send her authorization_url to someone else, and if
+    that person approved it, *their* calendar would be stored against *her*
+    account — and every meeting she scheduled created in it. With the check,
+    that person's browser presents her state under their own login and is
+    refused, and the code Google gave them is never exchanged.
 
-    What the signed state guarantees: a calendar is only ever stored against
-    the platform account that requested the consent link. Nobody can mint a
-    state for someone else's account, so nobody can attach their own calendar
-    to another professional's account.
+    This is why Google returns the browser to a frontend route that posts
+    code+state with the user's JWT, rather than to an API callback: a
+    navigation carries no Authorization header, so an API callback has no
+    caller to compare against. A nonce in a cookie would do the same job, but
+    the frontend and the API are on different domains, and a cookie set from a
+    cross-site request is exactly what browsers increasingly block.
 
-    What it does not guarantee: that the person completing the consent is the
-    one who requested the link. The state is bound to the requesting *user*,
-    not to the *browser* that finishes the flow. A professional could send her
-    authorization_url to someone else within STATE_EXPIRE_MINUTES; if that
-    person approves with their own Google account, their calendar is stored
-    against her account, and meetings she schedules are created in it.
-
-    Accepted as a known limitation for now. It needs an authenticated,
-    audited professional as the attacker and a victim who approves a consent
-    screen naming this app; the token is never returned to any client, and no
-    endpoint reads the calendar, so the reach is creating events. While the
-    Google project is in Testing, only listed test users can consent at all.
-
-    The usual fix, a nonce in a cookie checked here, does not fit this
-    deployment: the frontend and the API are on different domains, so the
-    cookie would be set from a cross-site request, which browsers increasingly
-    block. The fix that does fit is to return Google to a frontend route that
-    posts code+state to the API with the user's JWT, and to require the
-    state's subject to match it. That changes the redirect URI registered with
-    Google, so it has to be decided before the production OAuth client is.
+    A mismatch gets the same answer as a forged or expired state, so the
+    response says nothing about whose link it was.
     """
     try:
         payload = jwt.decode(state, settings.SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != STATE_TOKEN_TYPE:
             raise JWTError("not a calendar state token")
-        user_id: str | None = payload.get("sub")
-        if user_id is None:
-            raise JWTError("missing subject")
+        if payload.get("sub") != user.id:
+            raise JWTError("issued to another user")
     except JWTError:
         raise HTTPException(
             status_code=400, detail=translate("meetings.calendar_state_invalid")
         ) from None
-
-    user = get_user_by_id(db, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=400, detail=translate("meetings.calendar_state_invalid")
-        )
-    return user
 
 
 def build_authorization_url(user: User) -> str:
@@ -251,15 +232,19 @@ def _post_to_google(url: str, data: dict[str, str]) -> dict[str, Any]:
 
 
 def exchange_calendar_token(
-    db: Session, code: str, state: str
+    db: Session, code: str, state: str, user: User
 ) -> GoogleCalendarCredential:
     """Exchange the authorisation code for a refresh token and store it.
+
+    `user` is the logged-in caller, and the state has to have been issued to
+    her — see _verify_state(). Verified before the code is exchanged, so a
+    refused state never spends the code.
 
     Upsert rather than insert: re-authorising is the documented way out of a
     revoked or wrongly-scoped grant, and it has to replace what is there.
     """
     _require_configuration()
-    user = _user_from_state(db, state)
+    _verify_state(state, user)
 
     try:
         body = _post_to_google(
@@ -274,12 +259,9 @@ def exchange_calendar_token(
         )
     except _InvalidGrantError:
         # For an authorisation code this means the code expired or was already
-        # exchanged — most often the callback page being reloaded. Nothing is
-        # wrong with Google or with her account, but she has to start the
-        # consent again. Through the callback this message never reaches her:
-        # the callback logs it and redirects with ?calendar=error, on purpose
-        # (no failure detail travels in a URL). The 400 is for any caller that
-        # reads the exception itself, rather than an unhandled 500.
+        # exchanged — most often the return page being reloaded, which posts
+        # the same single-use code twice. Nothing is wrong with Google or with
+        # her account, but she has to start the consent again.
         raise HTTPException(
             status_code=400, detail=translate("meetings.calendar_state_invalid")
         ) from None
