@@ -10,18 +10,15 @@ Rules:
       for 48h + notify her cell's moderator and the admin (§7.2, ABF-116)
   5+ dismissed reports from the same USER in 30 days → her reporting drops
       to 3 a day + notify her cell's moderator (§7.2, ABF-116)
-  2+ upheld incidents in 7 days → auto-suspend 48h + notify admin
+  3+ upheld incidents in 7 days → auto-suspend 48h + notify admin
 
 The threshold rules themselves live in `restriction_service`; this module is
 where a decision is recorded and where the people who need to hear about one
 are worked out.
-
-TODO list for junior developer:
-  [ ] implement _check_auto_suspension()          – §7.2's third row, still open
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from cryptography.exceptions import InvalidTag
@@ -29,6 +26,7 @@ from fastapi import HTTPException
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Query, Session
 
+from app.core.config import settings
 from app.core.constants import (
     AccountStatus,
     AuditAction,
@@ -471,6 +469,8 @@ def decide_report(
         # never hard-deleted, only anonymised), but there is no address to
         # notify either way.
         reported_user = user_service.get_user_by_id(db, report.reported_user_id)
+        if reported_user is not None:
+            _check_auto_suspension(db, reported_user, moderator)
         author_email = reported_user.email if reported_user else None
         if author_email:
             try:
@@ -947,30 +947,45 @@ def suspend_user_for_moderator(
     return _card_for(db, suspended)
 
 
-def _check_auto_suspension(db: Session, reported_user: User) -> None:
+def _check_auto_suspension(
+    db: Session, reported_user: User, moderator: User
+) -> None:
     """
-    Check if the reported user should be automatically suspended.
+    §7.2's second row: a member with 3+ upheld reports against her in the
+    last 7 days is suspended for 48 hours.
 
-    Rule: §7.2's third row — 2+ upheld incidents in 7 days → temporary
-    automatic suspension (48h) + notify admin.
+    Called from decide_report()'s VALID branch, after the decision that may
+    have crossed the threshold has already committed — so, like
+    evaluate_after_decision(), the count below includes the report that
+    triggered this call.
 
-    Still open, and deliberately not what ABF-116 built. That ticket
-    implements §7.2's *first two* rows, both of which restrict one action and
-    leave the account alone; this one takes the account away, which is a
-    heavier measure on a different window and count. decide_report() calls
-    restriction_service.evaluate_after_decision() where this would also hook
-    in.
-
-    TODO:
-      1. Count reports with decision=VALID against reported_user inside
-         settings.AUTO_SUSPEND_DAYS_WINDOW
-      2. If >= settings.AUTO_SUSPEND_VALID_REPORTS and not already suspended:
-         call user_service.suspend_user()
-
-    Read the count from the setting, not from a literal — and note that the
-    setting still holds 3 while §7.2 reads 2. Settling that is this rule's
-    job; ABF-116 left the value alone rather than re-pointing a threshold
-    nothing enforces.
+    No-op when the member is not ACTIVE (already suspended, or otherwise not
+    eligible): suspend_user() raises on that rather than no-op'ing, and a
+    decision that already committed must not turn into a failed response
+    because of what this check finds afterwards.
     """
-    # TODO: implement this function
-    pass
+    if reported_user.account_status != AccountStatus.ACTIVE:
+        return
+
+    threshold = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+        days=settings.AUTO_SUSPEND_DAYS_WINDOW
+    )
+    count = (
+        db.query(Report)
+        .filter(
+            Report.reported_user_id == reported_user.id,
+            Report.decision == ReportDecision.VALID,
+            Report.decided_at >= threshold,
+        )
+        .count()
+    )
+    if count < settings.AUTO_SUSPEND_VALID_REPORTS:
+        return
+
+    user_service.suspend_user(
+        db,
+        reported_user.id,
+        moderator,
+        hours=settings.AUTO_SUSPEND_HOURS,
+        reason="auto",
+    )
