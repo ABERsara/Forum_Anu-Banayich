@@ -11,7 +11,13 @@ from sqlalchemy import Subquery, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.constants import LikeTargetType, PostStatus, QueryStatus, UserRole
+from app.core.constants import (
+    LikeTargetType,
+    PostStatus,
+    PostType,
+    QueryStatus,
+    UserRole,
+)
 from app.core.i18n import translate
 from app.models.forum import ForumPost
 from app.models.like import Like
@@ -144,6 +150,14 @@ def toggle_like(
         if not _may_view_forum_post(post, user):
             raise HTTPException(
                 status_code=403, detail=translate("forum.post_view_forbidden")
+            )
+        if post.post_type == PostType.MEETING:
+            # A meeting announcement takes no likes (ABF-156) — it is a
+            # notice, not something written to be responded to. Refused here
+            # rather than only hidden in the UI: the endpoint is what makes it
+            # true, and the button's absence is not a rule.
+            raise HTTPException(
+                status_code=403, detail=translate("likes.meeting_post_read_only")
             )
     else:
         raise HTTPException(

@@ -342,6 +342,77 @@ def test_the_entries_rebuild_keeps_the_rows_it_rebuilds(monkeypatch) -> None:
         assert _entry_ids(db_url) == {"e-1"}
 
 
+# The revision ABF-156's meetings migration sits directly on top of.
+REVISION_BEFORE_MEETINGS = "d4a1c7e93b52"
+
+
+def _forum_post_columns(db_url: str) -> set[str]:
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        return {c["name"] for c in inspect(engine).get_columns("forum_posts")}
+    finally:
+        engine.dispose()  # release the file lock before tempdir cleanup (Windows)
+
+
+def test_meetings_migration_goes_down_and_up_again_cleanly(monkeypatch) -> None:
+    """
+    ABF-156 adds two tables and two columns on an existing one, and the shared
+    Definition of Done asks for a migration that runs both ways. The columns
+    are what makes this worth asserting rather than assuming: dropping a column
+    is the half of a downgrade SQLite is fussiest about, and a downgrade that
+    leaves post_type behind makes the next upgrade fail with "duplicate column".
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        assert {"meetings", "google_calendar_credentials"} <= _created_tables(db_url)
+        assert {"post_type", "meeting_id"} <= _forum_post_columns(db_url)
+
+        command.downgrade(alembic_cfg, REVISION_BEFORE_MEETINGS)
+        assert not {"meetings", "google_calendar_credentials"} & _created_tables(db_url)
+        assert not {"post_type", "meeting_id"} & _forum_post_columns(db_url)
+
+        command.upgrade(alembic_cfg, "head")
+        assert {"meetings", "google_calendar_credentials"} <= _created_tables(db_url)
+        assert {"post_type", "meeting_id"} <= _forum_post_columns(db_url)
+
+
+def test_existing_posts_are_backfilled_as_ordinary_posts(monkeypatch) -> None:
+    """
+    post_type is NOT NULL, and every post written before ABF-156 predates the
+    column. The server_default is what answers for them — without it the
+    migration cannot add the column at all on a database with posts in it, and
+    a post that came back with no type would break the feed for everyone.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, REVISION_BEFORE_MEETINGS)
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO forum_posts (id, author_id, group_visibility, "
+                    "sector_visibility, title, content, status, report_count, "
+                    "created_at, updated_at) VALUES ('p-1', 'u-1', 'WIDOWS', "
+                    "'HASIDIC', 'כותרת', 'תוכן', 'VISIBLE', 0, "
+                    "'2026-09-01 10:00:00', '2026-09-01 10:00:00')"
+                )
+            )
+        engine.dispose()
+
+        command.upgrade(alembic_cfg, "head")
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(
+                    text("SELECT post_type, meeting_id FROM forum_posts WHERE id='p-1'")
+                ).one()
+        finally:
+            engine.dispose()
+        assert row[0] == "TEXT"
+        assert row[1] is None
+
+
 # The revision ABF-154's is_report_restricted column sits directly on top of.
 REVISION_BEFORE_REPORT_RESTRICTED = "17e5d15f3029"
 
