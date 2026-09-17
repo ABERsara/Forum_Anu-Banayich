@@ -170,6 +170,11 @@ def get_credential(db: Session, user_id: str) -> GoogleCalendarCredential | None
     )
 
 
+def _delete_credential(db: Session, credential: GoogleCalendarCredential) -> None:
+    db.delete(credential)
+    db.commit()
+
+
 class _InvalidGrantError(Exception):
     """Google's token endpoint answered `invalid_grant`.
 
@@ -346,8 +351,7 @@ def _access_token(db: Session, user: User) -> str:
         # otherwise keep answering "connected" to the status endpoint while
         # every attempt failed as "Google is unavailable", so it goes, and she
         # is told to connect again.
-        db.delete(credential)
-        db.commit()
+        _delete_credential(db, credential)
         raise HTTPException(
             status_code=403, detail=translate("meetings.calendar_consent_expired")
         ) from None
