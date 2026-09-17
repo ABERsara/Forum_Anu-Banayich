@@ -1,0 +1,243 @@
+<!--
+  No direction here: the page inherits it from <html dir>, which LocaleService
+  sets from the active language (CONTRIBUTING §6).
+-->
+<div class="page">
+  <a class="page__back" routerLink="/moderator/reports"
+    ><span aria-hidden="true">‹</span>
+    {{ 'moderator.report_detail.back_to_reports' | transloco }}</a
+  >
+  <h1>{{ 'moderator.report_detail.title' | transloco }}</h1>
+  <p class="page__hint">{{ 'moderator.report_detail.hint' | transloco }}</p>
+
+  <!--
+    The action failure is either a sentence the server wrote, shown as it came,
+    or a key of ours, piped here so it follows a language switch while it is
+    still on screen (core/i18n/screen-error.ts).
+  -->
+  @if (actionError().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (actionError().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
+
+  @if (isLoading()) {
+    <app-loading-spinner [message]="'moderator.report_detail.loading' | transloco" />
+  } @else if (hasError()) {
+    <app-error-display [message]="'moderator.errors.load_report_failed' | transloco" />
+  } @else if (report(); as report) {
+    <article class="report">
+      <header class="report__head">
+        <!-- A FORUM_POST report's title is what a member wrote: shown as it was
+             written, in either UI language (ABF-130). A DIRECT_MESSAGE report
+             has no title at all and takes a generic one (ABF-113). -->
+        <h2 class="report__title">{{ reportTitle() }}</h2>
+        <!-- role="status" so the outcome is announced after a decision: the
+             button that caused it is gone by then, and this is the line that
+             says what happened. -->
+        <span class="badge" role="status">{{ decisionLabels[report.decision] | transloco }}</span>
+      </header>
+
+      <h3 class="report__section">
+        {{ 'moderator.report_detail.content_section' | transloco }}
+      </h3>
+
+      @if (report.target_type === targetTypes.FORUM_POST) {
+        @if (report.content_text; as text) {
+          <!-- In full, and not the queue's 200-character preview: reading the
+               whole of what was written is what this screen is for. -->
+          <p class="report__content">{{ text }}</p>
+        } @else {
+          <!-- The theoretical branch, currently unreachable: nothing today
+               hard-deletes a ForumPost row, but the backend's own defensive
+               code still allows for it — see ForumPostReport in core/models. -->
+          <p class="report__content">
+            {{ 'moderator.reports.content_unavailable' | transloco }}
+          </p>
+        }
+      } @else {
+        <!-- Nested rather than a third @else if: the branches below read
+             `message_content`, which only exists once `target_type` has been
+             narrowed, and a sibling @else if testing `decision` does not carry
+             that narrowing with it. -->
+        @if (report.decision === decisions.CLOSED_ACCOUNT_DELETED) {
+          <!-- Closed, not decided — the reported-on account is gone. No
+               content, ever, even to the moderator who would have ruled on it
+               (spec §9.4, ABF-113). -->
+          <p class="report__content">
+            {{ 'moderator.reports.closed_account_deleted_note' | transloco }}
+          </p>
+        } @else if (report.message_content; as message) {
+          <p class="report__content">{{ message }}</p>
+        } @else {
+          <p class="report__content">{{ 'moderator.reports.content_unavailable' | transloco }}</p>
+        }
+      }
+
+      @if (isDirectMessage()) {
+        <!--
+          Opening this page is what decrypted the message, and the server
+          recorded the read (ABF-113, spec §9.3). The queue puts that behind a
+          button because a row does not need the plaintext; here the same call
+          is where everything else on the page came from, so there is nothing
+          to put behind a button — only a moderator to tell.
+        -->
+        <p class="report__audited">
+          {{ 'moderator.report_detail.audited_read_note' | transloco }}
+        </p>
+      }
+
+      <h3 class="report__section">{{ 'moderator.report_detail.report_section' | transloco }}</h3>
+      <dl class="report__meta">
+        <div>
+          <dt>{{ 'moderator.reports.reason_label' | transloco }}</dt>
+          <dd>{{ reasonLabels[report.reason] | transloco }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'moderator.reports.created_at_label' | transloco }}</dt>
+          <dd>{{ report.created_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
+        </div>
+        @if (report.target_type === targetTypes.FORUM_POST) {
+          <div>
+            <dt>{{ 'moderator.reports.content_status_label' | transloco }}</dt>
+            <dd>
+              {{
+                report.content_status
+                  ? (postStatusLabels[report.content_status] | transloco)
+                  : emptyValue
+              }}
+            </dd>
+          </div>
+          <div>
+            <dt>{{ 'moderator.report_detail.report_count_label' | transloco }}</dt>
+            <dd>{{ report.report_count ?? emptyValue }}</dd>
+          </div>
+        }
+        <div class="report__wide">
+          <dt>{{ 'moderator.reports.description_label' | transloco }}</dt>
+          <!-- The reporter's own words: content, not copy (ABF-130). -->
+          <dd>{{ report.description ?? emptyValue }}</dd>
+        </div>
+        <div class="report__wide">
+          <dt>{{ 'moderator.report_detail.reporter_label' | transloco }}</dt>
+          <dd>{{ reporterKey() | transloco }}</dd>
+        </div>
+        <div class="report__wide">
+          <dt>{{ 'moderator.report_detail.reported_user_label' | transloco }}</dt>
+          <dd class="report__member">
+            <!-- The member's own name, once her card has arrived; a dash until
+                 then, so the row does not change height under the reader. -->
+            <span>{{ reportedUserName() || emptyValue }}</span>
+            <a
+              class="report__card-link"
+              [routerLink]="['/moderator/users', report.reported_user_id]"
+              [attr.aria-label]="
+                'moderator.reports.user_card_aria' | transloco: { title: reportTitle() }
+              "
+            >
+              {{ 'moderator.reports.user_card_link' | transloco }}
+            </a>
+          </dd>
+        </div>
+      </dl>
+
+      <!-- ───────────── ההחלטה: ממתינה, או זו שכבר התקבלה ───────────── -->
+      @if (isPending()) {
+        <h3 class="report__section">
+          {{ 'moderator.report_detail.decision_section' | transloco }}
+        </h3>
+        <div class="report__actions">
+          <button
+            type="button"
+            class="btn btn--danger"
+            [attr.aria-label]="
+              'moderator.reports.decide_valid_aria' | transloco: { title: reportTitle() }
+            "
+            (click)="decide(decisions.VALID)"
+          >
+            {{ 'moderator.reports.decide_valid' | transloco }}
+          </button>
+          <button
+            type="button"
+            class="btn"
+            [attr.aria-label]="
+              'moderator.reports.decide_invalid_aria' | transloco: { title: reportTitle() }
+            "
+            (click)="decide(decisions.INVALID)"
+          >
+            {{ 'moderator.reports.decide_invalid' | transloco }}
+          </button>
+        </div>
+      } @else {
+        <h3 class="report__section">
+          {{ 'moderator.report_detail.decided_section' | transloco }}
+        </h3>
+        <dl class="report__meta">
+          <div>
+            <dt>{{ 'moderator.reports.decided_at_label' | transloco }}</dt>
+            <dd>{{ (report.decided_at | date: 'dd/MM/yyyy HH:mm') || emptyValue }}</dd>
+          </div>
+          <div class="report__wide">
+            <dt>{{ 'moderator.reports.note_label' | transloco }}</dt>
+            <!-- The moderator's own words: content, not copy (ABF-130). -->
+            <dd>{{ report.moderator_note ?? emptyValue }}</dd>
+          </div>
+        </dl>
+      }
+
+      <!-- ─────────────────── היסטוריית החלטות קודמות ─────────────────── -->
+      <h3 class="report__section">{{ 'moderator.report_detail.history_section' | transloco }}</h3>
+      <p class="report__hint">{{ 'moderator.report_detail.history_hint' | transloco }}</p>
+
+      <!--
+        Its own live region, and its own failure. The counts come from a second
+        request, and a card that does not arrive costs this section and nothing
+        else — the report above stays readable and decidable. aria-busy marks
+        the region as still filling so "unavailable" is not announced as a
+        result while the request is in flight.
+      -->
+      <div aria-live="polite" [attr.aria-busy]="isCardLoading()">
+        @if (isCardLoading()) {
+          <app-loading-spinner [message]="'moderator.report_detail.history_loading' | transloco" />
+        } @else if (cardError()) {
+          <p class="report__unavailable">
+            {{ 'moderator.report_detail.history_unavailable' | transloco }}
+          </p>
+        }
+      </div>
+
+      @if (card(); as card) {
+        <dl class="stats">
+          <div class="stats__item">
+            <dt>{{ 'moderator.user_card.reports_against_total' | transloco }}</dt>
+            <dd>{{ card.reports_against_total }}</dd>
+          </div>
+          <div class="stats__item">
+            <dt>{{ 'moderator.user_card.reports_against_valid' | transloco }}</dt>
+            <dd>{{ card.reports_against_valid }}</dd>
+          </div>
+          <div class="stats__item">
+            <dt>{{ 'moderator.user_card.reports_against_invalid' | transloco }}</dt>
+            <dd>{{ card.reports_against_invalid }}</dd>
+          </div>
+        </dl>
+      }
+    </article>
+  }
+
+  <!-- ───────────── אישור ההחלטה + הערת מבקר (חובה) ───────────── -->
+  @if (pendingDecision(); as decision) {
+    <app-confirm-dialog
+      [title]="confirmTitleKey(decision) | transloco"
+      [message]="confirmMessageKey(decision) | transloco"
+      [confirmText]="confirmTitleKey(decision) | transloco"
+      [isDestructive]="decision === decisions.VALID"
+      [requireInput]="true"
+      [inputLabel]="'moderator.reports.note_input_label' | transloco"
+      [inputPlaceholder]="'moderator.reports.note_placeholder' | transloco"
+      [inputMinLength]="minNoteLength"
+      (confirmed)="confirmDecision($event)"
+      (cancelled)="cancelDecision()"
+    />
+  }
+</div>

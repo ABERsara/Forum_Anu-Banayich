@@ -189,6 +189,25 @@
               </dl>
 
               <div class="reports__actions">
+                <!--
+                  ABF-155. The row is a preview — the post is cut at 200
+                  characters and the decision record is not on it at all. This
+                  is the way to the rest, and it comes first: reading the
+                  report is what the two buttons beside it are decided on.
+
+                  The text is exactly the detail screen's own heading, so it
+                  renders that screen's title key rather than a second copy of
+                  it (CONTRIBUTING §6, ABF-132).
+                -->
+                <a
+                  class="reports__detail-link"
+                  [routerLink]="['/moderator/reports', report.id]"
+                  [attr.aria-label]="
+                    'moderator.report_detail.open_aria' | transloco: { title: title }
+                  "
+                >
+                  {{ 'moderator.report_detail.title' | transloco }}
+                </a>
                 <button
                   type="button"
                   class="btn btn--danger"
@@ -302,6 +321,15 @@
               </dl>
 
               <div class="reports__actions">
+                <a
+                  class="reports__detail-link"
+                  [routerLink]="['/moderator/reports', report.id]"
+                  [attr.aria-label]="
+                    'moderator.report_detail.open_aria' | transloco: { title: title }
+                  "
+                >
+                  {{ 'moderator.report_detail.title' | transloco }}
+                </a>
                 <a
                   class="reports__card-link"
                   [routerLink]="['/moderator/users', report.reported_user_id]"

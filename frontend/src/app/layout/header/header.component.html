@@ -27,6 +27,17 @@
             <!-- Unread badge lands here once the inbox task (Sprint 5, task 4) exposes unread counts -->
           </a>
         }
+        <!--
+          The way in to the report queue, for the two roles the /moderator
+          routes already admit: a moderator and an admin. Role-gated in the
+          same shape as the messages link above, and no substitute for the
+          route guard — this only decides whether the link is drawn.
+        -->
+        @if (auth.isModerator() || auth.isAdmin()) {
+          <a routerLink="/moderator/reports" routerLinkActive="active" class="header__reports">{{
+            'header.reports' | transloco
+          }}</a>
+        }
         <a routerLink="/profile" routerLinkActive="active">{{ 'header.profile' | transloco }}</a>
         <button type="button" class="header__logout" (click)="logout()">
           {{ 'header.logout' | transloco }}

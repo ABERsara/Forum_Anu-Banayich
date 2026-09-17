@@ -411,3 +411,83 @@ def test_existing_posts_are_backfilled_as_ordinary_posts(monkeypatch) -> None:
             engine.dispose()
         assert row[0] == "TEXT"
         assert row[1] is None
+
+
+# The revision ABF-154's is_report_restricted column sits directly on top of.
+REVISION_BEFORE_REPORT_RESTRICTED = "17e5d15f3029"
+
+
+def _user_columns(db_url: str) -> set[str]:
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        return {c["name"] for c in inspect(engine).get_columns("users")}
+    finally:
+        engine.dispose()  # release the file lock before tempdir cleanup (Windows)
+
+
+def _report_restricted_state(db_url: str) -> dict[str, object]:
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT id, is_report_restricted FROM users")
+            ).all()
+    finally:
+        engine.dispose()
+    return {row[0]: row[1] for row in rows}
+
+
+def test_report_restricted_migration_goes_down_and_up_again_cleanly(
+    monkeypatch,
+) -> None:
+    """
+    The shared Definition of Done asks for a migration that runs both ways
+    (ABF-154, c5a90f47e2d1).
+
+    The second upgrade is the point rather than a formality: a downgrade that
+    leaves anything of the column behind fails on the way back up, which is
+    where nobody is looking.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        assert "is_report_restricted" in _user_columns(db_url)
+
+        # Named rather than "-1": this says which schema state the downgrade is
+        # meant to land on, and it keeps saying it however the graph grows.
+        command.downgrade(alembic_cfg, REVISION_BEFORE_REPORT_RESTRICTED)
+        assert "is_report_restricted" not in _user_columns(db_url)
+
+        command.upgrade(alembic_cfg, "head")
+        assert "is_report_restricted" in _user_columns(db_url)
+
+
+def test_report_restricted_backfills_existing_members_as_unrestricted(
+    monkeypatch,
+) -> None:
+    """
+    The column is NOT NULL and every deployed environment already has rows.
+    Without the server_default the ALTER fails outright; with a nullable column
+    instead, the rows would come out NULL — neither restricted nor
+    unrestricted, and `if user.is_report_restricted` would read that as
+    restricted and refuse a report from somebody who never filed a bad one.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, REVISION_BEFORE_REPORT_RESTRICTED)
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO users (id, email, password_hash, role, "
+                    "first_name, last_name, account_status, is_active_professional, "
+                    "is_suspended, created_at, updated_at) VALUES "
+                    "('u-existing', 'member@example.com', 'hashed', 'USER', "
+                    "'Test', 'User', 'ACTIVE', 1, 0, "
+                    "'2026-09-01 10:00:00', '2026-09-01 10:00:00')"
+                )
+            )
+        engine.dispose()
+
+        command.upgrade(alembic_cfg, "head")
+
+        assert _report_restricted_state(db_url) == {"u-existing": 0}

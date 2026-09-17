@@ -430,6 +430,29 @@ describe('ReportButtonComponent', () => {
     expect(dialogText()).toContain('הגעת למכסת הדיווחים היומית.');
   });
 
+  /**
+   * ABF-154's end of the same rule (SPEC §7.2). Five dismissed reports and the
+   * reporting is withdrawn — nothing gives it back on its own, so this needs a
+   * message of its own even more than the 429 above does: a limit that lifts
+   * tomorrow is worth retrying, and this one never is.
+   */
+  it('shows a specific message when the reporting has been withdrawn (403)', () => {
+    setup();
+
+    failWith(403);
+
+    expect(component.errorKey()).toBe('shared.report.error_restricted');
+    expect(dialogText()).toContain('הגישה לדיווח הוגבלה');
+  });
+
+  it('says the same on a private message, where the guard runs just as early', () => {
+    setup(ReportTargetType.DIRECT_MESSAGE, 'message-1');
+
+    failWith(403);
+
+    expect(component.errorKey()).toBe('shared.report.error_restricted');
+  });
+
   it('shows a generic message for other errors', () => {
     setup();
 
