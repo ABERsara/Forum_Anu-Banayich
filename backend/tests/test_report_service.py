@@ -3,11 +3,14 @@ Unit tests for report_service: filing a report and its escalation logic,
 the moderator's queue, and deciding on a report.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.constants import (
     AccountStatus,
     AuditAction,
@@ -797,6 +800,21 @@ def _make_reported_post(
     return post, report
 
 
+def _file_and_decide(
+    db_session: Session,
+    moderator: User,
+    author: User,
+    reporter: User,
+    decision: ReportDecision,
+) -> Report:
+    """File a fresh report against a new post by `author` and decide it."""
+    post = _make_post(db_session, author)
+    report = report_service.file_report(db_session, _report_data(post.id), reporter)
+    return report_service.decide_report(
+        db_session, report.id, _decision(decision), moderator
+    )
+
+
 class TestDecideReportRecordsTheDecision:
     def test_records_decision_moderator_note_and_timestamp(
         self, db_session: Session
@@ -1031,6 +1049,168 @@ class TestDecideReportInvalid:
         )
 
         assert calls == []
+
+
+class TestAutoSuspension:
+    """§7.2's second row: 3+ VALID reports against a member in 7 days
+    suspends her for 48 hours (ABF-151)."""
+
+    def test_two_valid_reports_in_seven_days_does_not_suspend(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+
+        _file_and_decide(db_session, moderator, author, reporter, ReportDecision.VALID)
+        _file_and_decide(db_session, moderator, author, reporter, ReportDecision.VALID)
+
+        db_session.refresh(author)
+        assert author.is_suspended is False
+        assert author.account_status == AccountStatus.ACTIVE
+
+    def test_third_valid_report_in_seven_days_suspends_for_48_hours(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+
+        for _ in range(2):
+            _file_and_decide(
+                db_session, moderator, author, reporter, ReportDecision.VALID
+            )
+        db_session.refresh(author)
+        assert author.is_suspended is False  # sanity check before the third
+
+        before = datetime.now(UTC).replace(tzinfo=None)
+        _file_and_decide(db_session, moderator, author, reporter, ReportDecision.VALID)
+
+        db_session.refresh(author)
+        assert author.is_suspended is True
+        assert author.account_status == AccountStatus.SUSPENDED
+        assert author.suspended_until is not None
+        expected_until = before + timedelta(hours=settings.AUTO_SUSPEND_HOURS)
+        assert abs((author.suspended_until - expected_until).total_seconds()) < 5
+
+        entry = (
+            db_session.query(AuditLog)
+            .filter(
+                AuditLog.action == AuditAction.USER_SUSPENDED,
+                AuditLog.entity_id == author.id,
+            )
+            .one()
+        )
+        assert entry.actor_id == moderator.id
+        assert entry.details == {
+            "hours": settings.AUTO_SUSPEND_HOURS,
+            "reason": "auto",
+        }
+
+    def test_invalid_decisions_do_not_count_toward_the_valid_threshold(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+
+        _file_and_decide(db_session, moderator, author, reporter, ReportDecision.VALID)
+        _file_and_decide(db_session, moderator, author, reporter, ReportDecision.VALID)
+        _file_and_decide(
+            db_session, moderator, author, reporter, ReportDecision.INVALID
+        )
+
+        db_session.refresh(author)
+        assert author.is_suspended is False
+
+    def test_valid_report_outside_the_seven_day_window_does_not_count(
+        self, db_session: Session
+    ) -> None:
+        moderator = _make_moderator(db_session)
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+
+        old_report = _file_and_decide(
+            db_session, moderator, author, reporter, ReportDecision.VALID
+        )
+        old_report.decided_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+            days=settings.AUTO_SUSPEND_DAYS_WINDOW + 1
+        )
+        db_session.commit()
+
+        _file_and_decide(db_session, moderator, author, reporter, ReportDecision.VALID)
+        _file_and_decide(db_session, moderator, author, reporter, ReportDecision.VALID)
+
+        db_session.refresh(author)
+        assert author.is_suspended is False
+
+    def test_already_suspended_author_is_not_suspended_again(
+        self, db_session: Session
+    ) -> None:
+        """
+        A member manually suspended before her third VALID decision must not
+        turn that decision into an error - suspend_user() raises when the
+        account is not ACTIVE, and the decision itself still has to succeed.
+        """
+        moderator = _make_moderator(db_session)
+        author = _make_user(
+            db_session,
+            "author@example.com",
+            user_type=UserType.WIDOWER,
+            sector=Sector.HASIDIC,
+        )
+        reporter = _make_user(db_session, "reporter@example.com")
+
+        for _ in range(2):
+            _file_and_decide(
+                db_session, moderator, author, reporter, ReportDecision.VALID
+            )
+
+        user_service.suspend_user(
+            db_session, author.id, moderator, hours=48, reason="manual, unrelated"
+        )
+        db_session.refresh(author)
+        suspended_until_before = author.suspended_until
+
+        result = _file_and_decide(
+            db_session, moderator, author, reporter, ReportDecision.VALID
+        )
+
+        assert result.decision == ReportDecision.VALID
+        db_session.refresh(author)
+        assert author.suspended_until == suspended_until_before
+
+        entries = (
+            db_session.query(AuditLog)
+            .filter(
+                AuditLog.action == AuditAction.USER_SUSPENDED,
+                AuditLog.entity_id == author.id,
+            )
+            .all()
+        )
+        assert len(entries) == 1
+        assert entries[0].details is not None
+        assert entries[0].details["reason"] == "manual, unrelated"
 
 
 class TestDecideReportGuards:
