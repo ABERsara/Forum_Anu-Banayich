@@ -14,18 +14,19 @@ GET    /admin/moderators             – the moderator roster
 POST   /admin/moderators             – appoint a moderator
 PATCH  /admin/moderators/{id}        – update a moderator's cells / alert email
 DELETE /admin/moderators/{id}        – remove a moderator from the roster
-GET  /admin/audit-log                – full audit log
+GET  /admin/audit-log                – the audit log: filtered, sorted, paginated
 POST /admin/users/{id}/suspend       – suspend a user manually
 """
 
-from typing import Any
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.constants import UserRole
+from app.core.constants import AuditAction, AuditSortField, SortDirection, UserRole
 from app.core.dependencies import get_current_active_user, get_db, require_role
 from app.models.user import User
+from app.schemas.audit import AuditLogEntry, AuditLogListResponse
 from app.schemas.user import (
     ModeratorAdminView,
     ModeratorCreateRequest,
@@ -38,7 +39,7 @@ from app.schemas.user import (
     SuspendUserRequest,
     UserAdminView,
 )
-from app.services import user_service
+from app.services import audit_service, user_service
 
 router = APIRouter(
     prefix="/admin",
@@ -209,16 +210,54 @@ def suspend_user(
     return UserAdminView.model_validate(user)
 
 
-@router.get("/audit-log")
+@router.get("/audit-log", response_model=AuditLogListResponse)
 def get_audit_log(
+    actor_id: str | None = Query(None),
+    action_type: AuditAction | None = Query(None),
+    entity_type: str | None = Query(None),
+    entity_id: str | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    sort: AuditSortField = Query(AuditSortField.TIMESTAMP),
+    direction: SortDirection = Query(SortDirection.DESC),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, le=100),
+    page_size: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-) -> list[Any]:
+) -> AuditLogListResponse:
     """
-    Return paginated audit log (admin only).
+    Return one filtered, sorted, paginated page of the audit log.
 
-    TODO: call audit_service.get_audit_log(db, page, page_size)
+    Admin only — the router's own `require_role(UserRole.ADMIN)` decides
+    that, before any parameter on this signature is looked at, so a member, a
+    moderator or a professional gets the same 403 whatever they filter by.
+
+    Every parameter of the frozen contract is declared here and passed
+    straight through: nothing is filtered, ordered or sliced in this
+    function. `sort` and `direction` are enums rather than strings so that an
+    unknown column is a 422 from FastAPI and never reaches an `order_by`,
+    and `page_size` is capped at 100 so that no caller can ask for the table
+    in one request.
+
+    `ip_address` is not returned. Not under a parameter, not to an admin, not
+    ever — see `schemas/audit.py`, where the field's absence is enforced.
     """
-    # TODO: implement
-    return []
+    rows, total_count = audit_service.get_audit_log(
+        db,
+        actor_id=actor_id,
+        action_type=action_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+        direction=direction,
+        page=page,
+        page_size=page_size,
+    )
+
+    return AuditLogListResponse(
+        items=[AuditLogEntry.model_validate(row) for row in rows],
+        total_count=total_count,
+        page=page,
+        page_size=page_size,
+    )
