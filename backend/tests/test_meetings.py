@@ -10,6 +10,7 @@ module's own behaviour against fake responses.
 
 from datetime import UTC, datetime, timedelta
 
+import httpx
 import pytest
 
 from app.core.constants import (
@@ -30,6 +31,7 @@ from app.models.audit import AuditLog
 from app.models.forum import ForumPost
 from app.models.meeting import Meeting
 from app.models.user import User
+from app.schemas.meeting import MeetingCreate
 from app.services import google_meet_service, meeting_service
 
 BASE = "/api/v1/meetings"
@@ -638,8 +640,6 @@ class TestOrphanedEvents:
         professional's calendar — so create_meeting() removes it rather than
         leaving her to find it.
         """
-        from app.schemas.meeting import MeetingCreate
-
         professional = _professional(make_user)
         deleted: list[str] = []
 
@@ -746,14 +746,7 @@ class TestCalendarConnection:
         _login_as(professional)
         state = await self._state_from_status(client)
 
-        monkeypatch.setattr(
-            google_meet_service,
-            "_post_to_google",
-            lambda url, data: {
-                "refresh_token": "1//refresh",
-                "scope": google_meet_service.settings.GOOGLE_CALENDAR_SCOPE,
-            },
-        )
+        self._google_grants_the_scope(monkeypatch)
 
         r = await client.post(
             f"{BASE}/calendar/connect", json={"code": "auth-code", "state": state}
@@ -778,14 +771,7 @@ class TestCalendarConnection:
         state = await self._state_from_status(client)
 
         _login_as(_professional(make_user, email="other-pro@example.com"))
-        monkeypatch.setattr(
-            google_meet_service,
-            "_post_to_google",
-            lambda url, data: {
-                "refresh_token": "1//refresh",
-                "scope": google_meet_service.settings.GOOGLE_CALENDAR_SCOPE,
-            },
-        )
+        self._google_grants_the_scope(monkeypatch)
 
         r = await client.post(
             f"{BASE}/calendar/connect", json={"code": "auth-code", "state": state}
@@ -804,6 +790,22 @@ class TestCalendarConnection:
         )
 
         assert r.status_code == 403
+
+    def _google_grants_the_scope(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """
+        Faked at the I/O boundary — the same line test_google_meet_service.py
+        patches — so everything the service does with Google's answer still
+        runs, and renaming a private helper cannot break this test.
+        """
+        body = {
+            "refresh_token": "1//refresh",
+            "scope": google_meet_service.settings.GOOGLE_CALENDAR_SCOPE,
+        }
+
+        def _post(url: str, **kwargs: object) -> httpx.Response:
+            return httpx.Response(200, json=body, request=httpx.Request("POST", url))
+
+        monkeypatch.setattr(google_meet_service.httpx, "post", _post)
 
     async def _state_from_status(self, client) -> str:
         from urllib.parse import parse_qs, urlparse
