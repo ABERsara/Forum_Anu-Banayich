@@ -41,7 +41,7 @@ Layout:
 """
 
 import re
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import Session
@@ -387,6 +387,10 @@ def _say(
     clock that does not tick in that gap the two rows share a created_at, and
     the tie-break falls to `id`, a random UUID. Explicit timestamps, spaced a
     minute apart, make the order the test's own.
+
+    The timestamp is naive UTC, the shape every datetime column in the schema
+    is read as — written out here rather than borrowed from agent_service's
+    own private helper, which this file has no claim on.
     """
     ciphertext, key_version = encrypt_message(content)
     message = AgentMessage(
@@ -394,7 +398,8 @@ def _say(
         role=role,
         content=ciphertext,
         key_version=key_version,
-        created_at=agent_service._utc_now() - timedelta(minutes=minutes_ago),
+        created_at=datetime.now(UTC).replace(tzinfo=None)
+        - timedelta(minutes=minutes_ago),
     )
     db_session.add(message)
     db_session.commit()
