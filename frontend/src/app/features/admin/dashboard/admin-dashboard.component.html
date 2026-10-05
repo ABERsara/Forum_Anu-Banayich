@@ -31,7 +31,12 @@
        reports read differently from the heading they lead to, and the two
        management links point at screens ABF-133 migrates: both kinds keep a key
        of their own here, so that no ticket owns copy for a screen it does not
-       touch, and no rename over there silently rewrites this menu. -->
+       touch, and no rename over there silently rewrites this menu.
+
+       The knowledge base joins the first kind: ABF-124 adds that screen, so
+       this menu calls it by its own title key too. It is the admin's only way
+       in — the ticket left the full menu there out of the MVP, not the access
+       itself. -->
   <nav>
     <a routerLink="/admin/registrations">{{ 'admin.dashboard.nav_registrations' | transloco }}</a> |
     <a routerLink="/admin/active-users">{{ 'admin.active_users.title' | transloco }}</a> |
@@ -39,6 +44,7 @@
     <a routerLink="/admin/moderators">{{ 'admin.dashboard.nav_moderators' | transloco }}</a> |
     <a routerLink="/admin/audit-log">{{ 'admin.dashboard.nav_audit_log' | transloco }}</a> |
     <a routerLink="/admin/broadcast">{{ 'admin.broadcast.title' | transloco }}</a> |
-    <a routerLink="/moderator/reports">{{ 'admin.dashboard.nav_reports' | transloco }}</a>
+    <a routerLink="/moderator/reports">{{ 'admin.dashboard.nav_reports' | transloco }}</a> |
+    <a routerLink="/professional/knowledge">{{ 'agents.knowledge.title' | transloco }}</a>
   </nav>
 </div>

@@ -119,6 +119,19 @@ class AgentKnowledgeEntryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AgentKnowledgeEntryListResponse(BaseModel):
+    """GET /agents/{domain_id}/knowledge-entries – one page of a knowledge base.
+
+    Paginated like every other list in the API, newest edit first, so the entry
+    a professional just saved is the one at the top of the first page.
+    """
+
+    items: list[AgentKnowledgeEntryResponse]
+    total: int
+    page: int
+    page_size: int
+
+
 # ---------------------------------------------------------------------------
 # The chat flow (ABF-122)
 # ---------------------------------------------------------------------------

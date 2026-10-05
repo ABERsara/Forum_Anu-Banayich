@@ -703,6 +703,51 @@ export interface AgentConversation {
   messages: AgentMessage[];
 }
 
+/**
+ * One knowledge base entry, as the professional who maintains it sees it
+ * (ABF-124).
+ *
+ * `title` and `content` are what the agent is indexed on; `source_name` and
+ * `source_url` record where copied material came from and are optional,
+ * because some entries are written by the professional themselves.
+ */
+export interface AgentKnowledgeEntry {
+  id: string;
+  domain_id: string;
+  title: string;
+  content: string;
+  source_name: string | null;
+  source_url: string | null;
+  /** The user id of whoever saved it last. */
+  updated_by: string;
+  /** Naive-UTC ISO timestamps, like every other date this API returns. */
+  created_at: string;
+  updated_at: string;
+}
+
+/** POST /agents/{domain_id}/knowledge-entries — the domain is in the path. */
+export interface AgentKnowledgeEntryCreateRequest {
+  title: string;
+  content: string;
+  source_name: string | null;
+  source_url: string | null;
+}
+
+/**
+ * PATCH /agents/{domain_id}/knowledge-entries/{entry_id} — only the keys that
+ * are present get written.
+ *
+ * Sending `title` or `content` re-indexes the entry, so the screen leaves out
+ * whatever did not change. `title` and `content` cannot be null (the server
+ * answers 422); the two source fields can, which clears them.
+ */
+export interface AgentKnowledgeEntryUpdateRequest {
+  title?: string;
+  content?: string;
+  source_name?: string | null;
+  source_url?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Pagination helper
 // ---------------------------------------------------------------------------

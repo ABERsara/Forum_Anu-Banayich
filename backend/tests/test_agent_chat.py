@@ -41,6 +41,7 @@ Layout:
 """
 
 import re
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import Session
@@ -58,7 +59,7 @@ from app.core.constants import (
     UserType,
 )
 from app.core.dependencies import get_current_active_user, get_current_user
-from app.core.encryption import decrypt_message
+from app.core.encryption import decrypt_message, encrypt_message
 from app.core.i18n import translate
 from app.main import app
 from app.models.agent import (
@@ -69,7 +70,7 @@ from app.models.agent import (
 )
 from app.models.audit import AuditLog
 from app.models.user import User
-from app.services import llm_service, rag_service
+from app.services import agent_service, llm_service, rag_service
 
 DOMAIN_NAME = "זכויות משפחות חד-הוריות"
 
@@ -357,6 +358,60 @@ async def _ask(client, domain, question: str, conversation_id: str | None = None
     if conversation_id is not None:
         payload["conversation_id"] = conversation_id
     return await client.post(_chat_url(domain), json=payload)
+
+
+def _start_conversation(
+    db_session: Session, person: User, domain: AgentDomain
+) -> AgentConversation:
+    """An empty thread to hang backdated turns on, owned the way the service
+    would have created it."""
+    conversation = AgentConversation(user_id=person.id, domain_id=domain.id)
+    db_session.add(conversation)
+    db_session.commit()
+    return conversation
+
+
+def _say(
+    db_session: Session,
+    conversation: AgentConversation,
+    role: AgentMessageRole,
+    content: str,
+    minutes_ago: float,
+) -> AgentMessage:
+    """One stored turn, backdated — encrypted exactly as the service writes it.
+
+    Earlier turns are written here, rather than asked for over HTTP, in the
+    tests that assert the *order* history comes back in. The service stamps a
+    question and its answer from two _utc_now() calls with only the retrieval
+    and the generation in between, and both of those are faked here — so on a
+    clock that does not tick in that gap the two rows share a created_at, and
+    the tie-break falls to `id`, a random UUID. Explicit timestamps, spaced a
+    minute apart, make the order the test's own.
+
+    The timestamp is naive UTC, the shape every datetime column in the schema
+    is read as — written out here rather than borrowed from agent_service's
+    own private helper, which this file has no claim on.
+    """
+    ciphertext, key_version = encrypt_message(content)
+    message = AgentMessage(
+        conversation_id=conversation.id,
+        role=role,
+        content=ciphertext,
+        key_version=key_version,
+        created_at=datetime.now(UTC).replace(tzinfo=None)
+        - timedelta(minutes=minutes_ago),
+    )
+    db_session.add(message)
+    db_session.commit()
+    return message
+
+
+def _stored_answer(answer: str) -> str:
+    """An agent turn as _compose_answer() leaves it in the table: the answer
+    with ANSWER_DISCLAIMER attached."""
+    return (
+        f"{answer}{agent_service.DISCLAIMER_SEPARATOR}{llm_service.ANSWER_DISCLAIMER}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -911,16 +966,25 @@ class TestFollowUp:
         assert db_session.query(AgentMessage).count() == 4
 
     async def test_the_follow_up_is_answered_with_the_earlier_turns_in_hand(
-        self, client, domain, knowledge_base, llm, user
+        self, client, db_session, domain, knowledge_base, llm, user
     ):
         """ "ומה לגבי הילדים שלי" only means something next to what came before
-        it, so the earlier question and answer are replayed into the prompt."""
-        _login_as(user)
-        conversation_id = (await _ask(client, domain, HOUSING_QUESTION)).json()[
-            "conversation_id"
-        ]
+        it, so the earlier question and answer are replayed into the prompt.
 
-        await _ask(client, domain, FOLLOW_UP_QUESTION, conversation_id)
+        The first exchange is seeded rather than asked for, because the
+        assertion below is about the order it comes back in — see _say()."""
+        _login_as(user)
+        conversation = _start_conversation(db_session, user, domain)
+        _say(db_session, conversation, AgentMessageRole.USER, HOUSING_QUESTION, 2)
+        _say(
+            db_session,
+            conversation,
+            AgentMessageRole.AGENT,
+            _stored_answer(llm.answer),
+            1,
+        )
+
+        await _ask(client, domain, FOLLOW_UP_QUESTION, conversation.id)
 
         history = llm.calls[-1]["conversation_history"]
         assert [turn.role for turn in history] == [
@@ -1007,17 +1071,27 @@ class TestFollowUp:
         ]
 
     async def test_the_earlier_answer_is_replayed_without_the_disclaimer(
-        self, client, domain, knowledge_base, llm, user
+        self, client, db_session, domain, knowledge_base, llm, user
     ):
         """The stored answer ends in ANSWER_DISCLAIMER; sending that back would
         contradict the rule telling the model not to write one, and would pay
-        for the same paragraph again on every turn."""
-        _login_as(user)
-        conversation_id = (await _ask(client, domain, HOUSING_QUESTION)).json()[
-            "conversation_id"
-        ]
+        for the same paragraph again on every turn.
 
-        await _ask(client, domain, FOLLOW_UP_QUESTION, conversation_id)
+        The stored turn is seeded with the disclaimer attached, as
+        _compose_answer() writes it, so that which row history[1] is does not
+        depend on a tie-break — see _say()."""
+        _login_as(user)
+        conversation = _start_conversation(db_session, user, domain)
+        _say(db_session, conversation, AgentMessageRole.USER, HOUSING_QUESTION, 2)
+        _say(
+            db_session,
+            conversation,
+            AgentMessageRole.AGENT,
+            _stored_answer(llm.answer),
+            1,
+        )
+
+        await _ask(client, domain, FOLLOW_UP_QUESTION, conversation.id)
 
         history = llm.calls[-1]["conversation_history"]
         assert history[1].content == llm.answer
@@ -1033,17 +1107,34 @@ class TestFollowUp:
         assert llm.calls[0]["conversation_history"] == []
 
     async def test_history_is_capped_at_agent_history_turns(
-        self, client, monkeypatch, domain, knowledge_base, llm, user
+        self, client, db_session, monkeypatch, domain, knowledge_base, llm, user
     ):
-        """A turn is a question and its answer, so N turns is up to 2N rows."""
+        """A turn is a question and its answer, so N turns is up to 2N rows.
+
+        Which turn is "the most recent" is the whole assertion, so the two
+        earlier exchanges are seeded with timestamps of their own — see
+        _say()."""
         monkeypatch.setattr(settings, "AGENT_HISTORY_TURNS", 1)
         _login_as(user)
-        conversation_id = (await _ask(client, domain, HOUSING_QUESTION)).json()[
-            "conversation_id"
-        ]
-        await _ask(client, domain, FOLLOW_UP_QUESTION, conversation_id)
+        conversation = _start_conversation(db_session, user, domain)
+        _say(db_session, conversation, AgentMessageRole.USER, HOUSING_QUESTION, 4)
+        _say(
+            db_session,
+            conversation,
+            AgentMessageRole.AGENT,
+            _stored_answer(llm.answer),
+            3,
+        )
+        _say(db_session, conversation, AgentMessageRole.USER, FOLLOW_UP_QUESTION, 2)
+        _say(
+            db_session,
+            conversation,
+            AgentMessageRole.AGENT,
+            _stored_answer(llm.answer),
+            1,
+        )
 
-        await _ask(client, domain, HOUSING_QUESTION, conversation_id)
+        await _ask(client, domain, HOUSING_QUESTION, conversation.id)
 
         history = llm.calls[-1]["conversation_history"]
         assert len(history) == 2

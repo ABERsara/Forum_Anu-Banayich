@@ -105,6 +105,17 @@ describe('PendingQuestionsComponent', () => {
     expect(component.isLoading()).toBe(false);
   });
 
+  it('links to the knowledge base the professional maintains', async () => {
+    mockService();
+    await setup();
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      '.pending-questions__knowledge-link',
+    );
+    expect(link?.getAttribute('href')).toBe('/professional/knowledge');
+    expect(link?.textContent?.trim()).toBe('ניהול בסיס הידע של הסוכן');
+  });
+
   it('identifies the asker by alias, not by name', async () => {
     mockService();
     await setup();
