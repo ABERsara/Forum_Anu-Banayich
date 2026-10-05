@@ -1,6 +1,7 @@
 """
 Unit tests for the email_service senders that really talk to SMTP: the OTP,
-the registration verdicts, the two new-question alerts and the answer alert.
+the registration verdicts, the two new-question alerts, the answer alert and
+the two alerts for §7.2's automatic measures (ABF-164).
 
 Each covers three paths: dev fallback (SMTP_HOST empty), real SMTP send,
 and SMTP failure (must never raise — registration and answering depend on that).
@@ -693,3 +694,194 @@ class TestDomainNotificationPartialFailure:
         email_service.send_domain_question_notification(
             ["one@example.com", "two@example.com"], "query-7"
         )
+
+
+# ---------------------------------------------------------------------------
+# ABF-164 — the two alerts for §7.2's automatic measures.
+#
+# Both fan out to a list in one session, like the domain-question alert, and
+# share one shape, so they share one table.
+# ---------------------------------------------------------------------------
+
+_USER_ID = "3f2b9c4e-member-id"
+
+_AutoAlert = namedtuple(
+    "_AutoAlert", "send subject wording dev_log sent_log error_log empty_log"
+)
+
+AUTO_VIOLATION_ALERTS = [
+    pytest.param(
+        _AutoAlert(
+            send=lambda emails: email_service.send_auto_suspension_alert(
+                emails, _USER_ID, 48
+            ),
+            subject="השעיה אוטומטית של חשבון",
+            wording="הושעה אוטומטית ל-48 שעות",
+            dev_log=f"[EMAIL] Automatic suspension of user {_USER_ID} for 48h → ",
+            sent_log=(
+                f"[EMAIL] Automatic suspension alert sent for user {_USER_ID} "
+                "→ 2/2 admins"
+            ),
+            error_log=(
+                "Failed to send automatic suspension alert emails "
+                "(0/2 delivered before the session failed)"
+            ),
+            empty_log=(
+                f"[EMAIL] Automatic suspension of user {_USER_ID}: no admin to alert"
+            ),
+        ),
+        id="auto-suspension",
+    ),
+    pytest.param(
+        _AutoAlert(
+            send=lambda emails: email_service.send_reporting_revoked_alert(
+                emails, _USER_ID
+            ),
+            subject="שלילת אפשרות הדיווח מחשבון",
+            wording="האפשרות לדווח על תוכן נשללה אוטומטית",
+            dev_log=f"[EMAIL] Reporting revoked for user {_USER_ID} → ",
+            sent_log=(
+                f"[EMAIL] Reporting revoked alert sent for user {_USER_ID} "
+                "→ 2/2 moderators"
+            ),
+            error_log=(
+                "Failed to send reporting revoked alert emails "
+                "(0/2 delivered before the session failed)"
+            ),
+            empty_log=(
+                f"[EMAIL] Reporting revoked for user {_USER_ID}: no moderator to alert"
+            ),
+        ),
+        id="reporting-revoked",
+    ),
+]
+
+_TEAM = ["one@example.com", "two@example.com"]
+
+
+def _subject(msg) -> str:
+    return str(make_header(decode_header(msg["Subject"])))
+
+
+@pytest.mark.parametrize("alert", AUTO_VIOLATION_ALERTS)
+class TestAutoViolationAlertsDevFallback:
+    def test_logs_a_line_per_recipient(self, alert, caplog):
+        with caplog.at_level(logging.INFO):
+            alert.send(_TEAM)
+
+        for address in _TEAM:
+            assert f"{alert.dev_log}{address}" in caplog.text
+
+    def test_does_not_touch_smtp(self, alert, monkeypatch):
+        def _fail(*args, **kwargs):
+            raise AssertionError("SMTP should not be used when SMTP_HOST is empty")
+
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _fail)
+        alert.send(_TEAM)
+
+
+@pytest.mark.parametrize("alert", AUTO_VIOLATION_ALERTS)
+class TestAutoViolationAlertsViaSmtp:
+    def test_the_whole_team_costs_one_handshake(self, alert, monkeypatch):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(settings, "SMTP_USER", "mailtrap-user")
+        monkeypatch.setattr(settings, "SMTP_PASSWORD", "mailtrap-pass")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _FakeSMTP)
+
+        alert.send(_TEAM)
+
+        assert len(_FakeSMTP.instances) == 1, "one session, not one per recipient"
+        smtp = _FakeSMTP.instances[0]
+        assert "starttls" in smtp.calls
+        assert ("login", "mailtrap-user", "mailtrap-pass") in smtp.calls
+        assert _recipients(smtp) == _TEAM
+
+    def test_message_is_hebrew_rtl_and_says_what_happened(self, alert, monkeypatch):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _FakeSMTP)
+
+        alert.send(_TEAM[:1])
+
+        msg, html = _sent_html(_FakeSMTP.instances[0])
+        assert msg["To"] == _TEAM[0]
+        assert alert.subject in _subject(msg)
+        assert _from_on_the_wire(msg) == (
+            'עמותת "אנו בניך"',
+            "noreply@anu-banayich.org.il",
+        )
+        assert 'dir="rtl">' in html
+        assert "שלום" in html
+        assert alert.wording in html
+
+    def test_names_the_account_by_id_and_says_why_nothing_else_is_sent(
+        self, alert, monkeypatch
+    ):
+        """
+        The id is the only handle on the member in the mail. The reports, their
+        content and the moderator's note have no parameter to arrive through,
+        and the mail says why, so its reader does not take it for an omission.
+        """
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _FakeSMTP)
+
+        alert.send(_TEAM[:1])
+
+        _, html = _sent_html(_FakeSMTP.instances[0])
+        assert f"מזהה החשבון: {_USER_ID}" in html
+        assert "מטעמי פרטיות" in html
+
+    def test_logs_how_many_were_alerted(self, alert, monkeypatch, caplog):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _FakeSMTP)
+
+        with caplog.at_level(logging.INFO):
+            alert.send(_TEAM)
+
+        assert alert.sent_log in caplog.text
+
+
+@pytest.mark.parametrize("alert", AUTO_VIOLATION_ALERTS)
+class TestAutoViolationAlertsNobodyToAlert:
+    def test_logs_a_warning(self, alert, caplog):
+        """An automatic measure nobody hears about is what the alert is for."""
+        with caplog.at_level(logging.WARNING):
+            alert.send([])
+
+        assert alert.empty_log in caplog.text
+
+    def test_opens_no_session(self, alert, monkeypatch):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+
+        def _fail(*args, **kwargs):
+            raise AssertionError("SMTP should not be opened for nobody")
+
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _fail)
+        alert.send([])
+
+
+@pytest.mark.parametrize("alert", AUTO_VIOLATION_ALERTS)
+class TestAutoViolationAlertsSmtpFailure:
+    def test_does_not_raise(self, alert, monkeypatch):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _RaisingSMTP)
+
+        # The suspension or the flag is already committed by now. A mail server
+        # that is down must not undo it.
+        alert.send(_TEAM)
+
+    def test_logs_the_failure(self, alert, monkeypatch, caplog):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _RaisingSMTP)
+
+        with caplog.at_level(logging.ERROR):
+            alert.send(_TEAM)
+
+        assert alert.error_log in caplog.text
+
+    def test_a_refused_mailbox_does_not_silence_the_rest(self, alert, monkeypatch):
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.mailtrap.io")
+        monkeypatch.setattr(email_service.smtplib, "SMTP", _RefusingSMTP)
+
+        alert.send([_RefusingSMTP.refused, "ok@example.com"])
+
+        assert _recipients(_RefusingSMTP.instances[0]) == ["ok@example.com"]

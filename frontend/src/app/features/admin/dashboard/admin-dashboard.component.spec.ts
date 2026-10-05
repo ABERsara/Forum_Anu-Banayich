@@ -1,8 +1,8 @@
 /**
  * The dashboard had no spec before ABF-132.
  *
- * It is a screen made almost entirely of copy — a heading, a stat card and a
- * seven-link menu — so the migration is exactly what needs a guard: without
+ * It is a screen made almost entirely of copy — a heading, a stat card and an
+ * eight-link menu — so the migration is exactly what needs a guard: without
  * one, nothing catches a nav label falling back to hardcoded Hebrew, or a raw
  * `admin.dashboard.title` reaching the page.
  */
@@ -87,6 +87,21 @@ describe('AdminDashboardComponent', () => {
     expect(fixture.nativeElement.querySelector('app-error-display')).toBeTruthy();
   });
 
+  /**
+   * The screen is guarded for PROFESSIONAL and ADMIN in app.routes.ts; what
+   * this asserts is that the dashboard offers the way in at all, since the
+   * admin has no other entry point to it.
+   */
+  it('links to the knowledge base screen', async () => {
+    await renderWith(vi.fn().mockReturnValue(of([REGISTRATION])));
+
+    const hrefs = [...fixture.nativeElement.querySelectorAll('nav a')].map((link) =>
+      (link as HTMLElement).getAttribute('href'),
+    );
+
+    expect(hrefs).toContain('/professional/knowledge');
+  });
+
   describe('i18n', () => {
     it('reads in Hebrew exactly as it did before the keys went in', async () => {
       await renderWith(vi.fn().mockReturnValue(of([REGISTRATION])));
@@ -101,6 +116,7 @@ describe('AdminDashboardComponent', () => {
         'יומן פעולות',
         'שידור לכלל המשתמשים',
         'דיווחים',
+        'ניהול בסיס הידע',
       ]);
     });
 
@@ -119,6 +135,7 @@ describe('AdminDashboardComponent', () => {
         'Audit log',
         'Broadcast to all users',
         'Reports',
+        'Manage the knowledge base',
       ]);
       expect(text()).not.toMatch(HEBREW);
     });
@@ -155,6 +172,23 @@ describe('AdminDashboardComponent', () => {
 
       expect(navLabels()).toContain(transloco.translate('admin.active_users.title'));
       expect(navLabels()).toContain(transloco.translate('admin.broadcast.title'));
+    });
+
+    /**
+     * The knowledge base screen is ABF-124's own, so its link follows the same
+     * rule as the two above: the page's title key, not a second copy of those
+     * words here. The rename is what would catch the copy being duplicated.
+     */
+    it("calls the knowledge base by that page's own title", async () => {
+      await renderWith(vi.fn().mockReturnValue(of([REGISTRATION])));
+      const transloco = TestBed.inject(TranslocoService);
+
+      expect(navLabels()).toContain(transloco.translate('agents.knowledge.title'));
+
+      transloco.setTranslationKey('agents.knowledge.title', 'שם אחר לגמרי', { lang: 'he' });
+      fixture.detectChanges();
+
+      expect(navLabels()).toContain('שם אחר לגמרי');
     });
 
     /**

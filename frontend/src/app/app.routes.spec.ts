@@ -1,5 +1,6 @@
 /**
- * The moderator routes, and what stops the wrong person reaching them.
+ * The moderator and professional routes, and what stops the wrong person
+ * reaching them.
  *
  * ABF-155 added `/moderator/reports/:id` and a header link into the queue, and
  * its acceptance criteria say the URL is refused to a role that may not have
@@ -28,6 +29,7 @@ import { AccountStatus, UserRole } from './core/constants';
 import { authGuard } from './core/guards/auth.guard';
 import { AuthService } from './core/services/auth.service';
 import type { UserProfile } from './core/models';
+import { AgentKnowledgeAdminComponent } from './features/agents/agent-knowledge-admin/agent-knowledge-admin.component';
 import { ModeratorReportDetailComponent } from './features/moderator/report-detail/report-detail.component';
 
 const ACCESS_TOKEN_KEY = 'access_token';
@@ -158,5 +160,62 @@ describe('moderator routes', () => {
     );
 
     expect(allowed).toBe(true);
+  });
+});
+
+/**
+ * ABF-124 put the knowledge base screen under `/professional` for an admin as
+ * well as a professional — the ticket has the admin reach it by URL — which is
+ * why the roles moved from the parent to each child. The risk that move
+ * carries is the opposite one: the pending questions quietly opening to an
+ * admin along with it.
+ */
+describe('professional routes', () => {
+  const professionalRoute = routes.find((route) => route.path === 'professional')!;
+  const child = (path: string) =>
+    (professionalRoute.children ?? []).find((route) => route.path === path)!;
+  const roleGuardOf = (path: string) => child(path).canActivate![0] as CanActivateFn;
+
+  it('leaves the parent to authGuard alone', () => {
+    expect(professionalRoute.canActivate).toEqual([authGuard]);
+  });
+
+  it('serves the knowledge base screen at /professional/knowledge', async () => {
+    const loaded = await (child('knowledge').loadComponent!() as Promise<unknown>);
+
+    expect(loaded).toBe(AgentKnowledgeAdminComponent);
+  });
+
+  describe('/professional/knowledge', () => {
+    it.each([
+      ['a professional', UserRole.PROFESSIONAL],
+      ['an admin', UserRole.ADMIN],
+    ])('lets %s through', (_who, role) => {
+      expect(run(roleGuardOf('knowledge'), makeUser(role)).allowed).toBe(true);
+    });
+
+    it.each([
+      ['a regular member', UserRole.USER],
+      ['a moderator', UserRole.MODERATOR],
+    ])('turns %s away', (_who, role) => {
+      const { allowed, sentTo } = run(roleGuardOf('knowledge'), makeUser(role));
+
+      expect(allowed).toBe(false);
+      expect(sentTo).toEqual(['/forum']);
+    });
+  });
+
+  describe('/professional/questions', () => {
+    it('lets a professional through', () => {
+      expect(run(roleGuardOf('questions'), makeUser(UserRole.PROFESSIONAL)).allowed).toBe(true);
+    });
+
+    it.each([
+      ['an admin', UserRole.ADMIN],
+      ['a regular member', UserRole.USER],
+      ['a moderator', UserRole.MODERATOR],
+    ])('still turns %s away', (_who, role) => {
+      expect(run(roleGuardOf('questions'), makeUser(role)).allowed).toBe(false);
+    });
   });
 });

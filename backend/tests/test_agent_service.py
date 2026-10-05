@@ -2,7 +2,8 @@
 Unit tests for agent_service.
 
 The catalog half (get_visible_domains, ABF-120) is the first section; the
-conversation half (ABF-122) follows from TestGetVisibleDomain onwards.
+conversation half (ABF-122) follows from TestGetVisibleDomain onwards, and the
+two reads behind the knowledge base admin screen (ABF-124) close the file.
 
 test_agent_chat.py drives the ABF-122 code through the HTTP routes. What is
 here instead are the decisions that are awkward to reach from a request,
@@ -27,7 +28,7 @@ The DB is real (in-memory), per CONTRIBUTING §9.
 
 import base64
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -44,7 +45,12 @@ from app.core.constants import (
     UserType,
 )
 from app.core.encryption import encrypt_message
-from app.models.agent import AgentConversation, AgentDomain, AgentMessage
+from app.models.agent import (
+    AgentConversation,
+    AgentDomain,
+    AgentKnowledgeEntry,
+    AgentMessage,
+)
 from app.models.user import User
 from app.services import agent_service, llm_service, rag_service
 
@@ -1013,3 +1019,215 @@ class TestDecryption:
         )
 
         assert agent_service._plaintext(message) == HOUSING_QUESTION
+
+
+# ---------------------------------------------------------------------------
+# The knowledge base admin screen (ABF-124)
+# ---------------------------------------------------------------------------
+
+
+def _make_professional(
+    db_session: Session,
+    email: str,
+    discipline: ProfessionalDomain | None,
+) -> User:
+    professional = _make_user(
+        db_session, email, user_type=None, sector=None, role=UserRole.PROFESSIONAL
+    )
+    professional.professional_domain = discipline
+    db_session.commit()
+    return professional
+
+
+def _make_entry(
+    db_session: Session,
+    domain: AgentDomain,
+    author: User,
+    title: str,
+    updated_at: datetime,
+) -> AgentKnowledgeEntry:
+    entry = AgentKnowledgeEntry(
+        domain_id=domain.id,
+        title=title,
+        content=f"תוכן עבור {title}",
+        updated_by=author.id,
+    )
+    db_session.add(entry)
+    db_session.commit()
+    entry.updated_at = updated_at
+    db_session.commit()
+    return entry
+
+
+class TestGetManageableDomains:
+    """The list the admin screen offers is can_manage_knowledge() applied to
+    the whole catalog — nothing more generous, nothing stricter."""
+
+    @pytest.fixture
+    def catalog(self, db_session: Session) -> dict[str, AgentDomain]:
+        return {
+            "rights": _make_domain(
+                db_session, "זכויות", professional_domain=ProfessionalDomain.LAWYER
+            ),
+            "estates": _make_domain(
+                db_session, "ירושה", professional_domain=ProfessionalDomain.LAWYER
+            ),
+            "health": _make_domain(
+                db_session, "בריאות", professional_domain=ProfessionalDomain.MEDICINE
+            ),
+        }
+
+    def test_a_professional_gets_every_domain_of_their_discipline_and_no_other(
+        self, db_session: Session, catalog: dict[str, AgentDomain]
+    ) -> None:
+        lawyer = _make_professional(
+            db_session, "lawyer@example.com", ProfessionalDomain.LAWYER
+        )
+
+        domains = agent_service.get_manageable_domains(db_session, lawyer)
+
+        assert {d.id for d in domains} == {catalog["rights"].id, catalog["estates"].id}
+
+    def test_an_admin_gets_the_whole_catalog(
+        self, db_session: Session, catalog: dict[str, AgentDomain]
+    ) -> None:
+        admin = _make_user(
+            db_session, "admin@example.com", None, None, role=UserRole.ADMIN
+        )
+
+        domains = agent_service.get_manageable_domains(db_session, admin)
+
+        assert {d.id for d in domains} == {d.id for d in catalog.values()}
+
+    def test_a_professional_with_no_discipline_gets_nothing(
+        self, db_session: Session, catalog: dict[str, AgentDomain]
+    ) -> None:
+        unassigned = _make_professional(db_session, "pro@example.com", None)
+
+        assert agent_service.get_manageable_domains(db_session, unassigned) == []
+
+    def test_a_member_gets_nothing_even_with_a_discipline_set(
+        self, db_session: Session, catalog: dict[str, AgentDomain]
+    ) -> None:
+        # The role is checked as well as the discipline (see
+        # can_manage_knowledge): the field alone, on the wrong kind of
+        # account, opens nothing.
+        member = _make_user(db_session)
+        member.professional_domain = ProfessionalDomain.LAWYER
+        db_session.commit()
+
+        assert agent_service.get_manageable_domains(db_session, member) == []
+
+    def test_an_inactive_domain_is_included(self, db_session: Session) -> None:
+        retired = _make_domain(
+            db_session,
+            "ישן",
+            is_active=False,
+            professional_domain=ProfessionalDomain.LAWYER,
+        )
+        lawyer = _make_professional(
+            db_session, "lawyer@example.com", ProfessionalDomain.LAWYER
+        )
+
+        domains = agent_service.get_manageable_domains(db_session, lawyer)
+
+        assert [d.id for d in domains] == [retired.id]
+
+    def test_domains_come_back_ordered_by_name(
+        self, db_session: Session, catalog: dict[str, AgentDomain]
+    ) -> None:
+        admin = _make_user(
+            db_session, "admin@example.com", None, None, role=UserRole.ADMIN
+        )
+
+        domains = agent_service.get_manageable_domains(db_session, admin)
+
+        names = [d.name for d in domains]
+        assert names == sorted(names)
+
+
+class TestListKnowledgeEntries:
+    @pytest.fixture
+    def author(self, db_session: Session) -> User:
+        return _make_professional(
+            db_session, "lawyer@example.com", ProfessionalDomain.LAWYER
+        )
+
+    @pytest.fixture
+    def rights(self, db_session: Session) -> AgentDomain:
+        return _make_domain(
+            db_session, "זכויות", professional_domain=ProfessionalDomain.LAWYER
+        )
+
+    def test_newest_edit_comes_first(
+        self, db_session: Session, rights: AgentDomain, author: User
+    ) -> None:
+        _make_entry(db_session, rights, author, "ישן", datetime(2026, 1, 1))
+        _make_entry(db_session, rights, author, "חדש", datetime(2026, 3, 1))
+        _make_entry(db_session, rights, author, "אמצע", datetime(2026, 2, 1))
+
+        entries, total = agent_service.list_knowledge_entries(db_session, rights.id)
+
+        assert [e.title for e in entries] == ["חדש", "אמצע", "ישן"]
+        assert total == 3
+
+    def test_a_page_holds_page_size_entries_and_the_total_counts_them_all(
+        self, db_session: Session, rights: AgentDomain, author: User
+    ) -> None:
+        for day in range(1, 6):
+            _make_entry(
+                db_session, rights, author, f"ערך {day}", datetime(2026, 1, day)
+            )
+
+        entries, total = agent_service.list_knowledge_entries(
+            db_session, rights.id, page=2, page_size=2
+        )
+
+        assert [e.title for e in entries] == ["ערך 3", "ערך 2"]
+        assert total == 5
+
+    def test_a_page_past_the_end_is_empty_but_still_reports_the_total(
+        self, db_session: Session, rights: AgentDomain, author: User
+    ) -> None:
+        # What the screen reads to step back to a page that still exists.
+        _make_entry(db_session, rights, author, "יחיד", datetime(2026, 1, 1))
+
+        entries, total = agent_service.list_knowledge_entries(
+            db_session, rights.id, page=3, page_size=20
+        )
+
+        assert entries == []
+        assert total == 1
+
+    def test_entries_saved_at_the_same_moment_page_without_repeats_or_gaps(
+        self, db_session: Session, rights: AgentDomain, author: User
+    ) -> None:
+        same_moment = datetime(2026, 1, 1)
+        created = {
+            _make_entry(db_session, rights, author, f"ערך {i}", same_moment).id
+            for i in range(5)
+        }
+
+        seen: list[str] = []
+        for page in (1, 2, 3):
+            entries, _ = agent_service.list_knowledge_entries(
+                db_session, rights.id, page=page, page_size=2
+            )
+            seen.extend(entry.id for entry in entries)
+
+        assert len(seen) == len(created)
+        assert set(seen) == created
+
+    def test_only_the_named_domain_is_listed(
+        self, db_session: Session, rights: AgentDomain, author: User
+    ) -> None:
+        estates = _make_domain(
+            db_session, "ירושה", professional_domain=ProfessionalDomain.LAWYER
+        )
+        _make_entry(db_session, rights, author, "שלי", datetime(2026, 1, 1))
+        _make_entry(db_session, estates, author, "של תחום אחר", datetime(2026, 1, 2))
+
+        entries, total = agent_service.list_knowledge_entries(db_session, rights.id)
+
+        assert [e.title for e in entries] == ["שלי"]
+        assert total == 1
