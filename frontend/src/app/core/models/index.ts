@@ -49,11 +49,27 @@ export interface UserProfile {
   sector: Sector | null;
   birth_date: string | null; // ISO date string "YYYY-MM-DD"
   account_status: AccountStatus;
+  /** Where the platform sends this account its alerts. Null means they go to `email`. */
+  alert_email: string | null;
   created_at: string; // ISO datetime
 }
 
-/** What admin sees when reviewing a registration. */
-export interface UserAdminView extends UserProfile {
+/**
+ * What a user may change about their own profile (PUT /users/me). Partial by
+ * design: an omitted key is left untouched. An explicit `null` alert_email
+ * clears it, and alerts then go to the login address. The API refuses any
+ * other field with a 422: the login address needs the OTP flow, and name,
+ * group and sector are admin decisions.
+ */
+export interface UserProfileUpdate {
+  alert_email?: string | null;
+}
+
+/**
+ * What admin sees when reviewing a registration. The API's admin view does not
+ * carry the alert address, so it is left out of the profile it extends.
+ */
+export interface UserAdminView extends Omit<UserProfile, 'alert_email'> {
   phone: string | null;
   id_number: string | null;
   first_approver_id: string | null;

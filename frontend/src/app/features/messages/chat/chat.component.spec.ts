@@ -35,6 +35,7 @@ const ME: UserProfile = {
   sector: Sector.HASIDIC,
   birth_date: '1985-03-15',
   account_status: AccountStatus.ACTIVE,
+  alert_email: null,
   created_at: '2026-06-01T00:00:00',
 };
 

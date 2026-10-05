@@ -6,12 +6,26 @@
  * action (USER role only — SPEC §3.2's permission table grants export to
  * that role alone), and account deletion (every role, per the same table).
  *
+ * ABF-165 adds the one profile field a user edits themselves: the alert
+ * address, where the platform sends this account its alerts (every role).
+ * The login address, name, group and sector stay read-only here: the first
+ * needs the OTP flow, the rest are admin decisions.
+ *
  * The screen owns no direction of its own (ABF-136): `LocaleService` sets
  * `<html dir>` from the active language and the page inherits it.
  */
 
-import { Component, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  ViewChild,
+  afterNextRender,
+  inject,
+  signal,
+} from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import {
@@ -31,13 +45,20 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [TranslocoPipe, ConfirmDialogComponent, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    ReactiveFormsModule,
+    TranslocoPipe,
+    ConfirmDialogComponent,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })
 export class ProfileComponent {
   readonly auth = inject(AuthService);
   private readonly account = inject(AccountService);
+  private readonly injector = inject(Injector);
   readonly userTypeLabels = USER_TYPE_LABELS;
   readonly sectorLabels = SECTOR_LABELS;
   readonly statusLabels = ACCOUNT_STATUS_LABELS;
@@ -50,6 +71,74 @@ export class ProfileComponent {
   showDeleteConfirm = signal(false);
   isDeleting = signal(false);
   deleteError = signal<ScreenError>(NO_ERROR);
+
+  readonly alertEmailForm = new FormGroup({
+    /** Blank means "no separate alert address": alerts go to the login address. */
+    alert_email: new FormControl('', { nonNullable: true, validators: [Validators.email] }),
+  });
+  readonly alertEmail = this.alertEmailForm.controls.alert_email;
+  isEditingAlertEmail = signal(false);
+  isSavingAlertEmail = signal(false);
+  alertEmailError = signal<ScreenError>(NO_ERROR);
+  alertEmailSaved = signal(false);
+
+  @ViewChild('alertEmailInput') private alertEmailInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('alertEmailEditButton') private alertEmailEditButton?: ElementRef<HTMLButtonElement>;
+
+  /** Opens the field on the address currently stored. */
+  editAlertEmail(): void {
+    this.alertEmail.reset(this.storedAlertEmail());
+    this.alertEmailError.set(NO_ERROR);
+    this.alertEmailSaved.set(false);
+    this.isEditingAlertEmail.set(true);
+    this.focusAfterRender(() => this.alertEmailInput);
+  }
+
+  /** Puts back the stored address and sends nothing. */
+  cancelAlertEmailEdit(): void {
+    this.alertEmail.reset(this.storedAlertEmail());
+    this.alertEmailError.set(NO_ERROR);
+    this.isEditingAlertEmail.set(false);
+    this.focusAfterRender(() => this.alertEmailEditButton);
+  }
+
+  saveAlertEmail(): void {
+    // Judge the value that is about to be sent: a pasted "  a@b.co  " is a
+    // valid address once trimmed, and Validators.email would reject it before.
+    const value = this.alertEmail.value.trim();
+    this.alertEmail.setValue(value);
+    this.alertEmail.markAsTouched();
+    if (this.alertEmail.invalid) return;
+
+    this.isSavingAlertEmail.set(true);
+    this.alertEmailError.set(NO_ERROR);
+    this.alertEmailSaved.set(false);
+    this.alertEmail.disable();
+    // A cleared field is sent as null, not "": the API clears the address on
+    // null and rejects an empty string as an invalid one.
+    this.account.updateMyProfile({ alert_email: value || null }).subscribe({
+      next: (user) => {
+        this.auth.setCurrentUser(user);
+        this.alertEmail.enable();
+        this.isSavingAlertEmail.set(false);
+        this.isEditingAlertEmail.set(false);
+        this.alertEmailSaved.set(true);
+        this.focusAfterRender(() => this.alertEmailEditButton);
+      },
+      error: (err: HttpErrorResponse) => {
+        // A 422 carries Pydantic's English field errors, not a sentence for the
+        // reader. Validators.email accepts a few shapes the API does not
+        // ("a@b", with no dot in the domain), so say what is wrong with it.
+        const fallbackKey =
+          err.status === 422
+            ? 'profile.alert_email.email_error'
+            : 'profile.errors.alert_email_save_failed';
+        this.alertEmailError.set(screenErrorFrom(err, fallbackKey));
+        this.alertEmail.enable();
+        this.isSavingAlertEmail.set(false);
+      },
+    });
+  }
 
   exportMessages(): void {
     this.isExporting.set(true);
@@ -88,6 +177,19 @@ export class ProfileComponent {
         this.isDeleting.set(false);
       },
     });
+  }
+
+  private storedAlertEmail(): string {
+    return this.auth.currentUser()?.alert_email ?? '';
+  }
+
+  /**
+   * The edit and the read-only view swap places, so the element that had focus
+   * leaves the page with them. Without this, keyboard and screen-reader users
+   * land back at the top of the document.
+   */
+  private focusAfterRender(target: () => ElementRef<HTMLElement> | undefined): void {
+    afterNextRender(() => target()?.nativeElement.focus(), { injector: this.injector });
   }
 
   /**
