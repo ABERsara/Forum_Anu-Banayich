@@ -27,6 +27,7 @@ from app.core.constants import (
     GroupVisibility,
     LikeTargetType,
     PostStatus,
+    PostType,
     ReportDecision,
     ReportTargetType,
     SectorVisibility,
@@ -171,7 +172,12 @@ def get_posts(
     if current_user.role not in (UserRole.USER, UserRole.ADMIN):
         raise HTTPException(status_code=403, detail=translate("forum.access_forbidden"))
 
-    query = db.query(ForumPost).options(joinedload(ForumPost.author))
+    # ForumPost.meeting is eager-loaded alongside the author: a MEETING post
+    # (ABF-156) is drawn from it, and leaving it lazy would be one extra query
+    # per announcement in the page.
+    query = db.query(ForumPost).options(
+        joinedload(ForumPost.author), joinedload(ForumPost.meeting)
+    )
 
     if current_user.role == UserRole.ADMIN:
         query = query.filter(ForumPost.status != PostStatus.DELETED)
@@ -260,7 +266,7 @@ def get_post_by_id(db: Session, post_id: str, current_user: User) -> ForumPost:
 
     post = (
         db.query(ForumPost)
-        .options(joinedload(ForumPost.author))
+        .options(joinedload(ForumPost.author), joinedload(ForumPost.meeting))
         .filter(ForumPost.id == post_id)
         .first()
     )
@@ -455,6 +461,16 @@ def update_post(
     if current_user.id != post.author_id:
         raise HTTPException(
             status_code=403, detail=translate("forum.post_edit_author_only")
+        )
+
+    if post.post_type == PostType.MEETING:
+        # A meeting announcement is read-only (ABF-156). Its title is the
+        # summary of an event that already exists in the professional's Google
+        # Calendar, so editing it here would leave the forum and the calendar
+        # saying different things about the same meeting — and changing a
+        # meeting is explicitly out of this ticket's scope.
+        raise HTTPException(
+            status_code=403, detail=translate("forum.meeting_post_read_only")
         )
 
     for field, value in data.model_dump(exclude_unset=True).items():
