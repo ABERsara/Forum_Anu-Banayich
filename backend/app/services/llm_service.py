@@ -308,6 +308,11 @@ GEMINI_TEMPERATURE = 0.2
 #: A chat answer, not a document. Also caps the cost of one request.
 GEMINI_MAX_OUTPUT_TOKENS = 1024
 
+#: How much of an error body reaches the log. Enough for Gemini's message and
+#: the model name it suggests, short enough that a provider having a bad day
+#: cannot fill the log with one response.
+GEMINI_ERROR_BODY_LOG_CHARS = 500
+
 #: Gemini's name for the two conversation roles. AgentMessageRole.AGENT is
 #: "agent" in our schema and "model" in theirs; the mapping is here so that
 #: the rest of the codebase never has to know that.
@@ -372,7 +377,17 @@ class GeminiProvider:
             raise LLMUnavailableError("Gemini request failed.") from exc
 
         if response.status_code != httpx.codes.OK:
-            logger.warning("Gemini returned HTTP %s", response.status_code)
+            # The body, not the status, is what says *why*: a retired model and
+            # a revoked key are both plain 404s, and only the body names the
+            # model to move to. Safe to log — the key travels in a header, and
+            # the request is ours — but truncated, because an error body has no
+            # size contract. It stays out of LLMUnavailableError, which reaches
+            # the user.
+            logger.warning(
+                "Gemini returned HTTP %s: %s",
+                response.status_code,
+                response.text[:GEMINI_ERROR_BODY_LOG_CHARS],
+            )
             raise LLMUnavailableError(f"Gemini returned HTTP {response.status_code}.")
 
         return self._extract_answer(response)
