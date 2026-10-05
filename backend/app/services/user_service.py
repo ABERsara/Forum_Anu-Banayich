@@ -441,6 +441,31 @@ def suspend_user(
     return user
 
 
+def lift_report_restriction(db: Session, user_id: str, actor: User) -> User:
+    """
+    Manually lift an automatic report restriction (backlog B1).
+    """
+    user = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if not user:
+        raise HTTPException(status_code=404, detail=translate("users.not_found"))
+    if not user.is_report_restricted:
+        raise HTTPException(status_code=400, detail=translate("users.not_restricted"))
+
+    user.is_report_restricted = False
+
+    log_action(
+        db,
+        actor=actor,
+        action=AuditAction.USER_RESTRICTED,
+        entity_type="User",
+        entity_id=user.id,
+        details={"measure": "report_restriction_lifted", "automatic": False},
+    )
+    db.refresh(user)
+
+    return user
+
+
 def _visible_to_user(professional: User, current_user: User) -> bool:
     """
     A professional is visible if:

@@ -166,6 +166,10 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "ניתן להשעות רק משתמש פעיל",
         ENGLISH: "Only an active member can be suspended",
     },
+    "users.not_restricted": {
+        HEBREW: "למשתמש זה אין הגבלת דיווח פעילה",
+        ENGLISH: "This user has no active report restriction",
+    },
     "users.professionals_only": {
         HEBREW: "ניתן לערוך אנשי מקצוע בלבד",
         ENGLISH: "Only professionals can be edited",
