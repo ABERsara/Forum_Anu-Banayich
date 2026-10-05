@@ -333,11 +333,13 @@ export enum AgentMessageRole {
  * row. Both go through AUDIT_ACTION_LABELS below — the values here are wire
  * values, and none of them is display text in either language.
  *
- * A value the backend adds and this enum has not caught up with does not break
- * the screen: the table falls back to the raw value for a row it has no label
- * for (see `audit-log.component.ts`), so an unrecognised action reads as
- * `some_new_action` rather than as a blank cell. It will be missing from the
- * filter dropdown until it is added here, which is the visible reminder.
+ * A value the backend adds and this enum has not caught up with fails
+ * `index.spec.ts`, which reads the members straight out of `constants.py` —
+ * MEETING_CREATED (ABF-156) landed on main while this enum was being written,
+ * and git merged the two without a word. Should one reach a running screen
+ * anyway, the table falls back to the raw value for a row it has no label for
+ * (see `audit-log.component.ts`), so it reads as `some_new_action` rather than
+ * as a blank cell.
  */
 export enum AuditAction {
   USER_APPROVED = 'user_approved',
@@ -363,6 +365,7 @@ export enum AuditAction {
   USER_RESTRICTED = 'user_restricted',
   AGENT_CONVERSATION = 'agent_conversation',
   AGENT_CONVERSATION_ACCESS_DENIED = 'agent_conversation_access_denied',
+  MEETING_CREATED = 'meeting_created',
 }
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, LabelKey> = {
@@ -390,6 +393,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, LabelKey> = {
   [AuditAction.AGENT_CONVERSATION]: 'constants.audit_action.agent_conversation',
   [AuditAction.AGENT_CONVERSATION_ACCESS_DENIED]:
     'constants.audit_action.agent_conversation_access_denied',
+  [AuditAction.MEETING_CREATED]: 'constants.audit_action.meeting_created',
 };
 
 /**

@@ -790,7 +790,8 @@
       "direct_message_report_viewed": "צפייה בתוכן הודעה שדווחה",
       "user_restricted": "החלת הגבלה אוטומטית",
       "agent_conversation": "שיחה עם סוכן AI",
-      "agent_conversation_access_denied": "גישה לשיחת סוכן נדחתה"
+      "agent_conversation_access_denied": "גישה לשיחת סוכן נדחתה",
+      "meeting_created": "קביעת פגישה"
     }
   }
 }

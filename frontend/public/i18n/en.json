@@ -790,7 +790,8 @@
       "direct_message_report_viewed": "Reported message content viewed",
       "user_restricted": "Automatic restriction applied",
       "agent_conversation": "AI agent conversation",
-      "agent_conversation_access_denied": "Agent conversation access denied"
+      "agent_conversation_access_denied": "Agent conversation access denied",
+      "meeting_created": "Meeting scheduled"
     }
   }
 }

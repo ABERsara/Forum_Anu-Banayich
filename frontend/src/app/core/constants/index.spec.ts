@@ -9,9 +9,19 @@
  * long after the commit that caused it.
  */
 
+/// <reference types="node" />
+// Asked for here rather than in tsconfig.spec.json's `types`, for the same
+// reason core/utils/error-key.util.spec.ts gives: only the backend-mirror check
+// at the bottom of this file needs to read constants.py off the disk.
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   ACCOUNT_STATUS_LABELS,
   AUDIT_ACTION_LABELS,
+  AuditAction,
+  AuditSortField,
   DOCUMENT_TYPE_LABELS,
   GROUP_VISIBILITY_LABELS,
   LabelKey,
@@ -23,6 +33,7 @@ import {
   RESTRICTION_TYPE_LABELS,
   SECTOR_LABELS,
   SECTOR_VISIBILITY_LABELS,
+  SortDirection,
   USER_TYPE_LABELS,
 } from './index';
 import { TRANSLATIONS } from '../../../testing/transloco-testing';
@@ -107,5 +118,41 @@ describe('shared label maps', () => {
       .filter((key) => !USED_KEYS.has(key));
 
     expect(orphaned, 'translations no label map points at').toEqual([]);
+  });
+});
+
+/** Vitest runs from `frontend/`, so the repo root is one level up. */
+const BACKEND_CONSTANTS = readFileSync(
+  join(process.cwd(), '..', 'backend', 'app', 'core', 'constants.py'),
+  'utf8',
+);
+
+/**
+ * The `NAME = "value"` members of one `class <name>(enum.StrEnum)` in
+ * constants.py, as `{NAME: value}` — the shape a TypeScript string enum has.
+ * The class body ends at the first line that is not indented.
+ */
+function backendEnum(name: string): Record<string, string> {
+  const body = BACKEND_CONSTANTS.split(`\nclass ${name}(`)[1]?.split(/\n(?=\S)/)[0];
+  expect(body, `class ${name} in constants.py`).toBeDefined();
+  return Object.fromEntries(
+    [...body!.matchAll(/^ {4}([A-Z][A-Z0-9_]*) = "([^"]*)"/gm)].map(([, key, value]) => [
+      key,
+      value,
+    ]),
+  );
+}
+
+describe('audit log enums mirror backend/app/core/constants.py', () => {
+  // Git merges a member added on one side of the stack and missing on the other
+  // without a conflict — MEETING_CREATED (ABF-156) did exactly that. Without
+  // this check, the action would be missing from the filter and would show up
+  // untranslated in the table, and nothing would fail.
+  it.each([
+    ['AuditAction', AuditAction],
+    ['AuditSortField', AuditSortField],
+    ['SortDirection', SortDirection],
+  ])('%s, member for member', (name, frontendEnum) => {
+    expect({ ...frontendEnum }).toEqual(backendEnum(name));
   });
 });
