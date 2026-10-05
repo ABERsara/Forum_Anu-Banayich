@@ -230,7 +230,7 @@ export const routes: Routes = [
       {
         path: 'restricted-users',
         loadComponent: () =>
-          import('./features/admin/users/restricted-users.component').then(
+          import('./features/admin/restricted-users/restricted-users.component').then(
             (m) => m.RestrictedUsersComponent,
           ),
       },

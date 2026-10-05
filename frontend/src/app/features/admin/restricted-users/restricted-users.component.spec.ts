@@ -271,6 +271,29 @@ describe('RestrictedUsersComponent', () => {
       expect(text()).not.toMatch(HEBREW);
     });
 
+    /**
+     * The confirm button's own label is a separate [confirmText] binding, not
+     * the generic "שלח"/"Confirm" fallback — a deleted binding would only be
+     * caught here, since the row button carries the same words too.
+     */
+    it('passes its own label to the confirm button, not the generic fallback', async () => {
+      await renderWith(vi.fn().mockReturnValue(of([makeLatinUser()])));
+
+      component.lift('u1');
+      fixture.detectChanges();
+      const confirmButton = fixture.nativeElement.querySelector(
+        'app-confirm-dialog .btn--primary',
+      ) as HTMLElement;
+      expect(confirmButton.textContent?.trim()).toBe('הסר הגבלה');
+
+      switchToEnglish();
+
+      const confirmButtonEn = fixture.nativeElement.querySelector(
+        'app-confirm-dialog .btn--primary',
+      ) as HTMLElement;
+      expect(confirmButtonEn.textContent?.trim()).toBe('Lift restriction');
+    });
+
     /** A person's name and address are content, not UI: they survive the switch. */
     it('leaves what the user is called alone', async () => {
       await renderWith(vi.fn().mockReturnValue(of([makeUser()])));

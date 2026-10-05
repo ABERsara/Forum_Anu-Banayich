@@ -79,14 +79,25 @@ class TestListRestrictedUsers:
 
         assert response.status_code == 403
 
+    async def test_forbidden_for_a_moderator(self, client, make_user, as_user) -> None:
+        """A moderator is the non-admin role closest to this data — worth its own case."""
+        moderator = make_user(
+            "moderator@example.com",
+            role=UserRole.MODERATOR,
+            account_status=AccountStatus.ACTIVE,
+        )
+        as_user(moderator)
+
+        response = await client.get(f"{BASE}/restricted")
+
+        assert response.status_code == 403
+
 
 class TestLiftRestriction:
     async def test_clears_the_flag_and_returns_the_user(
         self, client, db_session, make_user, as_user, admin
     ) -> None:
-        user = make_user(
-            "restricted@example.com", account_status=AccountStatus.ACTIVE
-        )
+        user = make_user("restricted@example.com", account_status=AccountStatus.ACTIVE)
         user.is_report_restricted = True
         db_session.commit()
         as_user(admin)
@@ -99,9 +110,7 @@ class TestLiftRestriction:
     async def test_user_no_longer_appears_on_the_restricted_list(
         self, client, db_session, make_user, as_user, admin
     ) -> None:
-        user = make_user(
-            "restricted@example.com", account_status=AccountStatus.ACTIVE
-        )
+        user = make_user("restricted@example.com", account_status=AccountStatus.ACTIVE)
         user.is_report_restricted = True
         db_session.commit()
         as_user(admin)
@@ -114,9 +123,7 @@ class TestLiftRestriction:
     async def test_records_the_lift_in_the_audit_log(
         self, client, db_session, make_user, as_user, admin
     ) -> None:
-        user = make_user(
-            "restricted@example.com", account_status=AccountStatus.ACTIVE
-        )
+        user = make_user("restricted@example.com", account_status=AccountStatus.ACTIVE)
         user.is_report_restricted = True
         db_session.commit()
         as_user(admin)
@@ -149,9 +156,7 @@ class TestLiftRestriction:
         assert response.status_code == 400
 
     async def test_requires_authentication(self, client, make_user) -> None:
-        user = make_user(
-            "restricted@example.com", account_status=AccountStatus.ACTIVE
-        )
+        user = make_user("restricted@example.com", account_status=AccountStatus.ACTIVE)
 
         response = await client.patch(f"{BASE}/{user.id}/lift-restriction")
 
@@ -160,13 +165,29 @@ class TestLiftRestriction:
     async def test_forbidden_for_non_admin_roles(
         self, client, db_session, make_user, as_user
     ) -> None:
-        user = make_user(
-            "restricted@example.com", account_status=AccountStatus.ACTIVE
-        )
+        user = make_user("restricted@example.com", account_status=AccountStatus.ACTIVE)
         user.is_report_restricted = True
         member = make_user("member@example.com", account_status=AccountStatus.ACTIVE)
         db_session.commit()
         as_user(member)
+
+        response = await client.patch(f"{BASE}/{user.id}/lift-restriction")
+
+        assert response.status_code == 403
+
+    async def test_forbidden_for_a_moderator(
+        self, client, db_session, make_user, as_user
+    ) -> None:
+        """A moderator is the non-admin role closest to this data — worth its own case."""
+        user = make_user("restricted@example.com", account_status=AccountStatus.ACTIVE)
+        user.is_report_restricted = True
+        moderator = make_user(
+            "moderator@example.com",
+            role=UserRole.MODERATOR,
+            account_status=AccountStatus.ACTIVE,
+        )
+        db_session.commit()
+        as_user(moderator)
 
         response = await client.patch(f"{BASE}/{user.id}/lift-restriction")
 

@@ -21,7 +21,7 @@ from app.models.audit import AuditLog
 from app.models.restriction import UserRestriction
 from app.models.user import User
 from app.schemas.user import ProfessionalCreateRequest, ProfessionalUpdateRequest
-from app.services import user_service
+from app.services import restriction_service, user_service
 
 
 def _make_user(
@@ -1234,7 +1234,7 @@ class TestLiftReportRestriction:
         user.is_report_restricted = True
         db_session.commit()
         admin = _make_admin(db_session, "admin1@example.com")
-        expires_at = datetime.now(UTC) + timedelta(days=12)
+        expires_at = now + timedelta(days=12)
         restriction = UserRestriction(
             user_id=user.id,
             restriction_type=RestrictionType.REPORTING,
@@ -1248,7 +1248,14 @@ class TestLiftReportRestriction:
         user_service.lift_report_restriction(db_session, user.id, admin)
 
         db_session.refresh(restriction)
-        assert restriction.expires_at.replace(tzinfo=UTC) == expires_at
+        assert restriction.expires_at == expires_at
+        # The property that actually matters: assert_may_file_report() still
+        # finds this row and still throttles, not just that it survived.
+        still_found = restriction_service.active_restriction(
+            db_session, user.id, RestrictionType.REPORTING
+        )
+        assert still_found is not None
+        assert still_found.id == restriction.id
 
     def test_cannot_lift_a_restriction_that_is_not_active(
         self, db_session: Session
