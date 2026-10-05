@@ -22,6 +22,7 @@ actually built. Nothing here needs a DB either: build_system_prompt() reads one
 attribute of an AgentDomain, so an unsaved row is enough.
 """
 
+import logging
 from collections.abc import Callable
 
 import httpx
@@ -368,6 +369,53 @@ class TestGeminiErrors:
 
         with pytest.raises(LLMUnavailableError):
             gemini(handler).generate("RULES", "שאלה", CHUNKS, [])
+
+    def test_the_error_body_is_logged_next_to_the_status(self, gemini, caplog):
+        """ABF-168: a retired model is a bare 404 until the body is read.
+
+        gemini-2.0-flash was retired without anything in the logs but
+        "Gemini returned HTTP 404", while the body named the model to move to.
+        Logging the status alone costs an afternoon the next time Google
+        retires one, which it will.
+        """
+        retired = {
+            "error": {
+                "message": (
+                    "models/gemini-2.0-flash is not found or is no longer "
+                    "available. Please update your code to use "
+                    "models/gemini-3.6-flash."
+                )
+            }
+        }
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(404, json=retired)
+
+        with (
+            caplog.at_level(logging.WARNING),
+            pytest.raises(LLMUnavailableError) as exc_info,
+        ):
+            gemini(handler).generate("RULES", "שאלה", CHUNKS, [])
+
+        assert "models/gemini-3.6-flash" in caplog.text
+        # The body stays in the log: this message is what reaches the user.
+        assert "gemini-3.6-flash" not in str(exc_info.value)
+
+    def test_a_long_error_body_is_truncated_in_the_log(self, gemini, caplog):
+        """An error body has no size contract; a log line does."""
+        cap = llm_service.GEMINI_ERROR_BODY_LOG_CHARS
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(503, text="x" * (cap * 10))
+
+        with (
+            caplog.at_level(logging.WARNING),
+            pytest.raises(LLMUnavailableError),
+        ):
+            gemini(handler).generate("RULES", "שאלה", CHUNKS, [])
+
+        assert "x" * cap in caplog.text
+        assert "x" * (cap + 1) not in caplog.text
 
     def test_non_json_body_raises_llm_unavailable_error(self, gemini):
         def handler(request: httpx.Request) -> httpx.Response:

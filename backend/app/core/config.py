@@ -223,7 +223,7 @@ class Settings(BaseSettings):
     # settings because they are two model families on two deprecation
     # schedules: retrieval keeps working when the chat model is retired, and
     # the reverse.
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MODEL: str = "gemini-3.6-flash"
 
     # Hard ceiling on one generation call. A chat request holds a worker for
     # its whole duration, so this is what stops a slow provider from taking
