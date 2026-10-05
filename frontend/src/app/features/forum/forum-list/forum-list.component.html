@@ -25,6 +25,13 @@
           {{ post.author.first_name }} {{ post.author.last_name }} |
           {{ post.created_at | date }}
         </p>
+        <!-- A meeting announcement reads differently from a post:
+             when it starts, and the way in. `meeting` is populated exactly
+             when post_type is MEETING, so the data the card needs is also the
+             test for whether to draw it. -->
+        @if (post.meeting; as meeting) {
+          <app-meeting-announcement [meeting]="meeting" />
+        }
         <!-- Excerpt and a report button are out of scope for ABF-41 (F2 / F5) -->
         <span class="post-card__badge">
           {{ groupVisibilityLabels[post.group_visibility] | transloco }} ·

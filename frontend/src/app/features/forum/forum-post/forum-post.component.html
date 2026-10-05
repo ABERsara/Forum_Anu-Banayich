@@ -14,7 +14,14 @@
     <p class="forum-post__meta">
       {{ post.author.first_name }} {{ post.author.last_name }} | {{ post.created_at | date }}
     </p>
-    <p class="forum-post__content">{{ post.content }}</p>
+    <!-- A meeting announcement carries its payload in structured fields, and
+         its body is a second copy of the title the server wrote there, so the
+         announcement is rendered instead of the text. -->
+    @if (post.meeting; as meeting) {
+      <app-meeting-announcement [meeting]="meeting" />
+    } @else {
+      <p class="forum-post__content">{{ post.content }}</p>
+    }
 
     @if (post.attachment_url) {
       <a [href]="post.attachment_url" target="_blank" rel="noopener">
@@ -23,20 +30,24 @@
     }
 
     <div class="forum-post__engagement">
-      <button
-        type="button"
-        class="forum-post__like-btn"
-        [class.forum-post__like-btn--liked]="post.liked_by_me"
-        [attr.aria-label]="
-          (post.liked_by_me ? 'forum.post.unlike_aria' : 'forum.post.like_aria')
-            | transloco: { count: post.like_count }
-        "
-        [disabled]="isLiking()"
-        (click)="toggleLike()"
-      >
-        <span aria-hidden="true">👍</span>
-        <span>{{ post.like_count }}</span>
-      </button>
+      <!-- No like on an announcement: the server answers 403, because a notice
+           is not something written to be responded to. -->
+      @if (!isMeeting()) {
+        <button
+          type="button"
+          class="forum-post__like-btn"
+          [class.forum-post__like-btn--liked]="post.liked_by_me"
+          [attr.aria-label]="
+            (post.liked_by_me ? 'forum.post.unlike_aria' : 'forum.post.like_aria')
+              | transloco: { count: post.like_count }
+          "
+          [disabled]="isLiking()"
+          (click)="toggleLike()"
+        >
+          <span aria-hidden="true">👍</span>
+          <span>{{ post.like_count }}</span>
+        </button>
+      }
       <app-report-button [contentType]="reportTargetType" [contentId]="post.id" />
     </div>
 
