@@ -230,6 +230,11 @@ class AuditAction(enum.StrEnum):
     # grounds as BROADCAST_SENT: it creates an event on an external service
     # and publishes a join link to a whole cell at once.
     MEETING_CREATED = "meeting_created"
+    # A user editing their own profile through PUT /users/me (ABF-165): today
+    # only the alert address. For a moderator or an admin that address is where
+    # report and SLA alerts are routed, and the admin's identical edit is already
+    # logged as MODERATOR_UPDATED, so the self-service path is logged too.
+    PROFILE_UPDATED = "profile_updated"
 
 
 # ---------------------------------------------------------------------------
