@@ -141,6 +141,17 @@ describe('RestrictedUsersComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('אירעה שגיאה בהסרת ההגבלה. נסה שוב.');
   });
 
+  it('closes the dialog on failure, so the error underneath is visible', () => {
+    adminServiceMock.liftRestriction.mockReturnValue(throwError(() => ({})));
+
+    component.lift('u1');
+    component.confirmLift();
+
+    expect(component.liftingId()).toBeNull();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-confirm-dialog')).toBeFalsy();
+  });
+
   it('clears a previous failure when the dialog is opened again', () => {
     adminServiceMock.liftRestriction.mockReturnValue(throwError(() => ({})));
     component.lift('u1');

@@ -67,8 +67,10 @@ export class RestrictedUsersComponent implements OnInit {
         this.users.set(this.users().filter((u) => u.id !== userId));
         this.liftingId.set(null);
       },
-      error: (err: HttpErrorResponse) =>
-        this.actionError.set(screenErrorFrom(err, 'admin.errors.lift_restriction_failed')),
+      error: (err: HttpErrorResponse) => {
+        this.liftingId.set(null);
+        this.actionError.set(screenErrorFrom(err, 'admin.errors.lift_restriction_failed'));
+      },
     });
   }
 }
