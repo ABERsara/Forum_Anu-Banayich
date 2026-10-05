@@ -185,9 +185,15 @@ def _notify_professionals(
     the loop. The loop is the asker's own POST /advice/questions request, and a
     send per professional means an SMTP connect, STARTTLS and login per
     professional, in sequence, while she waits. One call is one session.
+
+    Each professional is reached at their alert address when they set one on
+    their profile (ABF-165), and at their login address otherwise, the same
+    `alert_email or email` that report_service routes moderators by.
     """
     if professional is not None:
-        email_service.send_direct_question_notification(professional.email, query_id)
+        email_service.send_direct_question_notification(
+            professional.alert_email or professional.email, query_id
+        )
         return
 
     if domain is None:
@@ -203,7 +209,7 @@ def _notify_professionals(
         .all()
     )
     recipients = [
-        candidate.email
+        candidate.alert_email or candidate.email
         for candidate in matching_professionals
         if _professional_matches_asker(candidate, asker)
     ]
@@ -325,7 +331,9 @@ def answer_query(
     # touching asker/professional afterwards would re-SELECT them one lazy
     # load at a time (the same concern create_query() notes).
     response = _to_response(query, like_count=0, liked_by_me=False)
-    asker_email = query.asker.email
+    # Her alert address when she set one on her profile (ABF-165), her login
+    # address otherwise.
+    asker_email = query.asker.alert_email or query.asker.email
 
     db.commit()
 

@@ -376,6 +376,57 @@ class TestNewQuestionNotifications:
         assert direct_notifications == [(professional.email, response.id)]
         assert domain_notifications == []
 
+    def test_direct_question_goes_to_the_professionals_alert_address(
+        self,
+        db_session: Session,
+        direct_notifications: list[tuple[str, str]],
+    ) -> None:
+        """ABF-165: an alert address set on the profile is where alerts go."""
+        asker = _make_asker(db_session)
+        professional = _make_professional(db_session, domain=ProfessionalDomain.RABBI)
+        professional.alert_email = "pro.alerts@example.com"
+        db_session.commit()
+
+        response = professional_service.create_query(
+            db_session,
+            ProfessionalQueryCreate(
+                content="שאלה שמופנית לאיש מקצוע עם כתובת התראות",
+                professional_id=professional.id,
+            ),
+            asker,
+        )
+
+        assert direct_notifications == [("pro.alerts@example.com", response.id)]
+
+    def test_domain_question_reaches_each_professional_at_their_alert_address(
+        self,
+        db_session: Session,
+        domain_notifications: list[tuple[list[str], str]],
+    ) -> None:
+        """Per recipient: the alert address where set, the login address where not."""
+        asker = _make_asker(db_session)
+        with_alerts = _make_professional(
+            db_session, email="with@example.com", domain=ProfessionalDomain.RABBI
+        )
+        with_alerts.alert_email = "with.alerts@example.com"
+        db_session.commit()
+        _make_professional(
+            db_session, email="without@example.com", domain=ProfessionalDomain.RABBI
+        )
+
+        professional_service.create_query(
+            db_session,
+            ProfessionalQueryCreate(
+                content="שאלה כללית לכל רבני העמותה",
+                domain=ProfessionalDomain.RABBI,
+            ),
+            asker,
+        )
+
+        assert len(domain_notifications) == 1
+        recipients, _ = domain_notifications[0]
+        assert sorted(recipients) == ["with.alerts@example.com", "without@example.com"]
+
 
 class TestGetMyQuestions:
     def test_returns_only_own_questions_newest_first(self, db_session: Session) -> None:
@@ -1074,6 +1125,25 @@ class TestAnswerQuery:
         )
 
         assert sent_answer_emails == [(asker.email, query.id)]
+
+    def test_notifies_the_asker_at_her_alert_address(
+        self, db_session: Session, sent_answer_emails: list[tuple[str, str]]
+    ) -> None:
+        """ABF-165: an alert address set on the profile is where alerts go."""
+        asker = _make_asker(db_session)
+        asker.alert_email = "asker.alerts@example.com"
+        db_session.commit()
+        professional = _make_professional(db_session)
+        query = _make_query(db_session, asker, professional=professional)
+
+        professional_service.answer_query(
+            db_session,
+            query.id,
+            ProfessionalAnswerRequest(answer="תשובה מלאה ומפורטת לשואל"),
+            professional,
+        )
+
+        assert sent_answer_emails == [("asker.alerts@example.com", query.id)]
 
     def test_domain_professional_may_answer_a_general_question(
         self, db_session: Session, sent_answer_emails: list[tuple[str, str]]
