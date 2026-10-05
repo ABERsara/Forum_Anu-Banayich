@@ -5,8 +5,9 @@ Every sender has the same three steps: fall back to a console log when
 SMTP_HOST is empty, build a MIMEText message, hand it to _send_via_smtp –
 or, when the same notification goes to a whole list, to _send_many_via_smtp,
 which spends one SMTP handshake on the batch instead of one per recipient.
-The OTP, registration and consultation notifications all send real mail;
-the moderation ones below are still stubs.
+The OTP, registration and consultation notifications all send real mail,
+and so do the two alerts for §7.2's automatic measures (ABF-164); the other
+moderation ones below are still stubs.
 
 TODO (when ready for production):
   [ ] Send real email for moderator/suspension/SLA notifications
@@ -290,6 +291,114 @@ def send_suspension_notification(email: str, hours: int, reason: str) -> None:
         f"[EMAIL] Suspension notification → {email}, {hours}h, reason: {reason}"
     )
     # TODO: send real email
+
+
+def _build_auto_suspension_message(email: str, user_id: str, hours: int) -> MIMEText:
+    body = (
+        f"<p>שלום,</p>"
+        f"<p>חשבון ב{settings.PROJECT_NAME} הושעה אוטומטית ל-{hours} שעות, "
+        f"בעקבות דיווחים חוזרים נגדו שנמצאו מוצדקים.</p>"
+        f"<p>מזהה החשבון: {escape(user_id)}</p>"
+        f"<p>פרטי החשבון וההחלטות שהובילו להשעיה זמינים באתר.</p>"
+        f"<p>מטעמי פרטיות תוכן הדיווחים ופרטי המשתמש אינם נשלחים במייל.</p>"
+    )
+    return _build_message(email, 'השעיה אוטומטית של חשבון – עמותת "אנו בניך"', body)
+
+
+def send_auto_suspension_alert(
+    admin_emails: list[str], user_id: str, hours: int
+) -> None:
+    """
+    Tell the admins that §7.2's third row suspended a member automatically
+    (ABF-164).
+
+    The account's id and how long the suspension runs, and nothing else — the
+    same signature discipline as send_sending_restriction_alert(): no parameter
+    can carry the reports that triggered it, their content or the moderator's
+    note, because one of them may be a private message. The admin opens the
+    site to see the rest.
+
+    A list, for the reason send_domain_question_notification() takes one: the
+    whole admin team is written to over one SMTP session. An empty list is
+    logged as a warning rather than skipped in silence — an automatic
+    suspension nobody hears about is exactly what this alert is for.
+    """
+    if not admin_emails:
+        logger.warning(
+            f"[EMAIL] Automatic suspension of user {user_id}: no admin to alert"
+        )
+        return
+
+    if not settings.SMTP_HOST:
+        for admin_email in admin_emails:
+            logger.info(
+                f"[EMAIL] Automatic suspension of user {user_id} "
+                f"for {hours}h → {admin_email}"
+            )
+        return
+
+    messages = [
+        _build_auto_suspension_message(admin_email, user_id, hours)
+        for admin_email in admin_emails
+    ]
+    sent = _send_many_via_smtp(messages, "automatic suspension alert")
+    if sent:
+        logger.info(
+            f"[EMAIL] Automatic suspension alert sent for user {user_id} "
+            f"→ {sent}/{len(messages)} admins"
+        )
+
+
+def _build_reporting_revoked_message(email: str, user_id: str) -> MIMEText:
+    body = (
+        f"<p>שלום,</p>"
+        f"<p>האפשרות לדווח על תוכן נשללה אוטומטית מחשבון בתא שבאחריותך "
+        f"ב{settings.PROJECT_NAME}, לאחר שדיווחים רבים שהוגשו ממנו "
+        f"נמצאו לא מוצדקים.</p>"
+        f"<p>מזהה החשבון: {escape(user_id)}</p>"
+        f"<p>להגבלה הזו אין תאריך סיום, והיא אינה פגה מעצמה.</p>"
+        f"<p>מטעמי פרטיות תוכן הדיווחים ופרטי המשתמש אינם נשלחים במייל.</p>"
+    )
+    return _build_message(email, 'שלילת אפשרות הדיווח מחשבון – עמותת "אנו בניך"', body)
+
+
+def send_reporting_revoked_alert(moderator_emails: list[str], user_id: str) -> None:
+    """
+    Tell the moderators responsible for a member's cell that §7.2's second row
+    withdrew her reporting altogether (ABF-164).
+
+    Separate from send_reporting_restriction_alert(), which ABF-116 sends on
+    the same decision: that one is about a daily allowance with an end date,
+    this one is about the reporting itself, withdrawn with no end date
+    (ABF-154's `is_report_restricted`; lifting it is backlog B1). Folding them
+    together would tell a moderator that a measure lapses when it does not.
+
+    An id and nothing else, and a list with a warning when it is empty — the
+    same reasoning as send_auto_suspension_alert().
+    """
+    if not moderator_emails:
+        logger.warning(
+            f"[EMAIL] Reporting revoked for user {user_id}: no moderator to alert"
+        )
+        return
+
+    if not settings.SMTP_HOST:
+        for moderator_email in moderator_emails:
+            logger.info(
+                f"[EMAIL] Reporting revoked for user {user_id} → {moderator_email}"
+            )
+        return
+
+    messages = [
+        _build_reporting_revoked_message(moderator_email, user_id)
+        for moderator_email in moderator_emails
+    ]
+    sent = _send_many_via_smtp(messages, "reporting revoked alert")
+    if sent:
+        logger.info(
+            f"[EMAIL] Reporting revoked alert sent for user {user_id} "
+            f"→ {sent}/{len(messages)} moderators"
+        )
 
 
 def _build_question_message(email: str, *, is_general: bool) -> MIMEText:

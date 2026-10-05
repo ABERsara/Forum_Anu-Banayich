@@ -1,0 +1,303 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="knowledge-admin">
+  @if (isAdmin()) {
+    <a routerLink="/admin"
+      ><span aria-hidden="true">‹</span> {{ 'admin.back_to_dashboard' | transloco }}</a
+    >
+  } @else {
+    <a routerLink="/professional/questions"
+      ><span aria-hidden="true">‹</span> {{ 'agents.knowledge.back_to_questions' | transloco }}</a
+    >
+  }
+
+  <div class="knowledge-admin__header">
+    <h1 class="knowledge-admin__title">{{ 'agents.knowledge.title' | transloco }}</h1>
+    @if (selectedDomain() && !isFormOpen()) {
+      <app-button variant="primary" (clicked)="openAddForm()">
+        {{ 'agents.knowledge.add' | transloco }}
+      </app-button>
+    }
+  </div>
+  <p class="knowledge-admin__intro">{{ 'agents.knowledge.intro' | transloco }}</p>
+
+  @if (isLoadingDomains()) {
+    <app-loading-spinner [message]="'agents.knowledge.loading_domains' | transloco" />
+  } @else if (domainsError()) {
+    <app-error-display [message]="'agents.errors.load_manageable_failed' | transloco" />
+  } @else if (domains().length === 0) {
+    <p class="knowledge-admin__empty">{{ 'agents.knowledge.no_domains' | transloco }}</p>
+  } @else {
+    <!-- One domain needs no picker; its name is enough to say where edits go.
+         An agent's name is content the association wrote, shown as it came. -->
+    @if (domains().length > 1) {
+      <div class="form-field form-field--inline">
+        <label for="knowledge-domain">{{ 'agents.knowledge.domain_label' | transloco }}</label>
+        <select
+          id="knowledge-domain"
+          [disabled]="isBusy()"
+          [value]="selectedDomainId()"
+          (change)="selectDomain($any($event.target).value)"
+        >
+          @for (domain of domains(); track domain.id) {
+            <option [value]="domain.id" [selected]="domain.id === selectedDomainId()">
+              {{ domain.name }}
+            </option>
+          }
+        </select>
+      </div>
+    } @else if (selectedDomain(); as domain) {
+      <p class="knowledge-admin__domain">
+        <span class="knowledge-admin__domain-name">{{ domain.name }}</span>
+        · {{ domainLabels[domain.professional_domain] | transloco }}
+      </p>
+    }
+
+    <!-- The API's own `detail` is a finished sentence and is shown as it came;
+         our fallback is a key, so it follows a language switch. -->
+    @if (actionError().text; as text) {
+      <app-error-display [message]="text" />
+    } @else if (actionError().key; as key) {
+      <app-error-display [message]="key | transloco" />
+    }
+
+    <!-- The region is always on screen and only its content comes and goes: a
+         status element born with its text already inside is not a change, and
+         is never announced (CONTRIBUTING §5). The entry title is a parameter of
+         one key, not a second text node, so the word order is the language's
+         own (CONTRIBUTING §6). -->
+    <div class="knowledge-admin__live" role="status">
+      @if (successMessage(); as message) {
+        <p class="knowledge-admin__success">
+          {{ message.key | transloco: { title: message.title } }}
+        </p>
+      }
+    </div>
+
+    <!-- ─────────────────────────── טופס הוספה / עריכה ─────────────────────────── -->
+    @if (isFormOpen()) {
+      <section
+        class="panel"
+        [attr.aria-label]="
+          (editing() ? 'agents.knowledge.edit' : 'agents.knowledge.add') | transloco
+        "
+      >
+        <h2 class="panel__title">
+          @if (editing(); as entry) {
+            {{ 'agents.knowledge.edit_title' | transloco: { title: entry.title } }}
+          } @else {
+            {{ 'agents.knowledge.add' | transloco }}
+          }
+        </h2>
+
+        <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+          <div class="form-field">
+            <label for="knowledge-title">{{ 'agents.knowledge.title_label' | transloco }}</label>
+            <input
+              id="knowledge-title"
+              type="text"
+              formControlName="title"
+              autocomplete="off"
+              [attr.maxlength]="titleMaxLength"
+              [attr.aria-invalid]="form.controls.title.invalid && form.controls.title.touched"
+              [attr.aria-describedby]="
+                form.controls.title.invalid && form.controls.title.touched
+                  ? 'knowledge-title-error'
+                  : null
+              "
+            />
+            @if (form.controls.title.invalid && form.controls.title.touched) {
+              <span id="knowledge-title-error" class="field-error">
+                {{ 'agents.knowledge.title_error' | transloco: { max: titleMaxLength } }}
+              </span>
+            }
+          </div>
+
+          <div class="form-field">
+            <label for="knowledge-content">{{
+              'agents.knowledge.content_label' | transloco
+            }}</label>
+            <textarea
+              id="knowledge-content"
+              rows="10"
+              formControlName="content"
+              [attr.aria-invalid]="form.controls.content.invalid && form.controls.content.touched"
+              [attr.aria-describedby]="
+                form.controls.content.invalid && form.controls.content.touched
+                  ? 'knowledge-content-error'
+                  : null
+              "
+            ></textarea>
+            @if (form.controls.content.invalid && form.controls.content.touched) {
+              <span id="knowledge-content-error" class="field-error">
+                {{ 'agents.knowledge.content_error' | transloco }}
+              </span>
+            }
+          </div>
+
+          <fieldset class="source-group">
+            <legend>{{ 'agents.knowledge.source_legend' | transloco }}</legend>
+            <p class="source-group__hint">{{ 'agents.knowledge.source_hint' | transloco }}</p>
+
+            <div class="form-row">
+              <div class="form-field">
+                <label for="knowledge-source-name">
+                  {{ 'agents.knowledge.source_name_label' | transloco }}
+                </label>
+                <input
+                  id="knowledge-source-name"
+                  type="text"
+                  formControlName="source_name"
+                  autocomplete="off"
+                  [attr.maxlength]="sourceNameMaxLength"
+                />
+                @if (form.controls.source_name.invalid && form.controls.source_name.touched) {
+                  <span class="field-error">
+                    {{
+                      'agents.knowledge.source_name_error' | transloco: { max: sourceNameMaxLength }
+                    }}
+                  </span>
+                }
+              </div>
+
+              <div class="form-field">
+                <label for="knowledge-source-url">
+                  {{ 'agents.knowledge.source_url_label' | transloco }}
+                </label>
+                <!-- A URL reads left to right in either language. -->
+                <input
+                  id="knowledge-source-url"
+                  type="url"
+                  dir="ltr"
+                  formControlName="source_url"
+                  autocomplete="off"
+                  placeholder="https://"
+                  [attr.maxlength]="sourceUrlMaxLength"
+                  [attr.aria-invalid]="
+                    form.controls.source_url.invalid && form.controls.source_url.touched
+                  "
+                  [attr.aria-describedby]="
+                    form.controls.source_url.invalid && form.controls.source_url.touched
+                      ? 'knowledge-source-url-error'
+                      : null
+                  "
+                />
+                @if (form.controls.source_url.invalid && form.controls.source_url.touched) {
+                  <span id="knowledge-source-url-error" class="field-error">
+                    {{
+                      'agents.knowledge.source_url_error' | transloco: { max: sourceUrlMaxLength }
+                    }}
+                  </span>
+                }
+              </div>
+            </div>
+          </fieldset>
+
+          @if (isSaving()) {
+            <app-loading-spinner [message]="'agents.knowledge.saving' | transloco" />
+          }
+
+          <div class="panel__actions">
+            <app-button type="submit" variant="primary" [disabled]="isSaving()">
+              {{
+                (editing() ? 'agents.knowledge.save_changes' : 'agents.knowledge.add_submit')
+                  | transloco
+              }}
+            </app-button>
+            <app-button variant="secondary" [disabled]="isSaving()" (clicked)="closeForm()">
+              {{ 'common.cancel' | transloco }}
+            </app-button>
+          </div>
+        </form>
+      </section>
+    }
+
+    <!-- ────────────────────────────── תוכן קיים ────────────────────────────── -->
+    @if (isLoadingEntries()) {
+      <app-loading-spinner [message]="'agents.knowledge.loading' | transloco" />
+    } @else if (entriesError()) {
+      <app-error-display [message]="'agents.errors.load_entries_failed' | transloco" />
+    } @else if (entries().length === 0) {
+      <p class="knowledge-admin__empty">{{ 'agents.knowledge.empty' | transloco }}</p>
+    } @else {
+      <!-- An entry's title, content and source are what the professional
+           wrote — content, not UI, shown as they came in either language. -->
+      <ul class="entries">
+        @for (entry of entries(); track entry.id) {
+          <li class="entries__item">
+            <div class="entries__main">
+              <h2 class="entries__title">{{ entry.title }}</h2>
+              <p class="entries__content">{{ entry.content }}</p>
+              <p class="entries__meta">
+                {{
+                  'agents.knowledge.updated_on'
+                    | transloco: { date: updatedAt(entry) | date: 'dd/MM/yyyy HH:mm' }
+                }}
+                @if (entry.source_url) {
+                  ·
+                  <a [href]="entry.source_url" target="_blank" rel="noopener noreferrer">
+                    {{ entry.source_name || ('agents.knowledge.source_link' | transloco) }}
+                  </a>
+                } @else if (entry.source_name) {
+                  · {{ entry.source_name }}
+                }
+              </p>
+            </div>
+
+            <div class="entries__actions">
+              <app-button
+                variant="secondary"
+                [disabled]="editing()?.id === entry.id"
+                [ariaLabel]="'agents.knowledge.edit_aria' | transloco: { title: entry.title }"
+                (clicked)="openEditForm(entry)"
+              >
+                {{ 'agents.knowledge.edit' | transloco }}
+              </app-button>
+              <app-button
+                variant="danger"
+                [disabled]="isDeleting()"
+                [ariaLabel]="'agents.knowledge.delete_aria' | transloco: { title: entry.title }"
+                (clicked)="requestDelete(entry)"
+              >
+                {{ 'agents.knowledge.delete' | transloco }}
+              </app-button>
+            </div>
+          </li>
+        }
+      </ul>
+
+      @if (pageCount() > 1) {
+        <nav class="pager" [attr.aria-label]="'agents.knowledge.pager_aria' | transloco">
+          <app-button variant="secondary" [disabled]="page() <= 1" (clicked)="goToPreviousPage()">
+            {{ 'agents.knowledge.previous_page' | transloco }}
+          </app-button>
+          <!-- One key with two parameters: the page number moves inside the
+               sentence between languages, which two text nodes cannot do. -->
+          <span aria-live="polite">{{
+            'agents.knowledge.page_of' | transloco: { page: page(), count: pageCount() }
+          }}</span>
+          <app-button
+            variant="secondary"
+            [disabled]="page() >= pageCount()"
+            (clicked)="goToNextPage()"
+          >
+            {{ 'agents.knowledge.next_page' | transloco }}
+          </app-button>
+        </nav>
+      }
+    }
+  }
+
+  <!-- The dialog renders the text it is handed, so the pipe runs here rather
+       than inside shared/ (CONTRIBUTING §6). -->
+  @if (pendingDeletion(); as entry) {
+    <app-confirm-dialog
+      [title]="'agents.knowledge.delete_dialog_title' | transloco"
+      [message]="'agents.knowledge.delete_dialog_message' | transloco: { title: entry.title }"
+      [confirmText]="'agents.knowledge.delete' | transloco"
+      [isDestructive]="true"
+      (confirmed)="confirmDelete()"
+      (cancelled)="cancelDelete()"
+    />
+  }
+</div>

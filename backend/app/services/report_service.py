@@ -11,7 +11,9 @@ Rules:
   5+ dismissed reports from the same USER in 30 days → her reporting drops
       to 3 a day + notify her cell's moderator (§7.2, ABF-116), and the
       reporting itself is withdrawn until an admin restores it (§7.2, ABF-154)
+      + email her cell's moderator about that (ABF-164)
   3+ upheld reports on a USER in 7 days → auto-suspend 48h (§7.2, ABF-154)
+      + email the admin team (ABF-164)
 
 Where each of those lives
 -------------------------
@@ -57,10 +59,12 @@ from app.schemas.user import SuspendUserRequest, UserModerationCard
 from app.services import forum_service, restriction_service, user_service
 from app.services.audit_service import build_entry, log_action
 from app.services.email_service import (
+    send_auto_suspension_alert,
     send_content_removed_notification,
     send_direct_message_report_alert,
     send_moderator_alert,
     send_reporting_restriction_alert,
+    send_reporting_revoked_alert,
     send_sending_restriction_alert,
     send_urgent_moderator_alert,
 )
@@ -614,6 +618,29 @@ def _admin_alert_emails(db: Session) -> list[str]:
     return [admin.alert_email for admin in admins if admin.alert_email]
 
 
+def _admin_team_emails(db: Session) -> list[str]:
+    """
+    Contact addresses for every active admin — the "צוות הניהול" an automatic
+    suspension is reported to (ABF-164).
+
+    Wider than _admin_alert_emails() on purpose, and that one is left as it
+    is. It is an on-call roster: only admins who set an `alert_email` are on
+    it, and a deployment where nobody has would send §7.2's restriction alert
+    to no one. An automatic suspension takes a member off the platform for
+    AUTO_SUSPEND_HOURS on the strength of a rule, not a person, so every admin
+    hears about it — at the address they chose for alerts or, failing that, the
+    one they log in with. The same fallback _moderator_emails_for_author()
+    applies.
+    """
+    admins = (
+        db.query(User)
+        .filter(User.role == UserRole.ADMIN)
+        .filter(User.account_status == AccountStatus.ACTIVE)
+        .all()
+    )
+    return [admin.alert_email or admin.email for admin in admins]
+
+
 def _apply_content_decision(
     post: ForumPost, decision: ReportDecision
 ) -> Literal["already_deleted", "deleted", "restored", "unchanged"]:
@@ -1065,6 +1092,10 @@ def _check_auto_suspension(
         re-sent: the measure answers a pattern that is already being answered,
         the same rule `_restrict_repeatedly_upheld_sender()` applies to a live
         restriction.
+
+    Once the suspension is committed, the admin team is emailed (ABF-164).
+    The three ways out above return before that, so a member who is already
+    suspended does not set off a second email either.
     """
     if reported_user is None:
         return
@@ -1093,6 +1124,23 @@ def _check_auto_suspension(
         settings.AUTO_SUSPEND_HOURS,
         AUTO_SUSPENSION_REASON,
     )
+
+    # Strictly after suspend_user() has committed, and never fatal: the
+    # suspension is state, the email is not, and a mail server or a roster
+    # lookup failing must not turn a recorded decision into a failed request.
+    # This is the same policy decide_report() applies to its notifications.
+    # The id is read before the try: the commit expired the object, and a
+    # handler that has to reload it from a failed session would raise again.
+    user_id = reported_user.id
+    try:
+        send_auto_suspension_alert(
+            _admin_team_emails(db), user_id, settings.AUTO_SUSPEND_HOURS
+        )
+    except Exception:
+        logger.exception(
+            "Failed to alert the admins about the automatic suspension of user %s",
+            user_id,
+        )
 
 
 def _check_frequent_false_reporter(
@@ -1123,6 +1171,10 @@ def _check_frequent_false_reporter(
     `reporter` is None for a report §9.4 anonymised (ABF-112). Those must not
     aggregate into a single phantom over-reporter, which is the same guard
     `_restrict_frequent_false_reporter()` opens with.
+
+    Once the flag is committed, the moderators responsible for her cell are
+    emailed (ABF-164). That happens once, for the same reason the audit entry
+    is written once: a member who already carries the flag returns above.
     """
     if reporter is None or reporter.is_report_restricted:
         return
@@ -1161,3 +1213,17 @@ def _check_frequent_false_reporter(
             "automatic": True,
         },
     )
+
+    # After log_action() has committed the flag, and never fatal, for the same
+    # reason as the suspension alert in _check_auto_suspension(), and with the
+    # id read up front for the same reason too.
+    reporter_id = reporter.id
+    try:
+        send_reporting_revoked_alert(
+            _moderator_emails_for_author(db, reporter), reporter_id
+        )
+    except Exception:
+        logger.exception(
+            "Failed to alert the moderators about the revoked reporting of user %s",
+            reporter_id,
+        )

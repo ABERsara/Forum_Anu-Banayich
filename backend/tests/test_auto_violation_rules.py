@@ -23,6 +23,12 @@ or the notification (TestAutoSuspensionAuditTrail, TestFalseReporterAuditTrail),
 or read a threshold from anywhere but `settings`
 (TestThresholdsAreConfiguration).
 
+And ABF-164's emails, one per rule, sent once the measure is committed: the
+suspension goes to the admin team (TestAutoSuspensionEmailsTheAdminTeam), the
+withdrawn reporting to the moderators of the member's cell
+(TestRevokedReportingEmailsTheCellModerators), and an email that cannot be
+sent never undoes either measure (TestAFailedEmailDoesNotUndoTheMeasure).
+
 Time is controlled the way tests/test_restrictions.py controls it — history is
 written straight to `reports` with an explicit `decided_at`, and the decision
 that crosses a threshold always goes through the real `decide_report()` flow.
@@ -32,7 +38,9 @@ behind.
 """
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from email.header import decode_header, make_header
 
 import pytest
 
@@ -61,7 +69,12 @@ from app.models.report import Report
 from app.models.restriction import UserRestriction
 from app.models.user import User
 from app.schemas.report import ReportDecideRequest
-from app.services import report_service, restriction_service, user_service
+from app.services import (
+    email_service,
+    report_service,
+    restriction_service,
+    user_service,
+)
 
 FORUM_BASE = "/api/v1/forum"
 
@@ -87,6 +100,7 @@ def _make_user(
     account_status: AccountStatus = AccountStatus.ACTIVE,
     moderator_cells: list[dict[str, str]] | None = None,
     is_report_restricted: bool = False,
+    alert_email: str | None = None,
 ) -> User:
     is_member = role == UserRole.USER
     user = User(
@@ -100,6 +114,7 @@ def _make_user(
         account_status=account_status,
         moderator_cells=moderator_cells,
         is_report_restricted=is_report_restricted,
+        alert_email=alert_email,
         professional_domain=(
             ProfessionalDomain.LAWYER if role == UserRole.PROFESSIONAL else None
         ),
@@ -1509,3 +1524,436 @@ class TestThresholdsAreConfiguration:
 
         db_session.refresh(reporter)
         assert reporter.is_report_restricted is False
+
+
+# ---------------------------------------------------------------------------
+# ABF-164 — "כאשר כלל אוטומטי מופעל, נשלח מייל"
+# ---------------------------------------------------------------------------
+
+OTHER_CELL = {"group": UserType.WIDOW.value, "sector": Sector.LITVISH.value}
+
+
+def _cross_rule_one(db_session, moderator, offender, reporter) -> ForumPost:
+    """Two upheld findings on record, then the third decided for real."""
+    _fill_history(
+        db_session,
+        reporter=reporter,
+        reported_user=offender,
+        decision=ReportDecision.VALID,
+        count=settings.AUTO_SUSPEND_VALID_REPORTS - 1,
+    )
+    post = _make_post(db_session, offender)
+    report = _pending_report(db_session, reporter=reporter, post=post)
+    _decide(db_session, report, moderator, ReportDecision.VALID)
+    return post
+
+
+def _cross_rule_two(db_session, moderator, offender, reporter) -> ForumPost:
+    """Four dismissals on record, then the fifth decided for real."""
+    _fill_history(
+        db_session,
+        reporter=reporter,
+        reported_user=offender,
+        decision=ReportDecision.INVALID,
+        count=settings.FALSE_REPORT_LIMIT - 1,
+    )
+    post = _make_post(db_session, offender)
+    report = _pending_report(db_session, reporter=reporter, post=post)
+    _decide(db_session, report, moderator, ReportDecision.INVALID)
+    return post
+
+
+@pytest.fixture
+def suspension_alerts(monkeypatch) -> list[tuple[list[str], str, int]]:
+    """Every send_auto_suspension_alert() call, as (sorted recipients, id, hours)."""
+    sent: list[tuple[list[str], str, int]] = []
+    monkeypatch.setattr(
+        report_service,
+        "send_auto_suspension_alert",
+        lambda emails, user_id, hours: sent.append((sorted(emails), user_id, hours)),
+    )
+    return sent
+
+
+@pytest.fixture
+def revoked_alerts(monkeypatch) -> list[tuple[list[str], str]]:
+    """Every send_reporting_revoked_alert() call, as (sorted recipients, id)."""
+    sent: list[tuple[list[str], str]] = []
+    monkeypatch.setattr(
+        report_service,
+        "send_reporting_revoked_alert",
+        lambda emails, user_id: sent.append((sorted(emails), user_id)),
+    )
+    return sent
+
+
+class _RecordingSMTP:
+    """A mail server that keeps what it is handed, for the end-to-end tests."""
+
+    delivered: list = []
+
+    def __init__(self, host, port):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def ehlo(self):
+        pass
+
+    def starttls(self):
+        pass
+
+    def login(self, user, password):
+        pass
+
+    def send_message(self, msg):
+        _RecordingSMTP.delivered.append(msg)
+
+
+@pytest.fixture
+def mail_server(monkeypatch) -> Callable[[str], list]:
+    """
+    Turn real sending on against _RecordingSMTP, and hand back a lookup of what
+    was delivered under a given subject.
+
+    By subject, because one decision can set off several notifications and a
+    test is about one of them. The others are still log-only stubs today, and
+    filtering keeps these tests true on the day one of them starts sending.
+    """
+    _RecordingSMTP.delivered = []
+    monkeypatch.setattr(settings, "SMTP_HOST", "smtp.example.com")
+    monkeypatch.setattr(email_service.smtplib, "SMTP", _RecordingSMTP)
+
+    def _delivered(subject_fragment: str) -> list:
+        return [
+            msg
+            for msg in _RecordingSMTP.delivered
+            if subject_fragment in str(make_header(decode_header(msg["Subject"])))
+        ]
+
+    return _delivered
+
+
+def _html(msg) -> str:
+    return msg.get_payload(decode=True).decode("utf-8")
+
+
+class TestAutoSuspensionEmailsTheAdminTeam:
+    def test_crossing_rule_one_emails_every_active_admin(
+        self, db_session, suspension_alerts, moderator, offender, reporter
+    ):
+        """
+        "צוות הניהול" means every active admin, at the address they chose for
+        alerts or, failing that, the one they log in with. It does not include
+        a moderator, a cancelled admin, or the member herself: her own email is
+        user_service.suspend_user()'s, and it is out of this ticket's scope.
+        """
+        _make_user(db_session, "admin@example.com", role=UserRole.ADMIN)
+        _make_user(
+            db_session,
+            "admin2@example.com",
+            role=UserRole.ADMIN,
+            alert_email="admin2-alerts@example.com",
+        )
+        _make_user(
+            db_session,
+            "former-admin@example.com",
+            role=UserRole.ADMIN,
+            account_status=AccountStatus.CANCELLED,
+        )
+
+        _cross_rule_one(db_session, moderator, offender, reporter)
+
+        assert suspension_alerts == [
+            (
+                ["admin2-alerts@example.com", "admin@example.com"],
+                offender.id,
+                settings.AUTO_SUSPEND_HOURS,
+            )
+        ]
+
+    def test_the_email_is_sent_after_the_suspension_is_saved(
+        self, db_session, monkeypatch, admin, moderator, offender, reporter
+    ):
+        """The ticket's "לאחר שהפעולה נשמרה ב-DB", checked at the moment of sending."""
+        seen: dict[str, object] = {}
+
+        def _record(emails, user_id, hours):
+            row = db_session.query(User).filter(User.id == user_id).one()
+            seen["status"] = row.account_status
+            seen["audited"] = bool(
+                _audit_entries(db_session, AuditAction.USER_SUSPENDED)
+            )
+
+        monkeypatch.setattr(report_service, "send_auto_suspension_alert", _record)
+
+        _cross_rule_one(db_session, moderator, offender, reporter)
+
+        assert seen == {"status": AccountStatus.SUSPENDED, "audited": True}
+
+    def test_one_short_of_the_threshold_emails_nobody(
+        self, db_session, suspension_alerts, admin, moderator, offender, reporter
+    ):
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.VALID,
+            count=settings.AUTO_SUSPEND_VALID_REPORTS - 2,
+        )
+        _decide_a_fresh_report(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            moderator=moderator,
+            decision=ReportDecision.VALID,
+        )
+
+        assert suspension_alerts == []
+
+    def test_a_further_decision_against_a_suspended_member_emails_nobody(
+        self, db_session, suspension_alerts, admin, moderator, offender, reporter
+    ):
+        """No double suspension (ABF-154), so no second email about one."""
+        _cross_rule_one(db_session, moderator, offender, reporter)
+        _decide_a_fresh_report(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            moderator=moderator,
+            decision=ReportDecision.VALID,
+        )
+
+        assert len(suspension_alerts) == 1
+
+    def test_crossing_rule_two_sends_no_suspension_email(
+        self, db_session, suspension_alerts, admin, moderator, offender, reporter
+    ):
+        _cross_rule_two(db_session, moderator, offender, reporter)
+
+        assert suspension_alerts == []
+
+    def test_no_admin_to_alert_is_a_warning_not_silence(
+        self, db_session, monkeypatch, moderator, offender, reporter, caplog
+    ):
+        monkeypatch.setattr(settings, "SMTP_HOST", "")
+
+        with caplog.at_level(logging.WARNING):
+            _cross_rule_one(db_session, moderator, offender, reporter)
+
+        assert (
+            f"[EMAIL] Automatic suspension of user {offender.id}: no admin to alert"
+            in caplog.text
+        )
+
+    def test_the_mail_reaches_the_admin_and_names_only_the_account(
+        self, db_session, mail_server, admin, moderator, offender, reporter
+    ):
+        """The ticket's proof, end to end: a real message to the admin, over SMTP."""
+        post = _cross_rule_one(db_session, moderator, offender, reporter)
+
+        delivered = mail_server("השעיה אוטומטית")
+        assert [msg["To"] for msg in delivered] == [admin.email]
+        html = _html(delivered[0])
+        assert offender.id in html
+        assert f"{settings.AUTO_SUSPEND_HOURS} שעות" in html
+        assert post.content not in html
+        assert NOTE not in html
+        assert offender.email not in html
+
+
+class TestRevokedReportingEmailsTheCellModerators:
+    def test_crossing_rule_two_emails_the_moderators_of_her_cell(
+        self, db_session, revoked_alerts, admin, offender, reporter
+    ):
+        """
+        The email goes to the moderators covering the reporter's cell, at their
+        alert address where one is set. That is the routing every other
+        moderator alert in this module uses. It does not go to a moderator of
+        another cell or to the admins: §7.2 makes an over-eager reporter a
+        moderator's matter, and ABF-116 drew the same line.
+        """
+        deciding = _make_user(
+            db_session,
+            "moderator@example.com",
+            role=UserRole.MODERATOR,
+            moderator_cells=[CELL],
+            alert_email="moderator-alerts@example.com",
+        )
+        _make_user(
+            db_session,
+            "colleague@example.com",
+            role=UserRole.MODERATOR,
+            moderator_cells=[CELL, OTHER_CELL],
+        )
+        _make_user(
+            db_session,
+            "elsewhere@example.com",
+            role=UserRole.MODERATOR,
+            moderator_cells=[OTHER_CELL],
+        )
+
+        _cross_rule_two(db_session, deciding, offender, reporter)
+
+        assert revoked_alerts == [
+            (
+                ["colleague@example.com", "moderator-alerts@example.com"],
+                reporter.id,
+            )
+        ]
+
+    def test_the_email_is_sent_after_the_flag_is_saved(
+        self, db_session, monkeypatch, moderator, offender, reporter
+    ):
+        seen: dict[str, object] = {}
+
+        def _record(emails, user_id):
+            row = db_session.query(User).filter(User.id == user_id).one()
+            seen["flag"] = row.is_report_restricted
+            seen["audited"] = bool(_flag_audit_entries(db_session))
+
+        monkeypatch.setattr(report_service, "send_reporting_revoked_alert", _record)
+
+        _cross_rule_two(db_session, moderator, offender, reporter)
+
+        assert seen == {"flag": True, "audited": True}
+
+    def test_one_short_of_the_limit_emails_nobody(
+        self, db_session, revoked_alerts, moderator, offender, reporter
+    ):
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.INVALID,
+            count=settings.FALSE_REPORT_LIMIT - 2,
+        )
+        _decide_a_fresh_report(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            moderator=moderator,
+            decision=ReportDecision.INVALID,
+        )
+
+        assert revoked_alerts == []
+
+    def test_a_sixth_dismissal_emails_nobody_again(
+        self, db_session, revoked_alerts, moderator, offender, reporter
+    ):
+        """The flag is set once, so it is reported once."""
+        _cross_rule_two(db_session, moderator, offender, reporter)
+        _decide_a_fresh_report(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            moderator=moderator,
+            decision=ReportDecision.INVALID,
+        )
+
+        assert len(revoked_alerts) == 1
+
+    def test_crossing_rule_one_sends_no_revoked_reporting_email(
+        self, db_session, revoked_alerts, moderator, offender, reporter
+    ):
+        _cross_rule_one(db_session, moderator, offender, reporter)
+
+        assert revoked_alerts == []
+
+    def test_the_mail_reaches_the_moderator_and_names_only_the_account(
+        self, db_session, mail_server, moderator, offender, reporter
+    ):
+        """The ticket's proof, end to end: a real message to the moderator, over SMTP."""
+        post = _cross_rule_two(db_session, moderator, offender, reporter)
+
+        delivered = mail_server("שלילת אפשרות הדיווח")
+        assert [msg["To"] for msg in delivered] == [moderator.email]
+        html = _html(delivered[0])
+        assert reporter.id in html
+        assert post.content not in html
+        assert NOTE not in html
+        assert reporter.email not in html
+
+
+class TestAFailedEmailDoesNotUndoTheMeasure:
+    """
+    The third acceptance criterion: "כשל בשליחת המייל אינו גורר כשל בפעולה
+    הראשית". The tests cover both the send and the roster lookup in front of
+    it, because either one can be what fails.
+    """
+
+    @staticmethod
+    def _explode(*args, **kwargs):
+        raise RuntimeError("mail is down")
+
+    @pytest.mark.parametrize(
+        "target", ["send_auto_suspension_alert", "_admin_team_emails"]
+    )
+    def test_the_suspension_stands(
+        self,
+        db_session,
+        monkeypatch,
+        caplog,
+        admin,
+        moderator,
+        offender,
+        reporter,
+        target,
+    ):
+        monkeypatch.setattr(report_service, target, self._explode)
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.VALID,
+            count=settings.AUTO_SUSPEND_VALID_REPORTS - 1,
+        )
+        report = _pending_report(
+            db_session, reporter=reporter, post=_make_post(db_session, offender)
+        )
+
+        with caplog.at_level(logging.ERROR):
+            decided = _decide(db_session, report, moderator, ReportDecision.VALID)
+
+        assert decided.decision == ReportDecision.VALID
+        db_session.refresh(offender)
+        assert offender.account_status == AccountStatus.SUSPENDED
+        assert len(_audit_entries(db_session, AuditAction.USER_SUSPENDED)) == 1
+        assert (
+            "Failed to alert the admins about the automatic suspension of user "
+            f"{offender.id}" in caplog.text
+        )
+
+    @pytest.mark.parametrize(
+        "target", ["send_reporting_revoked_alert", "_moderator_emails_for_author"]
+    )
+    def test_the_withdrawn_reporting_stands(
+        self, db_session, monkeypatch, caplog, moderator, offender, reporter, target
+    ):
+        monkeypatch.setattr(report_service, target, self._explode)
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.INVALID,
+            count=settings.FALSE_REPORT_LIMIT - 1,
+        )
+        report = _pending_report(
+            db_session, reporter=reporter, post=_make_post(db_session, offender)
+        )
+
+        with caplog.at_level(logging.ERROR):
+            decided = _decide(db_session, report, moderator, ReportDecision.INVALID)
+
+        assert decided.decision == ReportDecision.INVALID
+        db_session.refresh(reporter)
+        assert reporter.is_report_restricted is True
+        assert len(_flag_audit_entries(db_session)) == 1
+        assert (
+            "Failed to alert the moderators about the revoked reporting of user "
+            f"{reporter.id}" in caplog.text
+        )
