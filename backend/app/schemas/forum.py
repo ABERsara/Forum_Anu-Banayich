@@ -6,7 +6,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.core.constants import GroupVisibility, PostStatus, SectorVisibility
+from app.core.constants import GroupVisibility, PostStatus, PostType, SectorVisibility
+from app.schemas.meeting import MeetingSummary
 from app.schemas.user import UserPublic
 
 
@@ -46,6 +47,12 @@ class ForumPostResponse(BaseModel):
     report_count: int
     author: UserPublic
     attachment_url: str | None = None
+    #: TEXT for everything a member writes. A MEETING post (ABF-156) is an
+    #: announcement the system published: read-only, and carrying `meeting`.
+    post_type: PostType = PostType.TEXT
+    #: Present exactly when post_type is MEETING — the join link and the times
+    #: the announcement is drawn from. Null on every ordinary post.
+    meeting: MeetingSummary | None = None
     # Not populated by every endpoint that returns a ForumPostResponse —
     # only get_posts()/get_post_by_id() compute real values via the likes
     # table; create/update/delete/broadcast fall back to these defaults

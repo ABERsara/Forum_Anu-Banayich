@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.constants import GroupVisibility, PostStatus, SectorVisibility
+from app.core.constants import GroupVisibility, PostStatus, PostType, SectorVisibility
 from app.db.base import Base
 
 
@@ -49,6 +49,24 @@ class ForumPost(Base):
     attachment_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
     # ------------------------------------------------------------------
+    # Post type (ABF-156)
+    #
+    # A MEETING post is read-only content: it cannot be liked or edited, and
+    # its body is not where its meaning lives — `meeting` is. Every post that
+    # existed before ABF-156 is TEXT, which is what the migration's
+    # server_default backfills and what create_post() keeps writing.
+    # ------------------------------------------------------------------
+    post_type: Mapped[PostType] = mapped_column(
+        Enum(PostType), nullable=False, default=PostType.TEXT
+    )
+    #: Set for exactly the MEETING posts. The foreign key sits here rather
+    #: than on Meeting because the forum feed is what has to draw the card —
+    #: one joinedload while paging posts, instead of a reverse lookup per row.
+    meeting_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("meetings.id"), nullable=True
+    )
+
+    # ------------------------------------------------------------------
     # Moderation
     # ------------------------------------------------------------------
     status: Mapped[PostStatus] = mapped_column(
@@ -71,6 +89,9 @@ class ForumPost(Base):
     # ------------------------------------------------------------------
     author: Mapped["User"] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "User", back_populates="forum_posts", foreign_keys=[author_id]
+    )
+    meeting: Mapped["Meeting | None"] = relationship(  # type: ignore[name-defined]  # noqa: F821
+        "Meeting", back_populates="posts", foreign_keys=[meeting_id]
     )
     reports: Mapped[list["Report"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "Report",
