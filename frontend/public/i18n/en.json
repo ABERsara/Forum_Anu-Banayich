@@ -86,6 +86,12 @@
       "suspend": "Suspend",
       "suspend_message": "This will suspend the user for the number of hours you set, and send them a message with the reason."
     },
+    "restricted_users": {
+      "title": "Report-restricted users",
+      "empty": "There are no report-restricted users right now.",
+      "lift": "Lift restriction",
+      "lift_message": "The user will be able to file reports again."
+    },
     "manage_professionals": {
       "title": "Manage professionals",
       "hint": "An active professional appears in the advice catalog of the users whose group and sector are ticked on their profile.",
@@ -161,6 +167,7 @@
       "load_pending_count_failed": "Something went wrong loading the number of pending registrations",
       "load_users_failed": "Something went wrong loading the users. Please refresh the page.",
       "suspend_failed": "Something went wrong suspending the user. Please try again.",
+      "lift_restriction_failed": "Something went wrong lifting the restriction. Please try again.",
       "broadcast_failed": "Something went wrong sending the broadcast.",
       "load_registrations_failed": "Something went wrong loading the registrations. Please refresh the page.",
       "load_registration_failed": "Something went wrong loading the request details. Please refresh the page.",
