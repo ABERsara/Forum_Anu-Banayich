@@ -42,7 +42,7 @@ import { AUDIT_ACTION_LABELS, AuditAction, SortDirection } from '../../../core/c
 import { LabelService } from '../../../core/i18n/label.service';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { AuditLogEntry, AuditLogQuery } from '../../../core/models';
-import { ReportService } from '../../../core/services/report.service';
+import { AdminService } from '../../../core/services/admin.service';
 import { utcIso } from '../../../core/utils/utc-date.util';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -81,7 +81,7 @@ type FilterField = keyof Filters;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AuditLogComponent implements OnInit {
-  private readonly reportService = inject(ReportService);
+  private readonly adminService = inject(AdminService);
   private readonly labels = inject(LabelService);
 
   readonly entries = signal<AuditLogEntry[]>([]);
@@ -271,7 +271,7 @@ export class AuditLogComponent implements OnInit {
     this.isLoading.set(true);
     this.loadError.set(NO_ERROR);
 
-    this.reportService.getAuditLog(this.queryFor(this.applied())).subscribe({
+    this.adminService.getAuditLog(this.queryFor(this.applied())).subscribe({
       next: (result) => {
         if (request !== this.latestRequest) {
           return;

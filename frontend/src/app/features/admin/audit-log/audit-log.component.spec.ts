@@ -31,7 +31,7 @@ import { vi } from 'vitest';
 import { AuditLogComponent } from './audit-log.component';
 import { AuditAction } from '../../../core/constants';
 import type { AuditLogEntry, AuditLogList } from '../../../core/models';
-import { ReportService } from '../../../core/services/report.service';
+import { AdminService } from '../../../core/services/admin.service';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
 /**
@@ -84,16 +84,16 @@ function wallClock(naiveUtc: string): string {
 
 describe('AuditLogComponent', () => {
   let fixture: ComponentFixture<AuditLogComponent>;
-  let reportServiceMock: { getAuditLog: ReturnType<typeof vi.fn> };
+  let adminServiceMock: { getAuditLog: ReturnType<typeof vi.fn> };
 
   async function render(log: unknown = of(makePage())): Promise<void> {
     TestBed.resetTestingModule();
 
-    reportServiceMock = { getAuditLog: vi.fn().mockReturnValue(log) };
+    adminServiceMock = { getAuditLog: vi.fn().mockReturnValue(log) };
 
     await TestBed.configureTestingModule({
       imports: [AuditLogComponent, translocoTesting()],
-      providers: [{ provide: ReportService, useValue: reportServiceMock }, provideRouter([])],
+      providers: [{ provide: AdminService, useValue: adminServiceMock }, provideRouter([])],
     }).compileComponents();
 
     fixture = TestBed.createComponent(AuditLogComponent);
@@ -178,7 +178,7 @@ describe('AuditLogComponent', () => {
   }
 
   function lastQuery(): Record<string, unknown> {
-    const calls = reportServiceMock.getAuditLog.mock.calls;
+    const calls = adminServiceMock.getAuditLog.mock.calls;
     return calls[calls.length - 1][0] as Record<string, unknown>;
   }
 
@@ -193,7 +193,7 @@ describe('AuditLogComponent', () => {
 
   describe('the table', () => {
     it('fetches the first page on open', () => {
-      expect(reportServiceMock.getAuditLog).toHaveBeenCalledTimes(1);
+      expect(adminServiceMock.getAuditLog).toHaveBeenCalledTimes(1);
       expect(lastQuery()).toMatchObject({ page: 1 });
     });
 
@@ -298,7 +298,7 @@ describe('AuditLogComponent', () => {
     it('does not refetch on a keystroke', () => {
       type('actor_id', 'admin-0001');
 
-      expect(reportServiceMock.getAuditLog).toHaveBeenCalledTimes(1);
+      expect(adminServiceMock.getAuditLog).toHaveBeenCalledTimes(1);
     });
 
     it('sends the filter once it is applied', () => {
@@ -359,7 +359,7 @@ describe('AuditLogComponent', () => {
      */
     it('goes back to page 1 when a filter is applied', async () => {
       await render(of(makePage({ items: [makeEntry()], total_count: 200, page: 1 })));
-      reportServiceMock.getAuditLog.mockReturnValue(
+      adminServiceMock.getAuditLog.mockReturnValue(
         of(makePage({ items: [makeEntry()], total_count: 200, page: 2 })),
       );
       buttonWith('הבא').click();
@@ -431,7 +431,7 @@ describe('AuditLogComponent', () => {
      */
     it('goes back to page 1 when the order is reversed', async () => {
       await render(of(makePage({ items: [makeEntry()], total_count: 200, page: 1 })));
-      reportServiceMock.getAuditLog.mockReturnValue(
+      adminServiceMock.getAuditLog.mockReturnValue(
         of(makePage({ items: [makeEntry()], total_count: 200, page: 2 })),
       );
       buttonWith('הבא').click();
@@ -484,7 +484,7 @@ describe('AuditLogComponent', () => {
 
     it('trusts the page the server answered with, not the one it asked for', async () => {
       await renderTwoPages();
-      reportServiceMock.getAuditLog.mockReturnValue(
+      adminServiceMock.getAuditLog.mockReturnValue(
         of(makePage({ items: [makeEntry({ id: 'other' })], total_count: 60, page: 2 })),
       );
 
@@ -499,7 +499,7 @@ describe('AuditLogComponent', () => {
 
       expect(buttonWith('הקודם').disabled).toBe(true);
 
-      reportServiceMock.getAuditLog.mockReturnValue(
+      adminServiceMock.getAuditLog.mockReturnValue(
         of(makePage({ items: [makeEntry()], total_count: 60, page: 2 })),
       );
       buttonWith('הבא').click();
@@ -511,7 +511,7 @@ describe('AuditLogComponent', () => {
 
     it('goes back to page 1 from page 2', async () => {
       await renderTwoPages();
-      reportServiceMock.getAuditLog.mockReturnValue(
+      adminServiceMock.getAuditLog.mockReturnValue(
         of(makePage({ items: [makeEntry()], total_count: 60, page: 2 })),
       );
       buttonWith('הבא').click();
@@ -534,7 +534,7 @@ describe('AuditLogComponent', () => {
 
       // A second request goes out while the first is still in flight. The
       // filter panel is the control that is on screen either way.
-      reportServiceMock.getAuditLog.mockReturnValue(second);
+      adminServiceMock.getAuditLog.mockReturnValue(second);
       apply();
 
       second.next(makePage({ items: [makeEntry({ actor_id: 'winner' })], page: 2 }));
@@ -551,7 +551,7 @@ describe('AuditLogComponent', () => {
       const second = new Subject<AuditLogList>();
       await render(first);
 
-      reportServiceMock.getAuditLog.mockReturnValue(second);
+      adminServiceMock.getAuditLog.mockReturnValue(second);
       apply();
 
       second.next(makePage({ items: [makeEntry({ actor_id: 'winner' })] }));
@@ -632,7 +632,7 @@ describe('AuditLogComponent', () => {
 
     it('clears a previous failure when the next request succeeds', async () => {
       await render(throwError(() => ({ status: 500 })));
-      reportServiceMock.getAuditLog.mockReturnValue(of(makePage()));
+      adminServiceMock.getAuditLog.mockReturnValue(of(makePage()));
 
       apply();
 
