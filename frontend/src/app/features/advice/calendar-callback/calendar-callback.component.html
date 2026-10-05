@@ -1,0 +1,36 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="calendar-callback">
+  <h1 class="calendar-callback__title">{{ 'meetings.callback.title' | transloco }}</h1>
+
+  @switch (status()) {
+    @case ('connecting') {
+      <app-loading-spinner [message]="'meetings.callback.connecting' | transloco" />
+    }
+    @case ('connected') {
+      <p class="calendar-callback__success" role="status">
+        {{ 'meetings.callback.connected' | transloco }}
+      </p>
+    }
+    @case ('denied') {
+      <p class="calendar-callback__denied" role="status">
+        {{ 'meetings.callback.denied' | transloco }}
+      </p>
+    }
+    @case ('failed') {
+      <!-- The API's own `detail` is a finished sentence and is shown as it
+           came; our fallback is a key, so it follows a language switch. -->
+      @if (error().text; as text) {
+        <app-error-display [message]="text" />
+      } @else if (error().key; as key) {
+        <app-error-display [message]="key | transloco" />
+      }
+    }
+  }
+
+  @if (status() !== 'connecting') {
+    <a class="calendar-callback__back" routerLink="/meetings/new">
+      {{ 'meetings.callback.back_to_form' | transloco }}
+    </a>
+  }
+</div>

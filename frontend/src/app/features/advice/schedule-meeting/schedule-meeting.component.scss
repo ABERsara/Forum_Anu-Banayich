@@ -1,0 +1,213 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+// No `direction` here: the page inherits it from <html dir>, which
+// LocaleService sets from the active language (CONTRIBUTING §6). Everything
+// below is direction-neutral — no text-align, no margin-left/right — so the
+// layout mirrors on its own when the language flips.
+:host {
+  display: block;
+  padding: $spacing-lg;
+}
+
+.schedule-meeting {
+  &__title {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+    margin: $spacing-lg 0 $spacing-xs;
+  }
+
+  &__intro {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-lg;
+  }
+
+  &__success {
+    color: $color-success;
+    font-weight: $font-weight-medium;
+    margin-bottom: $spacing-md;
+  }
+}
+
+// The one-time Google Calendar authorisation. Deliberately set apart from the
+// form: it is a step before it, not a field in it.
+.consent {
+  background: $color-bg-subtle;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+  max-width: 720px;
+
+  &__title {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+    margin: 0 0 $spacing-xs;
+  }
+
+  &__body {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: 0 0 $spacing-md;
+  }
+
+  &__connect {
+    display: inline-block;
+    padding: $spacing-sm $spacing-lg;
+    background: $color-primary;
+    color: $color-white;
+    border-radius: $radius-md;
+    font-weight: $font-weight-medium;
+    text-decoration: none;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: $color-primary-dark;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+}
+
+.meeting-form {
+  background: $color-bg;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
+  padding: $spacing-lg;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    label {
+      font-weight: $font-weight-medium;
+      color: $color-text;
+      font-size: $font-size-base;
+    }
+
+    input,
+    select {
+      padding: $spacing-sm $spacing-md;
+      border: 1px solid $color-border;
+      border-radius: $radius-md;
+      font-size: $font-size-base;
+      font-family: inherit;
+      background: $color-bg;
+      color: $color-text;
+      transition: border-color $transition-fast;
+
+      &:focus-visible {
+        @include focus-ring;
+        border-color: $color-primary;
+      }
+    }
+  }
+
+  &__error {
+    font-size: $font-size-xs;
+    color: $color-danger;
+    margin: 0;
+  }
+
+  &__note {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    margin: 0;
+  }
+
+  &__submit {
+    align-self: flex-start;
+    padding: $spacing-sm $spacing-xl;
+    background: $color-primary;
+    color: $color-white;
+    border: none;
+    border-radius: $radius-md;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover:not(:disabled) {
+      background: $color-primary-dark;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+
+    &:disabled {
+      background: $color-text-muted;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.upcoming {
+  margin-top: $spacing-xl;
+  max-width: 720px;
+
+  &__title {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+    margin: 0 0 $spacing-md;
+  }
+
+  &__empty {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+  }
+
+  &__item {
+    background: $color-bg;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: $spacing-sm $spacing-md;
+  }
+
+  &__item-title {
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  &__item-when {
+    font-size: $font-size-sm;
+    color: $color-text;
+  }
+
+  &__item-cell {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  &__item-join {
+    // Logical, so it leans on the inline axis and turns around by itself when
+    // the language flips.
+    margin-inline-start: auto;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+  }
+}

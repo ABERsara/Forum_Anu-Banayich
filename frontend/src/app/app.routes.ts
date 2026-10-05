@@ -144,6 +144,40 @@ export const routes: Routes = [
     ],
   },
   {
+    // Scheduled Google Meet meetings.
+    //
+    // `calendar/callback` is where Google returns the browser after the
+    // consent screen, and its path is not ours to choose: it is the
+    // `redirect_uri` registered with the OAuth client
+    // (GOOGLE_REDIRECT_URI_MEET), and Google refuses any other. That is why
+    // the whole feature lives under this prefix rather than under
+    // `/professional` — one tree, not two.
+    //
+    // The role is decided per child. Scheduling is a professional's, which
+    // the server enforces anyway; the callback takes authGuard only, so a
+    // member who somehow lands there is shown the server's refusal instead of
+    // a redirect that hides what happened.
+    path: 'meetings',
+    canActivate: [authGuard],
+    children: [
+      {
+        path: 'new',
+        canActivate: [roleGuard(UserRole.PROFESSIONAL)],
+        loadComponent: () =>
+          import('./features/advice/schedule-meeting/schedule-meeting.component').then(
+            (m) => m.ScheduleMeetingComponent,
+          ),
+      },
+      {
+        path: 'calendar/callback',
+        loadComponent: () =>
+          import('./features/advice/calendar-callback/calendar-callback.component').then(
+            (m) => m.CalendarCallbackComponent,
+          ),
+      },
+    ],
+  },
+  {
     path: 'messages',
     canActivate: [authGuard],
     children: [
