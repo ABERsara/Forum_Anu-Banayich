@@ -530,7 +530,13 @@ def chat(
         logger.warning("Agent retrieval failed: the question could not be embedded")
         raise _unavailable() from None
     answer = _compose_answer(domain, data.message, chunks, history)
-    answered_at = _utc_now()
+    # Both stamps come from _utc_now(), with only retrieval and generation in
+    # between — and that gap can be shorter than the system clock's
+    # resolution, which is how two rows of one exchange end up sharing a
+    # created_at. A tie leaves `id`, a random UUID, to decide which of them is
+    # the question. One microsecond keeps the pair ordered wherever it is read
+    # back: the thread in get_conversation() and the replay in _recent_turns().
+    answered_at = max(_utc_now(), asked_at + timedelta(microseconds=1))
 
     if conversation is None:
         # Both timestamps are given here rather than left to their
@@ -640,9 +646,9 @@ def get_conversation(
 
     messages = (
         # `id` only breaks a tie in `created_at`. Rows this service writes
-        # cannot tie — _new_message() stamps them microseconds apart — but a
-        # row inserted by a fixture or a backfill can, and a thread must not
-        # render in a different order on two requests.
+        # cannot tie — chat() stamps the answer strictly after the question —
+        # but a row inserted by a fixture or a backfill can, and a thread must
+        # not render in a different order on two requests.
         db.query(AgentMessage)
         .filter(AgentMessage.conversation_id == conversation.id)
         .order_by(AgentMessage.created_at, AgentMessage.id)
@@ -674,7 +680,9 @@ def _new_message(
     for two reasons. It is what orders a thread, and the two rows of one
     exchange are inserted together: on SQLite `func.now()` has one-second
     resolution, so both would land on the same value and "question before
-    answer" would become whatever order the rows happen to come back in. And
+    answer" would become whatever order the rows happen to come back in —
+    which is why chat() keeps the answer's stamp strictly after the
+    question's, rather than trusting the clock to have moved. And
     the rolling quota window compares `created_at` against `_utc_now()`, so
     the stored value has to come from the same clock as the threshold —
     otherwise a DB server not running in UTC skews the window.
