@@ -116,6 +116,17 @@ def list_active_users(db: Session = Depends(get_db)) -> list[UserAdminView]:
     ]
 
 
+@router.get("/users/restricted", response_model=list[UserAdminView])
+def list_restricted_users(db: Session = Depends(get_db)) -> list[UserAdminView]:
+    """
+    Return all users with an active report restriction.
+    """
+    return [
+        UserAdminView.model_validate(user)
+        for user in user_service.get_restricted_users(db)
+    ]
+
+
 @router.get("/professionals", response_model=list[ProfessionalAdminView])
 def list_professionals(db: Session = Depends(get_db)) -> list[ProfessionalAdminView]:
     """Return the full professional catalog, listed and unlisted alike."""

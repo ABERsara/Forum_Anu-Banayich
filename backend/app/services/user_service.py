@@ -291,6 +291,18 @@ def get_active_users(db: Session) -> list[User]:
     )
 
 
+def get_restricted_users(db: Session) -> list[User]:
+    """
+    Return all users with an active report restriction.
+    """
+    return (
+        db.query(User)
+        .filter(User.is_report_restricted.is_(True))
+        .order_by(User.created_at.asc())
+        .all()
+    )
+
+
 def _apply_first_approval(
     db: Session, user: User, admin: User, previous_status: AccountStatus
 ) -> None:
