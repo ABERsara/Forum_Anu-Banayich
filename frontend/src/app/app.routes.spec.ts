@@ -22,6 +22,7 @@ import {
   type CanActivateFn,
   type RouterStateSnapshot,
 } from '@angular/router';
+import { isObservable, of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { routes } from './app.routes';
@@ -57,6 +58,11 @@ function makeUser(role: UserRole): UserProfile {
  * Runs one of the route's own guards against a signed-in user, and reports
  * both halves of the answer: whether it let the navigation through, and where
  * it sent the reader if it did not.
+ *
+ * `roleGuard` answers with an observable, because the profile it reads arrives
+ * over the network. The mock hands it an auth state that is already resolved,
+ * so the answer is there by the time `subscribe` returns and these cases stay
+ * synchronous; the waiting itself is covered in `role.guard.spec.ts`.
  */
 function run(
   guard: CanActivateFn,
@@ -67,16 +73,30 @@ function run(
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
-      { provide: AuthService, useValue: { currentUser: () => user } },
+      {
+        provide: AuthService,
+        useValue: {
+          currentUser: () => user,
+          getAccessToken: () => localStorage.getItem(ACCESS_TOKEN_KEY),
+          authResolved: of(undefined),
+        },
+      },
       { provide: Router, useValue: { navigate } },
     ],
   });
 
-  const allowed = runInInjectionContext(TestBed.inject(Injector), () =>
+  const answer = runInInjectionContext(TestBed.inject(Injector), () =>
     guard({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot),
   );
 
-  return { allowed: allowed === true, sentTo: navigate.mock.calls[0]?.[0] ?? null };
+  let allowed = false;
+  if (isObservable(answer)) {
+    answer.subscribe((decision) => (allowed = decision === true));
+  } else {
+    allowed = answer === true;
+  }
+
+  return { allowed, sentTo: navigate.mock.calls[0]?.[0] ?? null };
 }
 
 describe('moderator routes', () => {

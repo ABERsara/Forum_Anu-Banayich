@@ -58,6 +58,7 @@ describe('ProfileComponent', () => {
   let fixture: ComponentFixture<ProfileComponent>;
   let authServiceMock: {
     currentUser: ReturnType<typeof vi.fn>;
+    profileUnavailable: ReturnType<typeof vi.fn>;
     logout: ReturnType<typeof vi.fn>;
   };
   let accountServiceMock: {
@@ -70,6 +71,7 @@ describe('ProfileComponent', () => {
 
     authServiceMock = {
       currentUser: vi.fn().mockReturnValue(user),
+      profileUnavailable: vi.fn().mockReturnValue(false),
       logout: vi.fn(),
     };
     accountServiceMock = {
