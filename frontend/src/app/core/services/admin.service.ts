@@ -57,6 +57,15 @@ export class AdminService {
     return this.api.post<UserAdminView>(`/admin/users/${userId}/suspend`, body);
   }
 
+  /** Users with an active report restriction (§7.2's hardened measure, ABF-154). */
+  getRestrictedUsers(): Observable<UserAdminView[]> {
+    return this.api.get<UserAdminView[]>('/admin/users/restricted');
+  }
+
+  liftRestriction(userId: string): Observable<UserAdminView> {
+    return this.api.patch<UserAdminView>(`/admin/users/${userId}/lift-restriction`, {});
+  }
+
   /** The moderator roster: every appointed moderator with their cells. */
   getModerators(): Observable<ModeratorAdminView[]> {
     return this.api.get<ModeratorAdminView[]>('/admin/moderators');

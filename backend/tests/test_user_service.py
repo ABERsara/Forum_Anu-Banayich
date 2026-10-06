@@ -12,14 +12,16 @@ from app.core.constants import (
     AccountStatus,
     AuditAction,
     ProfessionalDomain,
+    RestrictionType,
     Sector,
     UserRole,
     UserType,
 )
 from app.models.audit import AuditLog
+from app.models.restriction import UserRestriction
 from app.models.user import User
 from app.schemas.user import ProfessionalCreateRequest, ProfessionalUpdateRequest
-from app.services import user_service
+from app.services import restriction_service, user_service
 
 
 def _make_user(
@@ -1121,4 +1123,156 @@ class TestSuspendUser:
             user_service.suspend_user(
                 db_session, "does-not-exist", admin, 48, "spam behaviour"
             )
+        assert exc_info.value.status_code == 404
+
+
+class TestGetRestrictedUsers:
+    def test_returns_only_restricted_users(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        restricted = _make_user(
+            db_session, "restricted@example.com", AccountStatus.ACTIVE, now
+        )
+        restricted.is_report_restricted = True
+        _make_user(db_session, "normal@example.com", AccountStatus.ACTIVE, now)
+        _make_admin(db_session, "admin@example.com")
+        db_session.commit()
+
+        result = user_service.get_restricted_users(db_session)
+
+        emails = {u.email for u in result}
+        assert emails == {"restricted@example.com"}
+
+    def test_includes_restricted_users_of_any_role(self, db_session: Session) -> None:
+        """
+        Unlike get_active_users(), this is not limited to role=USER: a
+        moderator or admin's own reporter_id can cross the §7.2 threshold
+        too, and the dashboard must not hide that from an admin.
+        """
+        restricted_admin = _make_admin(db_session, "restricted-admin@example.com")
+        restricted_admin.is_report_restricted = True
+        db_session.commit()
+
+        result = user_service.get_restricted_users(db_session)
+
+        emails = {u.email for u in result}
+        assert emails == {"restricted-admin@example.com"}
+
+    def test_orders_by_created_at_ascending(self, db_session: Session) -> None:
+        base = datetime.now(UTC).replace(tzinfo=None)
+        newest = _make_user(
+            db_session,
+            "newest@example.com",
+            AccountStatus.ACTIVE,
+            base + timedelta(minutes=2),
+        )
+        oldest = _make_user(
+            db_session, "oldest@example.com", AccountStatus.ACTIVE, base
+        )
+        middle = _make_user(
+            db_session,
+            "middle@example.com",
+            AccountStatus.ACTIVE,
+            base + timedelta(minutes=1),
+        )
+        for user in (newest, oldest, middle):
+            user.is_report_restricted = True
+        db_session.commit()
+
+        result = user_service.get_restricted_users(db_session)
+
+        assert [u.email for u in result] == [oldest.email, middle.email, newest.email]
+
+
+class TestLiftReportRestriction:
+    def test_clears_the_flag(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(
+            db_session, "restricted@example.com", AccountStatus.ACTIVE, now
+        )
+        user.is_report_restricted = True
+        db_session.commit()
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        result = user_service.lift_report_restriction(db_session, user.id, admin)
+
+        assert result.is_report_restricted is False
+
+    def test_creates_audit_log_entry(self, db_session: Session) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(
+            db_session, "restricted@example.com", AccountStatus.ACTIVE, now
+        )
+        user.is_report_restricted = True
+        db_session.commit()
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        user_service.lift_report_restriction(db_session, user.id, admin)
+
+        logs = db_session.query(AuditLog).filter(AuditLog.entity_id == user.id).all()
+        assert len(logs) == 1
+        assert logs[0].action == AuditAction.USER_RESTRICTED
+        assert logs[0].actor_id == admin.id
+        assert logs[0].details == {
+            "measure": "report_restriction_lifted",
+            "automatic": False,
+        }
+
+    def test_does_not_touch_a_still_active_user_restriction_row(
+        self, db_session: Session
+    ) -> None:
+        """
+        ABF-162 only lifts the no-expiry flag (report_service.py's
+        is_report_restricted). The parallel UserRestriction row — ABF-116's
+        self-expiring 3-a-day allowance, REPORTING direction — is left
+        running on purpose: it already carries its own expires_at and is
+        what the moderator dashboard and §7.2 alert read from.
+        """
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(
+            db_session, "restricted@example.com", AccountStatus.ACTIVE, now
+        )
+        user.is_report_restricted = True
+        db_session.commit()
+        admin = _make_admin(db_session, "admin1@example.com")
+        expires_at = now + timedelta(days=12)
+        restriction = UserRestriction(
+            user_id=user.id,
+            restriction_type=RestrictionType.REPORTING,
+            expires_at=expires_at,
+            report_count=5,
+            window_days=30,
+        )
+        db_session.add(restriction)
+        db_session.commit()
+
+        user_service.lift_report_restriction(db_session, user.id, admin)
+
+        db_session.refresh(restriction)
+        assert restriction.expires_at == expires_at
+        # The property that actually matters: assert_may_file_report() still
+        # finds this row and still throttles, not just that it survived.
+        still_found = restriction_service.active_restriction(
+            db_session, user.id, RestrictionType.REPORTING
+        )
+        assert still_found is not None
+        assert still_found.id == restriction.id
+
+    def test_cannot_lift_a_restriction_that_is_not_active(
+        self, db_session: Session
+    ) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(
+            db_session, "not-restricted@example.com", AccountStatus.ACTIVE, now
+        )
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.lift_report_restriction(db_session, user.id, admin)
+        assert exc_info.value.status_code == 400
+
+    def test_lift_nonexistent_user_raises_404(self, db_session: Session) -> None:
+        admin = _make_admin(db_session, "admin1@example.com")
+
+        with pytest.raises(HTTPException) as exc_info:
+            user_service.lift_report_restriction(db_session, "does-not-exist", admin)
         assert exc_info.value.status_code == 404

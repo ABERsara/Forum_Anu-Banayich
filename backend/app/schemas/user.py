@@ -86,6 +86,7 @@ class UserAdminView(BaseModel):
     second_approver_id: str | None = None
     approved_at: datetime | None = None
     rejection_reason: str | None = None
+    is_report_restricted: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

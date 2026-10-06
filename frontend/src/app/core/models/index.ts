@@ -60,6 +60,7 @@ export interface UserAdminView extends UserProfile {
   second_approver_id: string | null;
   approved_at: string | null;
   rejection_reason: string | null;
+  is_report_restricted: boolean;
 }
 
 /**

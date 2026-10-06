@@ -227,6 +227,13 @@ export const routes: Routes = [
             (m) => m.ActiveUsersComponent,
           ),
       },
+      {
+        path: 'restricted-users',
+        loadComponent: () =>
+          import('./features/admin/restricted-users/restricted-users.component').then(
+            (m) => m.RestrictedUsersComponent,
+          ),
+      },
     ],
   },
 
