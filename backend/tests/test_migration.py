@@ -491,3 +491,83 @@ def test_report_restricted_backfills_existing_members_as_unrestricted(
         command.upgrade(alembic_cfg, "head")
 
         assert _report_restricted_state(db_url) == {"u-existing": 0}
+
+
+# The revision ABF-152's audit_logs indexes sit directly on top of.
+REVISION_BEFORE_AUDIT_INDEXES = "e7b3f19c4a06"
+
+# Every column GET /admin/audit-log filters or sorts on (ABF-152).
+AUDIT_LOG_INDEXES = {
+    "ix_audit_logs_actor_id": ["actor_id"],
+    "ix_audit_logs_action": ["action"],
+    "ix_audit_logs_entity_type": ["entity_type"],
+    "ix_audit_logs_entity_id": ["entity_id"],
+    "ix_audit_logs_timestamp": ["timestamp"],
+}
+
+
+def _audit_log_indexes(db_url: str) -> dict[str, list[str]]:
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        return {
+            index["name"]: index["column_names"]
+            for index in inspect(engine).get_indexes("audit_logs")
+        }
+    finally:
+        engine.dispose()  # release the file lock before tempdir cleanup (Windows)
+
+
+def test_audit_log_indexes_migration_goes_down_and_up_again_cleanly(
+    monkeypatch,
+) -> None:
+    """
+    The audit log page filters on four columns and sorts on a fifth, and the
+    table is append-only for seven years. LIMIT bounds the page, not the scan:
+    without these indexes every filtered page reads the whole table first.
+    Asserted against the database the migration built, not the model — an
+    index declared on the model alone is never created in production.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        assert _audit_log_indexes(db_url) == AUDIT_LOG_INDEXES
+
+        # Named rather than "-1": this says which schema state the downgrade is
+        # meant to land on, and it keeps saying it however the graph grows.
+        command.downgrade(alembic_cfg, REVISION_BEFORE_AUDIT_INDEXES)
+        assert _audit_log_indexes(db_url) == {}
+
+        command.upgrade(alembic_cfg, "head")
+        assert _audit_log_indexes(db_url) == AUDIT_LOG_INDEXES
+
+
+def test_no_audit_log_model_migration_drift(monkeypatch) -> None:
+    """
+    models/audit.py and migration a80e87afe0fa have to describe the same
+    indexes. If they part ways, the next `alembic revision --autogenerate`
+    emits a DROP or a CREATE for the difference, and a database built by
+    create_all() and one built by migrations stop behaving alike.
+
+    Scoped to indexes on purpose: SQLite stores `action` as a VARCHAR, so
+    compare_metadata always reports a type change against the model's Enum —
+    the same pre-existing SQLite artefact it reports for reports.decision,
+    and not something this migration can or should change.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        try:
+            with engine.connect() as connection:
+                context = MigrationContext.configure(connection)
+                diff = compare_metadata(context, Base.metadata)
+        finally:
+            engine.dispose()
+
+    index_drift = [
+        entry
+        for entry in diff
+        if isinstance(entry, tuple)
+        and entry[0] in {"add_index", "remove_index"}
+        and entry[1].table.name == "audit_logs"
+    ]
+    assert not index_drift, f"audit_logs index drift detected: {index_drift}"
