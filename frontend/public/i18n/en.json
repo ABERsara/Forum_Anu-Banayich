@@ -3,7 +3,9 @@
     "lang_he": "עברית",
     "lang_en": "English",
     "cancel": "Cancel",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "connection_error": "We could not reach the server. Your session is safe - you can try again.",
+    "retry": "Try again"
   },
   "header": {
     "switch_to_hebrew": "Switch to Hebrew",

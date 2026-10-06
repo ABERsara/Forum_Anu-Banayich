@@ -97,5 +97,7 @@
         (cancelled)="onDeleteAccountCancelled()"
       />
     }
+  } @else if (auth.profileUnavailable()) {
+    <app-error-display [message]="'common.connection_error' | transloco" />
   }
 </div>
