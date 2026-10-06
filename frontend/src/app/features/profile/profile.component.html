@@ -99,5 +99,8 @@
     }
   } @else if (auth.profileUnavailable()) {
     <app-error-display [message]="'common.connection_error' | transloco" />
+    <app-button variant="secondary" (clicked)="auth.reloadProfile()">
+      {{ 'common.retry' | transloco }}
+    </app-button>
   }
 </div>

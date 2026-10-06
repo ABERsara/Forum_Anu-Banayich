@@ -59,6 +59,7 @@ describe('ProfileComponent', () => {
   let authServiceMock: {
     currentUser: ReturnType<typeof vi.fn>;
     profileUnavailable: ReturnType<typeof vi.fn>;
+    reloadProfile: ReturnType<typeof vi.fn>;
     logout: ReturnType<typeof vi.fn>;
   };
   let accountServiceMock: {
@@ -66,12 +67,17 @@ describe('ProfileComponent', () => {
     deleteMyAccount: ReturnType<typeof vi.fn>;
   };
 
-  function renderFor(user: UserProfile | null): void {
+  /**
+   * `profileUnavailable` is read once, at render: the mock is a plain spy, not
+   * a signal, so flipping it afterwards would not reach the template.
+   */
+  function renderFor(user: UserProfile | null, profileUnavailable = false): void {
     TestBed.resetTestingModule();
 
     authServiceMock = {
       currentUser: vi.fn().mockReturnValue(user),
-      profileUnavailable: vi.fn().mockReturnValue(false),
+      profileUnavailable: vi.fn().mockReturnValue(profileUnavailable),
+      reloadProfile: vi.fn(),
       logout: vi.fn(),
     };
     accountServiceMock = {
@@ -144,6 +150,16 @@ describe('ProfileComponent', () => {
       expect(heading()).toBe('הפרופיל שלי');
       expect(detailRows()).toEqual([]);
       expect(fixture.nativeElement.querySelector('.profile-section')).toBeNull();
+    });
+
+    it('offers the call again when the profile could not be fetched', () => {
+      renderFor(null, true);
+
+      expect(text()).toContain('לא הצלחנו להגיע לשרת');
+
+      clickButton('נסה שוב');
+
+      expect(authServiceMock.reloadProfile).toHaveBeenCalled();
     });
 
     it('leaves the group and sector rows blank for a member who has neither', () => {

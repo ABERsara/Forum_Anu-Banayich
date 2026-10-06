@@ -24,6 +24,7 @@ import { NO_ERROR, ScreenError, screenErrorFrom } from '../../core/i18n/screen-e
 import { DirectMessageExportResult } from '../../core/models';
 import { AccountService } from '../../core/services/account.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ButtonComponent } from '../../shared/components/button/button.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
@@ -31,7 +32,13 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [TranslocoPipe, ConfirmDialogComponent, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    TranslocoPipe,
+    ButtonComponent,
+    ConfirmDialogComponent,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })
