@@ -10,12 +10,16 @@
 import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, Subject, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ProfileComponent } from './profile.component';
 import { AccountStatus, Sector, UserRole, UserType } from '../../core/constants';
-import { DirectMessageExportResult, UserProfile, UserProfileUpdate } from '../../core/models';
+import {
+  DirectMessageExportResult,
+  UserProfile,
+  UserProfileUpdateRequest,
+} from '../../core/models';
 import { AccountService } from '../../core/services/account.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HEBREW, translocoTesting } from '../../../testing/transloco-testing';
@@ -86,7 +90,9 @@ describe('ProfileComponent', () => {
       exportMyMessages: vi.fn().mockReturnValue(of(makeExportResult())),
       deleteMyAccount: vi.fn().mockReturnValue(of(undefined)),
       // The API answers with the whole profile, the body applied to it.
-      updateMyProfile: vi.fn((body: UserProfileUpdate) => of({ ...(user ?? makeUser()), ...body })),
+      updateMyProfile: vi.fn((body: UserProfileUpdateRequest) =>
+        of({ ...(user ?? makeUser()), ...body }),
+      ),
     };
 
     TestBed.configureTestingModule({
@@ -218,6 +224,18 @@ describe('ProfileComponent', () => {
       expect(fixture.nativeElement.querySelector('.spinner')).toBeFalsy();
     });
 
+    it('drops the export request when the page is left before it answers', () => {
+      renderFor(makeUser());
+      const response = new Subject<DirectMessageExportResult>();
+      accountServiceMock.exportMyMessages.mockReturnValue(response);
+      clickButton('ייצוא ההודעות שלי');
+      expect(response.observed).toBe(true);
+
+      fixture.destroy();
+
+      expect(response.observed).toBe(false);
+    });
+
     it("shows the server's own message when export fails with one", () => {
       renderFor(makeUser());
       accountServiceMock.exportMyMessages.mockReturnValue(
@@ -279,6 +297,22 @@ describe('ProfileComponent', () => {
       fixture.detectChanges();
 
       expect(accountServiceMock.deleteMyAccount).toHaveBeenCalled();
+      expect(authServiceMock.logout).toHaveBeenCalled();
+    });
+
+    // The one call the screen does not drop on leaving: the server may already
+    // have deleted the account, and only the logout ends this tab's session.
+    it('still logs out when the page is left before the deletion answers', () => {
+      renderFor(makeUser());
+      const response = new Subject<void>();
+      accountServiceMock.deleteMyAccount.mockReturnValue(response);
+      fixture.componentInstance.onDeleteAccountClick();
+      fixture.componentInstance.onDeleteAccountConfirmed();
+
+      fixture.destroy();
+      response.next();
+      response.complete();
+
       expect(authServiceMock.logout).toHaveBeenCalled();
     });
 
@@ -482,6 +516,22 @@ describe('ProfileComponent', () => {
       fixture.detectChanges();
       expect(alertSection().querySelector('.spinner')).toBeFalsy();
       expect(alertValue()).toBe('כתובת להתראות: new@example.com');
+    });
+
+    it('drops the save request when the page is left before it answers', () => {
+      renderFor(makeUser());
+      const response = new Subject<UserProfile>();
+      accountServiceMock.updateMyProfile.mockReturnValue(response);
+      clickButton('עריכה');
+      typeAlertEmail('new@example.com');
+      clickButton('שמירה');
+      expect(response.observed).toBe(true);
+
+      fixture.destroy();
+      response.next(makeUser({ alert_email: 'new@example.com' }));
+
+      expect(response.observed).toBe(false);
+      expect(authServiceMock.setCurrentUser).not.toHaveBeenCalled();
     });
 
     it('explains a 422 as an invalid address and keeps the field open', () => {

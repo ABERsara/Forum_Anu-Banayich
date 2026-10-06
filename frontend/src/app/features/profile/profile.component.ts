@@ -17,6 +17,7 @@
 
 import {
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   ViewChild,
@@ -25,6 +26,7 @@ import {
   signal,
 } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -59,6 +61,7 @@ export class ProfileComponent {
   readonly auth = inject(AuthService);
   private readonly account = inject(AccountService);
   private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
   readonly userTypeLabels = USER_TYPE_LABELS;
   readonly sectorLabels = SECTOR_LABELS;
   readonly statusLabels = ACCOUNT_STATUS_LABELS;
@@ -116,45 +119,51 @@ export class ProfileComponent {
     this.alertEmail.disable();
     // A cleared field is sent as null, not "": the API clears the address on
     // null and rejects an empty string as an invalid one.
-    this.account.updateMyProfile({ alert_email: value || null }).subscribe({
-      next: (user) => {
-        this.auth.setCurrentUser(user);
-        this.alertEmail.enable();
-        this.isSavingAlertEmail.set(false);
-        this.isEditingAlertEmail.set(false);
-        this.alertEmailSaved.set(true);
-        this.focusAfterRender(() => this.alertEmailEditButton);
-      },
-      error: (err: HttpErrorResponse) => {
-        // A 422 carries Pydantic's English field errors, not a sentence for the
-        // reader. Validators.email accepts a few shapes the API does not
-        // ("a@b", with no dot in the domain), so say what is wrong with it.
-        const fallbackKey =
-          err.status === 422
-            ? 'profile.alert_email.email_error'
-            : 'profile.errors.alert_email_save_failed';
-        this.alertEmailError.set(screenErrorFrom(err, fallbackKey));
-        this.alertEmail.enable();
-        this.isSavingAlertEmail.set(false);
-      },
-    });
+    this.account
+      .updateMyProfile({ alert_email: value || null })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (user) => {
+          this.auth.setCurrentUser(user);
+          this.alertEmail.enable();
+          this.isSavingAlertEmail.set(false);
+          this.isEditingAlertEmail.set(false);
+          this.alertEmailSaved.set(true);
+          this.focusAfterRender(() => this.alertEmailEditButton);
+        },
+        error: (err: HttpErrorResponse) => {
+          // A 422 carries Pydantic's English field errors, not a sentence for the
+          // reader. Validators.email accepts a few shapes the API does not
+          // ("a@b", with no dot in the domain), so say what is wrong with it.
+          const fallbackKey =
+            err.status === 422
+              ? 'profile.alert_email.email_error'
+              : 'profile.errors.alert_email_save_failed';
+          this.alertEmailError.set(screenErrorFrom(err, fallbackKey));
+          this.alertEmail.enable();
+          this.isSavingAlertEmail.set(false);
+        },
+      });
   }
 
   exportMessages(): void {
     this.isExporting.set(true);
     this.exportError.set(NO_ERROR);
     this.exportSuccess.set(false);
-    this.account.exportMyMessages().subscribe({
-      next: (result) => {
-        this.downloadExport(result);
-        this.isExporting.set(false);
-        this.exportSuccess.set(true);
-      },
-      error: (err: HttpErrorResponse) => {
-        this.exportError.set(screenErrorFrom(err, 'profile.errors.export_failed'));
-        this.isExporting.set(false);
-      },
-    });
+    this.account
+      .exportMyMessages()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.downloadExport(result);
+          this.isExporting.set(false);
+          this.exportSuccess.set(true);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.exportError.set(screenErrorFrom(err, 'profile.errors.export_failed'));
+          this.isExporting.set(false);
+        },
+      });
   }
 
   onDeleteAccountClick(): void {
@@ -170,6 +179,10 @@ export class ProfileComponent {
     this.showDeleteConfirm.set(false);
     this.isDeleting.set(true);
     this.deleteError.set(NO_ERROR);
+    // Not takeUntilDestroyed, unlike the two calls above: unsubscribing aborts
+    // the request, and the server may already have deleted the account. The
+    // logout then never runs, and this tab keeps a token that every endpoint
+    // answers with 403 (a 401 is what authInterceptor would log out on).
     this.account.deleteMyAccount().subscribe({
       next: () => this.auth.logout(),
       error: (err: HttpErrorResponse) => {
