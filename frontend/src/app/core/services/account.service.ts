@@ -9,7 +9,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { DirectMessageExportResult, UserProfile, UserProfileUpdate } from '../models';
+import { DirectMessageExportResult, UserProfile, UserProfileUpdateRequest } from '../models';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -21,7 +21,7 @@ export class AccountService {
    * Resolves to the whole updated profile. Does not touch session state; the
    * caller hands the result to AuthService.setCurrentUser().
    */
-  updateMyProfile(data: UserProfileUpdate): Observable<UserProfile> {
+  updateMyProfile(data: UserProfileUpdateRequest): Observable<UserProfile> {
     return this.api.put<UserProfile>('/users/me', data);
   }
 

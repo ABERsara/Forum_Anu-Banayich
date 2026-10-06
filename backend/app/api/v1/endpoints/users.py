@@ -15,7 +15,7 @@ from app.core.dependencies import get_current_active_user, get_db
 from app.core.i18n import translate
 from app.models.user import User
 from app.schemas.forum import DirectMessageExportItem, DirectMessageExportResponse
-from app.schemas.user import UserProfile, UserProfileUpdate
+from app.schemas.user import UserProfile, UserProfileUpdateRequest
 from app.services import retention_service, user_service
 from app.services.audit_service import log_action
 
@@ -30,7 +30,7 @@ def get_my_profile(current_user: User = Depends(get_current_active_user)) -> Use
 
 @router.put("/me", response_model=UserProfile)
 def update_my_profile(
-    data: UserProfileUpdate,
+    data: UserProfileUpdateRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> User:
@@ -38,7 +38,7 @@ def update_my_profile(
     Update the caller's own profile. Today that means the alert address only.
 
     Open to every role: the address is where the platform sends *this* account
-    its alerts, whatever the account's role. See UserProfileUpdate for what the
+    its alerts, whatever the account's role. See UserProfileUpdateRequest for what the
     body accepts and why the rest of the profile is not part of it.
     """
     return user_service.update_own_profile(db, current_user, data)

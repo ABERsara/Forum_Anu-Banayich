@@ -38,7 +38,7 @@ from app.schemas.user import (
     ModeratorUpdateRequest,
     ProfessionalCreateRequest,
     ProfessionalUpdateRequest,
-    UserProfileUpdate,
+    UserProfileUpdateRequest,
 )
 from app.services import retention_service
 from app.services.audit_service import build_entry, log_action
@@ -107,11 +107,11 @@ def ensure_account_active(user: User) -> None:
         raise HTTPException(status_code=403, detail=translate("users.account_inactive"))
 
 
-def update_own_profile(db: Session, user: User, data: UserProfileUpdate) -> User:
+def update_own_profile(db: Session, user: User, data: UserProfileUpdateRequest) -> User:
     """
     A user edits their own profile (PUT /users/me, ABF-165): the alert address.
 
-    Only the fields present in the request are touched, see UserProfileUpdate.
+    Only the fields present in the request are touched, see UserProfileUpdateRequest.
     A re-save of the value already stored changes nothing and is not logged.
 
     Logged even though the actor edits themselves: for a moderator or an admin

@@ -3,7 +3,7 @@ Pydantic schemas for user-related endpoints.
 
 UserPublic      → what any user sees about another user (name only, no PII)
 UserProfile     → what a user sees about themselves
-UserProfileUpdate → what a user may change about themselves (PUT /users/me)
+UserProfileUpdateRequest → what a user may change about themselves (PUT /users/me)
 UserAdminView  → what an admin sees (includes status, documents)
 RegistrationItem → pending registration in admin queue
 
@@ -72,7 +72,7 @@ class UserProfile(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class UserProfileUpdate(BaseModel):
+class UserProfileUpdateRequest(BaseModel):
     """
     A user edits their own profile (PUT /users/me).
 

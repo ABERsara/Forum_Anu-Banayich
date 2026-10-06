@@ -61,7 +61,7 @@ export interface UserProfile {
  * other field with a 422: the login address needs the OTP flow, and name,
  * group and sector are admin decisions.
  */
-export interface UserProfileUpdate {
+export interface UserProfileUpdateRequest {
   alert_email?: string | null;
 }
 
