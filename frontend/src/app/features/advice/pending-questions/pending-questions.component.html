@@ -6,9 +6,14 @@
   >
   <div class="pending-questions__header">
     <h1 class="pending-questions__title">{{ 'advice.pending.title' | transloco }}</h1>
-    <a routerLink="/professional/knowledge" class="pending-questions__knowledge-link">
-      {{ 'advice.pending.knowledge_link' | transloco }}
-    </a>
+    <div class="pending-questions__header-links">
+      <a routerLink="/professional/knowledge" class="pending-questions__header-link">
+        {{ 'advice.pending.knowledge_link' | transloco }}
+      </a>
+      <a routerLink="/meetings/new" class="pending-questions__header-link">
+        {{ 'advice.pending.schedule_meeting_link' | transloco }}
+      </a>
+    </div>
   </div>
   <p class="pending-questions__intro">{{ 'advice.pending.intro' | transloco }}</p>
 

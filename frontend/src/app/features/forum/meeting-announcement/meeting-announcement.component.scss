@@ -1,0 +1,60 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+// No `direction` here: the element inherits it from <html dir>, which
+// LocaleService sets from the active language (CONTRIBUTING §6).
+.meeting-announcement {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-sm $spacing-md;
+  margin: $spacing-sm 0;
+
+  &__badge {
+    background: $color-secondary;
+    color: $color-white;
+    border-radius: $radius-full;
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+  }
+
+  &__when {
+    font-size: $font-size-sm;
+    color: $color-text;
+  }
+
+  &__ended {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  // One class for both the live anchor and the disabled button, so the two
+  // states of one control look like one control.
+  &__join {
+    padding: $spacing-xs $spacing-lg;
+    border: none;
+    border-radius: $radius-md;
+    background: $color-primary;
+    color: $color-white;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover:not(:disabled) {
+      background: $color-primary-dark;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+
+    &:disabled {
+      background: $color-text-muted;
+      cursor: not-allowed;
+    }
+  }
+}

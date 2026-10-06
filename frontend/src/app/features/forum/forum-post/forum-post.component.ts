@@ -13,6 +13,7 @@ import { ReportTargetType } from '../../../core/constants';
 import { ForumPost } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { ForumService } from '../../../core/services/forum.service';
+import { MeetingAnnouncementComponent } from '../meeting-announcement/meeting-announcement.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
@@ -29,6 +30,7 @@ import { ReportButtonComponent } from '../../../shared/components/report-button/
     ErrorDisplayComponent,
     ConfirmDialogComponent,
     ReportButtonComponent,
+    MeetingAnnouncementComponent,
   ],
   templateUrl: './forum-post.component.html',
   styleUrl: './forum-post.component.scss',
@@ -68,11 +70,28 @@ export class ForumPostComponent implements OnInit {
     );
   });
 
-  // Unlike delete, editing is author-only (ABF-48 AC).
+  /**
+   * A MEETING announcement: published by the system when a
+   * professional scheduled a meeting, and read-only. The server refuses both
+   * a like and an edit on one, so neither control is drawn — a button that
+   * promises an action it cannot perform is worse than no button.
+   *
+   * Deleting it is not withdrawn. Hiding the announcement is the moderation
+   * path the backend was built around: `get_visible_meetings()` stops listing
+   * a meeting whose post is no longer VISIBLE. Nor is reporting it.
+   *
+   * Read from `meeting` rather than from `post_type`: drawing the card needs
+   * the object itself, so that one field is the single test for an
+   * announcement.
+   */
+  isMeeting = computed(() => !!this.post()?.meeting);
+
+  // Unlike delete, editing is author-only (ABF-48 AC) — and an announcement
+  // is not editable by anyone, its author included.
   canEdit = computed(() => {
     const post = this.post();
     const user = this.authService.currentUser();
-    return !!post && !!user && post.author.id === user.id;
+    return !!post && !!user && post.author.id === user.id && !this.isMeeting();
   });
 
   ngOnInit(): void {

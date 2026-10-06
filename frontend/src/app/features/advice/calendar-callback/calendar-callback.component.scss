@@ -1,0 +1,43 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+// No `direction` here: the page inherits it from <html dir>, which
+// LocaleService sets from the active language (CONTRIBUTING §6).
+:host {
+  display: block;
+  padding: $spacing-lg;
+}
+
+.calendar-callback {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+
+  &__title {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+    margin: $spacing-lg 0 0;
+  }
+
+  &__success {
+    color: $color-success;
+    font-weight: $font-weight-medium;
+    margin: 0;
+  }
+
+  &__denied {
+    color: $color-text-muted;
+    margin: 0;
+  }
+
+  &__back {
+    align-self: flex-start;
+    font-weight: $font-weight-medium;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+}
