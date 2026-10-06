@@ -86,6 +86,12 @@
       "suspend": "Suspend",
       "suspend_message": "This will suspend the user for the number of hours you set, and send them a message with the reason."
     },
+    "restricted_users": {
+      "title": "Report-restricted users",
+      "empty": "There are no report-restricted users right now.",
+      "lift": "Lift restriction",
+      "lift_message": "The user will be able to file reports again."
+    },
     "manage_professionals": {
       "title": "Manage professionals",
       "hint": "An active professional appears in the advice catalog of the users whose group and sector are ticked on their profile.",
@@ -186,6 +192,7 @@
       "load_pending_count_failed": "Something went wrong loading the number of pending registrations",
       "load_users_failed": "Something went wrong loading the users. Please refresh the page.",
       "suspend_failed": "Something went wrong suspending the user. Please try again.",
+      "lift_restriction_failed": "Something went wrong lifting the restriction. Please try again.",
       "broadcast_failed": "Something went wrong sending the broadcast.",
       "load_registrations_failed": "Something went wrong loading the registrations. Please refresh the page.",
       "load_registration_failed": "Something went wrong loading the request details. Please refresh the page.",
@@ -262,7 +269,8 @@
       "sending": "Sending answer...",
       "submit": "Send answer",
       "success": "Your answer was sent, and the asker has been notified by email.",
-      "knowledge_link": "Manage the agent's knowledge base"
+      "knowledge_link": "Manage the agent's knowledge base",
+      "schedule_meeting_link": "Schedule a meeting"
     },
     "errors": {
       "load_professionals_failed": "Something went wrong loading the professionals list. Please try again later.",
@@ -503,6 +511,55 @@
       "title": "Professional advice",
       "subtitle": "Questions awaiting your answer",
       "body": "View the questions sent to you and answer the asker."
+    }
+  },
+  "meetings": {
+    "schedule": {
+      "back_to_questions": "Back to pending questions",
+      "title": "Schedule a Google Meet",
+      "intro": "The meeting is announced in the forum of the cell you pick, and members join from there.",
+      "checking_status": "Checking the Google Calendar connection...",
+      "title_label": "Meeting title",
+      "title_error": "Please enter a title of 2 to 256 characters",
+      "when_label": "Date and time",
+      "when_error": "Please pick a time in the future",
+      "group_label": "Group",
+      "sector_label": "Sector",
+      "duration_note": "A meeting runs for 60 minutes.",
+      "submit": "Schedule the meeting",
+      "submitting": "Scheduling...",
+      "success": "The meeting is set, and its announcement was published in the forum."
+    },
+    "consent": {
+      "title": "Connect Google Calendar",
+      "body": "A Meet is created in your own Google Calendar, which needs your permission once. Signing in to the site does not include it.",
+      "connect": "Connect Google Calendar",
+      "blocks_submit": "Scheduling opens once the calendar is connected."
+    },
+    "upcoming": {
+      "title": "Meetings you have scheduled",
+      "empty": "You have no meetings still ahead.",
+      "join": "Join"
+    },
+    "callback": {
+      "title": "Connect Google Calendar",
+      "connecting": "Completing the connection...",
+      "connected": "The calendar is connected. You can schedule meetings.",
+      "denied": "Permission was not granted, so the calendar is not connected. You can try again from the scheduling form.",
+      "missing_code": "Google returned without the code the connection needs. Please try connecting again.",
+      "back_to_form": "Back to the scheduling form"
+    },
+    "announcement": {
+      "badge": "Meeting",
+      "starts_at": "Starts: {{when}}",
+      "join": "Join the meeting",
+      "ended": "This meeting has ended"
+    },
+    "errors": {
+      "status_failed": "The calendar connection could not be checked. Please try again.",
+      "create_failed": "The meeting could not be scheduled. Please try again.",
+      "load_upcoming_failed": "Upcoming meetings could not be loaded.",
+      "connect_failed": "The calendar could not be connected. Please try again."
     }
   },
   "moderator": {

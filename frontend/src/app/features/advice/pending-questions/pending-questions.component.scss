@@ -28,7 +28,16 @@
     margin: 0;
   }
 
-  &__knowledge-link {
+  // The two ways out of this screen — the knowledge base (ABF-124) and
+  // scheduling a meeting — kept together so `flex-between` on the header
+  // still has two children to push apart.
+  &__header-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-md;
+  }
+
+  &__header-link {
     font-size: $font-size-sm;
   }
 

@@ -12,13 +12,21 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { GROUP_VISIBILITY_LABELS, SECTOR_VISIBILITY_LABELS } from '../../../core/constants';
 import { ForumPost } from '../../../core/models';
 import { ForumService } from '../../../core/services/forum.service';
+import { MeetingAnnouncementComponent } from '../meeting-announcement/meeting-announcement.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-forum-list',
   standalone: true,
-  imports: [RouterLink, DatePipe, TranslocoPipe, LoadingSpinnerComponent, ErrorDisplayComponent],
+  imports: [
+    RouterLink,
+    DatePipe,
+    TranslocoPipe,
+    LoadingSpinnerComponent,
+    ErrorDisplayComponent,
+    MeetingAnnouncementComponent,
+  ],
   templateUrl: './forum-list.component.html',
   styleUrl: './forum-list.component.scss',
 })

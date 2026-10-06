@@ -1,0 +1,151 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="schedule-meeting">
+  <a routerLink="/professional/questions"
+    ><span aria-hidden="true">‹</span> {{ 'meetings.schedule.back_to_questions' | transloco }}</a
+  >
+
+  <h1 class="schedule-meeting__title">{{ 'meetings.schedule.title' | transloco }}</h1>
+  <p class="schedule-meeting__intro">{{ 'meetings.schedule.intro' | transloco }}</p>
+
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch. -->
+  @if (error().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (error().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
+
+  @if (isCheckingStatus()) {
+    <app-loading-spinner [message]="'meetings.schedule.checking_status' | transloco" />
+  }
+
+  <!-- The one-time consent step. An anchor rather than a button: it leaves the
+       app for Google's own consent screen, and the URL was built by the server
+       (it carries the signed `state`), never assembled here. -->
+  @if (needsConsent() && calendarStatus(); as status) {
+    <section class="consent" aria-labelledby="consent-title">
+      <h2 class="consent__title" id="consent-title">{{ 'meetings.consent.title' | transloco }}</h2>
+      <p class="consent__body">{{ 'meetings.consent.body' | transloco }}</p>
+      <a class="consent__connect" [href]="status.authorization_url">
+        {{ 'meetings.consent.connect' | transloco }}
+      </a>
+    </section>
+  }
+
+  <!-- Held as a key and piped here, so a confirmation already on screen
+       follows a language switch instead of freezing (CONTRIBUTING §6). -->
+  @if (successKey(); as key) {
+    <p class="schedule-meeting__success" role="status">
+      {{ key | transloco }}
+    </p>
+  }
+
+  <form class="meeting-form" [formGroup]="form" (ngSubmit)="submit()">
+    <div class="meeting-form__field">
+      <label for="meeting-title">{{ 'meetings.schedule.title_label' | transloco }}</label>
+      <input
+        id="meeting-title"
+        type="text"
+        formControlName="title"
+        [maxlength]="titleMaxLength"
+        [attr.aria-invalid]="form.controls.title.touched && form.controls.title.invalid"
+      />
+      @if (form.controls.title.touched && form.controls.title.invalid) {
+        <p class="meeting-form__error" role="alert">
+          {{ 'meetings.schedule.title_error' | transloco }}
+        </p>
+      }
+    </div>
+
+    <div class="meeting-form__field">
+      <label for="meeting-when">{{ 'meetings.schedule.when_label' | transloco }}</label>
+      <!-- `min` states the "must be in the future" rule to the browser; the
+           control's own validator and the server both state it again. -->
+      <input
+        id="meeting-when"
+        type="datetime-local"
+        formControlName="scheduled_at"
+        [min]="minDateTime"
+        [attr.aria-invalid]="
+          form.controls.scheduled_at.touched && form.controls.scheduled_at.invalid
+        "
+      />
+      @if (form.controls.scheduled_at.touched && form.controls.scheduled_at.invalid) {
+        <p class="meeting-form__error" role="alert">
+          {{ 'meetings.schedule.when_error' | transloco }}
+        </p>
+      }
+    </div>
+
+    <div class="meeting-form__field">
+      <label for="meeting-group">{{ 'meetings.schedule.group_label' | transloco }}</label>
+      <select id="meeting-group" formControlName="group_visibility">
+        @for (group of groupOptions; track group) {
+          <option [value]="group">{{ groupLabels[group] | transloco }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="meeting-form__field">
+      <label for="meeting-sector">{{ 'meetings.schedule.sector_label' | transloco }}</label>
+      <select id="meeting-sector" formControlName="sector_visibility">
+        @for (sector of sectorOptions; track sector) {
+          <option [value]="sector">{{ sectorLabels[sector] | transloco }}</option>
+        }
+      </select>
+    </div>
+
+    <p class="meeting-form__note">{{ 'meetings.schedule.duration_note' | transloco }}</p>
+
+    <!-- Disabled, not hidden, while consent is missing: the form stays
+         readable and whatever she typed survives the trip to Google. -->
+    <button
+      type="submit"
+      class="meeting-form__submit"
+      [disabled]="isSubmitting() || needsConsent()"
+    >
+      {{
+        (isSubmitting() ? 'meetings.schedule.submitting' : 'meetings.schedule.submit') | transloco
+      }}
+    </button>
+    @if (needsConsent()) {
+      <p class="meeting-form__note">{{ 'meetings.consent.blocks_submit' | transloco }}</p>
+    }
+  </form>
+
+  <section class="upcoming" aria-labelledby="upcoming-title">
+    <h2 class="upcoming__title" id="upcoming-title">{{ 'meetings.upcoming.title' | transloco }}</h2>
+
+    @if (isLoadingUpcoming()) {
+      <app-loading-spinner size="md" />
+    } @else if (upcoming().length === 0) {
+      <p class="upcoming__empty">{{ 'meetings.upcoming.empty' | transloco }}</p>
+    } @else {
+      <ul class="upcoming__list">
+        @for (meeting of upcoming(); track meeting.id) {
+          <li class="upcoming__item">
+            <!-- The title is what the professional wrote: content, not UI copy,
+                 so it is shown as it came in either interface language. -->
+            <strong class="upcoming__item-title">{{ meeting.title }}</strong>
+            <span class="upcoming__item-when">
+              {{ meeting.scheduled_at | date: 'dd/MM/yyyy HH:mm' }}
+            </span>
+            <span class="upcoming__item-cell">
+              {{ groupLabels[meeting.group_visibility] | transloco }} ·
+              {{ sectorLabels[meeting.sector_visibility] | transloco }}
+            </span>
+            <a
+              class="upcoming__item-join"
+              [href]="meeting.meet_link"
+              target="_blank"
+              rel="noopener"
+            >
+              {{ 'meetings.upcoming.join' | transloco }}
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</div>

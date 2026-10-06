@@ -185,6 +185,31 @@ describe('AdminService', () => {
     expect(result).toEqual(mockUser);
   });
 
+  it('getRestrictedUsers GETs the restricted users endpoint', () => {
+    let result: UserAdminView[] | undefined;
+    service.getRestrictedUsers().subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/users/restricted`);
+    expect(req.request.method).toBe('GET');
+
+    const mockUsers = [{ id: 'u1' }] as UserAdminView[];
+    req.flush(mockUsers);
+    expect(result).toEqual(mockUsers);
+  });
+
+  it('liftRestriction PATCHes the lift-restriction endpoint', () => {
+    let result: UserAdminView | undefined;
+    service.liftRestriction('u1').subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/users/u1/lift-restriction`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({});
+
+    const mockUser = { id: 'u1' } as UserAdminView;
+    req.flush(mockUser);
+    expect(result).toEqual(mockUser);
+  });
+
   it('getProfessionals GETs the professional catalog', () => {
     let result: ProfessionalAdminView[] | undefined;
     service.getProfessionals().subscribe((res) => (result = res));

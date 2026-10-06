@@ -111,6 +111,7 @@ describe('AdminDashboardComponent', () => {
       expect(navLabels()).toEqual([
         'הרשמות ממתינות',
         'משתמשים פעילים',
+        'משתמשים מוגבלי דיווח',
         'ניהול אנשי מקצוע',
         'ניהול ממונים',
         'יומן פעולות',
@@ -130,6 +131,7 @@ describe('AdminDashboardComponent', () => {
       expect(navLabels()).toEqual([
         'Pending registrations',
         'Active users',
+        'Report-restricted users',
         'Manage professionals',
         'Manage moderators',
         'Audit log',

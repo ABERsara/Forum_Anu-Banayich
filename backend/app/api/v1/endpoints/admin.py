@@ -16,6 +16,8 @@ PATCH  /admin/moderators/{id}        – update a moderator's cells / alert emai
 DELETE /admin/moderators/{id}        – remove a moderator from the roster
 GET  /admin/audit-log                – the audit log: filtered, sorted, paginated
 POST /admin/users/{id}/suspend       – suspend a user manually
+GET  /admin/users/restricted         – users with an active report restriction
+PATCH /admin/users/{id}/lift-restriction – lift a user's report restriction
 """
 
 from datetime import date
@@ -117,6 +119,17 @@ def list_active_users(db: Session = Depends(get_db)) -> list[UserAdminView]:
     ]
 
 
+@router.get("/users/restricted", response_model=list[UserAdminView])
+def list_restricted_users(db: Session = Depends(get_db)) -> list[UserAdminView]:
+    """
+    Return all users with an active report restriction.
+    """
+    return [
+        UserAdminView.model_validate(user)
+        for user in user_service.get_restricted_users(db)
+    ]
+
+
 @router.get("/professionals", response_model=list[ProfessionalAdminView])
 def list_professionals(db: Session = Depends(get_db)) -> list[ProfessionalAdminView]:
     """Return the full professional catalog, listed and unlisted alike."""
@@ -207,6 +220,19 @@ def suspend_user(
     Manually suspend a user.
     """
     user = user_service.suspend_user(db, user_id, current_user, data.hours, data.reason)
+    return UserAdminView.model_validate(user)
+
+
+@router.patch("/users/{user_id}/lift-restriction", response_model=UserAdminView)
+def lift_restriction(
+    user_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> UserAdminView:
+    """
+    Lift a user's report restriction.
+    """
+    user = user_service.lift_report_restriction(db, user_id, current_user)
     return UserAdminView.model_validate(user)
 
 

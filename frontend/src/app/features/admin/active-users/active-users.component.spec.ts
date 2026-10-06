@@ -28,6 +28,7 @@ function makeUser(overrides: Partial<UserAdminView> = {}): UserAdminView {
     second_approver_id: null,
     approved_at: null,
     rejection_reason: null,
+    is_report_restricted: false,
     ...overrides,
   };
 }
