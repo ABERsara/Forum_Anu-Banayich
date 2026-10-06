@@ -5,7 +5,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ForumListComponent } from './forum-list.component';
-import { GroupVisibility, PostStatus, SectorVisibility } from '../../../core/constants';
+import { GroupVisibility, PostStatus, PostType, SectorVisibility } from '../../../core/constants';
 import type { ForumPost, ForumPostList } from '../../../core/models';
 import { ForumService } from '../../../core/services/forum.service';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
@@ -24,6 +24,8 @@ function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
     like_count: 0,
     liked_by_me: false,
     created_at: '2026-07-01T10:00:00',
+    post_type: PostType.TEXT,
+    meeting: null,
     updated_at: '2026-07-01T10:00:00',
     ...overrides,
   };
@@ -253,6 +255,58 @@ describe('ForumListComponent', () => {
 
     it('does not pin its own text direction — it follows <html dir>', () => {
       expect(fixture.nativeElement.querySelector('.forum-list').hasAttribute('dir')).toBe(false);
+    });
+  });
+
+  /**
+   * A meeting announcement in the list. `meeting` is populated
+   * exactly when post_type is MEETING, and it is what the card draws from.
+   */
+  describe('a meeting announcement', () => {
+    const MEETING = {
+      id: 'meeting-1',
+      scheduled_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+      duration_minutes: 60,
+      meet_link: 'https://meet.google.com/abc-defg-hij',
+    };
+
+    function showAnnouncement(meeting = MEETING): HTMLElement {
+      forumServiceMock.getPosts.mockReturnValue(
+        of(
+          makeList({
+            items: [makePost({ post_type: PostType.MEETING, title: 'מפגש תמיכה', meeting })],
+          }),
+        ),
+      );
+      component.ngOnInit();
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('draws the way in next to the title', () => {
+      const card = showAnnouncement();
+
+      expect(card.textContent).toContain('מפגש תמיכה');
+      expect(
+        card.querySelector<HTMLAnchorElement>('a.meeting-announcement__join')?.getAttribute('href'),
+      ).toBe('https://meet.google.com/abc-defg-hij');
+    });
+
+    it('disables the way in once the meeting is over, and keeps the announcement', () => {
+      const card = showAnnouncement({
+        ...MEETING,
+        scheduled_at: new Date(Date.now() - 90 * 60_000).toISOString(),
+      });
+
+      expect(card.querySelector('a.meeting-announcement__join')).toBeNull();
+      expect(
+        card.querySelector<HTMLButtonElement>('button.meeting-announcement__join')?.disabled,
+      ).toBe(true);
+      expect(card.textContent).toContain('מפגש תמיכה');
+    });
+
+    it('leaves an ordinary post without one', () => {
+      expect(fixture.nativeElement.querySelector('.meeting-announcement')).toBeNull();
     });
   });
 });

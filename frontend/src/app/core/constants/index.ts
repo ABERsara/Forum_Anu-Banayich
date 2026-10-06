@@ -169,6 +169,28 @@ export const POST_STATUS_LABELS: Record<PostStatus, LabelKey> = {
 };
 
 // ---------------------------------------------------------------------------
+// Forum post type
+// ---------------------------------------------------------------------------
+
+/**
+ * What kind of content a forum post carries.
+ *
+ * TEXT is every post a member wrote, and what every post that predates the
+ * meetings feature was backfilled to. MEETING is the announcement a
+ * professional's scheduled Google Meet published: the system wrote it, and
+ * its real payload — when the meeting starts and where to join — travels in
+ * `ForumPost.meeting` rather than in the body.
+ *
+ * No label map, unlike the enums above: the type is never a word on the
+ * screen. It decides which card the forum draws, and `index.spec.ts` would
+ * fail on a `constants.post_type.*` translation no map points at.
+ */
+export enum PostType {
+  TEXT = 'text',
+  MEETING = 'meeting',
+}
+
+// ---------------------------------------------------------------------------
 // Professional domains
 // ---------------------------------------------------------------------------
 

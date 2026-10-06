@@ -131,8 +131,8 @@ class User(Base):
     #:
     #: A stored flag rather than a `user_restrictions` row, unlike everything
     #: else ABF-116 writes, because this measure has no end date — nothing
-    #: expires it and nothing lifts it yet (the admin control is backlog B1).
-    #: `active_restriction()` answers "in force right now" by comparing
+    #: expires it on its own. The admin control that lifts it by hand is
+    #: ABF-162. `active_restriction()` answers "in force right now" by comparing
     #: `expires_at`, and a row that must never lapse has no honest value to
     #: put there.
     #:

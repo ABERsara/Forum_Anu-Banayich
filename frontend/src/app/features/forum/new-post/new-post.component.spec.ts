@@ -9,6 +9,7 @@ import {
   AccountStatus,
   GroupVisibility,
   PostStatus,
+  PostType,
   Sector,
   SectorVisibility,
   UserRole,
@@ -49,6 +50,8 @@ const CREATED_POST: ForumPost = {
   like_count: 0,
   liked_by_me: false,
   created_at: '2026-07-16T10:00:00',
+  post_type: PostType.TEXT,
+  meeting: null,
   updated_at: '2026-07-16T10:00:00',
 };
 

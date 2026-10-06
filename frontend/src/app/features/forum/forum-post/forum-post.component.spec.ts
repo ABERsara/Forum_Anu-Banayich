@@ -9,6 +9,7 @@ import {
   AccountStatus,
   GroupVisibility,
   PostStatus,
+  PostType,
   Sector,
   SectorVisibility,
   UserRole,
@@ -33,6 +34,8 @@ function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
     like_count: 0,
     liked_by_me: false,
     created_at: '2026-07-01T10:00:00',
+    post_type: PostType.TEXT,
+    meeting: null,
     updated_at: '2026-07-01T10:00:00',
     ...overrides,
   };
@@ -394,6 +397,76 @@ describe('ForumPostComponent', () => {
       setup(makeUser());
 
       expect(fixture.nativeElement.querySelector('.forum-post').hasAttribute('dir')).toBe(false);
+    });
+  });
+
+  /**
+   * A meeting announcement: published by the system, read-only.
+   *
+   * The server refuses a like and an edit on one, so the screen draws neither
+   * — these assertions are about not promising an action that would come back
+   * a 403. What it does keep is the moderation path (deleting the
+   * announcement is how a meeting stops being listed) and reporting.
+   */
+  describe('a meeting announcement', () => {
+    const MEETING = {
+      id: 'meeting-1',
+      scheduled_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+      duration_minutes: 60,
+      meet_link: 'https://meet.google.com/abc-defg-hij',
+    };
+
+    function announcement(overrides: Partial<ForumPost> = {}): ForumPost {
+      return makePost({
+        post_type: PostType.MEETING,
+        title: 'מפגש תמיכה',
+        // The server writes the title into the body as well; the card renders
+        // the structured fields instead, so it must not show up twice.
+        content: 'מפגש תמיכה',
+        meeting: MEETING,
+        ...overrides,
+      });
+    }
+
+    it('shows when it starts and the way in, in place of the body text', () => {
+      setup(makeUser(), false, false, announcement());
+
+      expect(
+        fixture.nativeElement.querySelector('a.meeting-announcement__join')?.getAttribute('href'),
+      ).toBe('https://meet.google.com/abc-defg-hij');
+      expect(fixture.nativeElement.querySelector('.forum-post__content')).toBeNull();
+    });
+
+    it('takes no like', () => {
+      setup(makeUser(), false, false, announcement());
+
+      expect(component.isMeeting()).toBe(true);
+      expect(fixture.nativeElement.querySelector('.forum-post__like-btn')).toBeNull();
+    });
+
+    it('cannot be edited, not even by the professional who scheduled it', () => {
+      // The author of the announcement is the professional herself.
+      setup(makeUser({ id: 'author-1' }), false, false, announcement());
+
+      expect(component.canEdit()).toBe(false);
+      expect(fixture.nativeElement.querySelector('.forum-post__btn--edit')).toBeNull();
+    });
+
+    it('can still be deleted and reported — that is how moderation unlists a meeting', () => {
+      setup(makeUser({ id: 'author-1' }), false, false, announcement());
+
+      expect(component.canDelete()).toBe(true);
+      expect(fixture.nativeElement.querySelector('.forum-post__btn--delete')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('app-report-button')).toBeTruthy();
+    });
+
+    it('leaves an ordinary post with its like button and its body', () => {
+      setup(makeUser());
+
+      expect(component.isMeeting()).toBe(false);
+      expect(fixture.nativeElement.querySelector('.forum-post__like-btn')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('.forum-post__content')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('.meeting-announcement')).toBeNull();
     });
   });
 });

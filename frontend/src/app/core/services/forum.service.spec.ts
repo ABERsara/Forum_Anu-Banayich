@@ -4,7 +4,13 @@ import { TestBed } from '@angular/core/testing';
 
 import { ForumService, buildConversationKey } from './forum.service';
 import { environment } from '../../../environments/environment';
-import { GroupVisibility, PostStatus, RestrictionType, SectorVisibility } from '../constants';
+import {
+  GroupVisibility,
+  PostStatus,
+  PostType,
+  RestrictionType,
+  SectorVisibility,
+} from '../constants';
 import type {
   ConversationMessagesPage,
   DirectMessage,
@@ -29,6 +35,8 @@ const MOCK_POST: ForumPost = {
   like_count: 0,
   liked_by_me: false,
   created_at: '2026-07-14T00:00:00',
+  post_type: PostType.TEXT,
+  meeting: null,
   updated_at: '2026-07-14T00:00:00',
 };
 

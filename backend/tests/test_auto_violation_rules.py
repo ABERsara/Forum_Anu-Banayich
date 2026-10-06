@@ -69,7 +69,12 @@ from app.models.report import Report
 from app.models.restriction import UserRestriction
 from app.models.user import User
 from app.schemas.report import ReportDecideRequest
-from app.services import email_service, report_service, restriction_service
+from app.services import (
+    email_service,
+    report_service,
+    restriction_service,
+    user_service,
+)
 
 FORUM_BASE = "/api/v1/forum"
 
@@ -1139,6 +1144,23 @@ class TestRestrictedReporterIsRefused:
         post = _make_post(db_session, offender)
 
         response = await self._report(client, post.id)
+
+        assert response.status_code == 201
+
+    async def test_a_lift_restores_the_ability_to_file(
+        self, client, db_session, as_user, offender, admin
+    ):
+        """
+        ABF-162: the ticket's own proof of work, end to end — an admin's lift
+        is what ends the refusal, not the passage of time (this module's
+        flag has no expiry of its own; see its docstring on `User`).
+        """
+        restricted = self._restricted(db_session)
+        user_service.lift_report_restriction(db_session, restricted.id, admin)
+        db_session.refresh(restricted)
+        as_user(restricted)
+
+        response = await self._report(client, _make_post(db_session, offender).id)
 
         assert response.status_code == 201
 

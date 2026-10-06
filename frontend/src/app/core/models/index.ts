@@ -23,6 +23,7 @@ import {
   Sector,
   SectorVisibility,
   PostStatus,
+  PostType,
   UserRole,
   UserType,
 } from '../constants';
@@ -76,6 +77,7 @@ export interface UserAdminView extends Omit<UserProfile, 'alert_email'> {
   second_approver_id: string | null;
   approved_at: string | null;
   rejection_reason: string | null;
+  is_report_restricted: boolean;
 }
 
 /**
@@ -321,6 +323,18 @@ export interface ForumPost {
   liked_by_me: boolean;
   created_at: string;
   updated_at: string;
+  /**
+   * TEXT for a post a member wrote, MEETING for an announcement a scheduled
+   * Google Meet published. A MEETING post is read-only: the server refuses
+   * a like and an edit on one, so neither control is rendered.
+   */
+  post_type: PostType;
+  /**
+   * Populated exactly when `post_type` is MEETING, null otherwise, and the
+   * field the forum screens test: drawing the announcement card needs the
+   * object itself.
+   */
+  meeting: MeetingSummary | null;
 }
 
 export interface ForumPostList {
@@ -328,6 +342,97 @@ export interface ForumPostList {
   total: number;
   page: number;
   page_size: number;
+}
+
+// ---------------------------------------------------------------------------
+// Meetings (backend/app/schemas/meeting.py)
+// ---------------------------------------------------------------------------
+
+/**
+ * ⚠️  The timestamps in this section are the one exception to the "naive UTC"
+ *     note the rest of this file carries: `backend/app/schemas/meeting.py`
+ *     sends them with their zone stated (`...Z`), on purpose — the join
+ *     button decides whether a meeting is over from `scheduled_at`, and a
+ *     zone left for the client to guess is a button that switches off three
+ *     hours early in Israel. So they are read with `new Date(...)` directly;
+ *     `utcIso()` is not needed, and passes a zoned value through unchanged
+ *     anyway.
+ */
+
+/**
+ * The meeting as it travels on a forum announcement (`ForumPost.meeting`).
+ *
+ * Everything the announcement card needs in order to draw itself, and nothing
+ * about who scheduled it — the post already carries that as its author.
+ */
+export interface MeetingSummary {
+  id: string;
+  /** ISO datetime, zoned. When the meeting starts. */
+  scheduled_at: string;
+  /** How long it runs. `scheduled_at + duration_minutes` is when it is over. */
+  duration_minutes: number;
+  meet_link: string;
+}
+
+/** POST /meetings — a professional schedules a meeting for one cell. */
+export interface MeetingCreate {
+  title: string;
+  /**
+   * Zoned ISO, i.e. `new Date(...).toISOString()`. A naive value is refused
+   * with a 422 rather than assumed to be UTC: a `datetime-local` input holds
+   * the viewer's local wall-clock time, and reading that as UTC would book
+   * the meeting three hours late in Israel, silently.
+   */
+  scheduled_at: string;
+  /**
+   * One cell: a concrete group and a concrete sector. `ALL` on either axis is
+   * refused (422) — a meeting is a support session for one group of people who
+   * share a situation, not a broadcast.
+   */
+  group_visibility: GroupVisibility;
+  sector_visibility: SectorVisibility;
+}
+
+/** One meeting, as the meetings endpoints return it. */
+export interface Meeting {
+  id: string;
+  title: string;
+  /** ISO datetimes, zoned — see this section's note. */
+  scheduled_at: string;
+  duration_minutes: number;
+  meet_link: string;
+  group_visibility: GroupVisibility;
+  sector_visibility: SectorVisibility;
+  creator: UserPublic;
+  created_at: string;
+}
+
+/**
+ * GET /meetings/calendar/status — may this professional schedule yet?
+ *
+ * `authorization_url` travels with the answer rather than being a second
+ * request: the scheduling form has to know both whether consent is needed and
+ * where to send her for it, and both are answers to the same question. It is
+ * always present, because a professional may also need to re-link a calendar
+ * whose access she revoked at Google or whose grant expired.
+ */
+export interface CalendarStatus {
+  connected: boolean;
+  /** ISO datetime, zoned. Null until she has linked a calendar. */
+  connected_at: string | null;
+  authorization_url: string;
+}
+
+/**
+ * POST /meetings/calendar/connect — what Google handed the return page.
+ *
+ * Both values are copied from the query string Google returned the browser
+ * with. Neither is trusted: the server verifies the state against the
+ * logged-in caller, and the code means nothing until Google accepts it.
+ */
+export interface CalendarConnectRequest {
+  code: string;
+  state: string;
 }
 
 // ---------------------------------------------------------------------------

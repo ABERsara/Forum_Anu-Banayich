@@ -109,11 +109,27 @@ describe('PendingQuestionsComponent', () => {
     mockService();
     await setup();
 
-    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
-      '.pending-questions__knowledge-link',
+    const links = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+      '.pending-questions__header-link',
     );
-    expect(link?.getAttribute('href')).toBe('/professional/knowledge');
+    // Found by destination rather than by position: the header grew a second
+    // link, and an index here would silently start asserting about whichever
+    // one happens to come first.
+    const link = [...links].find((a) => a.getAttribute('href') === '/professional/knowledge');
+    expect(link).toBeTruthy();
     expect(link?.textContent?.trim()).toBe('ניהול בסיס הידע של הסוכן');
+  });
+
+  it('links to the scheduling screen', async () => {
+    mockService();
+    await setup();
+
+    const links = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+      '.pending-questions__header-link',
+    );
+    const link = [...links].find((a) => a.getAttribute('href') === '/meetings/new');
+    expect(link).toBeTruthy();
+    expect(link?.textContent?.trim()).toBe('תזמון פגישה לתא');
   });
 
   it('identifies the asker by alias, not by name', async () => {
