@@ -909,7 +909,8 @@
       "user_restricted": "Automatic restriction applied",
       "agent_conversation": "AI agent conversation",
       "agent_conversation_access_denied": "Agent conversation access denied",
-      "meeting_created": "Meeting scheduled"
+      "meeting_created": "Meeting scheduled",
+      "profile_updated": "Profile updated"
     }
   }
 }
