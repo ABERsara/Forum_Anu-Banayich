@@ -9,7 +9,7 @@ event for anyone who asked.
 
 Plain httpx against the REST API rather than google-api-python-client: the
 project already talks to a Google API this way (rag_service.py), the surface
-used here is the token endpoint plus insert, patch and delete on one events
+used here is the token endpoint plus insert, get, patch and delete on one events
 resource, and the client library would pull in a dependency tree — and its
 own credential/refresh machinery — for no gain.
 
@@ -552,6 +552,36 @@ def cancel_event(db: Session, creator: User, event_id: str) -> None:
             logger.info("Calendar event %s was already gone", event_id)
             return
         response.raise_for_status()
+
+
+def event_is_gone(db: Session, creator: User, event_id: str) -> bool:
+    """Whether an event is no longer in her calendar (ABF-163).
+
+    Read-only: asked by meeting_service.cancel_meeting() about a meeting
+    that is already over but was never marked cancelled, to tell the meeting
+    that took place (its event is still there) from the cancellation whose
+    database write failed after the event was deleted (it is not).
+
+    Gone is either answer Google gives for a deleted event: 404/410, or the
+    event itself with status "cancelled" — the Events API keeps returning a
+    deleted event from a get for a while, marked that way, rather than
+    refusing it. A refusal or a timeout is reported, never read as "gone":
+    guessing wrong would mark a meeting that happened as called off.
+    """
+    access_token = _access_token(db, creator)
+
+    with _calendar_errors("event lookup"):
+        response = httpx.get(
+            _event_url(event_id),
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=settings.GOOGLE_CALENDAR_TIMEOUT_SECONDS,
+        )
+        if response.status_code in _EVENT_GONE:
+            return True
+        response.raise_for_status()
+        body: dict[str, Any] = response.json()
+
+    return body.get("status") == "cancelled"
 
 
 def delete_event(db: Session, creator: User, event_id: str) -> None:

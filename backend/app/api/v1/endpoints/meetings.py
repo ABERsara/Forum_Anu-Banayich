@@ -174,6 +174,8 @@ def cancel_meeting(
     cancelled. The announcement stays in the forum, reading "cancelled" with
     no join button, and the meeting drops out of GET /meetings. Nothing is
     hard-deleted. Idempotent: cancelling it again is a 204 that does nothing.
-    The same 403/404 as PATCH, and 409 for a meeting that is already over.
+    The same 403/404 as PATCH, and 409 for a meeting that is already over —
+    unless an earlier cancellation already deleted its event and failed to
+    record it, which this one finishes (see meeting_service.cancel_meeting).
     """
     meeting_service.cancel_meeting(db, meeting_id, current_user)

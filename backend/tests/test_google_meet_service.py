@@ -693,3 +693,76 @@ class TestCancellingTheEvent:
 
         assert exc_info.value.status_code == 403
         assert db_session.query(GoogleCalendarCredential).count() == 0
+
+
+class TestLookingUpTheEvent:
+    """
+    event_is_gone() decides whether an unmarked meeting past its end took
+    place or was cancelled by an attempt whose write failed — see
+    meeting_service.cancel_meeting(). Wrong in one direction it marks a
+    meeting that happened as called off, so only Google's own word for
+    "deleted" counts.
+    """
+
+    def test_an_event_still_there_is_not_gone(
+        self, configured, db_session, professional, monkeypatch
+    ):
+        _connect(db_session, professional)
+        calls: list[dict[str, Any]] = []
+        _token_then(
+            monkeypatch,
+            "get",
+            _FakeResponse({"id": "evt-1", "status": "confirmed"}),
+            calls,
+        )
+
+        assert not google_meet_service.event_is_gone(db_session, professional, "evt-1")
+        (call,) = calls
+        assert call["url"] == EVENT_URL
+        assert call["headers"]["Authorization"] == f"Bearer {ACCESS_TOKEN}"
+
+    @pytest.mark.parametrize("status_code", [404, 410])
+    def test_an_event_google_no_longer_has_is_gone(
+        self, configured, db_session, professional, monkeypatch, status_code
+    ):
+        _connect(db_session, professional)
+        _token_then(monkeypatch, "get", _FakeResponse({}, status_code), [])
+
+        assert google_meet_service.event_is_gone(db_session, professional, "evt-1")
+
+    def test_a_deleted_event_google_still_returns_is_gone(
+        self, configured, db_session, professional, monkeypatch
+    ):
+        """A get on a deleted event can still answer 200, with the event
+        marked "cancelled" — deleted, as far as anyone attending goes."""
+        _connect(db_session, professional)
+        _token_then(
+            monkeypatch,
+            "get",
+            _FakeResponse({"id": "evt-1", "status": "cancelled"}),
+            [],
+        )
+
+        assert google_meet_service.event_is_gone(db_session, professional, "evt-1")
+
+    def test_a_refusal_is_reported_not_read_as_gone(
+        self, configured, db_session, professional, monkeypatch
+    ):
+        _connect(db_session, professional)
+        _token_then(monkeypatch, "get", _FakeResponse({}, 500), [])
+
+        with pytest.raises(HTTPException) as exc_info:
+            google_meet_service.event_is_gone(db_session, professional, "evt-1")
+
+        assert exc_info.value.status_code == 502
+
+    def test_a_timeout_is_reported_as_one(
+        self, configured, db_session, professional, monkeypatch
+    ):
+        _connect(db_session, professional)
+        _token_then(monkeypatch, "get", httpx.TimeoutException("too slow"), [])
+
+        with pytest.raises(HTTPException) as exc_info:
+            google_meet_service.event_is_gone(db_session, professional, "evt-1")
+
+        assert exc_info.value.status_code == 504

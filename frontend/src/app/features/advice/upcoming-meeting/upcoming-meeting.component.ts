@@ -2,8 +2,6 @@ import { DatePipe } from '@angular/common';
 import {
   Component,
   ElementRef,
-  Injector,
-  afterNextRender,
   computed,
   inject,
   input,
@@ -19,6 +17,7 @@ import { Meeting, MeetingUpdate } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { MeetingService } from '../../../core/services/meeting.service';
 import { AdviceError, NO_ERROR, adviceErrorFrom } from '../advice-error';
+import { focusAfterRender } from '../focus-after-render';
 import {
   TITLE_MAX_LENGTH,
   TITLE_MIN_LENGTH,
@@ -69,7 +68,7 @@ export class UpcomingMeetingComponent {
   private readonly fb = inject(FormBuilder);
   private readonly meetings = inject(MeetingService);
   private readonly authService = inject(AuthService);
-  private readonly injector = inject(Injector);
+  private readonly focusAfterRender = focusAfterRender();
 
   readonly meeting = input.required<Meeting>();
 
@@ -133,11 +132,8 @@ export class UpcomingMeetingComponent {
     ]);
     this.form.reset({ title: meeting.title, scheduled_at: this.originalWhen });
     this.isEditing.set(true);
-    // The button she pressed is gone once the form replaces it. Without
-    // moving focus, a keyboard or screen-reader user is left on nothing.
-    afterNextRender(() => this.titleInput()?.nativeElement.focus(), {
-      injector: this.injector,
-    });
+    // The button she pressed is gone once the form replaces it.
+    this.focusAfterRender(this.titleInput);
   }
 
   stopEditing(): void {

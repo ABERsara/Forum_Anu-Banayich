@@ -160,6 +160,15 @@ describe('UpcomingMeetingComponent', () => {
       expect(editButton()).toBeNull();
     });
 
+    /** The button she pressed is gone, so focus must not be left on nothing. */
+    it('moves focus into the title field', async () => {
+      setup();
+      openEditor();
+      await fixture.whenStable();
+
+      expect(document.activeElement).toBe(element().querySelector('input#edit-title-meeting-1'));
+    });
+
     it('sends only a changed title', () => {
       setup();
       openEditor();

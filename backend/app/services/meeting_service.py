@@ -435,8 +435,17 @@ def cancel_meeting(db: Session, meeting_id: str, professional: User) -> None:
 
     Idempotent: cancelling a cancelled meeting does nothing and succeeds, like
     forum_service.delete_post() on a deleted post — a second press, or the
-    retry above racing a first that did land, is not an error. A meeting that
-    is already over cannot be cancelled: it took place.
+    retry above racing a first that did land, is not an error.
+
+    A meeting that is already over cannot be cancelled: it took place, and
+    "cancelled" would rewrite what the cell saw. That 409 is decided by
+    Google, not by the clock alone, because an unmarked meeting past its end
+    is also what the failed write above leaves behind when the retry comes
+    late. Its event tells the two apart — still in her calendar, the meeting
+    happened; gone, an earlier cancellation already deleted it, and this one
+    only has to record that. Without the lookup that retry would be refused
+    for good, and the cell would be left with an announcement that never
+    says the meeting was called off.
 
     Unlike update_meeting(), a deactivated professional may still cancel. A
     meeting she can no longer run is exactly the one that should be called
@@ -446,10 +455,14 @@ def cancel_meeting(db: Session, meeting_id: str, professional: User) -> None:
 
     if announcement.cancelled_at is not None:
         return
-    if _ends_at(meeting) <= _utcnow():
+    if _ends_at(meeting) > _utcnow():
+        google_meet_service.cancel_event(db, professional, meeting.calendar_event_id)
+    elif not google_meet_service.event_is_gone(
+        db, professional, meeting.calendar_event_id
+    ):
+        # Over, and its event untouched: it took place. Only looked up, never
+        # deleted — a past meeting stays in her calendar as the record of it.
         raise HTTPException(status_code=409, detail=translate("meetings.already_ended"))
-
-    google_meet_service.cancel_event(db, professional, meeting.calendar_event_id)
 
     try:
         announcement.cancelled_at = _utcnow()

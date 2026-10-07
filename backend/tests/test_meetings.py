@@ -2,8 +2,9 @@
 Integration tests for the meetings surface (ABF-156), including editing and
 cancelling a meeting (ABF-163).
 
-Google is never called: google_meet_service.create_meeting(), update_event()
-and cancel_event() are replaced wherever a call is expected to succeed, and
+Google is never called: google_meet_service.create_meeting(), update_event(),
+cancel_event() and event_is_gone() are replaced wherever a call is expected to
+succeed, and
 the one test that does exercise
 the real path is the one asserting what happens when no calendar is linked —
 which fails before any HTTP call. test_google_meet_service.py covers that
@@ -714,6 +715,19 @@ def google_cancels(monkeypatch):
     return calls
 
 
+def _google_looks_up(monkeypatch, *, gone: bool) -> list[str]:
+    """Stand in for Google's event lookup, answering whether the event is
+    gone, and record which events were looked up."""
+    calls: list[str] = []
+
+    def _event_is_gone(db, creator, event_id):
+        calls.append(event_id)
+        return gone
+
+    monkeypatch.setattr(google_meet_service, "event_is_gone", _event_is_gone)
+    return calls
+
+
 def _google_refuses(monkeypatch, name: str) -> None:
     """Make one Google call fail the way google_meet_service reports it."""
     from fastapi import HTTPException
@@ -1133,16 +1147,55 @@ class TestCancelMeeting:
         assert db_session.query(AuditLog).count() == 1
 
     async def test_a_meeting_that_is_over_cannot_be_cancelled(
-        self, client, db_session, make_user, google_cancels
+        self, client, db_session, make_user, google_cancels, monkeypatch
     ):
         professional = _professional(make_user)
         meeting = _make_meeting(db_session, professional, starts_in=-timedelta(hours=2))
+        lookups = _google_looks_up(monkeypatch, gone=False)
         _login_as(professional)
 
         r = await client.delete(f"{BASE}/{meeting.id}")
 
         assert r.status_code == 409
+        # Its event is still in her calendar, so it took place. Looked up,
+        # never deleted: a past meeting stays there as the record of it.
+        assert lookups == [EVENT_ID]
         assert google_cancels == []
+        assert _announcement_of(db_session, meeting).cancelled_at is None
+        assert db_session.query(AuditLog).count() == 0
+
+    async def test_a_meeting_still_ahead_is_not_looked_up_first(
+        self, client, db_session, make_user, google_cancels, monkeypatch
+    ):
+        """The lookup is for a meeting already over, and nothing else: a
+        cancellation ahead of time costs Google one call, the deletion."""
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        lookups = _google_looks_up(monkeypatch, gone=True)
+        _login_as(professional)
+
+        r = await client.delete(f"{BASE}/{meeting.id}")
+
+        assert r.status_code == 204
+        assert lookups == []
+        assert google_cancels == [EVENT_ID]
+
+    async def test_when_the_lookup_fails_a_meeting_that_is_over_stays_as_it_was(
+        self, client, db_session, make_user, google_cancels, monkeypatch
+    ):
+        """An unanswered lookup is not read as "gone": that guess would mark
+        a meeting that took place as called off."""
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional, starts_in=-timedelta(hours=2))
+        _google_refuses(monkeypatch, "event_is_gone")
+        _login_as(professional)
+
+        r = await client.delete(f"{BASE}/{meeting.id}")
+
+        assert r.status_code == 502
+        assert google_cancels == []
+        assert _announcement_of(db_session, meeting).cancelled_at is None
+        assert db_session.query(AuditLog).count() == 0
 
     async def test_a_deactivated_professional_can_still_call_it_off(
         self, client, db_session, make_user, google_cancels
@@ -1200,6 +1253,42 @@ class TestCancelMeeting:
         assert google_cancels == [EVENT_ID, EVENT_ID]
         post = db_session.query(ForumPost).filter_by(meeting_id=meeting_id).one()
         assert post.cancelled_at is not None
+
+    def test_a_retry_after_the_meeting_ended_still_finishes_it(
+        self, db_session, make_user, google_cancels, monkeypatch
+    ):
+        """
+        The same failed write, retried only once the meeting is over. Its
+        event is gone — the first attempt deleted it — so this is the
+        unfinished cancellation, not a meeting that took place, and the
+        retry records it instead of answering "already ended" for good.
+        """
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        meeting_id = meeting.id
+        real_commit = db_session.commit
+
+        def _explode():
+            raise RuntimeError("database is gone")
+
+        monkeypatch.setattr(db_session, "commit", _explode)
+        with pytest.raises(Exception) as exc_info:
+            meeting_service.cancel_meeting(db_session, meeting_id, professional)
+        assert getattr(exc_info.value, "status_code", None) == 500
+
+        monkeypatch.setattr(db_session, "commit", real_commit)
+        later = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=2)
+        monkeypatch.setattr(meeting_service, "_utcnow", lambda: later)
+        lookups = _google_looks_up(monkeypatch, gone=True)
+        meeting_service.cancel_meeting(db_session, meeting_id, professional)
+
+        # Deleted once, by the first attempt; the retry only asked.
+        assert google_cancels == [EVENT_ID]
+        assert lookups == [EVENT_ID]
+        post = db_session.query(ForumPost).filter_by(meeting_id=meeting_id).one()
+        assert post.cancelled_at == later
+        entry = db_session.query(AuditLog).one()
+        assert entry.action == AuditAction.MEETING_CANCELLED
 
 
 class TestCancellationOutlivesModeration:
