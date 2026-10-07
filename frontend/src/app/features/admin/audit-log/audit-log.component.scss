@@ -1,0 +1,198 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+.audit-log {
+  padding: $spacing-md;
+
+  &__hint {
+    max-width: 70ch;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Filters
+  // ---------------------------------------------------------------------------
+
+  &__filters {
+    margin-block: $spacing-lg;
+
+    fieldset {
+      padding: $spacing-md;
+      border: 1px solid $color-border;
+      border-radius: $radius-md;
+      background: $color-bg-subtle;
+    }
+
+    legend {
+      padding-inline: $spacing-sm;
+      font-weight: $font-weight-medium;
+    }
+  }
+
+  &__filter-grid {
+    display: grid;
+    gap: $spacing-md;
+    grid-template-columns: 1fr;
+
+    @include responsive(md) {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    font-size: $font-size-sm;
+
+    input,
+    select {
+      padding: $spacing-sm;
+      border: 1px solid $color-border;
+      border-radius: $radius-sm;
+      background: $color-bg;
+      color: $color-text;
+      font-size: $font-size-base;
+      font-family: inherit;
+
+      &:focus-visible {
+        @include focus-ring;
+      }
+    }
+  }
+
+  &__filter-actions {
+    display: flex;
+    gap: $spacing-sm;
+    margin-top: $spacing-md;
+  }
+
+  // ---------------------------------------------------------------------------
+  // The table
+  // ---------------------------------------------------------------------------
+
+  &__count {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  &__empty {
+    padding: $spacing-lg;
+    border: 1px dashed $color-border;
+    border-radius: $radius-md;
+    color: $color-text-muted;
+    text-align: center;
+  }
+
+  // Four columns of ids and timestamps do not fold gracefully, and a table
+  // that reflows onto two lines per cell is harder to scan than one the
+  // reader slides sideways. The scroll is on a wrapper rather than on the
+  // table so the table keeps its own layout.
+  &__table-scroll {
+    overflow-x: auto;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: $font-size-sm;
+
+    th,
+    td {
+      padding: $spacing-sm $spacing-md;
+      border-bottom: 1px solid $color-border;
+      // RTL-safe: the logical start edge, whichever way the page runs.
+      text-align: start;
+      white-space: nowrap;
+    }
+
+    thead th {
+      background: $color-bg-subtle;
+      font-weight: $font-weight-medium;
+    }
+
+    tbody tr:hover {
+      background: $color-bg-subtle;
+    }
+  }
+
+  // The caption names the table for a screen reader; sighted readers already
+  // have the <h1> above it, so repeating it on screen is noise.
+  &__caption {
+    @include visually-hidden;
+  }
+
+  // Ids are long, opaque and not read as words — a smaller, monospaced cell
+  // makes them comparable at a glance, which is what an audit trail is for.
+  &__id {
+    color: $color-text-muted;
+    font-family: ui-monospace, monospace;
+    font-size: $font-size-xs;
+  }
+
+  &__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-xs;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Buttons and pager
+// ---------------------------------------------------------------------------
+
+.btn {
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: $color-bg;
+  color: $color-text;
+  font-size: $font-size-base;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover:not(:disabled) {
+    background: $color-bg-subtle;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    border-color: $color-primary;
+    background: $color-primary;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background: $color-primary-dark;
+    }
+  }
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+  color: $color-text-muted;
+  font-size: $font-size-sm;
+}

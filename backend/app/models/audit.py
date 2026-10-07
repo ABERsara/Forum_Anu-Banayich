@@ -6,6 +6,14 @@ Logs are append-only (never update or delete).
 Retention: 7 years (Israeli legal requirement).
 
 Only ADMIN role can read audit logs.
+
+Every column GET /admin/audit-log filters or sorts on is indexed (ABF-152):
+actor_id, action, entity_type, entity_id and timestamp. The table only ever
+grows, and without these a filtered page is a full scan of seven years of
+logs before LIMIT gets to apply. Declared here as well as in migration
+a80e87afe0fa: the model is what Base.metadata.create_all() builds, so an
+index that lives only in the migration does not exist for anything created
+that way.
 """
 
 import uuid
@@ -28,14 +36,16 @@ class AuditLog(Base):
 
     # The admin/moderator who performed the action
     actor_id: Mapped[str] = mapped_column(
-        String(36), nullable=False
+        String(36), nullable=False, index=True
     )  # no FK – logs outlive users
 
-    action: Mapped[AuditAction] = mapped_column(Enum(AuditAction), nullable=False)
+    action: Mapped[AuditAction] = mapped_column(
+        Enum(AuditAction), nullable=False, index=True
+    )
 
     # The entity that was affected (e.g. "User", "ForumPost")
-    entity_type: Mapped[str] = mapped_column(String(64), nullable=False)
-    entity_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    entity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
 
     # Extra context stored as JSON (e.g. {"reason": "...", "new_status": "..."})
     details: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
@@ -44,7 +54,7 @@ class AuditLog(Base):
     ip_address: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
+        DateTime, nullable=False, server_default=func.now(), index=True
     )
 
     # ------------------------------------------------------------------

@@ -1,0 +1,196 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="audit-log">
+  <a routerLink="/admin"
+    ><span aria-hidden="true">‹</span> {{ 'admin.back_to_dashboard' | transloco }}</a
+  >
+  <h1>{{ 'admin.audit_log.title' | transloco }}</h1>
+  <p class="audit-log__hint">{{ 'admin.audit_log.hint' | transloco }}</p>
+
+  <!-- A form, so that Enter in any of the boxes applies the filters — an
+       admin typing an entity id and pressing Enter should not have to find
+       the button. submit is the only thing that fetches; the inputs record
+       keystrokes and nothing more. -->
+  <form class="audit-log__filters" (submit)="$event.preventDefault(); applyFilters()">
+    <fieldset>
+      <legend>{{ 'admin.audit_log.filters_legend' | transloco }}</legend>
+
+      <div class="audit-log__filter-grid">
+        <label class="audit-log__field">
+          <span>{{ 'admin.audit_log.filter_actor_label' | transloco }}</span>
+          <input
+            type="text"
+            name="actor_id"
+            [value]="draft().actorId"
+            (input)="updateDraft('actorId', valueOf($event))"
+          />
+        </label>
+
+        <label class="audit-log__field">
+          <span>{{ 'admin.audit_log.filter_action_label' | transloco }}</span>
+          <select
+            name="action_type"
+            [value]="draft().actionType"
+            (change)="updateDraft('actionType', valueOf($event))"
+          >
+            <!-- The empty value is "no filter", not an action called nothing;
+                 the service drops an empty string rather than sending it. -->
+            <option value="">{{ 'admin.audit_log.filter_action_any' | transloco }}</option>
+            @for (action of actionTypes; track action) {
+              <option [value]="action">{{ actionLabels[action] | transloco }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="audit-log__field">
+          <span>{{ 'admin.audit_log.filter_entity_type_label' | transloco }}</span>
+          <!-- Free text, not a dropdown: `entity_type` is a plain string on
+               the server ("User", "ForumPost", …) with no enum behind it, so
+               there is no closed list to offer. -->
+          <input
+            type="text"
+            name="entity_type"
+            [value]="draft().entityType"
+            (input)="updateDraft('entityType', valueOf($event))"
+          />
+        </label>
+
+        <label class="audit-log__field">
+          <span>{{ 'admin.audit_log.filter_entity_id_label' | transloco }}</span>
+          <input
+            type="text"
+            name="entity_id"
+            [value]="draft().entityId"
+            (input)="updateDraft('entityId', valueOf($event))"
+          />
+        </label>
+
+        <label class="audit-log__field">
+          <span>{{ 'admin.audit_log.filter_date_from_label' | transloco }}</span>
+          <!-- type="date" hands over YYYY-MM-DD, which is exactly what the
+               API's `date` parameters take. Both ends are inclusive days. -->
+          <input
+            type="date"
+            name="date_from"
+            [value]="draft().dateFrom"
+            (input)="updateDraft('dateFrom', valueOf($event))"
+          />
+        </label>
+
+        <label class="audit-log__field">
+          <span>{{ 'admin.audit_log.filter_date_to_label' | transloco }}</span>
+          <input
+            type="date"
+            name="date_to"
+            [value]="draft().dateTo"
+            (input)="updateDraft('dateTo', valueOf($event))"
+          />
+        </label>
+      </div>
+
+      <div class="audit-log__filter-actions">
+        <button type="submit" class="btn btn--primary">
+          {{ 'admin.audit_log.filter_apply' | transloco }}
+        </button>
+        <button type="button" class="btn" (click)="clearFilters()">
+          {{ 'admin.audit_log.filter_reset' | transloco }}
+        </button>
+      </div>
+    </fieldset>
+  </form>
+
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch (ABF-129). -->
+  @if (loadError().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (loadError().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
+
+  <!-- Nothing at all under a failed load: the error above is the whole
+       answer, and an empty table beside it would read as "the log is empty",
+       which is a different and wrong claim. -->
+  @if (isLoading()) {
+    <app-loading-spinner />
+  } @else if (hasLoadError()) {
+    <!-- handled above -->
+  } @else if (entries().length === 0) {
+    <p class="audit-log__empty">
+      {{ (isFiltered() ? 'admin.audit_log.empty_filtered' : 'admin.audit_log.empty') | transloco }}
+    </p>
+  } @else {
+    <!-- The tally sits inside the sentence, so it goes in as a parameter
+         rather than as a node of its own. aria-live, because it changes
+         under a reader who never left the page (ABF-114). -->
+    <p class="audit-log__count" aria-live="polite">
+      {{ 'admin.audit_log.results_count' | transloco: { count: totalCount() } }}
+    </p>
+
+    <div class="audit-log__table-scroll">
+      <table class="audit-log__table">
+        <caption class="audit-log__caption">
+          {{
+            'admin.audit_log.table_caption' | transloco
+          }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">{{ 'admin.audit_log.column_actor' | transloco }}</th>
+            <th scope="col">{{ 'admin.audit_log.column_action' | transloco }}</th>
+            <th scope="col" [attr.aria-sort]="sortState()">
+              <!-- A button inside the th, not a click handler on the th: a
+                   header cell is not focusable and not announced as
+                   operable, so a keyboard reader would have no way to sort. -->
+              <button
+                type="button"
+                class="audit-log__sort"
+                [attr.aria-label]="sortActionKey() | transloco"
+                (click)="toggleSort()"
+              >
+                {{ 'admin.audit_log.column_timestamp' | transloco }}
+                <!-- A glyph, not copy: it reads the same in both languages
+                     and the button's aria-label already says it in words. -->
+                <span aria-hidden="true">{{ direction() === directions.DESC ? '▼' : '▲' }}</span>
+              </button>
+            </th>
+            <th scope="col">{{ 'admin.audit_log.column_entity' | transloco }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of entries(); track entry.id) {
+            <tr>
+              <!-- Identifiers the server stored, not copy: shown as they came
+                   in either interface language (ABF-130). -->
+              <td class="audit-log__id">{{ entry.actor_id }}</td>
+              <td>{{ actionLabel(entry) }}</td>
+              <td>{{ occurredAt(entry) | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td class="audit-log__id">{{ entry.entity_type }} · {{ entry.entity_id }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (pageCount() > 1) {
+      <nav class="pager" [attr.aria-label]="'admin.audit_log.pager_aria' | transloco">
+        <button
+          type="button"
+          class="btn"
+          [disabled]="!hasPreviousPage()"
+          (click)="goToPreviousPage()"
+        >
+          {{ 'admin.audit_log.previous_page' | transloco }}
+        </button>
+        <!-- One key with two parameters: the page number moves inside the
+             sentence between languages, which two text nodes cannot do
+             (ABF-131). -->
+        <span aria-live="polite">{{
+          'admin.audit_log.page_of' | transloco: { page: page(), count: pageCount() }
+        }}</span>
+        <button type="button" class="btn" [disabled]="!hasNextPage()" (click)="goToNextPage()">
+          {{ 'admin.audit_log.next_page' | transloco }}
+        </button>
+      </nav>
+    }
+  }
+</div>

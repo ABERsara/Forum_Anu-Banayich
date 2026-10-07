@@ -2,6 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import {
+  AuditLogList,
+  AuditLogQuery,
   BroadcastCreate,
   ForumPost,
   ModeratorAdminView,
@@ -98,5 +100,32 @@ export class AdminService {
     data: ProfessionalUpdateRequest,
   ): Observable<ProfessionalAdminView> {
     return this.api.put<ProfessionalAdminView>(`/admin/professionals/${userId}`, data);
+  }
+
+  /**
+   * One filtered, sorted page of the audit log (ABF-152). Admin only — every
+   * other role is answered 403 by the API whatever it asks for.
+   *
+   * The query string is built from the fields that are actually set, and an
+   * empty text input counts as unset: `?actor_id=` is a filter on the empty
+   * string, which matches nothing, and an admin who cleared a box means "stop
+   * filtering by this", not "show me rows with a blank actor".
+   *
+   * `URLSearchParams` rather than a template literal, following
+   * `ForumService.getConversation()`: half of these values come from
+   * free-text boxes, and an entity id with an `&` in it pasted straight into
+   * a URL stops being one parameter and becomes two.
+   */
+  getAuditLog(query: AuditLogQuery = {}): Observable<AuditLogList> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value === undefined || value === null || value === '') {
+        continue;
+      }
+      params.set(key, String(value));
+    }
+
+    const queryString = params.toString();
+    return this.api.get<AuditLogList>(`/admin/audit-log${queryString ? `?${queryString}` : ''}`);
   }
 }

@@ -1,8 +1,8 @@
 /**
  * Report service.
  *
- * TODO list for junior developer:
- *   [ ] implement getAuditLog() – admin use
+ * Filing reports and moderating them. The admin's audit log is not a report
+ * and lives on AdminService (ABF-152).
  */
 
 import { Injectable, inject } from '@angular/core';
@@ -91,15 +91,5 @@ export class ReportService {
   suspendUser(userId: string, hours: number, reason: string): Observable<UserModerationCard> {
     const body: SuspendUserRequest = { hours, reason };
     return this.api.post<UserModerationCard>(`/moderator/users/${userId}/suspend`, body);
-  }
-
-  // Admin
-  getAuditLog(page = 1): Observable<unknown[]> {
-    void page;
-    /**
-     * TODO: (admin role)
-     *   return this.api.get<unknown[]>(`/admin/audit-log?page=${page}`);
-     */
-    throw new Error('getAuditLog() not yet implemented');
   }
 }
