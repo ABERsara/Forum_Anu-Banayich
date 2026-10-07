@@ -48,8 +48,8 @@ import { LabelService } from '../../../core/i18n/label.service';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
 import { AuditLogEntry, AuditLogQuery } from '../../../core/models';
 import { AdminService } from '../../../core/services/admin.service';
-import { utcIso } from '../../../core/utils/utc-date.util';
 import { AuditLogEntryDialogComponent } from './audit-log-entry-dialog/audit-log-entry-dialog.component';
+import { auditActionLabel, auditOccurredAt } from './audit-log.util';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
@@ -282,33 +282,14 @@ export class AuditLogComponent implements OnInit {
   // Rendering one row
   // ---------------------------------------------------------------------------
 
-  /**
-   * The `what` column.
-   *
-   * Through LabelService rather than the template pipe because of the second
-   * branch: an action the server has and this build's `AuditAction` does not
-   * has no key to pipe, and the raw wire value is a better cell than a blank
-   * one — an audit log that quietly omits what happened is worse than one
-   * that says `some_new_action`. The LabelService read is what keeps the
-   * first branch following a language switch (CONTRIBUTING §6, ABF-128).
-   */
+  /** The `what` column — shared with the dialog, see `audit-log.util.ts`. */
   actionLabel(entry: AuditLogEntry): string {
-    const key = this.actionLabels[entry.action_type];
-    return key ? this.labels.label(key) : entry.action_type;
+    return auditActionLabel(entry, this.labels);
   }
 
-  /**
-   * The row's timestamp as an *instant*.
-   *
-   * It arrives as naive UTC — `2026-09-01T12:00:00`, no offset — and the date
-   * pipe reads a string without one as a local wall clock, so an admin in
-   * Israel would be shown 12:00 for something that happened at 15:00 her
-   * time. On an audit log that is not cosmetic: the whole point of the column
-   * is to say when, and this is a record that may be read back in a legal
-   * proceeding (see `core/utils/utc-date.util.ts`).
-   */
+  /** The `when` column as an instant — shared with the dialog, see `audit-log.util.ts`. */
   occurredAt(entry: AuditLogEntry): string {
-    return utcIso(entry.timestamp);
+    return auditOccurredAt(entry);
   }
 
   // ---------------------------------------------------------------------------

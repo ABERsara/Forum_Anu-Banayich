@@ -45,14 +45,13 @@ import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { AUDIT_ACTION_LABELS } from '../../../../core/constants';
 import { LabelService } from '../../../../core/i18n/label.service';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../../core/i18n/screen-error';
 import { AuditLogEntry } from '../../../../core/models';
 import { AdminService } from '../../../../core/services/admin.service';
-import { utcIso } from '../../../../core/utils/utc-date.util';
 import { ErrorDisplayComponent } from '../../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../../shared/components/loading-spinner/loading-spinner.component';
+import { auditActionLabel, auditOccurredAt } from '../audit-log.util';
 
 /** What Tab can land on inside the dialog. */
 const FOCUSABLE = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
@@ -157,20 +156,14 @@ export class AuditLogEntryDialogComponent implements OnInit, AfterViewInit {
     }
   }
 
-  /**
-   * The action in the reader's language, or the raw wire value for one this
-   * build has no label for — the same fallback the list uses, for the same
-   * reason: a record that omits what happened is worse than one that says
-   * `some_new_action`.
-   */
+  /** The action, exactly as the list's row named it — see `../audit-log.util.ts`. */
   actionLabel(entry: AuditLogEntry): string {
-    const key = AUDIT_ACTION_LABELS[entry.action_type];
-    return key ? this.labels.label(key) : entry.action_type;
+    return auditActionLabel(entry, this.labels);
   }
 
-  /** The naive-UTC timestamp as an instant — see `AuditLogComponent.occurredAt`. */
+  /** The timestamp as an instant, as the list reads it — see `../audit-log.util.ts`. */
   occurredAt(entry: AuditLogEntry): string {
-    return utcIso(entry.timestamp);
+    return auditOccurredAt(entry);
   }
 
   private load(): void {
