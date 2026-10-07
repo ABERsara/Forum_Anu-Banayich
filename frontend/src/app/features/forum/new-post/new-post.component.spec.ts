@@ -52,6 +52,7 @@ const CREATED_POST: ForumPost = {
   created_at: '2026-07-16T10:00:00',
   post_type: PostType.TEXT,
   meeting: null,
+  cancelled_at: null,
   updated_at: '2026-07-16T10:00:00',
 };
 

@@ -388,6 +388,9 @@ export enum AuditAction {
   AGENT_CONVERSATION = 'agent_conversation',
   AGENT_CONVERSATION_ACCESS_DENIED = 'agent_conversation_access_denied',
   MEETING_CREATED = 'meeting_created',
+  MEETING_UPDATED = 'meeting_updated',
+  MEETING_CANCELLED = 'meeting_cancelled',
+  PROFILE_UPDATED = 'profile_updated',
 }
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, LabelKey> = {
@@ -416,6 +419,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, LabelKey> = {
   [AuditAction.AGENT_CONVERSATION_ACCESS_DENIED]:
     'constants.audit_action.agent_conversation_access_denied',
   [AuditAction.MEETING_CREATED]: 'constants.audit_action.meeting_created',
+  [AuditAction.MEETING_UPDATED]: 'constants.audit_action.meeting_updated',
+  [AuditAction.MEETING_CANCELLED]: 'constants.audit_action.meeting_cancelled',
+  [AuditAction.PROFILE_UPDATED]: 'constants.audit_action.profile_updated',
 };
 
 /**

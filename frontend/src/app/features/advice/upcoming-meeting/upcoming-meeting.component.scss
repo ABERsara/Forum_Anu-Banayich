@@ -1,0 +1,192 @@
+@use '../../../../styles/variables' as *;
+@use '../../../../styles/mixins' as *;
+
+// No `direction` here: the element inherits it from <html dir>, which
+// LocaleService sets from the active language (CONTRIBUTING §6). Everything
+// below is direction-neutral — logical margins only — so the layout mirrors
+// on its own when the language flips.
+.upcoming-meeting {
+  background: $color-bg;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+
+  &__row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: $spacing-sm $spacing-md;
+  }
+
+  &__title {
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  &__when {
+    font-size: $font-size-sm;
+    color: $color-text;
+  }
+
+  &__cell {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  &__join {
+    // Logical, so it leans on the inline axis and turns around by itself when
+    // the language flips.
+    margin-inline-start: auto;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+  }
+
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+  }
+
+  &__btn {
+    padding: $spacing-xs $spacing-md;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    font-family: inherit;
+    cursor: pointer;
+    background: $color-bg;
+    transition:
+      background $transition-fast,
+      color $transition-fast;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+
+    // The muted look the join button takes when a meeting is over. Wins over
+    // the variants below by specificity (class + pseudo-class), not by order.
+    &:disabled {
+      border-color: $color-text-muted;
+      color: $color-text-muted;
+      cursor: not-allowed;
+    }
+
+    &--edit {
+      border: 1px solid $color-primary;
+      color: $color-primary;
+
+      &:hover:not(:disabled) {
+        background: $color-primary;
+        color: $color-white;
+      }
+    }
+
+    // Destructive, so it reads as one: the danger colour, not the primary.
+    &--cancel {
+      border: 1px solid $color-danger;
+      color: $color-danger;
+
+      &:hover:not(:disabled) {
+        background: $color-danger;
+        color: $color-white;
+      }
+    }
+  }
+}
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    label {
+      font-weight: $font-weight-medium;
+      color: $color-text;
+      font-size: $font-size-sm;
+    }
+
+    input {
+      padding: $spacing-sm $spacing-md;
+      border: 1px solid $color-border;
+      border-radius: $radius-md;
+      font-size: $font-size-base;
+      font-family: inherit;
+      background: $color-bg;
+      color: $color-text;
+      transition: border-color $transition-fast;
+
+      &:focus-visible {
+        @include focus-ring;
+        border-color: $color-primary;
+      }
+    }
+  }
+
+  &__error {
+    font-size: $font-size-xs;
+    color: $color-danger;
+    margin: 0;
+  }
+
+  &__note {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    margin: 0;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+  }
+
+  &__save,
+  &__discard {
+    padding: $spacing-sm $spacing-lg;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+    }
+  }
+
+  &__save {
+    background: $color-primary;
+    color: $color-white;
+    border: none;
+
+    &:hover:not(:disabled) {
+      background: $color-primary-dark;
+    }
+
+    &:disabled {
+      background: $color-text-muted;
+    }
+  }
+
+  &__discard {
+    background: $color-bg;
+    color: $color-text;
+    border: 1px solid $color-border;
+
+    &:hover:not(:disabled) {
+      background: $color-bg-subtle;
+    }
+  }
+}

@@ -3,17 +3,31 @@
 <div class="meeting-announcement">
   <span class="meeting-announcement__badge">{{ 'meetings.announcement.badge' | transloco }}</span>
 
-  <span class="meeting-announcement__when">
+  <!-- Struck through once cancelled: the time is still worth seeing (a member
+       who wrote it down can tell which meeting this was), but not as a time
+       anyone should keep. -->
+  <span
+    class="meeting-announcement__when"
+    [class.meeting-announcement__when--cancelled]="cancelled()"
+  >
     {{
       'meetings.announcement.starts_at'
         | transloco: { when: meeting().scheduled_at | date: 'dd/MM/yyyy HH:mm' }
     }}
   </span>
 
-  <!-- Past meeting: the button stays, disabled, and the announcement with it.
+  <!-- Cancelled: no join button at all, live or disabled — there is nothing
+       left to join. Checked before "ended", because a cancelled meeting whose
+       time has also passed is still, above all, a meeting that never took
+       place. -->
+  @if (cancelled()) {
+    <span class="meeting-announcement__cancelled">
+      {{ 'meetings.announcement.cancelled' | transloco }}
+    </span>
+  } @else if (hasEnded()) {
+    <!-- Past meeting: the button stays, disabled, and the announcement with it.
        A <button> rather than a dead anchor, because "disabled" is a state an
        anchor cannot carry — a screen reader would still offer it as a link. -->
-  @if (hasEnded()) {
     <button type="button" class="meeting-announcement__join" disabled>
       {{ 'meetings.announcement.join' | transloco }}
     </button>
