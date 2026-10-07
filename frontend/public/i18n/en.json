@@ -175,7 +175,21 @@
       "pager_aria": "Audit log pages",
       "previous_page": "Previous",
       "next_page": "Next",
-      "page_of": "Page {{page}} of {{count}}"
+      "page_of": "Page {{page}} of {{count}}",
+      "open_entry_aria": "Open entry details: {{action}}, {{when}}",
+      "entry": {
+        "title": "Entry details",
+        "close": "Close",
+        "close_aria": "Close the entry details and return to the log",
+        "field_action": "Action",
+        "field_timestamp": "When",
+        "field_actor": "Actor ID",
+        "field_entity_type": "Entity type",
+        "field_entity_id": "Entity ID",
+        "field_id": "Entry ID",
+        "field_details": "Details",
+        "no_details": "No further details were recorded for this entry."
+      }
     },
     "broadcast": {
       "title": "Broadcast to all users",
@@ -206,7 +220,8 @@
       "load_moderators_failed": "Something went wrong loading the moderators. Please refresh the page.",
       "save_moderator_failed": "Something went wrong saving the moderator. Please try again.",
       "remove_moderator_failed": "Something went wrong removing the moderator. Please try again.",
-      "load_audit_log_failed": "Something went wrong loading the audit log. Please refresh the page."
+      "load_audit_log_failed": "Something went wrong loading the audit log. Please refresh the page.",
+      "load_audit_log_entry_failed": "Something went wrong loading the entry. Please try again."
     }
   },
   "advice": {

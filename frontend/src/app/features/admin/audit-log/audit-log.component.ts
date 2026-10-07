@@ -22,8 +22,13 @@
  * ticket is that no screen ever will.
  *
  * `details` is fetched — it is part of the frozen contract — and deliberately
- * not rendered: the single-entry view is Task 2, and a JSON blob squeezed into
- * a list row is the thing that view exists to do properly.
+ * not rendered in the table: a JSON object squeezed into a list row is what
+ * the single-entry dialog exists to do properly (ABF-153). A row opens it.
+ *
+ * Opening and closing the dialog touch none of the list's state. The filters,
+ * the sort and the page stay exactly as they were and nothing is refetched,
+ * so closing lands the admin back on the same filter and page, with focus on
+ * the row they opened.
  */
 
 import {
@@ -44,6 +49,7 @@ import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/scree
 import { AuditLogEntry, AuditLogQuery } from '../../../core/models';
 import { AdminService } from '../../../core/services/admin.service';
 import { utcIso } from '../../../core/utils/utc-date.util';
+import { AuditLogEntryDialogComponent } from './audit-log-entry-dialog/audit-log-entry-dialog.component';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
@@ -75,7 +81,14 @@ type FilterField = keyof Filters;
 @Component({
   selector: 'app-audit-log',
   standalone: true,
-  imports: [DatePipe, RouterLink, TranslocoPipe, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    DatePipe,
+    RouterLink,
+    TranslocoPipe,
+    AuditLogEntryDialogComponent,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -94,6 +107,9 @@ export class AuditLogComponent implements OnInit {
   readonly draft = signal<Filters>(NO_FILTERS);
   readonly applied = signal<Filters>(NO_FILTERS);
   readonly direction = signal<SortDirection>(SortDirection.DESC);
+
+  /** The entry the dialog is showing, or `null` when it is closed. */
+  readonly openEntryId = signal<string | null>(null);
 
   readonly pageSize = PAGE_SIZE;
   readonly directions = SortDirection;
@@ -142,6 +158,9 @@ export class AuditLogComponent implements OnInit {
    * something else.
    */
   private latestRequest = 0;
+
+  /** The row's button that opened the dialog, to hand focus back to. */
+  private entryOpener: HTMLElement | null = null;
 
   ngOnInit(): void {
     this.load();
@@ -227,6 +246,36 @@ export class AuditLogComponent implements OnInit {
       this.page.update((page) => page + 1);
       this.load();
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // One entry, in full (ABF-153)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Open the dialog on a row's entry.
+   *
+   * `opener` is the row's own button, whether the click landed on it or
+   * anywhere else on the row, so focus goes back to something a keyboard can
+   * reach — a table cell is not.
+   */
+  openEntry(entry: AuditLogEntry, opener: HTMLElement): void {
+    this.entryOpener = opener;
+    this.openEntryId.set(entry.id);
+  }
+
+  /**
+   * Close the dialog, and nothing else.
+   *
+   * No `load()`: the rows on screen are still the answer to the filters, the
+   * sort and the page on screen, and the log is append-only, so nothing the
+   * dialog showed can have changed them. Refetching would only risk landing
+   * the admin somewhere other than where they were.
+   */
+  closeEntry(): void {
+    this.openEntryId.set(null);
+    this.entryOpener?.focus();
+    this.entryOpener = null;
   }
 
   // ---------------------------------------------------------------------------

@@ -158,11 +158,32 @@
         </thead>
         <tbody>
           @for (entry of entries(); track entry.id) {
-            <tr>
+            <!-- The whole row opens the entry, for a mouse. The button in the
+                 `what` cell is the same action for a keyboard and a screen
+                 reader, which a clickable <tr> is not; its click bubbles to
+                 the row, so it has no handler of its own and one click is one
+                 open. -->
+            <tr class="audit-log__row" (click)="openEntry(entry, opener)">
               <!-- Identifiers the server stored, not copy: shown as they came
                    in either interface language (ABF-130). -->
               <td class="audit-log__id">{{ entry.actor_id }}</td>
-              <td>{{ actionLabel(entry) }}</td>
+              <td>
+                <button
+                  #opener
+                  type="button"
+                  class="audit-log__open"
+                  [attr.aria-label]="
+                    'admin.audit_log.open_entry_aria'
+                      | transloco
+                        : {
+                            action: actionLabel(entry),
+                            when: occurredAt(entry) | date: 'dd/MM/yyyy HH:mm',
+                          }
+                  "
+                >
+                  {{ actionLabel(entry) }}
+                </button>
+              </td>
               <td>{{ occurredAt(entry) | date: 'dd/MM/yyyy HH:mm' }}</td>
               <td class="audit-log__id">{{ entry.entity_type }} · {{ entry.entity_id }}</td>
             </tr>
@@ -192,5 +213,9 @@
         </button>
       </nav>
     }
+  }
+
+  @if (openEntryId(); as entryId) {
+    <app-audit-log-entry-dialog [entryId]="entryId" (closed)="closeEntry()" />
   }
 </div>
