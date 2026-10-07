@@ -4,7 +4,22 @@ import { TestBed } from '@angular/core/testing';
 
 import { AccountService } from './account.service';
 import { environment } from '../../../environments/environment';
-import type { DirectMessageExportResult } from '../models';
+import { AccountStatus, UserRole } from '../constants';
+import type { DirectMessageExportResult, UserProfile } from '../models';
+
+const MOCK_PROFILE: UserProfile = {
+  id: 'u1',
+  first_name: 'שרה',
+  last_name: 'לוי',
+  email: 'sara@example.com',
+  role: UserRole.USER,
+  user_type: null,
+  sector: null,
+  birth_date: null,
+  account_status: AccountStatus.ACTIVE,
+  alert_email: 'alerts@example.com',
+  created_at: '2026-01-01T00:00:00Z',
+};
 
 const MOCK_EXPORT: DirectMessageExportResult = {
   items: [
@@ -43,6 +58,29 @@ describe('AccountService', () => {
 
     req.flush(MOCK_EXPORT);
     expect(result).toEqual(MOCK_EXPORT);
+  });
+
+  it('updateMyProfile PUTs the body to /users/me and returns the updated profile', () => {
+    let result: UserProfile | undefined;
+    service
+      .updateMyProfile({ alert_email: 'alerts@example.com' })
+      .subscribe((res) => (result = res));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/users/me`);
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ alert_email: 'alerts@example.com' });
+
+    req.flush(MOCK_PROFILE);
+    expect(result).toEqual(MOCK_PROFILE);
+  });
+
+  it('updateMyProfile sends an explicit null to clear the alert email', () => {
+    service.updateMyProfile({ alert_email: null }).subscribe();
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/users/me`);
+    expect(req.request.body).toEqual({ alert_email: null });
+
+    req.flush({ ...MOCK_PROFILE, alert_email: null });
   });
 
   it('deleteMyAccount DELETEs the current user', () => {

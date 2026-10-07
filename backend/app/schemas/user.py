@@ -3,7 +3,8 @@ Pydantic schemas for user-related endpoints.
 
 UserPublic      → what any user sees about another user (name only, no PII)
 UserProfile     → what a user sees about themselves
-UserAdminView   → what an admin sees (includes status, documents)
+UserProfileUpdateRequest → what a user may change about themselves (PUT /users/me)
+UserAdminView  → what an admin sees (includes status, documents)
 RegistrationItem → pending registration in admin queue
 
 Professional catalog (SPEC §6.1):
@@ -63,9 +64,32 @@ class UserProfile(BaseModel):
     sector: Sector | None = None
     birth_date: date | None = None
     account_status: AccountStatus
+    # str, not EmailStr, like ModeratorAdminView: a read model must not fail on
+    # rows that are already in the database. Input is validated on the way in.
+    alert_email: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserProfileUpdateRequest(BaseModel):
+    """
+    A user edits their own profile (PUT /users/me).
+
+    Only the alert address: where the platform sends this account its alerts.
+    Partial update: an omitted key is left untouched. Sending
+    `alert_email: null` clears it on purpose, and alerts fall back to the
+    login address, as they do for a moderator (ModeratorUpdateRequest).
+
+    `extra="forbid"`: changing the login address needs the OTP flow, and name,
+    group and sector are admin decisions. A body that tries to set any of them
+    gets a 422, not a 200 that silently changed nothing, so the client is never
+    told that an edit it sent was saved when it was ignored.
+    """
+
+    alert_email: EmailStr | None = Field(None, examples=["alerts.sara@example.com"])
+
+    model_config = {"extra": "forbid"}
 
 
 class UserAdminView(BaseModel):

@@ -140,4 +140,14 @@ export class AuthService {
   loadCurrentUser(): Observable<UserProfile> {
     return this.api.get<UserProfile>('/users/me').pipe(tap((user) => this._currentUser.set(user)));
   }
+
+  /**
+   * Replace the signed-in user's profile with one the API just returned, e.g.
+   * after the user edited it (PUT /users/me answers with the whole profile),
+   * so every screen reading currentUser shows the saved value without a
+   * second GET.
+   */
+  setCurrentUser(user: UserProfile): void {
+    this._currentUser.set(user);
+  }
 }

@@ -19,6 +19,7 @@ const USER: UserProfile = {
   sector: null,
   birth_date: null,
   account_status: AccountStatus.ACTIVE,
+  alert_email: null,
   created_at: '2026-01-01T00:00:00Z',
 };
 

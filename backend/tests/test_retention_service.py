@@ -343,6 +343,23 @@ class TestDeleteOwnAccount:
         assert moderator.moderator_cells == []
         assert moderator.alert_email is None
 
+    @pytest.mark.parametrize(
+        "role", [UserRole.USER, UserRole.PROFESSIONAL, UserRole.ADMIN]
+    )
+    def test_deletion_scrubs_the_alert_email_for_every_role(self, db_session, role):
+        """
+        ABF-165: any role can set an alert address on their own profile, so it
+        is personal data the deletion has to scrub, not only a moderator's.
+        """
+        user = _make_user(db_session, "a@example.com", role=role)
+        user.alert_email = "personal.alerts@example.com"
+        db_session.commit()
+
+        user_service.delete_own_account(db_session, user)
+
+        db_session.refresh(user)
+        assert user.alert_email is None
+
     def test_the_reporter_deleting_her_account_leaves_the_report_open_and_anonymous(
         self, db_session
     ):

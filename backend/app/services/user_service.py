@@ -15,6 +15,7 @@ TODO list for junior developer:
   [x] implement get_professionals() / create_professional() / update_professional()
   [x] implement get_moderators() / create_moderator() / update_moderator() /
       remove_moderator()
+  [x] implement update_own_profile() – the user's own alert address
 """
 
 import secrets
@@ -37,6 +38,7 @@ from app.schemas.user import (
     ModeratorUpdateRequest,
     ProfessionalCreateRequest,
     ProfessionalUpdateRequest,
+    UserProfileUpdateRequest,
 )
 from app.services import retention_service
 from app.services.audit_service import build_entry, log_action
@@ -105,6 +107,46 @@ def ensure_account_active(user: User) -> None:
         raise HTTPException(status_code=403, detail=translate("users.account_inactive"))
 
 
+def update_own_profile(db: Session, user: User, data: UserProfileUpdateRequest) -> User:
+    """
+    A user edits their own profile (PUT /users/me, ABF-165): the alert address.
+
+    Only the fields present in the request are touched, see UserProfileUpdateRequest.
+    A re-save of the value already stored changes nothing and is not logged.
+
+    Logged even though the actor edits themselves: for a moderator or an admin
+    the alert address is where report and SLA alerts go, and the admin's
+    identical edit (update_moderator) is already logged. Like every entry that
+    touches this column, the entry records only whether an address is set,
+    never the address itself (CONTRIBUTING §4).
+    """
+    updates = data.model_dump(exclude_unset=True, mode="json")
+    changed = sorted(
+        field for field, value in updates.items() if getattr(user, field) != value
+    )
+    if not changed:
+        return user
+
+    for field in changed:
+        setattr(user, field, updates[field])
+
+    # log_action() commits, so the edit and its audit entry land together.
+    log_action(
+        db,
+        actor=user,
+        action=AuditAction.PROFILE_UPDATED,
+        entity_type="User",
+        entity_id=user.id,
+        details={
+            "updated_fields": changed,
+            "alert_email_set": user.alert_email is not None,
+        },
+    )
+    db.refresh(user)
+
+    return user
+
+
 #: What every deleted account's identity fields become. A fixed placeholder
 #: rather than blanking to "" — "" would collide on the login form's
 #: first_name display and, for email, would collide with every other
@@ -161,6 +203,9 @@ def delete_own_account(db: Session, user: User) -> None:
     user.birth_date = None
     user.otp_code = None
     user.otp_expires_at = None
+    # Any role can set an alert address on their own profile (ABF-165), so it
+    # is personal data to scrub for every role, not only a moderator's.
+    user.alert_email = None
     user.account_status = AccountStatus.CANCELLED
 
     # Role-specific fields that would otherwise keep routing content or
@@ -168,7 +213,6 @@ def delete_own_account(db: Session, user: User) -> None:
     # remove_moderator() does for a removed moderator.
     if user.role == UserRole.MODERATOR:
         user.moderator_cells = []
-        user.alert_email = None
     elif user.role == UserRole.PROFESSIONAL:
         user.is_active_professional = False
 

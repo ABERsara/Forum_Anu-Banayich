@@ -1,4 +1,5 @@
 @use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
 @use 'sass:color';
 
 .profile-page {
@@ -37,6 +38,52 @@
   &__success {
     color: $color-success;
   }
+
+  // The stored value is content, not explanation: full-contrast text, unlike
+  // the muted description paragraphs around it.
+  & &__value {
+    color: $color-text;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+  }
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin-bottom: $spacing-md;
+
+  label {
+    font-weight: $font-weight-medium;
+  }
+
+  input {
+    padding: $spacing-sm;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    font-size: $font-size-base;
+    font-family: inherit;
+    background: $color-bg;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+}
+
+.field-hint {
+  font-size: $font-size-xs;
+  color: $color-text-muted;
+}
+
+.field-error {
+  font-size: $font-size-xs;
+  color: $color-danger;
 }
 
 .btn {
@@ -72,6 +119,16 @@
 
     &:hover:not(:disabled) {
       background: color.adjust($color-danger, $lightness: -10%);
+    }
+  }
+
+  &--secondary {
+    background: $color-bg;
+    color: $color-text;
+    border: 1px solid $color-border;
+
+    &:hover:not(:disabled) {
+      background: $color-bg-subtle;
     }
   }
 }
