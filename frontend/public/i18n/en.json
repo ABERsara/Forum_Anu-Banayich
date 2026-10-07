@@ -649,6 +649,19 @@
     "group_label": "Group:",
     "sector_label": "Sector:",
     "status_label": "Status:",
+    "alert_email": {
+      "title": "Alert email",
+      "description": "The platform sends your account's alerts to this address. If none is set, they go to the address you sign in with.",
+      "label": "Alert email:",
+      "not_set": "Not set",
+      "edit_button": "Edit",
+      "input_label": "Email address for alerts",
+      "hint": "You can leave this empty, and alerts will go to the address you sign in with.",
+      "email_error": "Please enter a valid email address",
+      "save_button": "Save",
+      "saving": "Saving the address...",
+      "save_success": "Your alert email has been updated."
+    },
     "retention": {
       "title": "Private message retention",
       "description": "Private messages are kept for up to 3 years and then deleted automatically and permanently. You can download a copy of all your private messages at any time.",
@@ -667,7 +680,8 @@
     },
     "errors": {
       "export_failed": "Couldn't export your messages. Please try again later.",
-      "delete_account_failed": "Couldn't delete your account. Please try again later."
+      "delete_account_failed": "Couldn't delete your account. Please try again later.",
+      "alert_email_save_failed": "Couldn't save your alert email. Please try again later."
     }
   },
   "shared": {

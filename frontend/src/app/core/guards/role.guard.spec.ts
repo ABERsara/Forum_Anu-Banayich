@@ -30,6 +30,7 @@ describe('roleGuard', () => {
     first_name: 'Test',
     last_name: 'User',
     email: 'test@example.com',
+    alert_email: null,
     role,
     user_type: null,
     sector: null,

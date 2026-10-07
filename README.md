@@ -531,6 +531,7 @@ Google אחראי על אימות המייל, ולכן שלב OTP מדולג. ש
 | `POST` | `/auth/login` | כניסה – מחזיר JWT | פומבי |
 | `POST` | `/auth/refresh` | רענון JWT | מחובר |
 | `GET` | `/users/me` | פרטי המשתמש הנוכחי | מחובר |
+| `PUT` | `/users/me` | עדכון כתובת ההתראות (`alert_email`) של המשתמש עצמו | מחובר |
 | `GET` | `/forum/posts` | רשימת פוסטים (מסוננת!) | USER |
 | `POST` | `/forum/posts` | פרסום פוסט | USER |
 | `GET` | `/forum/posts/{id}` | פוסט בודד | USER |

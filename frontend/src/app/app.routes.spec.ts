@@ -50,6 +50,7 @@ function makeUser(role: UserRole): UserProfile {
     sector: null,
     birth_date: null,
     account_status: AccountStatus.ACTIVE,
+    alert_email: null,
     created_at: '2026-07-15T09:30:00',
   } as UserProfile;
 }

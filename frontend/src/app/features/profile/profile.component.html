@@ -24,6 +24,84 @@
       </p>
     </section>
 
+    <section class="profile-section" aria-labelledby="alert-email-heading">
+      <h2 id="alert-email-heading">{{ 'profile.alert_email.title' | transloco }}</h2>
+      <p>{{ 'profile.alert_email.description' | transloco }}</p>
+
+      @if (isEditingAlertEmail()) {
+        <form [formGroup]="alertEmailForm" (ngSubmit)="saveAlertEmail()">
+          <div class="form-field">
+            <label for="alert-email-input">{{
+              'profile.alert_email.input_label' | transloco
+            }}</label>
+            <input
+              #alertEmailInput
+              id="alert-email-input"
+              type="email"
+              autocomplete="email"
+              formControlName="alert_email"
+              [attr.aria-invalid]="alertEmail.invalid && alertEmail.touched"
+              aria-describedby="alert-email-hint alert-email-field-error"
+            />
+            <span id="alert-email-hint" class="field-hint">
+              {{ 'profile.alert_email.hint' | transloco }}
+            </span>
+            <span id="alert-email-field-error" class="field-error">
+              @if (alertEmail.invalid && alertEmail.touched) {
+                {{ 'profile.alert_email.email_error' | transloco }}
+              }
+            </span>
+          </div>
+
+          <div class="profile-section__actions">
+            <button type="submit" class="btn btn--primary" [disabled]="isSavingAlertEmail()">
+              {{ 'profile.alert_email.save_button' | transloco }}
+            </button>
+            <button
+              type="button"
+              class="btn btn--secondary"
+              [disabled]="isSavingAlertEmail()"
+              (click)="cancelAlertEmailEdit()"
+            >
+              {{ 'common.cancel' | transloco }}
+            </button>
+          </div>
+        </form>
+      } @else {
+        <p class="profile-section__value">
+          <strong>{{ 'profile.alert_email.label' | transloco }}</strong>
+          {{ user.alert_email ?? ('profile.alert_email.not_set' | transloco) }}
+        </p>
+        <button
+          #alertEmailEditButton
+          type="button"
+          class="btn btn--primary"
+          aria-describedby="alert-email-heading"
+          (click)="editAlertEmail()"
+        >
+          {{ 'profile.alert_email.edit_button' | transloco }}
+        </button>
+      }
+
+      <div
+        class="profile-section__status"
+        aria-live="polite"
+        [attr.aria-busy]="isSavingAlertEmail()"
+      >
+        @if (isSavingAlertEmail()) {
+          <app-loading-spinner size="sm" [message]="'profile.alert_email.saving' | transloco" />
+        } @else if (alertEmailError().text; as text) {
+          <app-error-display [message]="text" />
+        } @else if (alertEmailError().key; as key) {
+          <app-error-display [message]="key | transloco" />
+        } @else if (alertEmailSaved()) {
+          <p class="profile-section__success">
+            {{ 'profile.alert_email.save_success' | transloco }}
+          </p>
+        }
+      </div>
+    </section>
+
     @if (user.role === userRole.USER) {
       <section class="profile-section" aria-labelledby="retention-heading">
         <h2 id="retention-heading">{{ 'profile.retention.title' | transloco }}</h2>

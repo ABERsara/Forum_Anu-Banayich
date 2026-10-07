@@ -25,6 +25,7 @@ const PROFILE: UserProfile = {
   first_name: 'Test',
   last_name: 'User',
   email: 'test@example.com',
+  alert_email: null,
   role: UserRole.USER,
   user_type: null,
   sector: null,

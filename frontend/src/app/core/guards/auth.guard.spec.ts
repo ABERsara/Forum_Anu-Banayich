@@ -23,6 +23,7 @@ describe('authGuard', () => {
     sector: null,
     birth_date: null,
     account_status,
+    alert_email: null,
     created_at: new Date().toISOString(),
   });
 

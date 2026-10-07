@@ -199,4 +199,14 @@ export class AuthService {
       }),
     );
   }
+
+  /**
+   * Replace the signed-in user's profile with one the API just returned, e.g.
+   * after the user edited it (PUT /users/me answers with the whole profile),
+   * so every screen reading currentUser shows the saved value without a
+   * second GET.
+   */
+  setCurrentUser(user: UserProfile): void {
+    this._currentUser.set(user);
+  }
 }
