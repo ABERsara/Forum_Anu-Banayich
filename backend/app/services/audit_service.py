@@ -26,10 +26,12 @@ Usage:
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from app.core.constants import AuditAction, AuditSortField, SortDirection
+from app.core.i18n import translate
 from app.models.audit import AuditLog
 from app.models.user import User
 
@@ -182,3 +184,25 @@ def get_audit_log(
         query.order_by(*ordering).offset((page - 1) * page_size).limit(page_size).all()
     )
     return rows, total_count
+
+
+def get_audit_entry(db: Session, entry_id: str) -> AuditLog:
+    """
+    Return one audit log entry, whole — the row behind a line of the list.
+
+    The read side of the drill-down (ABF-153): the list shows who, what, when
+    and to which entity, and an admin who needs the rest — above all
+    `details` — opens the entry and is shown this.
+
+    A lookup by primary key, so it is bounded by construction: one row or
+    none, never a scan of the table the list endpoint works so hard not to
+    scan.
+
+    404 when there is no such entry. Nothing here distinguishes "never
+    existed" from anything else, because nothing else is possible: the log is
+    append-only, so an id that resolves once resolves for seven years.
+    """
+    entry = db.get(AuditLog, entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=translate("audit.entry_not_found"))
+    return entry
