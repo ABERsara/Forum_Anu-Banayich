@@ -67,6 +67,8 @@ describe('ProfileComponent', () => {
   let authServiceMock: {
     currentUser: WritableSignal<UserProfile | null>;
     setCurrentUser: ReturnType<typeof vi.fn>;
+    profileUnavailable: WritableSignal<boolean>;
+    reloadProfile: ReturnType<typeof vi.fn>;
     logout: ReturnType<typeof vi.fn>;
   };
   let accountServiceMock: {
@@ -81,9 +83,14 @@ describe('ProfileComponent', () => {
     // A real signal, written the way AuthService.setCurrentUser() writes it,
     // so a saved profile reaches the screen through the same path it does live.
     const currentUser = signal(user);
+    // Likewise a signal, so a case can take the profile away mid-screen and
+    // the template actually hears about it.
+    const profileUnavailable = signal(false);
     authServiceMock = {
       currentUser,
       setCurrentUser: vi.fn((next: UserProfile) => currentUser.set(next)),
+      profileUnavailable,
+      reloadProfile: vi.fn(),
       logout: vi.fn(),
     };
     accountServiceMock = {
@@ -160,6 +167,18 @@ describe('ProfileComponent', () => {
       expect(heading()).toBe('הפרופיל שלי');
       expect(detailRows()).toEqual([]);
       expect(fixture.nativeElement.querySelector('.profile-section')).toBeNull();
+    });
+
+    it('offers the call again when the profile could not be fetched', () => {
+      renderFor(null);
+      authServiceMock.profileUnavailable.set(true);
+      fixture.detectChanges();
+
+      expect(text()).toContain('לא הצלחנו להגיע לשרת');
+
+      clickButton('נסה שוב');
+
+      expect(authServiceMock.reloadProfile).toHaveBeenCalled();
     });
 
     it('leaves the group and sector rows blank for a member who has neither', () => {

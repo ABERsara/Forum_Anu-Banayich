@@ -26,9 +26,13 @@ const USER: UserProfile = {
 describe('HomeComponent', () => {
   let fixture: ComponentFixture<HomeComponent>;
   let currentUser: ReturnType<typeof signal<UserProfile | null>>;
+  let profileUnavailable: ReturnType<typeof signal<boolean>>;
+  let reloadProfile: ReturnType<typeof vi.fn>;
 
   function setup(role: UserRole | null): void {
     currentUser = signal<UserProfile | null>(role === null ? null : { ...USER, role });
+    profileUnavailable = signal(false);
+    reloadProfile = vi.fn();
 
     TestBed.configureTestingModule({
       imports: [HomeComponent, translocoTesting()],
@@ -38,6 +42,8 @@ describe('HomeComponent', () => {
           provide: AuthService,
           useValue: {
             currentUser,
+            profileUnavailable,
+            reloadProfile,
             isUser: () => role === UserRole.USER,
             isAdmin: () => role === UserRole.ADMIN,
             isModerator: () => role === UserRole.MODERATOR,
@@ -182,6 +188,25 @@ describe('HomeComponent', () => {
 
       expect(text()).toContain('Loading...');
       expect(copyOnly()).not.toMatch(HEBREW);
+    });
+
+    /**
+     * The session outlives a backend that is not answering, which is the point
+     * of the fix - but the screen it lands on has no profile to render. It
+     * says so and offers the call again, rather than turning a spinner at a
+     * reader who would have no way of knowing it never stops.
+     */
+    it('offers the call again when the profile could not be fetched', () => {
+      setup(null);
+      profileUnavailable.set(true);
+      fixture.detectChanges();
+
+      expect(text()).not.toContain('טוען...');
+      expect(text()).toContain('לא הצלחנו להגיע לשרת');
+
+      fixture.nativeElement.querySelector('button').click();
+
+      expect(reloadProfile).toHaveBeenCalled();
     });
   });
 
