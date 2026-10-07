@@ -224,8 +224,8 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         ENGLISH: "Only the author can edit this post.",
     },
     "forum.meeting_post_read_only": {
-        HEBREW: "לא ניתן לערוך הכרזה על פגישה.",
-        ENGLISH: "A meeting announcement cannot be edited.",
+        HEBREW: "הכרזה על פגישה מתעדכנת דרך עריכת הפגישה עצמה.",
+        ENGLISH: "A meeting announcement is updated by editing the meeting itself.",
     },
     # -- Reports ----------------------------------------------------------
     "reports.target_type_unsupported": {
@@ -366,6 +366,50 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
     "meetings.creation_failed": {
         HEBREW: "הפגישה לא נשמרה. יש לנסות שוב.",
         ENGLISH: "The meeting could not be saved. Try again.",
+    },
+    # -- Editing and cancelling a meeting (ABF-163) -----------------------
+    "meetings.not_found": {
+        HEBREW: "הפגישה המבוקשת לא נמצאה.",
+        ENGLISH: "The requested meeting was not found.",
+    },
+    "meetings.creator_only": {
+        HEBREW: "רק מי שתזמן את הפגישה יכול לערוך או לבטל אותה.",
+        ENGLISH: "Only the professional who scheduled this meeting can edit or cancel it.",
+    },
+    "meetings.inactive_professional_edit": {
+        HEBREW: "רק איש מקצוע פעיל יכול לערוך פגישה.",
+        ENGLISH: "Only an active professional can edit a meeting.",
+    },
+    # An empty PATCH body, or a field sent as null. Either way there is
+    # nothing to change, and a null title or time is not a value to store.
+    "meetings.update_empty": {
+        HEBREW: "יש לשלוח כותרת חדשה, מועד חדש או את שניהם.",
+        ENGLISH: "Send a new title, a new time, or both.",
+    },
+    "meetings.already_cancelled": {
+        HEBREW: "הפגישה בוטלה ולא ניתן לערוך אותה.",
+        ENGLISH: "This meeting was cancelled and can no longer be edited.",
+    },
+    "meetings.already_ended": {
+        HEBREW: "הפגישה כבר הסתיימה ולא ניתן לשנות אותה.",
+        ENGLISH: "This meeting has already ended and can no longer be changed.",
+    },
+    # The event was deleted from her calendar by hand. Cancelling still works
+    # (an event already gone counts as removed), which is what the text offers.
+    "meetings.calendar_event_missing": {
+        HEBREW: "אירוע הפגישה לא נמצא ביומן Google, אולי נמחק משם. אפשר לבטל את הפגישה ולתזמן חדשה.",
+        ENGLISH: "The meeting's event was not found in Google Calendar and may have been deleted there. You can cancel this meeting and schedule a new one.",
+    },
+    "meetings.update_failed": {
+        HEBREW: "השינויים בפגישה לא נשמרו. יש לנסות שוב.",
+        ENGLISH: "The changes to the meeting could not be saved. Try again.",
+    },
+    # The event is already gone from Google by the time this can happen, and a
+    # retry finishes the job (an event already gone counts as removed). The
+    # text says so, so she retries instead of wondering what state it is in.
+    "meetings.cancellation_failed": {
+        HEBREW: "האירוע הוסר מיומן Google אבל הביטול לא נשמר. יש לנסות שוב כדי להשלים אותו.",
+        ENGLISH: "The event was removed from Google Calendar, but the cancellation was not saved. Try again to complete it.",
     },
     # -- AI agents --------------------------------------------------------
     "agents.domain_not_found": {

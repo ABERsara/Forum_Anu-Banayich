@@ -5,6 +5,8 @@ POST /meetings                     – schedule a meeting (professional only)
 GET  /meetings                     – meetings still to come that you may see
 GET  /meetings/calendar/status     – is this professional's calendar linked
 POST /meetings/calendar/connect    – link the calendar Google just authorised
+PATCH  /meetings/{meeting_id}      – change its title or time (its creator, ABF-163)
+DELETE /meetings/{meeting_id}      – call it off (its creator, ABF-163)
 """
 
 from fastapi import APIRouter, Depends
@@ -18,6 +20,7 @@ from app.schemas.meeting import (
     CalendarStatusResponse,
     MeetingCreate,
     MeetingResponse,
+    MeetingUpdate,
 )
 from app.services import google_meet_service, meeting_service
 
@@ -66,9 +69,11 @@ def list_meetings(
     return [MeetingResponse.model_validate(meeting) for meeting in meetings]
 
 
-# The two calendar routes are declared before anything with a path parameter
-# (there is none today) for the usual FastAPI reason: routes match in order,
-# and a /meetings/{meeting_id} declared first would swallow "calendar".
+# The two calendar routes are declared before the /meetings/{meeting_id} ones
+# for the usual FastAPI reason: routes match in order, and a path parameter
+# declared first would swallow "calendar". No method is shared today, so
+# nothing would actually collide — but the order is what keeps it that way
+# when one is added.
 
 
 @router.get(
@@ -124,3 +129,51 @@ def calendar_connect(
         connected_at=credential.updated_at,
         authorization_url=google_meet_service.build_authorization_url(current_user),
     )
+
+
+@router.patch(
+    "/meetings/{meeting_id}",
+    response_model=MeetingResponse,
+    dependencies=[Depends(require_role(UserRole.PROFESSIONAL))],
+)
+def update_meeting(
+    meeting_id: str,
+    data: MeetingUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> MeetingResponse:
+    """
+    Change a meeting's title, its time, or both — its creator only.
+
+    The meeting, its forum announcement and the event in her Google Calendar
+    are updated together; the Meet link stays the same. 403 for every role but
+    PROFESSIONAL and for a professional who did not create it, 404 for an
+    unknown id, 409 once the meeting is cancelled or over, and 422 for an
+    empty body, a null field, or a time that is not in the future. A failure
+    at Google changes nothing here (502/504), and 403 is also what a revoked
+    calendar grant answers, as on POST /meetings.
+    """
+    meeting = meeting_service.update_meeting(db, meeting_id, data, current_user)
+    return MeetingResponse.model_validate(meeting)
+
+
+@router.delete(
+    "/meetings/{meeting_id}",
+    status_code=204,
+    dependencies=[Depends(require_role(UserRole.PROFESSIONAL))],
+)
+def cancel_meeting(
+    meeting_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """
+    Call a meeting off — its creator only.
+
+    Deletes the event from her Google Calendar and marks the announcement as
+    cancelled. The announcement stays in the forum, reading "cancelled" with
+    no join button, and the meeting drops out of GET /meetings. Nothing is
+    hard-deleted. Idempotent: cancelling it again is a 204 that does nothing.
+    The same 403/404 as PATCH, and 409 for a meeting that is already over.
+    """
+    meeting_service.cancel_meeting(db, meeting_id, current_user)

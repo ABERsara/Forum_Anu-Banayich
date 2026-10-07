@@ -464,11 +464,11 @@ def update_post(
         )
 
     if post.post_type == PostType.MEETING:
-        # A meeting announcement is read-only (ABF-156). Its title is the
-        # summary of an event that already exists in the professional's Google
-        # Calendar, so editing it here would leave the forum and the calendar
-        # saying different things about the same meeting — and changing a
-        # meeting is explicitly out of this ticket's scope.
+        # A meeting announcement is read-only here (ABF-156). Its title is the
+        # summary of an event in the professional's Google Calendar, so
+        # editing it here would leave the forum and the calendar saying
+        # different things about the same meeting. PATCH /meetings/{id}
+        # (ABF-163) is the way to change it, and it updates both.
         raise HTTPException(
             status_code=403, detail=translate("forum.meeting_post_read_only")
         )

@@ -53,6 +53,11 @@ class ForumPostResponse(BaseModel):
     #: Present exactly when post_type is MEETING — the join link and the times
     #: the announcement is drawn from. Null on every ordinary post.
     meeting: MeetingSummary | None = None
+    #: Set when the creator called the meeting off (ABF-163): the announcement
+    #: stays in the feed and reads "cancelled", with no way in. Null on every
+    #: live announcement and on every ordinary post. Separate from `status`,
+    #: which is moderation's — see ForumPost.cancelled_at.
+    cancelled_at: datetime | None = None
     # Not populated by every endpoint that returns a ForumPostResponse —
     # only get_posts()/get_post_by_id() compute real values via the likes
     # table; create/update/delete/broadcast fall back to these defaults

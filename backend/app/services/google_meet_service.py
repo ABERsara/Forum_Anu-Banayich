@@ -9,8 +9,9 @@ event for anyone who asked.
 
 Plain httpx against the REST API rather than google-api-python-client: the
 project already talks to a Google API this way (rag_service.py), the surface
-used here is three endpoints, and the client library would pull in a
-dependency tree — and its own credential/refresh machinery — for no gain.
+used here is the token endpoint plus insert, patch and delete on one events
+resource, and the client library would pull in a dependency tree — and its
+own credential/refresh machinery — for no gain.
 
 Why an OAuth authorisation-code flow at all, when auth_service already does
 "log in with Google": that one verifies a Firebase ID token, which proves
@@ -20,6 +21,8 @@ authorisation, with its own consent screen and its own refresh token.
 
 import logging
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlencode
@@ -361,6 +364,60 @@ def _rfc3339(moment: datetime) -> str:
     return moment.replace(tzinfo=UTC).isoformat().replace("+00:00", "Z")
 
 
+def _event_times(scheduled_at: datetime, duration_minutes: int) -> dict[str, Any]:
+    """The `start`/`end` pair of an event, the end derived from the duration."""
+    end = scheduled_at + timedelta(minutes=duration_minutes)
+    return {
+        "start": {"dateTime": _rfc3339(scheduled_at)},
+        "end": {"dateTime": _rfc3339(end)},
+    }
+
+
+def _event_url(event_id: str) -> str:
+    return f"{GOOGLE_CALENDAR_EVENTS_URL}/{event_id}"
+
+
+#: What the Events API answers for an event that is not there: 404 for an id
+#: it never had, 410 Gone for one that was deleted — by us, or by hand from
+#: her calendar.
+_EVENT_GONE = (404, 410)
+
+
+@contextmanager
+def _calendar_errors(what: str) -> Iterator[None]:
+    """Map a failed Calendar API call to the message the professional reads.
+
+    One copy for every event call — creating, editing and cancelling fail in
+    the same ways, and three copies of this ladder would drift. `what` names
+    the call in the log line and nowhere else. The response body is never
+    logged: Google's error text is not ours to keep, and the status code is
+    all the log needs to tell a timeout from a refusal.
+    """
+    try:
+        yield
+    except httpx.TimeoutException as exc:
+        logger.warning("Google Calendar %s timed out", what)
+        raise HTTPException(
+            status_code=504, detail=translate("meetings.google_timeout")
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        logger.warning(
+            "Google rejected the %s: HTTP %s", what, exc.response.status_code
+        )
+        raise HTTPException(
+            status_code=502, detail=translate("meetings.google_unavailable")
+        ) from exc
+    except httpx.HTTPError as exc:
+        logger.warning("Google Calendar %s failed: %s", what, type(exc).__name__)
+        raise HTTPException(
+            status_code=502, detail=translate("meetings.google_unavailable")
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=502, detail=translate("meetings.google_unavailable")
+        ) from exc
+
+
 def create_meeting(
     db: Session,
     creator: User,
@@ -376,11 +433,9 @@ def create_meeting(
     would also hand every member's address to every other member.
     """
     access_token = _access_token(db, creator)
-    end = scheduled_at + timedelta(minutes=duration_minutes)
     payload = {
         "summary": title,
-        "start": {"dateTime": _rfc3339(scheduled_at)},
-        "end": {"dateTime": _rfc3339(end)},
+        **_event_times(scheduled_at, duration_minutes),
         "conferenceData": {
             "createRequest": {
                 # Google's idempotency key for the conference. A fresh uuid4
@@ -392,7 +447,7 @@ def create_meeting(
         },
     }
 
-    try:
+    with _calendar_errors("event creation"):
         response = httpx.post(
             GOOGLE_CALENDAR_EVENTS_URL,
             json=payload,
@@ -404,27 +459,6 @@ def create_meeting(
         )
         response.raise_for_status()
         body: dict[str, Any] = response.json()
-    except httpx.TimeoutException as exc:
-        logger.warning("Google Calendar event creation timed out")
-        raise HTTPException(
-            status_code=504, detail=translate("meetings.google_timeout")
-        ) from exc
-    except httpx.HTTPStatusError as exc:
-        logger.warning(
-            "Google rejected the event creation: HTTP %s", exc.response.status_code
-        )
-        raise HTTPException(
-            status_code=502, detail=translate("meetings.google_unavailable")
-        ) from exc
-    except httpx.HTTPError as exc:
-        logger.warning("Google Calendar event creation failed: %s", type(exc).__name__)
-        raise HTTPException(
-            status_code=502, detail=translate("meetings.google_unavailable")
-        ) from exc
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=502, detail=translate("meetings.google_unavailable")
-        ) from exc
 
     event_id = body.get("id")
     meet_link = body.get("hangoutLink") or _entry_point(body)
@@ -447,6 +481,79 @@ def _entry_point(body: dict[str, Any]) -> str | None:
     return None
 
 
+def update_event(
+    db: Session,
+    creator: User,
+    event_id: str,
+    *,
+    title: str,
+    scheduled_at: datetime,
+    duration_minutes: int,
+) -> None:
+    """Rewrite an event's summary and times in place (ABF-163).
+
+    PATCH, not PUT: only the fields sent are changed, so the conference —
+    and with it the Meet link every member already has — is left exactly as
+    it was. The link in the announcement stays valid through any number of
+    edits. sendUpdates=none for the reason create_meeting() gives: nobody is
+    invited, and the forum announcement is the notification.
+
+    The full set of values is sent every time, not only what changed: the
+    end has to move with the start, and sending the title alongside costs
+    nothing and leaves no question about what the event ends up saying.
+
+    An event that is no longer there — she deleted it from her calendar by
+    hand — is a 409 with its own message rather than "Google is unavailable":
+    retrying cannot fix it, and cancelling can (see cancel_event()).
+    """
+    access_token = _access_token(db, creator)
+    payload = {"summary": title, **_event_times(scheduled_at, duration_minutes)}
+
+    with _calendar_errors("event update"):
+        response = httpx.patch(
+            _event_url(event_id),
+            json=payload,
+            params={"sendUpdates": "none"},
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=settings.GOOGLE_CALENDAR_TIMEOUT_SECONDS,
+        )
+        if response.status_code in _EVENT_GONE:
+            logger.warning("Calendar event %s is gone; cannot update it", event_id)
+            raise HTTPException(
+                status_code=409, detail=translate("meetings.calendar_event_missing")
+            )
+        response.raise_for_status()
+
+
+def cancel_event(db: Session, creator: User, event_id: str) -> None:
+    """Delete an event because its meeting was called off (ABF-163).
+
+    Unlike delete_event() below, a failure here is reported, not swallowed:
+    this is the whole of what the professional asked for, and a cancellation
+    that leaves the event in her calendar would let the forum and the
+    calendar disagree about whether the meeting is on.
+
+    An event already gone counts as deleted. That covers one she removed from
+    her calendar by hand, and the retry after a cancellation whose database
+    write failed once the event was already deleted — see
+    meeting_service.cancel_meeting(), which depends on exactly this to
+    recover.
+    """
+    access_token = _access_token(db, creator)
+
+    with _calendar_errors("event deletion"):
+        response = httpx.delete(
+            _event_url(event_id),
+            params={"sendUpdates": "none"},
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=settings.GOOGLE_CALENDAR_TIMEOUT_SECONDS,
+        )
+        if response.status_code in _EVENT_GONE:
+            logger.info("Calendar event %s was already gone", event_id)
+            return
+        response.raise_for_status()
+
+
 def delete_event(db: Session, creator: User, event_id: str) -> None:
     """Best-effort removal of an event we created and then failed to record.
 
@@ -458,7 +565,7 @@ def delete_event(db: Session, creator: User, event_id: str) -> None:
     try:
         access_token = _access_token(db, creator)
         httpx.delete(
-            f"{GOOGLE_CALENDAR_EVENTS_URL}/{event_id}",
+            _event_url(event_id),
             params={"sendUpdates": "none"},
             headers={"Authorization": f"Bearer {access_token}"},
             timeout=settings.GOOGLE_CALENDAR_TIMEOUT_SECONDS,

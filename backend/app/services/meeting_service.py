@@ -6,11 +6,12 @@ which cell, what gets written down when one is scheduled, and which meetings
 a given member is allowed to see. Talking to Google is
 google_meet_service.py's job — nothing in this file makes an HTTP call.
 
-The split matters at exactly one point: the event is created at Google
-*before* the transaction that records it, because an event we failed to
-create must not leave a meeting row pointing at a join link that does not
-exist. The reverse failure — recorded at Google, not recorded here — is
-recoverable, and create_meeting() recovers from it.
+The split matters at exactly one point: Google is called *before* the
+transaction that records what it did, because a change Google refused must
+not be written down here as if it had happened. The reverse failure — done at
+Google, not recorded here — is recoverable, and each writer recovers from it
+in its own way: create_meeting() deletes the event, update_meeting() puts the
+old values back, and cancel_meeting() is safe to retry.
 """
 
 import logging
@@ -33,7 +34,7 @@ from app.core.i18n import translate
 from app.models.forum import ForumPost
 from app.models.meeting import Meeting
 from app.models.user import User
-from app.schemas.meeting import MeetingCreate
+from app.schemas.meeting import MeetingCreate, MeetingUpdate
 from app.services import google_meet_service
 from app.services.audit_service import build_entry
 
@@ -196,9 +197,13 @@ def get_visible_meetings(db: Session, current_user: User) -> list[Meeting]:
     or two reports hiding it pending review, is a decision that members should
     not see this meeting, and a list that kept publishing the join link would
     quietly undo that decision. Reversible by design — reports dismissed and
-    the post back to VISIBLE, and the meeting is listed again. The meeting
-    itself is not cancelled: the row and the Google event stay, and cancelling
-    a meeting is outside ABF-156.
+    the post back to VISIBLE, and the meeting is listed again. Moderation does
+    not cancel the meeting: the row and the Google event stay.
+
+    Nor once its creator has cancelled it (ABF-163), which is not reversible:
+    the Google event is gone, so there is nothing left to join. The
+    announcement itself stays in the forum and says so — this is a list of
+    meetings still ahead, and a cancelled one is not.
     """
     now = _utcnow()
     query = (
@@ -207,6 +212,7 @@ def get_visible_meetings(db: Session, current_user: User) -> list[Meeting]:
         .join(ForumPost, ForumPost.meeting_id == Meeting.id)
         .filter(
             ForumPost.status == PostStatus.VISIBLE,
+            ForumPost.cancelled_at.is_(None),
             Meeting.scheduled_at >= now - _LOOKBACK,
         )
     )
@@ -239,8 +245,232 @@ def get_visible_meetings(db: Session, current_user: User) -> list[Meeting]:
         )
 
     meetings = query.order_by(Meeting.scheduled_at.asc()).all()
-    return [
-        meeting
-        for meeting in meetings
-        if meeting.scheduled_at + timedelta(minutes=meeting.duration_minutes) >= now
-    ]
+    return [meeting for meeting in meetings if _ends_at(meeting) >= now]
+
+
+def _ends_at(meeting: Meeting) -> datetime:
+    """When a meeting is over: its start plus the duration it was booked for."""
+    return meeting.scheduled_at + timedelta(minutes=meeting.duration_minutes)
+
+
+def _load(db: Session, meeting_id: str) -> Meeting:
+    """The meeting as MeetingResponse reads it, creator included."""
+    return (
+        db.query(Meeting)
+        .options(joinedload(Meeting.creator))
+        .filter(Meeting.id == meeting_id)
+        .one()
+    )
+
+
+def _lock_own_meeting(
+    db: Session, meeting_id: str, professional: User
+) -> tuple[Meeting, ForumPost]:
+    """
+    The meeting and its announcement, locked, once she is shown to own it.
+
+    404 for an id that does not exist, then 403 for a meeting someone else
+    created — the order forum_service.update_post() uses. Every other role is
+    already a 403 by then: the endpoints require PROFESSIONAL.
+
+    Both rows are locked (FOR UPDATE; a no-op on SQLite) until the request
+    commits, and that includes the call to Google. Two tabs editing the same
+    meeting must not reach Google in one order and the database in the other,
+    which would leave the calendar saying one thing and the forum another.
+    The price is a lock held across one HTTP call, bounded by
+    GOOGLE_CALENDAR_TIMEOUT_SECONDS, on rows that only their creator writes.
+    `of=` keeps each lock on its own table, as in forum_service.delete_post().
+    """
+    meeting = (
+        db.query(Meeting)
+        .filter(Meeting.id == meeting_id)
+        .with_for_update(of=Meeting)
+        .first()
+    )
+    if meeting is None:
+        raise HTTPException(status_code=404, detail=translate("meetings.not_found"))
+    if meeting.creator_id != professional.id:
+        raise HTTPException(status_code=403, detail=translate("meetings.creator_only"))
+
+    # Exactly one announcement per meeting — create_meeting() writes the two
+    # in one transaction — so .one() is an assertion, not a lookup that may
+    # come back empty.
+    announcement = (
+        db.query(ForumPost)
+        .filter(ForumPost.meeting_id == meeting.id)
+        .with_for_update(of=ForumPost)
+        .one()
+    )
+    return meeting, announcement
+
+
+def update_meeting(
+    db: Session, meeting_id: str, data: MeetingUpdate, professional: User
+) -> Meeting:
+    """
+    Change a meeting's title, its time, or both, everywhere it is written.
+
+    Three copies of the same facts move together: the Meeting row, its
+    announcement (whose title and body are the meeting's title — see
+    create_meeting()), and the event in her Google Calendar. The Meet link
+    does not change, so a member who already copied it still gets in.
+
+    Refused with a 409 once the meeting is cancelled (its event is gone, so
+    there is nothing at Google to edit) or over (an edit would rewrite what
+    the cell was told about a meeting that already happened). A request that
+    changes nothing — the same title, the same instant — returns the meeting
+    as it is, without calling Google or writing an audit entry for an edit
+    that did not happen.
+
+    Moderation is not consulted: an announcement a moderator hid can still be
+    corrected by its author, and stays hidden.
+    """
+    if not professional.is_active_professional:
+        # The same rule as create_meeting(): an admin who deactivated her has
+        # stopped her scheduling, and moving a meeting is scheduling it again.
+        raise HTTPException(
+            status_code=403, detail=translate("meetings.inactive_professional_edit")
+        )
+
+    meeting, announcement = _lock_own_meeting(db, meeting_id, professional)
+
+    if announcement.cancelled_at is not None:
+        raise HTTPException(
+            status_code=409, detail=translate("meetings.already_cancelled")
+        )
+    if _ends_at(meeting) <= _utcnow():
+        raise HTTPException(status_code=409, detail=translate("meetings.already_ended"))
+
+    # The schema guarantees that every field present is a real value, so None
+    # here means "left out" and the stored value stands.
+    title = data.title if data.title is not None else meeting.title
+    scheduled_at = (
+        data.scheduled_at if data.scheduled_at is not None else meeting.scheduled_at
+    )
+
+    changes: dict[str, dict[str, str]] = {}
+    if title != meeting.title:
+        changes["title"] = {"from": meeting.title, "to": title}
+    if scheduled_at != meeting.scheduled_at:
+        changes["scheduled_at"] = {
+            "from": meeting.scheduled_at.isoformat(),
+            "to": scheduled_at.isoformat(),
+        }
+    if not changes:
+        return _load(db, meeting.id)
+
+    # Read before anything can expire them: the rollback below expires every
+    # attribute on the session, and these are what puts the event back.
+    previous_title = meeting.title
+    previous_scheduled_at = meeting.scheduled_at
+    event_id = meeting.calendar_event_id
+    duration_minutes = meeting.duration_minutes
+
+    google_meet_service.update_event(
+        db,
+        professional,
+        event_id,
+        title=title,
+        scheduled_at=scheduled_at,
+        duration_minutes=duration_minutes,
+    )
+
+    try:
+        meeting.title = title
+        meeting.scheduled_at = scheduled_at
+        announcement.title = title
+        announcement.content = title
+        # build_entry rather than log_action, as in create_meeting(): the
+        # audit row commits with the change it describes, or not at all.
+        db.add(
+            build_entry(
+                actor=professional,
+                action=AuditAction.MEETING_UPDATED,
+                entity_type="Meeting",
+                entity_id=meeting.id,
+                details={"changes": changes, "calendar_event_id": event_id},
+            )
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        # Google already shows the new values and nothing here does. Put the
+        # event back the way the forum still describes it, so the two agree
+        # on the old meeting rather than disagree about the new one.
+        try:
+            google_meet_service.update_event(
+                db,
+                professional,
+                event_id,
+                title=previous_title,
+                scheduled_at=previous_scheduled_at,
+                duration_minutes=duration_minutes,
+            )
+        except Exception:
+            logger.exception("Could not restore calendar event %s", event_id)
+        logger.exception("Could not record the edit of meeting %s", meeting_id)
+        raise HTTPException(
+            status_code=500, detail=translate("meetings.update_failed")
+        ) from None
+
+    return _load(db, meeting_id)
+
+
+def cancel_meeting(db: Session, meeting_id: str, professional: User) -> None:
+    """
+    Call a meeting off: delete its Google event, mark its announcement.
+
+    The announcement is marked, not deleted. It stays in the cell's forum
+    reading "cancelled", without a way in, so a member who planned to come
+    finds out where she would have looked — deleting it would make the
+    meeting quietly vanish. The Meeting row stays too: what was scheduled,
+    and the audit entry naming it, are the only record left once the Google
+    event is gone.
+
+    The event is deleted first, and the announcement marked only once Google
+    agrees, so "cancelled" is never shown for a meeting that is still in her
+    calendar. If the write then fails, the event is gone and the meeting is
+    not yet marked — and pressing cancel again completes it, because
+    cancel_event() counts an event that is already gone as deleted.
+
+    Idempotent: cancelling a cancelled meeting does nothing and succeeds, like
+    forum_service.delete_post() on a deleted post — a second press, or the
+    retry above racing a first that did land, is not an error. A meeting that
+    is already over cannot be cancelled: it took place.
+
+    Unlike update_meeting(), a deactivated professional may still cancel. A
+    meeting she can no longer run is exactly the one that should be called
+    off, and refusing her would leave the cell a live join button for it.
+    """
+    meeting, announcement = _lock_own_meeting(db, meeting_id, professional)
+
+    if announcement.cancelled_at is not None:
+        return
+    if _ends_at(meeting) <= _utcnow():
+        raise HTTPException(status_code=409, detail=translate("meetings.already_ended"))
+
+    google_meet_service.cancel_event(db, professional, meeting.calendar_event_id)
+
+    try:
+        announcement.cancelled_at = _utcnow()
+        db.add(
+            build_entry(
+                actor=professional,
+                action=AuditAction.MEETING_CANCELLED,
+                entity_type="Meeting",
+                entity_id=meeting.id,
+                details={
+                    "title": meeting.title,
+                    "scheduled_at": meeting.scheduled_at.isoformat(),
+                    "calendar_event_id": meeting.calendar_event_id,
+                    "forum_post_id": announcement.id,
+                },
+            )
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Could not record the cancellation of meeting %s", meeting_id)
+        raise HTTPException(
+            status_code=500, detail=translate("meetings.cancellation_failed")
+        ) from None

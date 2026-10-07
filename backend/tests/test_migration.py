@@ -571,3 +571,55 @@ def test_no_audit_log_model_migration_drift(monkeypatch) -> None:
         and entry[1].table.name == "audit_logs"
     ]
     assert not index_drift, f"audit_logs index drift detected: {index_drift}"
+
+
+# The revision ABF-163's cancelled_at column sits directly on top of: the
+# merge that joined main's two heads (ABF-165's and ABF-152's).
+REVISION_BEFORE_CANCELLED_AT = "2d0766bdb16c"
+
+
+def test_cancelled_at_migration_goes_down_and_up_again_cleanly(monkeypatch) -> None:
+    """
+    ABF-163 adds one nullable column to forum_posts. The second upgrade is
+    the point: a downgrade that leaves the column behind fails there, with
+    "duplicate column", where nobody is looking.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        assert "cancelled_at" in _forum_post_columns(db_url)
+
+        command.downgrade(alembic_cfg, REVISION_BEFORE_CANCELLED_AT)
+        assert "cancelled_at" not in _forum_post_columns(db_url)
+
+        command.upgrade(alembic_cfg, "head")
+        assert "cancelled_at" in _forum_post_columns(db_url)
+
+
+def test_forum_post_columns_match_the_model(monkeypatch) -> None:
+    """
+    models/forum.py and the migrations have to describe the same forum_posts
+    columns. A column declared on the model and never migrated works in every
+    test (create_all() builds it) and fails in production on the first query.
+
+    Scoped to added and removed columns, like the audit_logs index check
+    above: SQLite's VARCHAR-for-Enum type reports are noise here.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        try:
+            with engine.connect() as connection:
+                context = MigrationContext.configure(connection)
+                diff = compare_metadata(context, Base.metadata)
+        finally:
+            engine.dispose()
+
+    column_drift = [
+        entry
+        for entry in diff
+        if isinstance(entry, tuple)
+        and entry[0] in {"add_column", "remove_column"}
+        and entry[2] == "forum_posts"
+    ]
+    assert not column_drift, f"forum_posts column drift detected: {column_drift}"

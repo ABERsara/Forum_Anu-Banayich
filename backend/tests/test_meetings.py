@@ -1,8 +1,10 @@
 """
-Integration tests for the meetings surface (ABF-156).
+Integration tests for the meetings surface (ABF-156), including editing and
+cancelling a meeting (ABF-163).
 
-Google is never called: google_meet_service.create_meeting() is replaced
-wherever a meeting is expected to succeed, and the one test that does exercise
+Google is never called: google_meet_service.create_meeting(), update_event()
+and cancel_event() are replaced wherever a call is expected to succeed, and
+the one test that does exercise
 the real path is the one asserting what happens when no calendar is linked —
 which fails before any HTTP call. test_google_meet_service.py covers that
 module's own behaviour against fake responses.
@@ -31,7 +33,7 @@ from app.models.audit import AuditLog
 from app.models.forum import ForumPost
 from app.models.meeting import Meeting
 from app.models.user import User
-from app.schemas.meeting import MeetingCreate
+from app.schemas.meeting import MeetingCreate, MeetingUpdate
 from app.services import google_meet_service, meeting_service
 
 BASE = "/api/v1/meetings"
@@ -673,6 +675,575 @@ class TestOrphanedEvents:
 
         assert getattr(exc_info.value, "status_code", None) == 500
         assert deleted == [EVENT_ID]
+
+
+# ---------------------------------------------------------------------------
+# Editing and cancelling (ABF-163)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def google_updates(monkeypatch):
+    """Stand in for Google's event PATCH, and record every call made to it."""
+    calls: list[dict[str, object]] = []
+
+    def _update(db, creator, event_id, *, title, scheduled_at, duration_minutes):
+        calls.append(
+            {
+                "creator_id": creator.id,
+                "event_id": event_id,
+                "title": title,
+                "scheduled_at": scheduled_at,
+                "duration_minutes": duration_minutes,
+            }
+        )
+
+    monkeypatch.setattr(google_meet_service, "update_event", _update)
+    return calls
+
+
+@pytest.fixture
+def google_cancels(monkeypatch):
+    """Stand in for Google's event DELETE, and record which events it removed."""
+    calls: list[str] = []
+
+    def _cancel(db, creator, event_id):
+        calls.append(event_id)
+
+    monkeypatch.setattr(google_meet_service, "cancel_event", _cancel)
+    return calls
+
+
+def _google_refuses(monkeypatch, name: str) -> None:
+    """Make one Google call fail the way google_meet_service reports it."""
+    from fastapi import HTTPException
+
+    def _refuse(*args, **kwargs):
+        raise HTTPException(status_code=502, detail="Google is unavailable")
+
+    monkeypatch.setattr(google_meet_service, name, _refuse)
+
+
+def _other_roles(make_user) -> list[User]:
+    return [
+        make_user(
+            email="member-x@example.com",
+            role=UserRole.USER,
+            account_status=AccountStatus.ACTIVE,
+            user_type=UserType.WIDOW,
+            sector=Sector.HASIDIC,
+        ),
+        make_user(
+            email="mod-x@example.com",
+            role=UserRole.MODERATOR,
+            account_status=AccountStatus.ACTIVE,
+        ),
+        make_user(
+            email="admin-x@example.com",
+            role=UserRole.ADMIN,
+            account_status=AccountStatus.ACTIVE,
+        ),
+        _professional(make_user, email="other-pro@example.com"),
+    ]
+
+
+class TestUpdateMeeting:
+    async def test_the_creator_renames_it_everywhere_it_is_written(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+
+        r = await client.patch(f"{BASE}/{meeting.id}", json={"title": "כותרת חדשה"})
+
+        assert r.status_code == 200
+        assert r.json()["title"] == "כותרת חדשה"
+        # The join link survives the edit: members who already have it still
+        # get in.
+        assert r.json()["meet_link"] == MEET_LINK
+
+        db_session.refresh(meeting)
+        assert meeting.title == "כותרת חדשה"
+        post = _announcement_of(db_session, meeting)
+        assert post.title == "כותרת חדשה"
+        assert post.content == "כותרת חדשה"
+
+        # And the Google event, with the time it already had.
+        assert google_updates == [
+            {
+                "creator_id": professional.id,
+                "event_id": EVENT_ID,
+                "title": "כותרת חדשה",
+                "scheduled_at": meeting.scheduled_at,
+                "duration_minutes": 60,
+            }
+        ]
+
+    async def test_a_new_time_is_stored_as_utc_and_sent_to_google(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+        in_two_days = (datetime.now(UTC) + timedelta(days=2)).date()
+
+        r = await client.patch(
+            f"{BASE}/{meeting.id}",
+            json={"scheduled_at": f"{in_two_days.isoformat()}T18:00:00+03:00"},
+        )
+
+        assert r.status_code == 200
+        expected = datetime(in_two_days.year, in_two_days.month, in_two_days.day, 15)
+        db_session.refresh(meeting)
+        assert meeting.scheduled_at == expected
+        assert r.json()["scheduled_at"].endswith("Z")
+        assert google_updates[0]["scheduled_at"] == expected
+        # The title it already had travels with it.
+        assert google_updates[0]["title"] == "מפגש"
+
+    async def test_a_member_of_the_cell_sees_the_change_in_the_forum(
+        self, client, db_session, make_user, google_updates
+    ):
+        """The ticket's proof, end to end: the professional edits, and the
+        member's feed carries the new title and the new time."""
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        new_time = datetime.now(UTC) + timedelta(days=3)
+
+        _login_as(professional)
+        r = await client.patch(
+            f"{BASE}/{meeting.id}",
+            json={"title": "מפגש שהוזז", "scheduled_at": new_time.isoformat()},
+        )
+        assert r.status_code == 200
+
+        _login_as(_member(make_user))
+        feed = await client.get("/api/v1/forum/posts")
+
+        item = feed.json()["items"][0]
+        assert item["title"] == "מפגש שהוזז"
+        assert item["meeting"]["scheduled_at"] == r.json()["scheduled_at"]
+        assert item["cancelled_at"] is None
+
+    async def test_the_edit_is_audited_with_what_changed(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+
+        r = await client.patch(f"{BASE}/{meeting.id}", json={"title": "כותרת חדשה"})
+
+        assert r.status_code == 200
+        entry = db_session.query(AuditLog).one()
+        assert entry.action == AuditAction.MEETING_UPDATED
+        assert entry.actor_id == professional.id
+        assert entry.entity_id == meeting.id
+        assert entry.details["changes"] == {
+            "title": {"from": "מפגש", "to": "כותרת חדשה"}
+        }
+        assert entry.details["calendar_event_id"] == EVENT_ID
+
+    async def test_nobody_but_the_creator_may_edit(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+
+        for user in _other_roles(make_user):
+            _login_as(user)
+            r = await client.patch(f"{BASE}/{meeting.id}", json={"title": "פריצה"})
+            assert r.status_code == 403, user.role
+
+        db_session.refresh(meeting)
+        assert meeting.title == "מפגש"
+        assert google_updates == []
+        assert db_session.query(AuditLog).count() == 0
+
+    async def test_an_unknown_meeting_is_404(
+        self, client, db_session, make_user, google_updates
+    ):
+        _login_as(_professional(make_user))
+
+        r = await client.patch(f"{BASE}/no-such-meeting", json={"title": "כותרת"})
+
+        assert r.status_code == 404
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            pytest.param({}, id="empty"),
+            pytest.param({"title": None}, id="null-title"),
+            pytest.param({"scheduled_at": None}, id="null-time"),
+            pytest.param({"title": "א"}, id="title-too-short"),
+        ],
+    )
+    async def test_a_body_with_nothing_to_store_is_422(
+        self, client, db_session, make_user, google_updates, body
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+
+        r = await client.patch(f"{BASE}/{meeting.id}", json=body)
+
+        assert r.status_code == 422
+        assert google_updates == []
+
+    async def test_a_time_already_past_is_422(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+
+        r = await client.patch(
+            f"{BASE}/{meeting.id}",
+            json={"scheduled_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat()},
+        )
+
+        assert r.status_code == 422
+        assert google_updates == []
+
+    async def test_a_time_without_a_zone_is_refused_not_guessed(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+        tomorrow = (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%d")
+
+        r = await client.patch(
+            f"{BASE}/{meeting.id}", json={"scheduled_at": f"{tomorrow}T18:00"}
+        )
+
+        assert r.status_code == 422
+        assert r.json()["detail"][0]["type"] == "timezone_aware"
+
+    async def test_a_cancelled_meeting_cannot_be_edited(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _announcement_of(db_session, meeting).cancelled_at = datetime.now(UTC).replace(
+            tzinfo=None
+        )
+        db_session.commit()
+        _login_as(professional)
+
+        r = await client.patch(f"{BASE}/{meeting.id}", json={"title": "כותרת חדשה"})
+
+        assert r.status_code == 409
+        assert google_updates == []
+
+    async def test_a_meeting_that_is_over_cannot_be_edited(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional, starts_in=-timedelta(hours=2))
+        _login_as(professional)
+
+        r = await client.patch(f"{BASE}/{meeting.id}", json={"title": "כותרת חדשה"})
+
+        assert r.status_code == 409
+        assert google_updates == []
+
+    async def test_a_meeting_in_progress_can_still_be_corrected(
+        self, client, db_session, make_user, google_updates
+    ):
+        """Over is the end, not the start — the same rule as the join button."""
+        professional = _professional(make_user)
+        meeting = _make_meeting(
+            db_session, professional, starts_in=-timedelta(minutes=10)
+        )
+        _login_as(professional)
+
+        r = await client.patch(f"{BASE}/{meeting.id}", json={"title": "כותרת מתוקנת"})
+
+        assert r.status_code == 200
+
+    async def test_an_edit_that_changes_nothing_touches_nothing(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+
+        r = await client.patch(f"{BASE}/{meeting.id}", json={"title": "מפגש"})
+
+        assert r.status_code == 200
+        assert google_updates == []
+        assert db_session.query(AuditLog).count() == 0
+
+    async def test_a_deactivated_professional_cannot_edit(
+        self, client, db_session, make_user, google_updates
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        professional.is_active_professional = False
+        db_session.commit()
+        _login_as(professional)
+
+        r = await client.patch(f"{BASE}/{meeting.id}", json={"title": "כותרת חדשה"})
+
+        assert r.status_code == 403
+        assert google_updates == []
+
+    async def test_when_google_refuses_nothing_changes_here(
+        self, client, db_session, make_user, monkeypatch
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _google_refuses(monkeypatch, "update_event")
+        _login_as(professional)
+
+        r = await client.patch(f"{BASE}/{meeting.id}", json={"title": "כותרת חדשה"})
+
+        assert r.status_code == 502
+        db_session.refresh(meeting)
+        assert meeting.title == "מפגש"
+        assert _announcement_of(db_session, meeting).title == "מפגש"
+        assert db_session.query(AuditLog).count() == 0
+
+    def test_a_failed_write_puts_the_google_event_back(
+        self, db_session, make_user, google_updates, monkeypatch
+    ):
+        """
+        Google is updated before the rows. If the transaction then fails, the
+        calendar shows the new meeting and the forum the old one — so the
+        event is put back the way the forum still describes it.
+        """
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        original_time = meeting.scheduled_at
+        meeting_id = meeting.id
+
+        def _explode():
+            raise RuntimeError("database is gone")
+
+        monkeypatch.setattr(db_session, "commit", _explode)
+
+        with pytest.raises(Exception) as exc_info:
+            meeting_service.update_meeting(
+                db_session,
+                meeting_id,
+                MeetingUpdate(title="כותרת חדשה"),
+                professional,
+            )
+
+        assert getattr(exc_info.value, "status_code", None) == 500
+        assert [call["title"] for call in google_updates] == ["כותרת חדשה", "מפגש"]
+        assert google_updates[1]["scheduled_at"] == original_time
+
+
+class TestCancelMeeting:
+    async def test_the_creator_cancels_it_and_the_event_is_deleted(
+        self, client, db_session, make_user, google_cancels
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+
+        r = await client.delete(f"{BASE}/{meeting.id}")
+
+        assert r.status_code == 204
+        assert google_cancels == [EVENT_ID]
+        post = _announcement_of(db_session, meeting)
+        db_session.refresh(post)
+        assert post.cancelled_at is not None
+        # Marked, not removed: the announcement and the meeting both stay, and
+        # moderation's status is left alone.
+        assert post.status == PostStatus.VISIBLE
+        assert db_session.query(Meeting).count() == 1
+
+    async def test_a_member_sees_it_cancelled_and_no_longer_listed(
+        self, client, db_session, make_user, google_cancels
+    ):
+        """The ticket's proof: the announcement is still in her feed, marked
+        cancelled, and the meeting no longer offers itself as one ahead."""
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+        assert (await client.delete(f"{BASE}/{meeting.id}")).status_code == 204
+
+        _login_as(_member(make_user))
+        feed = await client.get("/api/v1/forum/posts")
+        listed = await client.get(BASE)
+
+        item = feed.json()["items"][0]
+        assert item["meeting"]["id"] == meeting.id
+        assert item["cancelled_at"] is not None
+        assert listed.json() == []
+
+    async def test_the_cancellation_is_audited(
+        self, client, db_session, make_user, google_cancels
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+
+        await client.delete(f"{BASE}/{meeting.id}")
+
+        entry = db_session.query(AuditLog).one()
+        assert entry.action == AuditAction.MEETING_CANCELLED
+        assert entry.actor_id == professional.id
+        assert entry.entity_id == meeting.id
+        assert entry.details["calendar_event_id"] == EVENT_ID
+        assert entry.details["title"] == "מפגש"
+        assert (
+            entry.details["forum_post_id"] == _announcement_of(db_session, meeting).id
+        )
+
+    async def test_nobody_but_the_creator_may_cancel(
+        self, client, db_session, make_user, google_cancels
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+
+        for user in _other_roles(make_user):
+            _login_as(user)
+            r = await client.delete(f"{BASE}/{meeting.id}")
+            assert r.status_code == 403, user.role
+
+        assert google_cancels == []
+        assert _announcement_of(db_session, meeting).cancelled_at is None
+
+    async def test_an_unknown_meeting_is_404(
+        self, client, db_session, make_user, google_cancels
+    ):
+        _login_as(_professional(make_user))
+
+        r = await client.delete(f"{BASE}/no-such-meeting")
+
+        assert r.status_code == 404
+
+    async def test_cancelling_twice_is_one_cancellation(
+        self, client, db_session, make_user, google_cancels
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+
+        first = await client.delete(f"{BASE}/{meeting.id}")
+        second = await client.delete(f"{BASE}/{meeting.id}")
+
+        assert (first.status_code, second.status_code) == (204, 204)
+        assert google_cancels == [EVENT_ID]
+        assert db_session.query(AuditLog).count() == 1
+
+    async def test_a_meeting_that_is_over_cannot_be_cancelled(
+        self, client, db_session, make_user, google_cancels
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional, starts_in=-timedelta(hours=2))
+        _login_as(professional)
+
+        r = await client.delete(f"{BASE}/{meeting.id}")
+
+        assert r.status_code == 409
+        assert google_cancels == []
+
+    async def test_a_deactivated_professional_can_still_call_it_off(
+        self, client, db_session, make_user, google_cancels
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        professional.is_active_professional = False
+        db_session.commit()
+        _login_as(professional)
+
+        r = await client.delete(f"{BASE}/{meeting.id}")
+
+        assert r.status_code == 204
+
+    async def test_when_google_refuses_the_meeting_stays_on(
+        self, client, db_session, make_user, monkeypatch
+    ):
+        """'Cancelled' is never shown for a meeting still in her calendar."""
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _google_refuses(monkeypatch, "cancel_event")
+        _login_as(professional)
+
+        r = await client.delete(f"{BASE}/{meeting.id}")
+
+        assert r.status_code == 502
+        assert _announcement_of(db_session, meeting).cancelled_at is None
+        assert db_session.query(AuditLog).count() == 0
+
+    def test_a_failed_write_is_finished_by_trying_again(
+        self, db_session, make_user, google_cancels, monkeypatch
+    ):
+        """
+        The event is deleted before the announcement is marked. If that write
+        fails, a second press completes the cancellation — cancel_event()
+        counts an event that is already gone as deleted (pinned in
+        test_google_meet_service.py).
+        """
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        meeting_id = meeting.id
+        real_commit = db_session.commit
+
+        def _explode():
+            raise RuntimeError("database is gone")
+
+        monkeypatch.setattr(db_session, "commit", _explode)
+        with pytest.raises(Exception) as exc_info:
+            meeting_service.cancel_meeting(db_session, meeting_id, professional)
+        assert getattr(exc_info.value, "status_code", None) == 500
+
+        monkeypatch.setattr(db_session, "commit", real_commit)
+        meeting_service.cancel_meeting(db_session, meeting_id, professional)
+
+        assert google_cancels == [EVENT_ID, EVENT_ID]
+        post = db_session.query(ForumPost).filter_by(meeting_id=meeting_id).one()
+        assert post.cancelled_at is not None
+
+
+class TestCancellationOutlivesModeration:
+    """
+    Why the cancellation is its own column and not a PostStatus: moderation
+    writes `status` back. Hidden by reports and then restored, an announcement
+    must come back still cancelled — not as a live meeting with a join button.
+    """
+
+    async def test_hidden_and_restored_it_is_still_cancelled(
+        self, client, db_session, make_user, google_cancels
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(db_session, professional)
+        _login_as(professional)
+        assert (await client.delete(f"{BASE}/{meeting.id}")).status_code == 204
+
+        post = _announcement_of(db_session, meeting)
+        post.status = PostStatus.HIDDEN
+        db_session.commit()
+        post.status = PostStatus.VISIBLE
+        db_session.commit()
+
+        _login_as(_member(make_user))
+        feed = await client.get("/api/v1/forum/posts")
+
+        assert feed.json()["items"][0]["cancelled_at"] is not None
+        assert (await client.get(BASE)).json() == []
+
+    async def test_a_hidden_announcement_can_still_be_cancelled(
+        self, client, db_session, make_user, google_cancels
+    ):
+        professional = _professional(make_user)
+        meeting = _make_meeting(
+            db_session, professional, announcement_status=PostStatus.HIDDEN
+        )
+        _login_as(professional)
+
+        r = await client.delete(f"{BASE}/{meeting.id}")
+
+        assert r.status_code == 204
+        post = _announcement_of(db_session, meeting)
+        assert post.cancelled_at is not None
+        assert post.status == PostStatus.HIDDEN
 
 
 class TestCalendarConnection:
