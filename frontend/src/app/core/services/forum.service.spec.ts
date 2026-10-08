@@ -37,6 +37,7 @@ const MOCK_POST: ForumPost = {
   created_at: '2026-07-14T00:00:00',
   post_type: PostType.TEXT,
   meeting: null,
+  cancelled_at: null,
   updated_at: '2026-07-14T00:00:00',
 };
 

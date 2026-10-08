@@ -65,6 +65,19 @@ class ForumPost(Base):
     meeting_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("meetings.id"), nullable=True
     )
+    #: When the meeting this post announces was called off by its creator
+    #: (ABF-163). NULL on every live announcement and on every TEXT post. A
+    #: timestamp rather than a flag, the convention DirectMessage.hidden_at and
+    #: read_at already follow, so the row also answers *when*.
+    #:
+    #: Its own column rather than a PostStatus value on purpose. `status` is
+    #: moderation's, and moderation writes it back: two reports set HIDDEN, a
+    #: dismissed report restores VISIBLE. A CANCELLED status would be
+    #: overwritten by the first of those and then "restored" to VISIBLE,
+    #: putting a cancelled meeting's join button back in front of the cell. The
+    #: two facts are independent: a cancelled announcement can still be
+    #: reported or deleted, and a hidden one can still be cancelled.
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # ------------------------------------------------------------------
     # Moderation

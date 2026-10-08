@@ -6,7 +6,14 @@ that makes scheduling possible (ABF-156).
 from datetime import UTC, datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, AwareDatetime, BaseModel, Field, field_validator
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.core.constants import GroupVisibility, SectorVisibility
 from app.core.i18n import translate
@@ -33,6 +40,22 @@ def _as_utc(value: datetime) -> datetime:
 UtcDatetime = Annotated[datetime, AfterValidator(_as_utc)]
 
 
+def _future_naive_utc(value: datetime) -> datetime:
+    """Normalise to naive UTC and refuse a meeting that already started.
+
+    Always aware by the time it gets here — AwareDatetime has already refused
+    anything else. Both halves belong in the schema rather than in the
+    service: the "is it in the future" question is only meaningful once the
+    zone has been resolved, and resolving it twice in two places is how the
+    two answers drift apart. Shared by MeetingCreate and MeetingUpdate for the
+    same reason.
+    """
+    value = value.astimezone(UTC).replace(tzinfo=None)
+    if value <= datetime.now(UTC).replace(tzinfo=None):
+        raise ValueError(translate("meetings.scheduled_in_past"))
+    return value
+
+
 class MeetingCreate(BaseModel):
     """POST /meetings – a professional schedules a meeting for one cell."""
 
@@ -57,18 +80,7 @@ class MeetingCreate(BaseModel):
     @field_validator("scheduled_at")
     @classmethod
     def _future_utc(cls, value: datetime) -> datetime:
-        """Normalise to naive UTC and refuse a meeting that already started.
-
-        Always aware by the time it gets here — AwareDatetime has already
-        refused anything else. Both halves belong here rather than in the
-        service: the "is it in the future" question is only meaningful once the
-        zone has been resolved, and resolving it twice in two places is how
-        the two answers drift apart.
-        """
-        value = value.astimezone(UTC).replace(tzinfo=None)
-        if value <= datetime.now(UTC).replace(tzinfo=None):
-            raise ValueError(translate("meetings.scheduled_in_past"))
-        return value
+        return _future_naive_utc(value)
 
     @field_validator("group_visibility")
     @classmethod
@@ -83,6 +95,43 @@ class MeetingCreate(BaseModel):
         if value == SectorVisibility.ALL:
             raise ValueError(translate("meetings.visibility_must_be_one_cell"))
         return value
+
+
+class MeetingUpdate(BaseModel):
+    """PATCH /meetings/{id} – the creator changes the title, the time, or both.
+
+    Each field is optional, and one that is left out is left as it is. The
+    cell is not here on purpose: moving a meeting to another cell would move
+    its announcement to members who never saw it and away from the ones who
+    did, which is a new meeting, not an edit of this one. Neither is the
+    duration, which ABF-156 fixes from the setting at creation.
+    """
+
+    title: str | None = Field(None, min_length=2, max_length=256)
+
+    #: The same rules as MeetingCreate.scheduled_at: zone stated, in the
+    #: future, stored as naive UTC.
+    scheduled_at: AwareDatetime | None = None
+
+    @field_validator("scheduled_at")
+    @classmethod
+    def _future_utc(cls, value: datetime | None) -> datetime | None:
+        return None if value is None else _future_naive_utc(value)
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> "MeetingUpdate":
+        """Refuse an empty body, and a field sent as an explicit null.
+
+        Both would otherwise reach the service as "change nothing" or "set
+        the title to None". The first is a request that cannot have meant
+        anything, and the second would write NULL into a NOT NULL column and
+        send Google an event without a summary.
+        """
+        if not self.model_fields_set or any(
+            getattr(self, field) is None for field in self.model_fields_set
+        ):
+            raise ValueError(translate("meetings.update_empty"))
+        return self
 
 
 class MeetingSummary(BaseModel):

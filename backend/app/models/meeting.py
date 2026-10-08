@@ -16,7 +16,12 @@ are null for all but a handful of rows.
 The row outlives its announcement, but it is not *published* without it:
 when moderation deletes or hides the announcement, GET /meetings stops
 listing the meeting (see meeting_service.get_visible_meetings()). The row
-and the Google event remain — cancelling a meeting is outside ABF-156.
+and the Google event remain.
+
+Its creator can edit the title and time, or cancel it (ABF-163). A
+cancellation is recorded on the announcement (ForumPost.cancelled_at), not
+here, and deletes the Google event. This row is kept as the record of what
+was scheduled.
 """
 
 import uuid
@@ -58,9 +63,10 @@ class Meeting(Base):
 
     #: The Meet URL members join. Google's, not ours — we never mint it.
     meet_link: Mapped[str] = mapped_column(String(1024), nullable=False)
-    #: The Calendar event id, kept so a future ticket can cancel or edit the
-    #: meeting (both explicitly out of scope for ABF-156) without having to
-    #: search the professional's calendar for it.
+    #: The Calendar event id, which is how editing and cancelling (ABF-163)
+    #: reach the event without searching the professional's calendar for it.
+    #: Still set after a cancellation, when it names an event that has been
+    #: deleted; the audit entry for the cancellation records it too.
     calendar_event_id: Mapped[str] = mapped_column(String(256), nullable=False)
 
     # ------------------------------------------------------------------

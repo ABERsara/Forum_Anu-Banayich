@@ -230,6 +230,13 @@ class AuditAction(enum.StrEnum):
     # grounds as BROADCAST_SENT: it creates an event on an external service
     # and publishes a join link to a whole cell at once.
     MEETING_CREATED = "meeting_created"
+    # Its creator changing a meeting's title or time, or calling it off
+    # (ABF-163). Audited for the same reason as MEETING_CREATED: each one
+    # rewrites an event on Google's side and an announcement a whole cell
+    # reads, and a cancellation is the only record left that the meeting was
+    # ever on — its Google event is gone.
+    MEETING_UPDATED = "meeting_updated"
+    MEETING_CANCELLED = "meeting_cancelled"
     # A user editing their own profile through PUT /users/me (ABF-165): today
     # only the alert address. For a moderator or an admin that address is where
     # report and SLA alerts are routed, and the admin's identical edit is already

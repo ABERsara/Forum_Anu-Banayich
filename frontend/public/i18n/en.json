@@ -545,7 +545,25 @@
     "upcoming": {
       "title": "Meetings you have scheduled",
       "empty": "You have no meetings still ahead.",
-      "join": "Join"
+      "join": "Join",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "edit_aria": "Edit the meeting {{title}}",
+      "cancel_aria": "Cancel the meeting {{title}}",
+      "updated": "The meeting was updated, along with its forum announcement and its Google Calendar event.",
+      "cancelled": "The meeting was cancelled. Its forum announcement now reads \"Meeting cancelled\", and the event was removed from Google Calendar."
+    },
+    "edit": {
+      "save": "Save changes",
+      "saving": "Saving...",
+      "discard": "Back without saving",
+      "note": "A new time also moves the Google Calendar event. The join link stays the same."
+    },
+    "cancel_dialog": {
+      "title": "Cancel this meeting?",
+      "message": "Its forum announcement will read \"Meeting cancelled\" with no way to join, and the event will be deleted from Google Calendar. This cannot be undone.",
+      "confirm": "Yes, cancel the meeting",
+      "keep": "Keep the meeting"
     },
     "callback": {
       "title": "Connect Google Calendar",
@@ -559,13 +577,16 @@
       "badge": "Meeting",
       "starts_at": "Starts: {{when}}",
       "join": "Join the meeting",
-      "ended": "This meeting has ended"
+      "ended": "This meeting has ended",
+      "cancelled": "Meeting cancelled"
     },
     "errors": {
       "status_failed": "The calendar connection could not be checked. Please try again.",
       "create_failed": "The meeting could not be scheduled. Please try again.",
       "load_upcoming_failed": "Upcoming meetings could not be loaded.",
-      "connect_failed": "The calendar could not be connected. Please try again."
+      "connect_failed": "The calendar could not be connected. Please try again.",
+      "update_failed": "The meeting could not be updated. Please try again.",
+      "cancel_failed": "The meeting could not be cancelled. Please try again."
     }
   },
   "moderator": {
@@ -914,6 +935,8 @@
       "agent_conversation": "AI agent conversation",
       "agent_conversation_access_denied": "Agent conversation access denied",
       "meeting_created": "Meeting scheduled",
+      "meeting_updated": "Meeting edited",
+      "meeting_cancelled": "Meeting cancelled",
       "profile_updated": "Profile updated"
     }
   }
