@@ -175,7 +175,21 @@
       "pager_aria": "עימוד יומן הביקורת",
       "previous_page": "הקודם",
       "next_page": "הבא",
-      "page_of": "עמוד {{page}} מתוך {{count}}"
+      "page_of": "עמוד {{page}} מתוך {{count}}",
+      "open_entry_aria": "פתיחת פרטי הרשומה: {{action}}, {{when}}",
+      "entry": {
+        "title": "פרטי רשומה",
+        "close": "סגירה",
+        "close_aria": "סגירת פרטי הרשומה וחזרה ליומן",
+        "field_action": "פעולה",
+        "field_timestamp": "מתי",
+        "field_actor": "מזהה מבצע/ת",
+        "field_entity_type": "סוג ישות",
+        "field_entity_id": "מזהה ישות",
+        "field_id": "מזהה רשומה",
+        "field_details": "פרטים נוספים",
+        "no_details": "לרשומה זו לא נשמרו פרטים נוספים."
+      }
     },
     "broadcast": {
       "title": "שידור לכלל המשתמשים",
@@ -206,7 +220,8 @@
       "load_moderators_failed": "אירעה שגיאה בטעינת הממונים. נסה לרענן את הדף.",
       "save_moderator_failed": "אירעה שגיאה בשמירת הממונה. נסה שוב.",
       "remove_moderator_failed": "אירעה שגיאה בהסרת הממונה. נסה שוב.",
-      "load_audit_log_failed": "אירעה שגיאה בטעינת יומן הביקורת. נסה לרענן את הדף."
+      "load_audit_log_failed": "אירעה שגיאה בטעינת יומן הביקורת. נסה לרענן את הדף.",
+      "load_audit_log_entry_failed": "אירעה שגיאה בטעינת הרשומה. נסה שוב."
     }
   },
   "advice": {

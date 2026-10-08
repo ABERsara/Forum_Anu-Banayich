@@ -16,6 +16,7 @@ import {
   UserType,
 } from '../constants';
 import type {
+  AuditLogEntry,
   AuditLogList,
   ForumPost,
   ModeratorAdminView,
@@ -369,6 +370,51 @@ describe('AdminService', () => {
       // `&` — which is what a template literal would have produced.
       expect(params.get('entity_id')).toBe('a&b=c d');
       expect([...params.keys()]).toEqual(['entity_id']);
+    });
+  });
+
+  describe('getAuditLogEntry', () => {
+    const ENTRY: AuditLogEntry = {
+      id: 'entry-1',
+      actor_id: 'admin-1',
+      action_type: AuditAction.USER_SUSPENDED,
+      entity_type: 'User',
+      entity_id: 'user-9',
+      timestamp: '2026-09-01T12:00:00',
+      details: { hours: 48, changes: { title: { from: 'a', to: 'b' } } },
+    };
+
+    it('GETs the one entry by id and returns it', () => {
+      let result: AuditLogEntry | undefined;
+
+      service.getAuditLogEntry('entry-1').subscribe((res) => (result = res));
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/admin/audit-log/entry-1`);
+      expect(req.request.method).toBe('GET');
+
+      req.flush(ENTRY);
+      expect(result).toEqual(ENTRY);
+    });
+
+    it('hands details on as the object it arrived as', () => {
+      let result: AuditLogEntry | undefined;
+
+      service.getAuditLogEntry('entry-1').subscribe((res) => (result = res));
+      httpMock.expectOne(`${environment.apiUrl}/admin/audit-log/entry-1`).flush(ENTRY);
+
+      expect(result!.details).toEqual({ hours: 48, changes: { title: { from: 'a', to: 'b' } } });
+    });
+
+    /**
+     * A path segment, not a query value: unencoded, an id with a `/` in it
+     * would address a different route, and one with a `?` would turn the
+     * rest of itself into a query string.
+     */
+    it('encodes the id so it stays one path segment', () => {
+      service.getAuditLogEntry('a/b?c').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/admin/audit-log/a%2Fb%3Fc`);
+      req.flush(ENTRY);
     });
   });
 });

@@ -117,6 +117,28 @@
     }
   }
 
+  // The whole row opens the entry, so the whole row says so.
+  &__row {
+    cursor: pointer;
+  }
+
+  // The `what` cell's button: reads as the cell's text, underlined as a
+  // thing that opens, with the focus ring any control here has.
+  &__open {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: $color-primary;
+    font: inherit;
+    text-align: start;
+    text-decoration: underline;
+    cursor: pointer;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
   // The caption names the table for a screen reader; sighted readers already
   // have the <h1> above it, so repeating it on screen is noise.
   &__caption {

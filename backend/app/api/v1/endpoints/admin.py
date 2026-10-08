@@ -15,6 +15,7 @@ POST   /admin/moderators             – appoint a moderator
 PATCH  /admin/moderators/{id}        – update a moderator's cells / alert email
 DELETE /admin/moderators/{id}        – remove a moderator from the roster
 GET  /admin/audit-log                – the audit log: filtered, sorted, paginated
+GET  /admin/audit-log/{id}           – one audit log entry, in full
 POST /admin/users/{id}/suspend       – suspend a user manually
 GET  /admin/users/restricted         – users with an active report restriction
 PATCH /admin/users/{id}/lift-restriction – lift a user's report restriction
@@ -287,3 +288,29 @@ def get_audit_log(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/audit-log/{entry_id}", response_model=AuditLogEntry)
+def get_audit_log_entry(entry_id: str, db: Session = Depends(get_db)) -> AuditLogEntry:
+    """
+    Return one audit log entry in full — what a row of the list opens onto.
+
+    Admin only, by the same router-level `require_role(UserRole.ADMIN)` as the
+    list, and decided before the id is looked up: a member who guesses an id
+    gets 403 whether or not it exists, so the endpoint cannot be used to learn
+    which ids do.
+
+    The same `AuditLogEntry` the list serialises each row with, so the entry
+    opened from a row is exactly that row — and `ip_address` stays out of this
+    response for the same reason it stays out of that one (`schemas/audit.py`).
+
+    `details` goes out as a JSON object, never as a string holding one: the
+    column is `JSON` and the schema types it as a dict, so the client receives
+    structure it can lay out, not text it would have to parse back.
+
+    **Keep this route below any fixed path under `/audit-log/`.** FastAPI
+    matches routes in the order they are declared, and `{entry_id}` matches
+    any single segment — a `GET /audit-log/export` declared after this one
+    would be read as a lookup of an entry called "export" and answer 404.
+    """
+    return AuditLogEntry.model_validate(audit_service.get_audit_entry(db, entry_id))

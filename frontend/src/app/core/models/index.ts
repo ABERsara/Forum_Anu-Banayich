@@ -902,8 +902,9 @@ export interface AuditLogEntry {
   /** Naive UTC, like every other timestamp this API returns — see utcIso(). */
   timestamp: string;
   /**
-   * Context the logging service attached, never PII (CONTRIBUTING §4). Read
-   * by the single-entry view (Task 2); the list does not render it.
+   * Context the logging service attached, never PII (CONTRIBUTING §4). An
+   * object, not a string holding JSON. Shown by the single-entry dialog
+   * (ABF-153); the list does not render it.
    */
   details: Record<string, unknown> | null;
 }
