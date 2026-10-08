@@ -746,4 +746,257 @@ describe('AuditLogComponent', () => {
       expect(page.style.direction).toBe('');
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Export (ABF-161)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * "Export CSV" downloads the rows the table is showing: cut by the filters
+   * that were *applied* — not by what is half-typed in a box — with every page
+   * included and no paging or sort parameters sent, and saved as the very
+   * bytes the server sent, so the BOM that makes Excel read Hebrew survives.
+   *
+   * The download itself is the real `saveFile()`; only the two browser
+   * functions jsdom lacks, and the click that would leave the page, are
+   * stubbed.
+   */
+  describe('export', () => {
+    const FILE = new Blob(['csv'], { type: 'text/csv' });
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    let exportAuditLog: ReturnType<typeof vi.fn>;
+    let createObjectURL: ReturnType<typeof vi.fn<(file: Blob) => string>>;
+    let downloads: HTMLAnchorElement[];
+
+    /**
+     * Put `exportAuditLog` on the service mock. On the same object `render()`
+     * provided, rather than a new one, since `useValue` hands the component
+     * that exact object — so it also survives a re-render inside a test.
+     */
+    function stubExport(result: unknown = of(FILE)): void {
+      exportAuditLog = vi.fn().mockReturnValue(result);
+      Object.assign(adminServiceMock, { exportAuditLog });
+    }
+
+    beforeEach(() => {
+      // Fake, so saveFile's delayed revoke cannot fire after the URL stubs
+      // below have been put back.
+      vi.useFakeTimers();
+      stubExport();
+      createObjectURL = vi.fn<(file: Blob) => string>().mockReturnValue('blob:audit-log');
+      URL.createObjectURL = createObjectURL;
+      URL.revokeObjectURL = vi.fn<(url: string) => void>();
+      downloads = [];
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+        this: HTMLAnchorElement,
+      ) {
+        downloads.push(this);
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+    });
+
+    function exportButton(): HTMLButtonElement {
+      return root().querySelector<HTMLButtonElement>('.audit-log__export button')!;
+    }
+
+    function clickExport(): void {
+      exportButton().click();
+      fixture.detectChanges();
+    }
+
+    function exportedFilters(): Record<string, unknown> {
+      expect(exportAuditLog).toHaveBeenCalledTimes(1);
+      return exportAuditLog.mock.calls[0][0] as Record<string, unknown>;
+    }
+
+    it('offers the button beside the title, labelled as the ticket names it', () => {
+      expect(exportButton().textContent!.trim()).toBe('ייצוא CSV');
+      expect(exportButton().disabled).toBe(false);
+    });
+
+    it('fetches nothing until it is pressed', () => {
+      expect(exportAuditLog).not.toHaveBeenCalled();
+    });
+
+    it('exports the two filters the table was fetched with, together', () => {
+      type('actor_id', 'admin-0001');
+      choose(AuditAction.USER_SUSPENDED);
+      apply();
+
+      clickExport();
+
+      expect(exportedFilters()).toEqual({
+        actor_id: 'admin-0001',
+        action_type: AuditAction.USER_SUSPENDED,
+      });
+    });
+
+    it('sends every filter the panel offers', () => {
+      type('actor_id', 'admin-0001');
+      choose(AuditAction.POST_DELETED);
+      type('entity_type', 'ForumPost');
+      type('entity_id', 'post-3');
+      type('date_from', '2026-09-01');
+      type('date_to', '2026-09-30');
+      apply();
+
+      clickExport();
+
+      expect(exportedFilters()).toEqual({
+        actor_id: 'admin-0001',
+        action_type: AuditAction.POST_DELETED,
+        entity_type: 'ForumPost',
+        entity_id: 'post-3',
+        date_from: '2026-09-01',
+        date_to: '2026-09-30',
+      });
+    });
+
+    it('sends the filters the service sends for the table, exactly', () => {
+      type('entity_id', 'user-0009');
+      choose(AuditAction.USER_APPROVED);
+      apply();
+
+      clickExport();
+
+      const { direction, page, page_size, ...tableFilters } = lastQuery();
+      expect([direction, page, page_size].every((value) => value !== undefined)).toBe(true);
+      expect(exportedFilters()).toEqual(tableFilters);
+    });
+
+    it('exports the applied filters, not what is half-typed in a box', () => {
+      type('actor_id', 'admin-0001');
+      apply();
+      type('actor_id', 'someone-else');
+
+      clickExport();
+
+      expect(exportedFilters()).toEqual({ actor_id: 'admin-0001' });
+    });
+
+    it('exports every page, not the one on screen, in the server order', async () => {
+      await render(of(makePage({ total_count: 120 })));
+      stubExport();
+      buttonWith('הבא').click();
+      sortHeaderButton().click();
+      fixture.detectChanges();
+
+      clickExport();
+
+      expect(exportedFilters()).toEqual({});
+    });
+
+    it('saves the very file the server sent, under a dated .csv name', () => {
+      clickExport();
+
+      expect(createObjectURL).toHaveBeenCalledWith(FILE);
+      expect(downloads).toHaveLength(1);
+      expect(downloads[0].download).toMatch(/^audit-log-\d{4}-\d{2}-\d{2}\.csv$/);
+    });
+
+    it('cannot be pressed twice while the file is on its way', () => {
+      const pending = new Subject<Blob>();
+      stubExport(pending);
+
+      clickExport();
+      clickExport();
+
+      expect(exportAuditLog).toHaveBeenCalledTimes(1);
+      expect(exportButton().disabled).toBe(true);
+      expect(exportButton().getAttribute('aria-busy')).toBe('true');
+      expect(exportButton().textContent!.trim()).toBe('מייצא…');
+
+      pending.next(FILE);
+      pending.complete();
+      fixture.detectChanges();
+
+      expect(exportButton().disabled).toBe(false);
+      expect(exportButton().textContent!.trim()).toBe('ייצוא CSV');
+    });
+
+    it('is disabled while the table is loading', async () => {
+      await render(NEVER);
+
+      expect(exportButton().disabled).toBe(true);
+    });
+
+    it('is disabled when there are no rows to export', async () => {
+      await render(of(makePage({ items: [], total_count: 0 })));
+
+      expect(exportButton().disabled).toBe(true);
+    });
+
+    it('is disabled when the table failed to load', async () => {
+      await render(throwError(() => ({ status: 500 })));
+
+      expect(exportButton().disabled).toBe(true);
+    });
+
+    it('says the export failed, and leaves the table as it was', () => {
+      stubExport(throwError(() => ({ status: 500, error: new Blob(['{}']) })));
+
+      clickExport();
+
+      expect(text()).toContain('אירעה שגיאה בייצוא יומן הביקורת. נסה שוב.');
+      expect(rows()).toHaveLength(1);
+      expect(downloads).toHaveLength(0);
+      expect(exportButton().disabled).toBe(false);
+    });
+
+    it('clears a failed export once the next one succeeds', () => {
+      stubExport(throwError(() => ({ status: 500 })));
+      clickExport();
+      stubExport();
+
+      clickExport();
+
+      expect(text()).not.toContain('אירעה שגיאה בייצוא');
+      expect(downloads).toHaveLength(1);
+    });
+
+    /** ABF-165's review: an export stops listening when the screen is left. */
+    it('drops a file that arrives after the admin has left the page', () => {
+      const pending = new Subject<Blob>();
+      stubExport(pending);
+      clickExport();
+
+      fixture.destroy();
+      pending.next(FILE);
+
+      expect(pending.observed).toBe(false);
+      expect(createObjectURL).not.toHaveBeenCalled();
+    });
+
+    it('tells every reader the file is the whole filtered result', () => {
+      const hintId = exportButton().getAttribute('aria-describedby')!;
+
+      expect(root().querySelector(`#${hintId}`)!.textContent).toContain(
+        'כל הרשומות התואמות לסינון',
+      );
+    });
+
+    it('reads in English with no Hebrew left in it', () => {
+      switchToEnglish();
+      const area = root().querySelector('.audit-log__export')!.textContent!;
+
+      expect(exportButton().textContent!.trim()).toBe('Export CSV');
+      expect(area).not.toMatch(HEBREW);
+    });
+
+    it('shows the failure in English too', () => {
+      stubExport(throwError(() => ({ status: 500 })));
+      switchToEnglish();
+
+      clickExport();
+
+      expect(text()).toContain('Something went wrong exporting the audit log.');
+    });
+  });
 });

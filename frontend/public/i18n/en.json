@@ -162,6 +162,9 @@
       "filter_date_to_label": "To date",
       "filter_apply": "Apply filters",
       "filter_reset": "Clear filters",
+      "export_csv": "Export CSV",
+      "exporting": "Exporting…",
+      "export_hint": "The file holds every entry matching the applied filters, not only the page shown.",
       "table_caption": "Audit log entries",
       "column_actor": "Who",
       "column_action": "What",
@@ -205,6 +208,7 @@
       "toggle_professional_failed": "Something went wrong updating the status. Please try again.",
       "load_moderators_failed": "Something went wrong loading the moderators. Please refresh the page.",
       "save_moderator_failed": "Something went wrong saving the moderator. Please try again.",
+      "export_audit_log_failed": "Something went wrong exporting the audit log. Please try again.",
       "remove_moderator_failed": "Something went wrong removing the moderator. Please try again.",
       "load_audit_log_failed": "Something went wrong loading the audit log. Please refresh the page."
     }

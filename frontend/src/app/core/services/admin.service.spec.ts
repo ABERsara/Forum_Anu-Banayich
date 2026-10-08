@@ -262,6 +262,85 @@ describe('AdminService', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // The audit log as a CSV file (ABF-161)
+  // ---------------------------------------------------------------------------
+
+  describe('exportAuditLog', () => {
+    const EXPORT_URL = `${environment.apiUrl}/admin/audit-log/export`;
+
+    /** The bytes the server sends: a UTF-8 BOM, then the header row. */
+    const CSV_BYTES = new Uint8Array([0xef, 0xbb, 0xbf, 0x61, 0x2c, 0x62, 0x0d, 0x0a]);
+
+    it('GETs the export endpoint, asking for the body as a file', () => {
+      service.exportAuditLog().subscribe();
+
+      const req = httpMock.expectOne(EXPORT_URL);
+      expect(req.request.method).toBe('GET');
+      expect(req.request.responseType).toBe('blob');
+      req.flush(new Blob([CSV_BYTES]));
+    });
+
+    /**
+     * The point of `responseType: 'blob'`: read as text, the body would go
+     * through a TextDecoder that drops the BOM, and the saved file would open
+     * in Excel with its Hebrew as mojibake.
+     */
+    it('hands back the bytes it received, the BOM included', async () => {
+      let result: Blob | undefined;
+      service.exportAuditLog().subscribe((file) => (result = file));
+
+      httpMock.expectOne(EXPORT_URL).flush(new Blob([CSV_BYTES], { type: 'text/csv' }));
+
+      expect(result).toBeInstanceOf(Blob);
+      expect(new Uint8Array(await result!.arrayBuffer())).toEqual(CSV_BYTES);
+    });
+
+    it('sends every filter it was given, and nothing else', () => {
+      service
+        .exportAuditLog({
+          actor_id: 'admin-1',
+          action_type: AuditAction.POST_DELETED,
+          entity_type: 'ForumPost',
+          entity_id: 'post-3',
+          date_from: '2026-09-01',
+          date_to: '2026-09-30',
+        })
+        .subscribe();
+
+      const req = httpMock.expectOne((r) => r.url.startsWith(EXPORT_URL));
+      const params = new URLSearchParams(req.request.url.split('?')[1]);
+      expect(Object.fromEntries(params)).toEqual({
+        actor_id: 'admin-1',
+        action_type: 'post_deleted',
+        entity_type: 'ForumPost',
+        entity_id: 'post-3',
+        date_from: '2026-09-01',
+        date_to: '2026-09-30',
+      });
+      req.flush(new Blob());
+    });
+
+    it('builds the same query string the table request does', () => {
+      const filters = { actor_id: 'a&b', entity_type: '', date_to: '2026-09-30' };
+
+      service.exportAuditLog(filters).subscribe();
+      service.getAuditLog(filters).subscribe();
+
+      const [exportReq, listReq] = httpMock.match((r) => r.url.includes('/admin/audit-log'));
+      expect(exportReq.request.url.split('?')[1]).toBe(listReq.request.url.split('?')[1]);
+      expect(exportReq.request.url).toBe(`${EXPORT_URL}?actor_id=a%26b&date_to=2026-09-30`);
+      exportReq.flush(new Blob());
+      listReq.flush({ items: [], total_count: 0, page: 1, page_size: 50 });
+    });
+
+    it('sends no query string when nothing is filtered', () => {
+      service.exportAuditLog({}).subscribe();
+
+      httpMock.expectOne(EXPORT_URL).flush(new Blob());
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // The audit log (ABF-152)
   // ---------------------------------------------------------------------------
 

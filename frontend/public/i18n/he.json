@@ -162,6 +162,9 @@
       "filter_date_to_label": "עד תאריך",
       "filter_apply": "החל סינון",
       "filter_reset": "ניקוי סינון",
+      "export_csv": "ייצוא CSV",
+      "exporting": "מייצא…",
+      "export_hint": "הקובץ כולל את כל הרשומות התואמות לסינון שהוחל, לא רק את העמוד המוצג.",
       "table_caption": "רשומות יומן הביקורת",
       "column_actor": "מי",
       "column_action": "מה",
@@ -205,6 +208,7 @@
       "toggle_professional_failed": "אירעה שגיאה בעדכון הסטטוס. נסה שוב.",
       "load_moderators_failed": "אירעה שגיאה בטעינת הממונים. נסה לרענן את הדף.",
       "save_moderator_failed": "אירעה שגיאה בשמירת הממונה. נסה שוב.",
+      "export_audit_log_failed": "אירעה שגיאה בייצוא יומן הביקורת. נסה שוב.",
       "remove_moderator_failed": "אירעה שגיאה בהסרת הממונה. נסה שוב.",
       "load_audit_log_failed": "אירעה שגיאה בטעינת יומן הביקורת. נסה לרענן את הדף."
     }
