@@ -961,6 +961,17 @@ describe('AuditLogComponent', () => {
       expect(downloads).toHaveLength(1);
     });
 
+    it('drops a failed export message once the table is filtered again', () => {
+      stubExport(throwError(() => ({ status: 500 })));
+      clickExport();
+      expect(text()).toContain('אירעה שגיאה בייצוא יומן הביקורת');
+
+      type('actor_id', 'admin-0001');
+      apply();
+
+      expect(text()).not.toContain('אירעה שגיאה בייצוא יומן הביקורת');
+    });
+
     /** ABF-165's review: an export stops listening when the screen is left. */
     it('drops a file that arrives after the admin has left the page', () => {
       const pending = new Subject<Blob>();

@@ -15,7 +15,9 @@
  * Typing does not refetch. The separation is what lets the empty state say
  * *which* emptiness it means ("no entries match the filters you chose" rather
  * than "the log is empty") without that message flickering between the
- * keystroke and the request.
+ * keystroke and the request. It is also what "Export CSV" (ABF-161) is cut by:
+ * the file holds every row `applied` selects, across all pages, so it is the
+ * table the admin is looking at, not whatever is half-typed above it.
  *
  * The one thing this screen never shows is the actor's IP address. The API
  * does not send it, under any parameter, and the decision recorded on this
@@ -334,6 +336,10 @@ export class AuditLogComponent implements OnInit {
     const request = ++this.latestRequest;
     this.isLoading.set(true);
     this.loadError.set(NO_ERROR);
+    // A failed export belongs to the table it was cut from. Once the table is
+    // being replaced, "the export failed" would describe a file nobody can
+    // ask for any more.
+    this.exportError.set(NO_ERROR);
 
     this.adminService.getAuditLog(this.queryFor(this.applied())).subscribe({
       next: (result) => {
