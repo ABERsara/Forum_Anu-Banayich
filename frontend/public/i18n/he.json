@@ -909,7 +909,8 @@
       "user_restricted": "החלת הגבלה אוטומטית",
       "agent_conversation": "שיחה עם סוכן AI",
       "agent_conversation_access_denied": "גישה לשיחת סוכן נדחתה",
-      "meeting_created": "קביעת פגישה"
+      "meeting_created": "קביעת פגישה",
+      "profile_updated": "עדכון פרופיל"
     }
   }
 }

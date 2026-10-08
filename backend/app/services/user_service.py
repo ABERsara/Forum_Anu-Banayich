@@ -488,6 +488,9 @@ def suspend_user(
 def lift_report_restriction(db: Session, user_id: str, actor: User) -> User:
     """
     Manually lift an automatic report restriction (backlog B1).
+
+    Records when, so the rule that set the flag counts only dismissals
+    decided after this (ABF-XXX). Same clock as `reports.decided_at`.
     """
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
@@ -496,6 +499,7 @@ def lift_report_restriction(db: Session, user_id: str, actor: User) -> User:
         raise HTTPException(status_code=400, detail=translate("users.not_restricted"))
 
     user.is_report_restricted = False
+    user.report_restriction_lifted_at = datetime.now(UTC).replace(tzinfo=None)
 
     log_action(
         db,
