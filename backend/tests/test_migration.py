@@ -571,3 +571,130 @@ def test_no_audit_log_model_migration_drift(monkeypatch) -> None:
         and entry[1].table.name == "audit_logs"
     ]
     assert not index_drift, f"audit_logs index drift detected: {index_drift}"
+
+
+# The merge revision ABF-XXX's report_restriction_lifted_at sits directly on top of.
+REVISION_BEFORE_LIFTED_AT = "2d0766bdb16c"
+
+
+def _lifted_at_state(db_url: str) -> dict[str, object]:
+    engine = create_engine(db_url, poolclass=pool.NullPool)
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT id, report_restriction_lifted_at FROM users")
+            ).all()
+    finally:
+        engine.dispose()
+    return {row[0]: row[1] for row in rows}
+
+
+def test_lifted_at_migration_goes_down_and_up_again_cleanly(monkeypatch) -> None:
+    """ABF-XXX, 953f562dc226: the column comes and goes with the revision."""
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+        assert "report_restriction_lifted_at" in _user_columns(db_url)
+
+        # Named rather than "-1": this says which schema state the downgrade is
+        # meant to land on, and it keeps saying it however the graph grows.
+        command.downgrade(alembic_cfg, REVISION_BEFORE_LIFTED_AT)
+        assert "report_restriction_lifted_at" not in _user_columns(db_url)
+
+        command.upgrade(alembic_cfg, "head")
+        assert "report_restriction_lifted_at" in _user_columns(db_url)
+
+
+def test_lifted_at_is_backfilled_from_the_latest_lift_in_the_audit_log(
+    monkeypatch,
+) -> None:
+    """
+    ABF-162 merged before this column existed, so a member lifted in between
+    has only her audit entry to say so. Without the backfill her column comes
+    out NULL, and the next dismissal restricts her again on the very count
+    that was lifted.
+
+    Three members: lifted twice (the later lift wins wherever it sits in the
+    table, and a re-restriction entry after it is not mistaken for a lift),
+    never lifted (NULL, which the
+    rule reads as the window alone), and one whose only USER_RESTRICTED entry
+    is the automatic restriction.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, REVISION_BEFORE_LIFTED_AT)
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        with engine.begin() as conn:
+            for user_id in ("u-lifted", "u-never", "u-restricted"):
+                conn.execute(
+                    text(
+                        "INSERT INTO users (id, email, password_hash, role, "
+                        "first_name, last_name, account_status, "
+                        "is_active_professional, is_suspended, "
+                        "is_report_restricted, created_at, updated_at) VALUES "
+                        "(:id, :email, 'hashed', 'USER', 'Test', 'User', "
+                        "'ACTIVE', 1, 0, 0, "
+                        "'2026-09-01 10:00:00', '2026-09-01 10:00:00')"
+                    ),
+                    {"id": user_id, "email": f"{user_id}@example.com"},
+                )
+            # The later lift is inserted first, so "the last one read" and
+            # "the latest one" are different rows here.
+            for entry_id, entity_id, measure, timestamp in (
+                ("a-1", "u-lifted", "report_restriction_lifted", "2026-10-07 15:30:00"),
+                ("a-2", "u-lifted", "report_restricted", "2026-10-06 09:00:00"),
+                ("a-3", "u-lifted", "report_restriction_lifted", "2026-10-06 12:00:00"),
+                ("a-4", "u-lifted", "report_restricted", "2026-10-07 09:00:00"),
+                ("a-5", "u-lifted", "report_restricted", "2026-10-08 08:00:00"),
+                ("a-6", "u-restricted", "report_restricted", "2026-10-07 10:00:00"),
+            ):
+                conn.execute(
+                    text(
+                        "INSERT INTO audit_logs (id, actor_id, action, "
+                        "entity_type, entity_id, details, timestamp) VALUES "
+                        "(:id, 'admin-1', 'USER_RESTRICTED', 'User', "
+                        ":entity_id, :details, :timestamp)"
+                    ),
+                    {
+                        "id": entry_id,
+                        "entity_id": entity_id,
+                        "details": f'{{"measure": "{measure}", "automatic": false}}',
+                        "timestamp": timestamp,
+                    },
+                )
+        engine.dispose()
+
+        command.upgrade(alembic_cfg, "head")
+
+        state = _lifted_at_state(db_url)
+        assert str(state["u-lifted"]).startswith("2026-10-07 15:30:00")
+        assert state["u-never"] is None
+        assert state["u-restricted"] is None
+
+
+def test_no_lifted_at_model_migration_drift(monkeypatch) -> None:
+    """
+    models/user.py and 953f562dc226 have to describe the same column, or the
+    next `alembic revision --autogenerate` emits an add or a drop for it.
+    Scoped to this column for the reason test_no_audit_log_model_migration_drift
+    gives: SQLite reports type changes on every Enum column regardless.
+    """
+    with _alembic_on_a_temp_sqlite_db(monkeypatch) as (alembic_cfg, db_url):
+        command.upgrade(alembic_cfg, "head")
+
+        engine = create_engine(db_url, poolclass=pool.NullPool)
+        try:
+            with engine.connect() as connection:
+                context = MigrationContext.configure(connection)
+                diff = compare_metadata(context, Base.metadata)
+        finally:
+            engine.dispose()
+
+    def _about_the_column(entry: object) -> bool:
+        # compare_metadata yields a tuple per add/remove, and a list of tuples
+        # per modified column; ("modify_nullable", schema, table, column, ...).
+        if isinstance(entry, list):
+            return any(_about_the_column(e) for e in entry)
+        return isinstance(entry, tuple) and "report_restriction_lifted_at" in str(entry)
+
+    drift = [entry for entry in diff if _about_the_column(entry)]
+    assert not drift, f"report_restriction_lifted_at drift detected: {drift}"

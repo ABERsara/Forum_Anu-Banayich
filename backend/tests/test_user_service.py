@@ -1197,6 +1197,48 @@ class TestLiftReportRestriction:
 
         assert result.is_report_restricted is False
 
+    def test_records_when_it_was_lifted(self, db_session: Session) -> None:
+        """
+        ABF-XXX: the rule that set the flag counts only dismissals decided
+        after this, so it is stamped on the same naive-UTC clock as
+        `reports.decided_at`.
+        """
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(
+            db_session, "restricted@example.com", AccountStatus.ACTIVE, now
+        )
+        user.is_report_restricted = True
+        db_session.commit()
+        admin = _make_admin(db_session, "admin1@example.com")
+        assert user.report_restriction_lifted_at is None
+
+        before = datetime.now(UTC).replace(tzinfo=None)
+        result = user_service.lift_report_restriction(db_session, user.id, admin)
+        after = datetime.now(UTC).replace(tzinfo=None)
+
+        assert before <= result.report_restriction_lifted_at <= after
+
+    def test_a_second_lift_moves_the_time_forward(self, db_session: Session) -> None:
+        """Only the latest lift starts the count, so it overwrites the first."""
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user = _make_user(
+            db_session, "restricted@example.com", AccountStatus.ACTIVE, now
+        )
+        user.is_report_restricted = True
+        db_session.commit()
+        admin = _make_admin(db_session, "admin1@example.com")
+        first = user_service.lift_report_restriction(
+            db_session, user.id, admin
+        ).report_restriction_lifted_at
+        user.is_report_restricted = True
+        db_session.commit()
+
+        second = user_service.lift_report_restriction(
+            db_session, user.id, admin
+        ).report_restriction_lifted_at
+
+        assert second > first
+
     def test_creates_audit_log_entry(self, db_session: Session) -> None:
         now = datetime.now(UTC).replace(tzinfo=None)
         user = _make_user(

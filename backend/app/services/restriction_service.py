@@ -107,6 +107,7 @@ def decided_report_count(
     user_id: str,
     decision: ReportDecision,
     window_days: int,
+    since: datetime | None = None,
 ) -> int:
     """
     How many reports about (or from) `user_id` were decided `decision` inside
@@ -136,17 +137,21 @@ def decided_report_count(
     not accusations, and a report sits pending for however long the moderator
     takes. Filtering on it also drops PENDING rows for free — theirs is NULL,
     and NULL is not >= anything.
+
+    `since` narrows the window further, to decisions strictly after it — an
+    admin's lift (ABF-XXX), which the dismissals before it have already been
+    answered by. It only ever narrows: a `since` older than the window start
+    changes nothing, and None is the window alone.
     """
     threshold = _now() - timedelta(days=window_days)
-    return (
-        db.query(Report)
-        .filter(
-            subject == user_id,
-            Report.decision == decision,
-            Report.decided_at >= threshold,
-        )
-        .count()
+    query = db.query(Report).filter(
+        subject == user_id,
+        Report.decision == decision,
+        Report.decided_at >= threshold,
     )
+    if since is not None:
+        query = query.filter(Report.decided_at > since)
+    return query.count()
 
 
 # ---------------------------------------------------------------------------
