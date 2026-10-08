@@ -23,11 +23,13 @@ Usage:
     rows they describe.
 """
 
+from collections.abc import Iterator
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import InstrumentedAttribute
+from sqlalchemy.orm.query import Query
 
 from app.core.constants import AuditAction, AuditSortField, SortDirection
 from app.models.audit import AuditLog
@@ -96,6 +98,112 @@ _SORT_COLUMNS: dict[AuditSortField, InstrumentedAttribute[Any]] = {
     AuditSortField.TIMESTAMP: AuditLog.timestamp,
 }
 
+#: How many rows the export pulls from the cursor at a time, and so how many
+#: are ever held in memory at once — whatever the size of the log.
+EXPORT_BATCH_SIZE = 500
+
+
+def _filtered(
+    query: Query[AuditLog],
+    *,
+    actor_id: str | None,
+    action_type: AuditAction | None,
+    entity_type: str | None,
+    entity_id: str | None,
+    date_from: date | None,
+    date_to: date | None,
+) -> Query[AuditLog]:
+    """
+    The WHERE clause of the frozen filter contract, and the only copy of it.
+
+    Both readers of the log go through this: the screen (`get_audit_log`) and
+    the CSV export (`iter_audit_log_for_export`, ABF-161). The export's
+    acceptance criterion is that the file holds exactly the rows the filtered
+    screen shows, and two copies of these six conditions are two places for
+    that to stop being true — a date bound fixed in one and not the other
+    would ship a file that quietly disagrees with the screen it was exported
+    from. One function is what makes the two the same by construction.
+
+    See `get_audit_log` for why each filter is optional and why `date_to` is
+    `< date_to + 1 day`.
+    """
+    if actor_id is not None:
+        query = query.filter(AuditLog.actor_id == actor_id)
+    if action_type is not None:
+        query = query.filter(AuditLog.action == action_type)
+    if entity_type is not None:
+        query = query.filter(AuditLog.entity_type == entity_type)
+    if entity_id is not None:
+        query = query.filter(AuditLog.entity_id == entity_id)
+    if date_from is not None:
+        query = query.filter(
+            AuditLog.timestamp >= datetime.combine(date_from, time.min)
+        )
+    if date_to is not None:
+        query = query.filter(
+            AuditLog.timestamp < datetime.combine(date_to + timedelta(days=1), time.min)
+        )
+    return query
+
+
+def iter_audit_log_for_export(
+    db: Session,
+    *,
+    actor_id: str | None = None,
+    action_type: AuditAction | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    exclude_id: str | None = None,
+) -> Iterator[AuditLog]:
+    """
+    Every row the filters select, newest first, read from the database a
+    batch at a time (GET /admin/audit-log/export, ABF-161).
+
+    **Not one page and not the whole table.** The rows are the ones the
+    screen's filters select — the same `_filtered()` the list uses, so the
+    WHERE clause is applied by the database, never by Python. There is no
+    LIMIT, because the export is all of them; what keeps seven years of log
+    out of memory instead is `yield_per`: SQLAlchemy reads `EXPORT_BATCH_SIZE`
+    rows at a time, and on Postgres that is a server-side cursor, so the
+    database sends a batch only when the previous one has been written out.
+
+    The order is the screen's default, newest first, with the same `id`
+    tiebreak — so a row sits in the same place in the file as in the list.
+
+    `exclude_id` is the export's own DATA_EXPORTED entry. The endpoint writes
+    it before this runs, and without the exclusion a file exported from a
+    screen showing N rows would hold N + 1: a row the admin never saw,
+    recording the export itself.
+
+    **A generator, and it closes the session when it is done.** The rows are
+    read while the response is streamed, which is after the endpoint has
+    returned. FastAPI's default today keeps `get_db`'s session open until the
+    response has been sent, but `fastapi>=0.111` also admits 0.106–0.117,
+    which closed it as the endpoint returned; closing it here — idempotently,
+    and also when the client abandons the download half-way — returns the
+    connection to the pool on every version.
+    """
+    query = _filtered(
+        db.query(AuditLog),
+        actor_id=actor_id,
+        action_type=action_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    if exclude_id is not None:
+        query = query.filter(AuditLog.id != exclude_id)
+
+    try:
+        yield from query.order_by(
+            AuditLog.timestamp.desc(), AuditLog.id.desc()
+        ).yield_per(EXPORT_BATCH_SIZE)
+    finally:
+        db.close()
+
 
 def get_audit_log(
     db: Session,
@@ -141,24 +249,15 @@ def get_audit_log(
 
     Returns `(rows, total_count)`.
     """
-    query = db.query(AuditLog)
-
-    if actor_id is not None:
-        query = query.filter(AuditLog.actor_id == actor_id)
-    if action_type is not None:
-        query = query.filter(AuditLog.action == action_type)
-    if entity_type is not None:
-        query = query.filter(AuditLog.entity_type == entity_type)
-    if entity_id is not None:
-        query = query.filter(AuditLog.entity_id == entity_id)
-    if date_from is not None:
-        query = query.filter(
-            AuditLog.timestamp >= datetime.combine(date_from, time.min)
-        )
-    if date_to is not None:
-        query = query.filter(
-            AuditLog.timestamp < datetime.combine(date_to + timedelta(days=1), time.min)
-        )
+    query = _filtered(
+        db.query(AuditLog),
+        actor_id=actor_id,
+        action_type=action_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
     # Before the page window, and over the filtered query rather than the
     # table: this is the number the pager divides into pages.
