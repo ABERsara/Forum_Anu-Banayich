@@ -14,15 +14,17 @@ GET    /admin/moderators             – the moderator roster
 POST   /admin/moderators             – appoint a moderator
 PATCH  /admin/moderators/{id}        – update a moderator's cells / alert email
 DELETE /admin/moderators/{id}        – remove a moderator from the roster
+GET  /admin/audit-log/export         – the filtered audit log as a CSV file
 GET  /admin/audit-log                – the audit log: filtered, sorted, paginated
 POST /admin/users/{id}/suspend       – suspend a user manually
 GET  /admin/users/restricted         – users with an active report restriction
 PATCH /admin/users/{id}/lift-restriction – lift a user's report restriction
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.constants import AuditAction, AuditSortField, SortDirection, UserRole
@@ -41,7 +43,7 @@ from app.schemas.user import (
     SuspendUserRequest,
     UserAdminView,
 )
-from app.services import audit_service, user_service
+from app.services import audit_csv, audit_service, user_service
 
 router = APIRouter(
     prefix="/admin",
@@ -234,6 +236,105 @@ def lift_restriction(
     """
     user = user_service.lift_report_restriction(db, user_id, current_user)
     return UserAdminView.model_validate(user)
+
+
+@router.get(
+    "/audit-log/export",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"text/csv": {}}, "description": "The CSV file."}},
+)
+def export_audit_log(
+    actor_id: str | None = Query(None),
+    action_type: AuditAction | None = Query(None),
+    entity_type: str | None = Query(None),
+    entity_id: str | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    The audit log as a CSV file, under the filters the screen has applied
+    (ABF-161).
+
+    Admin only, by the router's `require_role(UserRole.ADMIN)` like every
+    route here — decided before any parameter is read, so every other role
+    gets 403 whatever it filters by, and nothing below runs for it.
+
+    **The six filters are the list's six, declared the same way.** Exactly
+    those: no `sort`, `direction`, `page` or `page_size`, because the file is
+    every matching row, not the page on screen. The WHERE clause behind them
+    is literally the list's (`audit_service._filtered`), and
+    `test_admin_audit_log_export.py` fails if the two signatures drift.
+
+    **Declared above `GET /audit-log`, and above any `/audit-log/{id}`.**
+    FastAPI matches routes in declaration order and a path parameter matches
+    any segment, so a `GET /audit-log/{entry_id}` declared first would answer
+    this URL as a lookup of an entry called "export" (ABF-153 adds exactly
+    that route). A test pins the order.
+
+    **The export is itself audited.** A file that carries seven years of who
+    did what out of the system is the sensitive action `log_action` exists
+    for (SPEC §9.3; the service names "export" in its own docstring), and
+    `DATA_EXPORTED` is already the value for it — so no enum change and no
+    migration. The entry records which filters the file was cut with. Like
+    the member's own export in `users.py`, it is written before the data
+    leaves; unlike it, the rows are not in hand yet, so there is no count to
+    record. The entry is then kept out of the file it describes: the admin
+    exported the N rows on their screen, not N + 1.
+
+    The response is streamed — see `iter_audit_log_for_export` for how the
+    rows are read a batch at a time and `audit_csv` for the file's format.
+    `no-store`, because the file is the audit log and has no business in a
+    shared cache or the browser's.
+
+    `ip_address` is not in the file, for the reason it is not on the screen
+    (`schemas/audit.py`): `audit_csv.COLUMNS` does not have it.
+    """
+    export_entry = audit_service.log_action(
+        db,
+        actor=current_user,
+        action=AuditAction.DATA_EXPORTED,
+        # Nothing single was exported, so the entity is the admin who did
+        # it — the shape forum_service already uses for an action on no row.
+        entity_type="AuditLog",
+        entity_id=current_user.id,
+        details={
+            "format": "csv",
+            "filters": {
+                name: str(value)
+                for name, value in (
+                    ("actor_id", actor_id),
+                    ("action_type", action_type),
+                    ("entity_type", entity_type),
+                    ("entity_id", entity_id),
+                    ("date_from", date_from),
+                    ("date_to", date_to),
+                )
+                if value is not None
+            },
+        },
+    )
+
+    rows = audit_service.iter_audit_log_for_export(
+        db,
+        actor_id=actor_id,
+        action_type=action_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        date_from=date_from,
+        date_to=date_to,
+        exclude_id=export_entry.id,
+    )
+    filename = f"audit-log-{datetime.now(UTC):%Y-%m-%d}.csv"
+    return StreamingResponse(
+        audit_csv.csv_chunks(rows),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get("/audit-log", response_model=AuditLogListResponse)
