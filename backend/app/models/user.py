@@ -148,6 +148,26 @@ class User(Base):
     is_report_restricted: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false(), nullable=False
     )
+    #: When an admin last lifted `is_report_restricted` by hand (ABF-162), in
+    #: naive UTC like `reports.decided_at`. NULL for a member never lifted.
+    #:
+    #: `_check_frequent_false_reporter()` counts only dismissals decided after
+    #: it (ABF-XXX). Without it a lift was undone by the next dismissal of a
+    #: report still waiting in the queue: the dismissals that set the flag were
+    #: still inside the 30-day window, so the rule fired again on them.
+    #:
+    #: A column rather than a lookup of the lift's audit entry on every
+    #: decision. The log is a record, append-only for seven years, not state
+    #: to compute from. Finding the lift would mean matching inside its JSON
+    #: `details`, which the two dialects spell differently. And its
+    #: `timestamp` comes from the database's clock (whole seconds on SQLite),
+    #: while `decided_at` comes from the application's. Migration 953f562dc226
+    #: reads those entries once, to backfill lifts made before this column
+    #: existed. Overwritten on every lift, because only the latest one starts
+    #: the count.
+    report_restriction_lifted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
 
     # ------------------------------------------------------------------
     # Timestamps
