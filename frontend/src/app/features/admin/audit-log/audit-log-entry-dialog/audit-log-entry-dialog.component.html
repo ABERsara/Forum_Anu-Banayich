@@ -1,0 +1,92 @@
+<!-- The backdrop takes the click; the panel is the dialog. Keydown is on the
+     backdrop so Escape and the Tab trap work wherever focus is inside it.
+     role="presentation": the backdrop is not a control of its own — the
+     close button is the keyboard's way out, and Escape is handled here. -->
+<div
+  class="entry-dialog"
+  role="presentation"
+  (click)="onBackdropClick($event)"
+  (keydown)="onKeydown($event)"
+>
+  <section
+    #panel
+    class="entry-dialog__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="audit-entry-dialog-title"
+  >
+    <header class="entry-dialog__header">
+      <h2 id="audit-entry-dialog-title" class="entry-dialog__title">
+        {{ 'admin.audit_log.entry.title' | transloco }}
+      </h2>
+      <button
+        #closeButton
+        type="button"
+        class="btn"
+        [attr.aria-label]="'admin.audit_log.entry.close_aria' | transloco"
+        (click)="close()"
+      >
+        {{ 'admin.audit_log.entry.close' | transloco }}
+      </button>
+    </header>
+
+    @if (isLoading()) {
+      <app-loading-spinner />
+    } @else if (hasLoadError()) {
+      <!-- The API's own `detail` is a finished sentence and is shown as it
+           came; our fallback is a key, so it follows a language switch. -->
+      @if (loadError().text; as text) {
+        <app-error-display [message]="text" />
+      } @else if (loadError().key; as key) {
+        <app-error-display [message]="key | transloco" />
+      }
+      <button type="button" class="btn" (click)="retry()">
+        {{ 'common.retry' | transloco }}
+      </button>
+    } @else if (entry(); as entry) {
+      <dl class="entry-dialog__fields">
+        <dt>{{ 'admin.audit_log.entry.field_action' | transloco }}</dt>
+        <dd>
+          {{ actionLabel(entry) }}
+          <!-- The wire value as well as the label: it is what the action
+               filter and the API take, and what a record quoted elsewhere
+               will name. -->
+          <code class="entry-dialog__code" dir="ltr">{{ entry.action_type }}</code>
+        </dd>
+
+        <dt>{{ 'admin.audit_log.entry.field_timestamp' | transloco }}</dt>
+        <!-- To the second, where the list stops at the minute: entries
+             written by one action share a minute, and telling them apart is
+             what an admin opens a single entry for. -->
+        <dd>{{ occurredAt(entry) | date: 'dd/MM/yyyy HH:mm:ss' }}</dd>
+
+        <!-- Identifiers the server stored, not copy: shown as they came in
+             either interface language (ABF-130). -->
+        <dt>{{ 'admin.audit_log.entry.field_actor' | transloco }}</dt>
+        <dd class="entry-dialog__id" dir="ltr">{{ entry.actor_id }}</dd>
+
+        <dt>{{ 'admin.audit_log.entry.field_entity_type' | transloco }}</dt>
+        <dd class="entry-dialog__id" dir="ltr">{{ entry.entity_type }}</dd>
+
+        <dt>{{ 'admin.audit_log.entry.field_entity_id' | transloco }}</dt>
+        <dd class="entry-dialog__id" dir="ltr">{{ entry.entity_id }}</dd>
+
+        <dt>{{ 'admin.audit_log.entry.field_id' | transloco }}</dt>
+        <dd class="entry-dialog__id" dir="ltr">{{ entry.id }}</dd>
+      </dl>
+
+      <h3 class="entry-dialog__subtitle">
+        {{ 'admin.audit_log.entry.field_details' | transloco }}
+      </h3>
+      @if (detailsJson(); as json) {
+        <!-- Indented JSON of the object the API sent, not the object printed
+             as a string. dir="ltr": JSON is read left to right, and in an
+             RTL page its braces and commas would be reordered. tabindex so a
+             keyboard reader can scroll a long block. -->
+        <pre class="entry-dialog__details" dir="ltr" tabindex="0"><code>{{ json }}</code></pre>
+      } @else {
+        <p class="entry-dialog__empty">{{ 'admin.audit_log.entry.no_details' | transloco }}</p>
+      }
+    }
+  </section>
+</div>

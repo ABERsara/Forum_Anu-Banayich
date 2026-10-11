@@ -20,6 +20,12 @@ Four things this file is built around, in the order they can bite:
    response holds 50 rows" — that is also true of fetching ten thousand and
    slicing in Python. So the SQL itself is captured and inspected: the page
    query carries a LIMIT, and nothing ever selects the table unbounded.
+
+The second half of the file is GET /api/v1/admin/audit-log/{id} (ABF-153),
+the entry a row opens onto, held to the same four: admin only (and 403 before
+the id is even looked up), no IP, the record exactly as the list row showed
+it — with `details` as structure rather than a string — and one row read by
+primary key.
 """
 
 from datetime import datetime
@@ -819,3 +825,300 @@ class TestTheQueryIsBoundedInTheDatabase:
             assert _is_bounded(sql), f"unbounded SELECT over audit_logs: {sql}"
         assert len(response.json()["items"]) == 10
         assert response.json()["total_count"] == 100
+
+
+# ---------------------------------------------------------------------------
+# GET /admin/audit-log/{id} — one entry, in full (ABF-153)
+# ---------------------------------------------------------------------------
+
+
+def _entry_url(entry_id: str) -> str:
+    return f"{BASE}/{entry_id}"
+
+
+#: A `details` the way the services that log really write one: nested, with a
+#: list, a number, a boolean, a null and Hebrew in it — every shape that an
+#: escaped string would flatten into one line of backslashes.
+_NESTED_DETAILS: dict[str, Any] = {
+    "changes": {
+        "title": {"from": "מפגש ראשון", "to": "מפגש שני"},
+        "scheduled_at": {"from": "2026-10-01T09:00:00", "to": "2026-10-02T09:00:00"},
+    },
+    "revoked_cells": ["cell-1", "cell-2"],
+    "hours": 48,
+    "automatic": False,
+    "reason": None,
+}
+
+
+class TestEntryPermissions:
+    """
+    The DoD's own words: a direct GET to the API address by a non-admin is
+    403. "Direct" is the point — the screen never offers the request to them,
+    so this is the only line that stands between a member and the log.
+    """
+
+    async def test_requires_authentication(self, client, db_session) -> None:
+        _make_entry(db_session, "entry-1")
+
+        response = await client.get(_entry_url("entry-1"))
+
+        assert response.status_code == 401
+
+    @pytest.mark.parametrize(
+        "role",
+        [UserRole.USER, UserRole.MODERATOR, UserRole.PROFESSIONAL],
+    )
+    async def test_forbidden_for_every_non_admin_role(
+        self, client, db_session, as_user, role
+    ) -> None:
+        _make_entry(db_session, "entry-1", details={"hours": 24})
+        as_user(_make_user(db_session, role, f"{role.value}.entry@example.com"))
+
+        response = await client.get(_entry_url("entry-1"))
+
+        assert response.status_code == 403
+        assert "hours" not in response.text
+
+    @pytest.mark.parametrize(
+        "role",
+        [UserRole.USER, UserRole.MODERATOR, UserRole.PROFESSIONAL],
+    )
+    async def test_forbidden_before_the_id_is_looked_up(
+        self, client, db_session, as_user, role
+    ) -> None:
+        """
+        403 for an id that does not exist too, not 404. Were the two to
+        differ, a member could walk ids and learn which entries exist without
+        ever reading one.
+        """
+        as_user(_make_user(db_session, role, f"{role.value}.ghost@example.com"))
+
+        response = await client.get(_entry_url("no-such-entry"))
+
+        assert response.status_code == 403
+
+    async def test_admin_reads_the_entry(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        _make_entry(db_session, "entry-1")
+        as_user(admin)
+
+        response = await client.get(_entry_url("entry-1"))
+
+        assert response.status_code == 200
+        assert response.json()["id"] == "entry-1"
+
+
+class TestEntryResponse:
+    async def test_returns_the_full_record(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        _make_entry(
+            db_session,
+            "entry-1",
+            actor_id="admin-7",
+            action=AuditAction.USER_SUSPENDED,
+            entity_type="User",
+            entity_id="user-42",
+            timestamp=datetime(2026, 9, 3, 8, 15, 30),
+            details={"hours": 24, "reason": "spam"},
+        )
+        as_user(admin)
+
+        response = await client.get(_entry_url("entry-1"))
+
+        assert response.json() == {
+            "id": "entry-1",
+            "actor_id": "admin-7",
+            "action_type": AuditAction.USER_SUSPENDED.value,
+            "entity_type": "User",
+            "entity_id": "user-42",
+            "timestamp": "2026-09-03T08:15:30",
+            "details": {"hours": 24, "reason": "spam"},
+        }
+
+    async def test_is_the_same_record_the_list_row_showed(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        """
+        The drill-down opens *that* row. One schema serialises both, and this
+        is what holds it there if either ever gains a field the other lacks.
+        """
+        _make_entry(db_session, "entry-1", details=_NESTED_DETAILS)
+        _make_entry(db_session, "entry-2", timestamp=datetime(2026, 9, 2, 12, 0, 0))
+        as_user(admin)
+
+        listed = (await client.get(BASE)).json()["items"]
+        row = next(item for item in listed if item["id"] == "entry-1")
+        opened = (await client.get(_entry_url("entry-1"))).json()
+
+        assert opened == row
+
+    async def test_returns_the_entry_asked_for_and_not_a_neighbour(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        for index in range(3):
+            _make_entry(db_session, f"entry-{index}", entity_id=f"user-{index}")
+        as_user(admin)
+
+        response = await client.get(_entry_url("entry-1"))
+
+        assert response.json()["id"] == "entry-1"
+        assert response.json()["entity_id"] == "user-1"
+
+    async def test_never_returns_the_ip_address(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        """
+        On a row that has one — a NULL column would pass this for free. The
+        whole body is searched, so the address cannot come back nested either.
+        """
+        _make_entry(
+            db_session, "entry-1", ip_address="203.0.113.7", details=_NESTED_DETAILS
+        )
+        as_user(admin)
+
+        response = await client.get(_entry_url("entry-1"))
+
+        assert response.status_code == 200
+        assert "203.0.113.7" not in response.text
+        assert "ip_address" not in response.text
+
+
+class TestEntryDetailsAreStructure:
+    """
+    DoD: `details` readable, not an escaped string. The screen can only lay
+    out what it receives as structure — had the API sent the object as a
+    string holding JSON, the best any client could do is print its escapes.
+    """
+
+    async def test_details_arrive_as_a_json_object(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        _make_entry(db_session, "entry-1", details=_NESTED_DETAILS)
+        as_user(admin)
+
+        response = await client.get(_entry_url("entry-1"))
+
+        details = response.json()["details"]
+        assert isinstance(details, dict)
+        assert details == _NESTED_DETAILS
+
+    async def test_nesting_survives_every_level(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        _make_entry(db_session, "entry-1", details=_NESTED_DETAILS)
+        as_user(admin)
+
+        details = (await client.get(_entry_url("entry-1"))).json()["details"]
+
+        assert details["changes"]["title"] == {"from": "מפגש ראשון", "to": "מפגש שני"}
+        assert details["revoked_cells"] == ["cell-1", "cell-2"]
+        assert details["hours"] == 48
+        assert details["automatic"] is False
+        assert details["reason"] is None
+
+    async def test_the_wire_holds_no_json_inside_a_string(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        """
+        Checked on the raw body, beneath the parser: a double-encoded value
+        parses without complaint, and only shows itself here — as `details`
+        opening with a quote instead of a brace, and as escaped quotes.
+        """
+        _make_entry(db_session, "entry-1", details=_NESTED_DETAILS)
+        as_user(admin)
+
+        response = await client.get(_entry_url("entry-1"))
+
+        body = response.text.replace(" ", "")
+        assert '"details":{' in body
+        assert '\\"' not in body
+
+    async def test_an_entry_without_details_says_null(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        _make_entry(db_session, "entry-1", details=None)
+        as_user(admin)
+
+        response = await client.get(_entry_url("entry-1"))
+
+        assert response.status_code == 200
+        assert response.json()["details"] is None
+
+
+class TestEntryNotFound:
+    async def test_an_unknown_id_is_404(self, client, as_user, admin) -> None:
+        as_user(admin)
+
+        response = await client.get(_entry_url("no-such-entry"))
+
+        assert response.status_code == 404
+
+    async def test_says_so_in_hebrew_by_default(self, client, as_user, admin) -> None:
+        as_user(admin)
+
+        response = await client.get(_entry_url("no-such-entry"))
+
+        assert response.json()["detail"] == "הרשומה לא נמצאה ביומן הביקורת."
+
+    async def test_says_so_in_english_when_asked(self, client, as_user, admin) -> None:
+        as_user(admin)
+
+        response = await client.get(
+            _entry_url("no-such-entry"), headers={"Accept-Language": "en"}
+        )
+
+        assert response.json()["detail"] == "The audit log entry was not found."
+
+    async def test_a_prefix_of_a_real_id_is_not_a_match(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        """An exact lookup, not a LIKE: `entry-1` must not open `entry-10`."""
+        _make_entry(db_session, "entry-10")
+        as_user(admin)
+
+        response = await client.get(_entry_url("entry-1"))
+
+        assert response.status_code == 404
+
+    async def test_the_list_still_answers_at_its_own_path(
+        self, client, db_session, as_user, admin
+    ) -> None:
+        """`{entry_id}` matches any one segment; the bare list path has none."""
+        _make_entry(db_session, "entry-1")
+        as_user(admin)
+
+        response = await client.get(BASE)
+
+        assert response.status_code == 200
+        assert response.json()["total_count"] == 1
+
+
+class TestEntryQueryIsOneRow:
+    """
+    The list's acceptance criterion carries over: nothing fetches the table.
+    A lookup by primary key is one row or none, and the SQL shows which.
+    """
+
+    async def test_reads_one_row_by_primary_key(
+        self, client, db_session, as_user, admin, executed_sql
+    ) -> None:
+        for index in range(50):
+            _make_entry(db_session, f"entry-{index:02d}")
+        as_user(admin)
+        # The test shares its session with the request, and an entry this
+        # session just wrote would be served from its identity map with no
+        # SQL at all — which would make "what did it run" vacuous.
+        for cached in list(db_session.identity_map.values()):
+            if isinstance(cached, AuditLog):
+                db_session.expunge(cached)
+        executed_sql.clear()
+
+        response = await client.get(_entry_url("entry-07"))
+
+        assert response.status_code == 200
+        [sql] = _audit_selects(executed_sql)
+        assert "WHERE audit_logs.id =" in sql
+        assert "count(" not in sql.lower()

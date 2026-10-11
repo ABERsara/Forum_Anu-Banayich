@@ -186,6 +186,11 @@ MESSAGES: Final[dict[str, dict[str, str]]] = {
         HEBREW: "החשבון כבר נמחק",
         ENGLISH: "This account has already been deleted",
     },
+    # -- Audit log (ABF-153) ----------------------------------------------
+    "audit.entry_not_found": {
+        HEBREW: "הרשומה לא נמצאה ביומן הביקורת.",
+        ENGLISH: "The audit log entry was not found.",
+    },
     # -- Community forum --------------------------------------------------
     "forum.access_forbidden": {
         HEBREW: "אין לך הרשאה לגשת לפורום הקהילתי.",

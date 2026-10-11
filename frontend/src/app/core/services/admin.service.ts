@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import {
+  AuditLogEntry,
   AuditLogList,
   AuditLogFilters,
   AuditLogQuery,
@@ -153,5 +154,18 @@ export class AdminService {
    */
   getAuditLog(query: AuditLogQuery = {}): Observable<AuditLogList> {
     return this.api.get<AuditLogList>(`/admin/audit-log${auditLogSearch(query)}`);
+  }
+
+  /**
+   * One audit log entry in full — what a row of the list opens onto
+   * (ABF-153). Admin only, like the list: any other role gets 403, for an id
+   * that exists and for one that does not.
+   *
+   * The id is encoded even though the server only ever mints UUIDs: it is a
+   * path segment, and a value with a `/` or `?` in it would otherwise address
+   * a different route rather than a missing entry.
+   */
+  getAuditLogEntry(entryId: string): Observable<AuditLogEntry> {
+    return this.api.get<AuditLogEntry>(`/admin/audit-log/${encodeURIComponent(entryId)}`);
   }
 }

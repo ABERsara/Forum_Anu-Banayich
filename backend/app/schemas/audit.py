@@ -1,5 +1,6 @@
 """
-Pydantic schemas for reading the audit log (GET /admin/audit-log, ABF-152).
+Pydantic schemas for reading the audit log: the list (GET /admin/audit-log,
+ABF-152) and one entry of it (GET /admin/audit-log/{id}, ABF-153).
 
 There is no write schema here. Audit entries are never posted by a client —
 `audit_service.log_action()` is the only thing that creates one, called from
@@ -30,6 +31,11 @@ class AuditLogEntry(BaseModel):
     One audit log row, exactly as the frozen contract lists it: `id`,
     `actor_id`, `action_type`, `entity_type`, `entity_id`, `timestamp`,
     `details`.
+
+    Both endpoints answer with this: each item of the list, and the single
+    entry a row opens onto. One schema for the two is what guarantees the
+    drill-down shows the row that was clicked rather than a cousin of it —
+    and that neither of them can grow an `ip_address` the other lacks.
 
     No actor *name*. The contract carries the actor's id and the model holds
     no name to join on anyway — `AuditLog.actor_id` has no foreign key, so
