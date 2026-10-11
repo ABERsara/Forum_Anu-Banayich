@@ -18,6 +18,7 @@ import { vi } from 'vitest';
 import { ScheduleMeetingComponent } from './schedule-meeting.component';
 import { GroupVisibility, SectorVisibility } from '../../../core/constants';
 import type { CalendarStatus, Meeting } from '../../../core/models';
+import { AuthService } from '../../../core/services/auth.service';
 import { MeetingService } from '../../../core/services/meeting.service';
 import { HEBREW, translocoTesting } from '../../../../testing/transloco-testing';
 
@@ -69,7 +70,12 @@ describe('ScheduleMeetingComponent', () => {
 
     TestBed.configureTestingModule({
       imports: [ScheduleMeetingComponent, translocoTesting()],
-      providers: [{ provide: MeetingService, useValue: meetingServiceMock }, provideRouter([])],
+      providers: [
+        { provide: MeetingService, useValue: meetingServiceMock },
+        // The list's rows draw their edit/cancel buttons for the creator only.
+        { provide: AuthService, useValue: { currentUser: () => ({ id: 'pro-1' }) } },
+        provideRouter([]),
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ScheduleMeetingComponent);
@@ -124,7 +130,7 @@ describe('ScheduleMeetingComponent', () => {
 
       expect(text()).toContain('מפגש ראשון');
       expect(
-        element().querySelector<HTMLAnchorElement>('.upcoming__item-join')?.getAttribute('href'),
+        element().querySelector<HTMLAnchorElement>('.upcoming-meeting__join')?.getAttribute('href'),
       ).toBe('https://meet.google.com/abc-defg-hij');
     });
   });
@@ -332,6 +338,73 @@ describe('ScheduleMeetingComponent', () => {
       expect(meetingServiceMock.getCalendarStatus).toHaveBeenCalledOnce();
       expect(component.error()).toEqual({ key: 'meetings.errors.create_failed', text: '' });
       expect(text()).toContain('תזמון הפגישה נכשל');
+    });
+  });
+
+  /**
+   * Editing and cancelling happen in the rows (UpcomingMeetingComponent,
+   * tested on its own). What this screen owns is what follows: reading the
+   * list again, saying what happened beside it, and treating a 403 from a row
+   * the way it treats one from its own form.
+   */
+  describe('after an edit or a cancellation in the list (ABF-163)', () => {
+    function upcomingMeeting(): HTMLElement {
+      return element().querySelector('app-upcoming-meeting')!;
+    }
+
+    it('reads the list again and confirms an edit beside it', () => {
+      setup({ getUpcomingMeetings: vi.fn().mockReturnValue(of([makeMeeting()])) });
+
+      component.onMeetingUpdated();
+      fixture.detectChanges();
+
+      expect(meetingServiceMock.getUpcomingMeetings).toHaveBeenCalledTimes(2);
+      expect(element().querySelector('.upcoming__success')?.textContent).toContain('הפגישה עודכנה');
+    });
+
+    it('reads the list again and confirms a cancellation, which outlives its row', () => {
+      setup({
+        getUpcomingMeetings: vi
+          .fn()
+          .mockReturnValueOnce(of([makeMeeting()]))
+          .mockReturnValueOnce(of([])),
+      });
+      expect(upcomingMeeting()).not.toBeNull();
+
+      component.onMeetingCancelled();
+      fixture.detectChanges();
+
+      expect(element().querySelector('app-upcoming-meeting')).toBeNull();
+      expect(element().querySelector('.upcoming__success')?.textContent).toContain('הפגישה בוטלה');
+    });
+
+    it('shows one confirmation at a time', () => {
+      setup();
+      fillForm();
+      component.submit();
+      fixture.detectChanges();
+      expect(component.successKey()).toBe('meetings.schedule.success');
+
+      component.onMeetingCancelled();
+      fixture.detectChanges();
+
+      expect(component.successKey()).toBe('');
+      expect(text()).not.toContain('הפגישה נקבעה וההכרזה פורסמה בפורום.');
+    });
+
+    it('asks for the calendar status again after a refusal in a row', () => {
+      setup({
+        getCalendarStatus: vi
+          .fn()
+          .mockReturnValueOnce(of(CONNECTED))
+          .mockReturnValueOnce(of(NOT_CONNECTED)),
+      });
+
+      component.onCalendarRefused();
+      fixture.detectChanges();
+
+      expect(meetingServiceMock.getCalendarStatus).toHaveBeenCalledTimes(2);
+      expect(component.needsConsent()).toBe(true);
     });
   });
 

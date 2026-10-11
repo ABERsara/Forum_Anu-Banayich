@@ -2,7 +2,7 @@
  * Scheduled meetings, and the Google Calendar authorisation that makes
  * scheduling possible.
  *
- * Four calls, no logic: who may schedule, which cells she may convene and
+ * Six calls, no logic: who may schedule, which cells she may convene and
  * which meetings she may see are all the server's decisions, and a copy of
  * any of them here would be a second rule to keep in step with the first.
  */
@@ -10,7 +10,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { CalendarStatus, Meeting, MeetingCreate } from '../models';
+import { CalendarStatus, Meeting, MeetingCreate, MeetingUpdate } from '../models';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -41,6 +41,29 @@ export class MeetingService {
    */
   getUpcomingMeetings(): Observable<Meeting[]> {
     return this.api.get<Meeting[]>('/meetings');
+  }
+
+  /**
+   * Change a meeting's title, its time, or both. Its creator only (ABF-163).
+   *
+   * The server updates the forum announcement and the Google Calendar event
+   * along with the meeting; the Meet link does not change. A 403 is either
+   * "not yours" or a calendar grant that was revoked, told apart the same
+   * way as on {@link createMeeting}: by asking {@link getCalendarStatus}.
+   */
+  updateMeeting(id: string, data: MeetingUpdate): Observable<Meeting> {
+    return this.api.patch<Meeting>(`/meetings/${id}`, data);
+  }
+
+  /**
+   * Call a meeting off. Its creator only (ABF-163).
+   *
+   * Deletes the Google Calendar event and marks the announcement as
+   * cancelled; the announcement stays in the forum. Answers 204 with no
+   * body, and again 204 for a meeting already cancelled.
+   */
+  cancelMeeting(id: string): Observable<void> {
+    return this.api.delete<void>(`/meetings/${id}`);
   }
 
   /** Whether this professional has authorised calendar access, and where to send her if not. */

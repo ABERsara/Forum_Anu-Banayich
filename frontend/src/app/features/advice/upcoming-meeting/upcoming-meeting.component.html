@@ -1,0 +1,127 @@
+<!-- No dir here: text direction follows <html dir>, which LocaleService sets
+     from the active language (CONTRIBUTING §6). -->
+<div class="upcoming-meeting">
+  @if (isEditing()) {
+    <form class="edit-form" [formGroup]="form" (ngSubmit)="save()">
+      <div class="edit-form__field">
+        <label [for]="'edit-title-' + meeting().id">
+          {{ 'meetings.schedule.title_label' | transloco }}
+        </label>
+        <input
+          #titleInput
+          [id]="'edit-title-' + meeting().id"
+          type="text"
+          formControlName="title"
+          [maxlength]="titleMaxLength"
+          [attr.aria-invalid]="form.controls.title.touched && form.controls.title.invalid"
+        />
+        @if (form.controls.title.touched && form.controls.title.invalid) {
+          <p class="edit-form__error" role="alert">
+            {{ 'meetings.schedule.title_error' | transloco }}
+          </p>
+        }
+      </div>
+
+      <div class="edit-form__field">
+        <label [for]="'edit-when-' + meeting().id">
+          {{ 'meetings.schedule.when_label' | transloco }}
+        </label>
+        <input
+          [id]="'edit-when-' + meeting().id"
+          type="datetime-local"
+          formControlName="scheduled_at"
+          [min]="minDateTime"
+          [attr.aria-invalid]="
+            form.controls.scheduled_at.touched && form.controls.scheduled_at.invalid
+          "
+        />
+        @if (form.controls.scheduled_at.touched && form.controls.scheduled_at.invalid) {
+          <p class="edit-form__error" role="alert">
+            {{ 'meetings.schedule.when_error' | transloco }}
+          </p>
+        }
+      </div>
+
+      <p class="edit-form__note">{{ 'meetings.edit.note' | transloco }}</p>
+
+      <div class="edit-form__actions">
+        <button type="submit" class="edit-form__save" [disabled]="isSaving()">
+          {{ (isSaving() ? 'meetings.edit.saving' : 'meetings.edit.save') | transloco }}
+        </button>
+        <button
+          type="button"
+          class="edit-form__discard"
+          [disabled]="isSaving()"
+          (click)="stopEditing()"
+        >
+          {{ 'meetings.edit.discard' | transloco }}
+        </button>
+      </div>
+    </form>
+  } @else {
+    <div class="upcoming-meeting__row">
+      <!-- The title is what the professional wrote: content, not UI copy, so
+           it is shown as it came in either interface language. -->
+      <strong class="upcoming-meeting__title">{{ meeting().title }}</strong>
+      <span class="upcoming-meeting__when">
+        {{ meeting().scheduled_at | date: 'dd/MM/yyyy HH:mm' }}
+      </span>
+      <span class="upcoming-meeting__cell">
+        {{ groupLabels[meeting().group_visibility] | transloco }} ·
+        {{ sectorLabels[meeting().sector_visibility] | transloco }}
+      </span>
+      <a class="upcoming-meeting__join" [href]="meeting().meet_link" target="_blank" rel="noopener">
+        {{ 'meetings.upcoming.join' | transloco }}
+      </a>
+    </div>
+
+    <!-- Each label names its meeting for a screen reader: a list of
+         identical "Edit" buttons says nothing about which one is which. -->
+    @if (canManage()) {
+      <div class="upcoming-meeting__actions">
+        <button
+          type="button"
+          class="upcoming-meeting__btn upcoming-meeting__btn--edit"
+          [attr.aria-label]="'meetings.upcoming.edit_aria' | transloco: { title: meeting().title }"
+          [disabled]="isBusy()"
+          (click)="startEditing()"
+        >
+          {{ 'meetings.upcoming.edit' | transloco }}
+        </button>
+        <button
+          type="button"
+          class="upcoming-meeting__btn upcoming-meeting__btn--cancel"
+          [attr.aria-label]="
+            'meetings.upcoming.cancel_aria' | transloco: { title: meeting().title }
+          "
+          [disabled]="isBusy()"
+          (click)="askToCancel()"
+        >
+          {{ 'meetings.upcoming.cancel' | transloco }}
+        </button>
+      </div>
+    }
+  }
+
+  <!-- The API's own `detail` is a finished sentence and is shown as it came;
+       our fallback is a key, so it follows a language switch. -->
+  @if (error().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (error().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
+
+  @if (showCancelConfirm()) {
+    <!-- The dialog is dumb: it renders the text it is handed, so the pipe
+         runs here rather than inside shared/ (CONTRIBUTING §6). -->
+    <app-confirm-dialog
+      [title]="'meetings.cancel_dialog.title' | transloco"
+      [message]="'meetings.cancel_dialog.message' | transloco"
+      [confirmText]="'meetings.cancel_dialog.confirm' | transloco"
+      [cancelText]="'meetings.cancel_dialog.keep' | transloco"
+      [isDestructive]="true"
+      (confirmed)="onCancelConfirmed()"
+      (cancelled)="onCancelDismissed()"
+    />
+  }
+</div>

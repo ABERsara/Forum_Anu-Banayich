@@ -28,6 +28,15 @@ export class MeetingAnnouncementComponent {
   readonly meeting = input.required<MeetingSummary>();
 
   /**
+   * Whether the professional who scheduled it called it off (ABF-163) — the
+   * post's `cancelled_at`, which travels on the post rather than on
+   * `meeting`. A cancelled announcement says so and offers no way in: its
+   * Google event is gone, and a button, even a disabled one, would read as a
+   * meeting that might still happen.
+   */
+  readonly cancelled = input(false);
+
+  /**
    * Whether the meeting is over: its start plus its duration, not its start.
    * A member a few minutes late can still find her way in, which is the same
    * rule `meeting_service.get_visible_meetings()` applies on the server.

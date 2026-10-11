@@ -338,6 +338,13 @@ export interface ForumPost {
    * object itself.
    */
   meeting: MeetingSummary | null;
+  /**
+   * Set when the professional who scheduled the meeting called it off
+   * (ABF-163). The announcement stays in the feed and reads "cancelled", with
+   * no join button. Null on every live announcement and every ordinary post.
+   * Only ever tested for presence, so its missing zone does not matter here.
+   */
+  cancelled_at: string | null;
 }
 
 export interface ForumPostList {
@@ -394,6 +401,18 @@ export interface MeetingCreate {
    */
   group_visibility: GroupVisibility;
   sector_visibility: SectorVisibility;
+}
+
+/**
+ * PATCH /meetings/{id} — the creator changes the title, the time, or both.
+ *
+ * Send only what changes; a field left out stays as it is. An empty body, or
+ * a field sent as null, is refused with a 422. `scheduled_at` follows the
+ * same rule as {@link MeetingCreate}: zoned, via `toISOString()`.
+ */
+export interface MeetingUpdate {
+  title?: string;
+  scheduled_at?: string;
 }
 
 /** One meeting, as the meetings endpoints return it. */

@@ -36,6 +36,7 @@ function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
     created_at: '2026-07-01T10:00:00',
     post_type: PostType.TEXT,
     meeting: null,
+    cancelled_at: null,
     updated_at: '2026-07-01T10:00:00',
     ...overrides,
   };
@@ -458,6 +459,16 @@ describe('ForumPostComponent', () => {
       expect(component.canDelete()).toBe(true);
       expect(fixture.nativeElement.querySelector('.forum-post__btn--delete')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('app-report-button')).toBeTruthy();
+    });
+
+    /** ABF-163: the post page agrees with the list. */
+    it('reads "cancelled" with no way in once the meeting is called off', () => {
+      setup(makeUser(), false, false, announcement({ cancelled_at: '2026-10-07T09:00:00' }));
+
+      const page = fixture.nativeElement as HTMLElement;
+      expect(page.textContent).toContain('פגישה בוטלה');
+      expect(page.querySelector('.meeting-announcement__join')).toBeNull();
+      expect(page.textContent).toContain('מפגש תמיכה');
     });
 
     it('leaves an ordinary post with its like button and its body', () => {

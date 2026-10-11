@@ -1,6 +1,5 @@
-import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -13,34 +12,15 @@ import {
 import { CalendarStatus, Meeting } from '../../../core/models';
 import { MeetingService } from '../../../core/services/meeting.service';
 import { AdviceError, NO_ERROR, adviceErrorFrom } from '../advice-error';
+import {
+  TITLE_MAX_LENGTH,
+  TITLE_MIN_LENGTH,
+  futureDateTime,
+  toLocalInputValue,
+} from '../meeting-form';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
-
-/** Mirrors MeetingCreate in backend/app/schemas/meeting.py. */
-const TITLE_MIN_LENGTH = 2;
-const TITLE_MAX_LENGTH = 256;
-
-/** `2026-10-05T14:30`, the shape a `datetime-local` input reads and writes. */
-function toLocalInputValue(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, '0');
-  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  return `${day}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-/**
- * A meeting has to start in the future — the server answers 422 otherwise.
- *
- * Checked against the clock at the moment of editing, so a value that was
- * valid when it was typed and went stale while the form sat open passes here
- * and is caught by the server, whose sentence is then shown as it came. The
- * `min` attribute on the input states the same rule to the browser; neither is
- * a substitute for the server's.
- */
-function futureDateTime(control: AbstractControl): { pastDateTime: true } | null {
-  const value = control.value as string;
-  if (!value) return null;
-  return new Date(value).getTime() > Date.now() ? null : { pastDateTime: true };
-}
+import { UpcomingMeetingComponent } from '../upcoming-meeting/upcoming-meeting.component';
 
 /**
  * A professional schedules a Google Meet for one of her cells.
@@ -62,10 +42,10 @@ function futureDateTime(control: AbstractControl): { pastDateTime: true } | null
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    DatePipe,
     TranslocoPipe,
     ErrorDisplayComponent,
     LoadingSpinnerComponent,
+    UpcomingMeetingComponent,
   ],
   templateUrl: './schedule-meeting.component.html',
   styleUrl: './schedule-meeting.component.scss',
@@ -121,6 +101,13 @@ export class ScheduleMeetingComponent implements OnInit {
   readonly error = signal<AdviceError>(NO_ERROR);
   /** Held as a key and piped in the template, so it follows a language switch. */
   readonly successKey = signal('');
+  /**
+   * The confirmation for an edit or a cancellation in the list (ABF-163).
+   * Its own signal rather than `successKey`, because it belongs beside the
+   * list, not above the form — and only one of the two is ever shown: each
+   * action takes the other's confirmation down.
+   */
+  readonly upcomingSuccessKey = signal('');
 
   /**
    * Whether she still has to authorise Google Calendar. False while the status
@@ -141,6 +128,7 @@ export class ScheduleMeetingComponent implements OnInit {
     // there is nothing to schedule.
     this.error.set(NO_ERROR);
     this.successKey.set('');
+    this.upcomingSuccessKey.set('');
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -184,6 +172,30 @@ export class ScheduleMeetingComponent implements OnInit {
           }
         },
       });
+  }
+
+  /** A meeting in the list was edited: it may have moved, so the list is read again. */
+  onMeetingUpdated(): void {
+    this.successKey.set('');
+    this.upcomingSuccessKey.set('meetings.upcoming.updated');
+    this.loadUpcoming();
+  }
+
+  /** A meeting in the list was cancelled: it leaves the list on the next read. */
+  onMeetingCancelled(): void {
+    this.successKey.set('');
+    this.upcomingSuccessKey.set('meetings.upcoming.cancelled');
+    this.loadUpcoming();
+  }
+
+  /**
+   * An edit or a cancel came back 403. The same check as after a refused
+   * submit, for the same reason: a grant Google revoked has been deleted by
+   * now, and the status brings the consent step back. Silent, so the row's
+   * own sentence survives a failing check.
+   */
+  onCalendarRefused(): void {
+    this.loadCalendarStatus({ reportFailure: false });
   }
 
   /**

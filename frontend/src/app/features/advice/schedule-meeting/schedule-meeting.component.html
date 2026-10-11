@@ -117,6 +117,12 @@
   <section class="upcoming" aria-labelledby="upcoming-title">
     <h2 class="upcoming__title" id="upcoming-title">{{ 'meetings.upcoming.title' | transloco }}</h2>
 
+    <!-- Outside the list on purpose: a cancelled meeting leaves the list, and
+         the confirmation has to outlive the row it is about. -->
+    @if (upcomingSuccessKey(); as key) {
+      <p class="upcoming__success" role="status">{{ key | transloco }}</p>
+    }
+
     @if (isLoadingUpcoming()) {
       <app-loading-spinner size="md" />
     } @else if (upcoming().length === 0) {
@@ -124,25 +130,13 @@
     } @else {
       <ul class="upcoming__list">
         @for (meeting of upcoming(); track meeting.id) {
-          <li class="upcoming__item">
-            <!-- The title is what the professional wrote: content, not UI copy,
-                 so it is shown as it came in either interface language. -->
-            <strong class="upcoming__item-title">{{ meeting.title }}</strong>
-            <span class="upcoming__item-when">
-              {{ meeting.scheduled_at | date: 'dd/MM/yyyy HH:mm' }}
-            </span>
-            <span class="upcoming__item-cell">
-              {{ groupLabels[meeting.group_visibility] | transloco }} ·
-              {{ sectorLabels[meeting.sector_visibility] | transloco }}
-            </span>
-            <a
-              class="upcoming__item-join"
-              [href]="meeting.meet_link"
-              target="_blank"
-              rel="noopener"
-            >
-              {{ 'meetings.upcoming.join' | transloco }}
-            </a>
+          <li>
+            <app-upcoming-meeting
+              [meeting]="meeting"
+              (updated)="onMeetingUpdated()"
+              (cancelled)="onMeetingCancelled()"
+              (refused)="onCalendarRefused()"
+            />
           </li>
         }
       </ul>

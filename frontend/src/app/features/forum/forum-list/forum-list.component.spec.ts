@@ -26,6 +26,7 @@ function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
     created_at: '2026-07-01T10:00:00',
     post_type: PostType.TEXT,
     meeting: null,
+    cancelled_at: null,
     updated_at: '2026-07-01T10:00:00',
     ...overrides,
   };
@@ -270,11 +271,18 @@ describe('ForumListComponent', () => {
       meet_link: 'https://meet.google.com/abc-defg-hij',
     };
 
-    function showAnnouncement(meeting = MEETING): HTMLElement {
+    function showAnnouncement(meeting = MEETING, cancelledAt: string | null = null): HTMLElement {
       forumServiceMock.getPosts.mockReturnValue(
         of(
           makeList({
-            items: [makePost({ post_type: PostType.MEETING, title: 'מפגש תמיכה', meeting })],
+            items: [
+              makePost({
+                post_type: PostType.MEETING,
+                title: 'מפגש תמיכה',
+                meeting,
+                cancelled_at: cancelledAt,
+              }),
+            ],
           }),
         ),
       );
@@ -307,6 +315,16 @@ describe('ForumListComponent', () => {
 
     it('leaves an ordinary post without one', () => {
       expect(fixture.nativeElement.querySelector('.meeting-announcement')).toBeNull();
+    });
+
+    /** ABF-163: what a member of the cell sees once the professional cancels. */
+    it('reads "cancelled" with no way in once the meeting is called off', () => {
+      const card = showAnnouncement(MEETING, '2026-10-07T09:00:00');
+
+      expect(card.textContent).toContain('פגישה בוטלה');
+      expect(card.querySelector('.meeting-announcement__join')).toBeNull();
+      // Still in the feed, title and all: marked, not removed.
+      expect(card.textContent).toContain('מפגש תמיכה');
     });
   });
 });

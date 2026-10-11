@@ -36,6 +36,7 @@ function makePost(overrides: Partial<ForumPost> = {}): ForumPost {
     created_at: '2026-07-01T10:00:00',
     post_type: PostType.TEXT,
     meeting: null,
+    cancelled_at: null,
     updated_at: '2026-07-01T10:00:00',
     ...overrides,
   };

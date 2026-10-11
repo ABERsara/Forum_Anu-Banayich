@@ -28,9 +28,10 @@
         <!-- A meeting announcement reads differently from a post:
              when it starts, and the way in. `meeting` is populated exactly
              when post_type is MEETING, so the data the card needs is also the
-             test for whether to draw it. -->
+             test for whether to draw it. A cancelled one (ABF-163) stays in
+             the feed and says so. -->
         @if (post.meeting; as meeting) {
-          <app-meeting-announcement [meeting]="meeting" />
+          <app-meeting-announcement [meeting]="meeting" [cancelled]="!!post.cancelled_at" />
         }
         <!-- Excerpt and a report button are out of scope for ABF-41 (F2 / F5) -->
         <span class="post-card__badge">

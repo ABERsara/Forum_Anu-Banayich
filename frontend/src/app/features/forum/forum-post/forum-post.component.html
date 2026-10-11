@@ -16,9 +16,10 @@
     </p>
     <!-- A meeting announcement carries its payload in structured fields, and
          its body is a second copy of the title the server wrote there, so the
-         announcement is rendered instead of the text. -->
+         announcement is rendered instead of the text. A cancelled one
+         (ABF-163) says so, with no way in. -->
     @if (post.meeting; as meeting) {
-      <app-meeting-announcement [meeting]="meeting" />
+      <app-meeting-announcement [meeting]="meeting" [cancelled]="!!post.cancelled_at" />
     } @else {
       <p class="forum-post__content">{{ post.content }}</p>
     }

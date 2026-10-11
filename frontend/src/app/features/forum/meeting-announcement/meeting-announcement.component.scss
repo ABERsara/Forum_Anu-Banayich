@@ -29,6 +29,19 @@
     color: $color-text-muted;
   }
 
+  &__when--cancelled {
+    color: $color-text-muted;
+    text-decoration: line-through;
+  }
+
+  // Said in words, not only in colour, so it reaches a screen reader and a
+  // reader who cannot tell the colours apart (WCAG 1.4.1).
+  &__cancelled {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-bold;
+    color: $color-danger;
+  }
+
   // One class for both the live anchor and the disabled button, so the two
   // states of one control look like one control.
   &__join {

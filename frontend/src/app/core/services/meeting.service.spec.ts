@@ -1,5 +1,5 @@
 /**
- * The four meeting calls, against `HttpTestingController`.
+ * The six meeting calls, against `HttpTestingController`.
  *
  * What is worth asserting here is the shape of the *request*, because that is
  * the half the backend contract fixes and the half a component cannot check:
@@ -94,5 +94,27 @@ describe('MeetingService', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ code: 'google-code', state: 'signed-state' });
     req.flush(STATUS);
+  });
+
+  /** Only what changes travels: the server leaves an absent field as it is. */
+  it('edits a meeting with a PATCH that carries only the changed fields', () => {
+    service
+      .updateMeeting('meeting-1', { title: 'כותרת חדשה' })
+      .subscribe((meeting) => expect(meeting.title).toBe('כותרת חדשה'));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/meetings/meeting-1`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ title: 'כותרת חדשה' });
+    req.flush({ ...MEETING, title: 'כותרת חדשה' });
+  });
+
+  it('cancels a meeting with a DELETE on the meeting itself', () => {
+    let done = false;
+    service.cancelMeeting('meeting-1').subscribe(() => (done = true));
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/meetings/meeting-1`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    expect(done).toBe(true);
   });
 });

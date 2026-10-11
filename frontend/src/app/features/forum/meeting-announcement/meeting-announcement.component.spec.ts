@@ -1,10 +1,12 @@
 /**
  * The body of a meeting announcement.
  *
- * One rule is worth testing here and is tested nowhere else on the client:
- * when a meeting is over. It is the *end* that decides — start plus duration —
+ * Two rules are worth testing here and are tested nowhere else on the client.
+ * When a meeting is over: it is the *end* that decides — start plus duration —
  * so a member a few minutes late still gets a live button, and that is the
- * same rule the server applies when it decides which meetings to list.
+ * same rule the server applies when it decides which meetings to list. And
+ * what a cancelled meeting looks like (ABF-163): it says so, and offers no way
+ * in at all.
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -30,13 +32,14 @@ function makeMeeting(minutesFromNow: number, overrides: Partial<MeetingSummary> 
 describe('MeetingAnnouncementComponent', () => {
   let fixture: ComponentFixture<MeetingAnnouncementComponent>;
 
-  function setup(meeting: MeetingSummary): void {
+  function setup(meeting: MeetingSummary, cancelled?: boolean): void {
     TestBed.configureTestingModule({
       imports: [MeetingAnnouncementComponent, translocoTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(MeetingAnnouncementComponent);
     fixture.componentRef.setInput('meeting', meeting);
+    if (cancelled !== undefined) fixture.componentRef.setInput('cancelled', cancelled);
     fixture.detectChanges();
   }
 
@@ -112,6 +115,52 @@ describe('MeetingAnnouncementComponent', () => {
 
     expect(text()).toContain('This meeting has ended');
     expect(text()).not.toMatch(HEBREW);
+  });
+
+  describe('once the meeting is cancelled', () => {
+    it('says so, and offers no way in — not even a disabled one', () => {
+      setup(makeMeeting(30), true);
+
+      expect(text()).toContain('פגישה בוטלה');
+      expect(joinLink()).toBeNull();
+      expect(joinButton()).toBeNull();
+    });
+
+    it('keeps the time it was set for, struck through', () => {
+      setup(makeMeeting(30), true);
+
+      expect(
+        element()
+          .querySelector('.meeting-announcement__when')
+          ?.classList.contains('meeting-announcement__when--cancelled'),
+      ).toBe(true);
+    });
+
+    /** A cancelled meeting never took place, whatever the clock says now. */
+    it('reads as cancelled rather than ended once its time has passed', () => {
+      setup(makeMeeting(-90), true);
+
+      expect(text()).toContain('פגישה בוטלה');
+      expect(text()).not.toContain('הפגישה הסתיימה');
+      expect(joinButton()).toBeNull();
+    });
+
+    it('is not cancelled unless told so', () => {
+      setup(makeMeeting(30));
+
+      expect(text()).not.toContain('פגישה בוטלה');
+      expect(joinLink()).not.toBeNull();
+    });
+
+    it('translates the word', () => {
+      setup(makeMeeting(30), true);
+
+      TestBed.inject(TranslocoService).setActiveLang('en');
+      fixture.detectChanges();
+
+      expect(text()).toContain('Meeting cancelled');
+      expect(text()).not.toMatch(HEBREW);
+    });
   });
 
   it('does not pin its own text direction — it follows <html dir>', () => {
