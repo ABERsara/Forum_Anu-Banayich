@@ -4,8 +4,41 @@
   <a routerLink="/admin"
     ><span aria-hidden="true">‹</span> {{ 'admin.back_to_dashboard' | transloco }}</a
   >
-  <h1>{{ 'admin.audit_log.title' | transloco }}</h1>
+  <div class="audit-log__header">
+    <h1>{{ 'admin.audit_log.title' | transloco }}</h1>
+
+    <!-- ABF-161. Always on screen, so an admin knows the export exists before
+         filtering; enabled once there are rows on screen to export. The hint
+         answers the question the button raises — "this page, or all of
+         them?" — for a sighted reader and, through aria-describedby, for a
+         screen reader too. -->
+    <div class="audit-log__export">
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!canExport()"
+        [attr.aria-busy]="isExporting()"
+        aria-describedby="audit-log-export-hint"
+        (click)="exportCsv()"
+      >
+        {{
+          (isExporting() ? 'admin.audit_log.exporting' : 'admin.audit_log.export_csv') | transloco
+        }}
+      </button>
+      <p id="audit-log-export-hint" class="audit-log__export-hint">
+        {{ 'admin.audit_log.export_hint' | transloco }}
+      </p>
+    </div>
+  </div>
   <p class="audit-log__hint">{{ 'admin.audit_log.hint' | transloco }}</p>
+
+  <!-- Its own error, apart from the table's: a failed export leaves the rows
+       on screen exactly as true as they were. -->
+  @if (exportError().text; as text) {
+    <app-error-display [message]="text" />
+  } @else if (exportError().key; as key) {
+    <app-error-display [message]="key | transloco" />
+  }
 
   <!-- A form, so that Enter in any of the boxes applies the filters — an
        admin typing an entity id and pressing Enter should not have to find

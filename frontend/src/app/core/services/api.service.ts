@@ -13,6 +13,19 @@ export class ApiService {
     return this.http.get<T>(`${this.base}${path}`);
   }
 
+  /**
+   * A GET whose body is a file, handed over as the bytes the server sent.
+   *
+   * A `Blob`, not `responseType: 'text'`: decoding to a string runs the body
+   * through a UTF-8 `TextDecoder`, which strips a leading byte-order mark — and
+   * the audit log's CSV export (ABF-161) carries one precisely so that Excel
+   * reads its Hebrew as UTF-8. Saved from a string, the file would open as
+   * mojibake.
+   */
+  getBlob(path: string): Observable<Blob> {
+    return this.http.get(`${this.base}${path}`, { responseType: 'blob' });
+  }
+
   post<T>(path: string, body: unknown): Observable<T> {
     return this.http.post<T>(`${this.base}${path}`, body);
   }

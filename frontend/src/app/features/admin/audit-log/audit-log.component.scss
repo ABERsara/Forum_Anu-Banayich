@@ -4,6 +4,32 @@
 .audit-log {
   padding: $spacing-md;
 
+  // The title and the export button on one line, wrapping under each other on
+  // a narrow screen rather than squeezing the title.
+  &__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-md;
+  }
+
+  // `end`, not `right`: the logical end edge, whichever way the page runs.
+  &__export {
+    display: flex;
+    flex-direction: column;
+    align-items: end;
+    gap: $spacing-xs;
+  }
+
+  &__export-hint {
+    max-width: 40ch;
+    margin: 0;
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+    text-align: end;
+  }
+
   &__hint {
     max-width: 70ch;
     color: $color-text-muted;

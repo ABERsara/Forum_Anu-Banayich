@@ -12,6 +12,10 @@ What this file pins, in the order the ticket's acceptance criteria list them:
     (TestFalseReporterFlag);
   * a member carrying the flag is refused with 403 and the right message
     (TestRestrictedReporterIsRefused);
+  * after an admin lifts the flag, only dismissals decided after the lift
+    count toward it again (ABF-XXX: TestALiftStartsTheCountAgain), and a
+    member never lifted is counted as before
+    (TestAMemberNeverLiftedIsCountedAsBefore);
   * every window is exercised with the clock under the test's control
     (TestWindowsAreMeasuredFromTheClock, and the `decided_at` offsets
     throughout).
@@ -1191,6 +1195,415 @@ class TestRestrictedReporterIsRefused:
         response = await self._report(client, _make_post(db_session, offender).id)
 
         assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# ABF-XXX — "לאחר lift, דחיות שהתקבלו לפני ה-lift לא מפעילות מחדש את ההגבלה"
+# ---------------------------------------------------------------------------
+
+
+def _restrict_then_lift(db_session, *, moderator, offender, reporter, admin):
+    """
+    The flag set by the real rule on the real flow, then lifted by the real
+    ABF-162 service call. The dismissals that set it are a day old, well
+    inside the 30-day window, which is the whole problem: by the window alone
+    they would still count after the lift.
+    """
+    _fill_history(
+        db_session,
+        reporter=reporter,
+        reported_user=offender,
+        decision=ReportDecision.INVALID,
+        count=settings.FALSE_REPORT_LIMIT - 1,
+        decided_at=_days_ago(1),
+        prefix="before-lift",
+    )
+    _decide_a_fresh_report(
+        db_session,
+        reporter=reporter,
+        reported_user=offender,
+        moderator=moderator,
+        decision=ReportDecision.INVALID,
+    )
+    db_session.refresh(reporter)
+    assert reporter.is_report_restricted is True
+
+    user_service.lift_report_restriction(db_session, reporter.id, admin)
+    db_session.refresh(reporter)
+    assert reporter.is_report_restricted is False
+
+
+def _dismiss_after_the_lift(db_session, *, moderator, offender, reporter, count):
+    """
+    `count` dismissals decided after the lift: all but the last written as
+    history stamped now, the last decided for real so the rule runs on it.
+    """
+    _fill_history(
+        db_session,
+        reporter=reporter,
+        reported_user=offender,
+        decision=ReportDecision.INVALID,
+        count=count - 1,
+        prefix="after-lift",
+    )
+    _decide_a_fresh_report(
+        db_session,
+        reporter=reporter,
+        reported_user=offender,
+        moderator=moderator,
+        decision=ReportDecision.INVALID,
+    )
+    db_session.refresh(reporter)
+
+
+class TestALiftStartsTheCountAgain:
+    """
+    The ticket's three criteria, each on the real decide_report() flow after
+    a real lift, plus the two edges a boundary has (the instant of the lift,
+    and a lift older than the window) and "the latest lift", which the
+    ticket names.
+    """
+
+    def test_a_queued_report_dismissed_after_the_lift_does_not_restrict_again(
+        self, db_session, moderator, offender, reporter, admin, revoked_alerts
+    ):
+        """
+        The ticket's own scenario: a report filed before the lift, still in
+        the queue, dismissed after it. Before this ticket, that one dismissal
+        plus the five the lift answered made six inside the window, and the
+        flag came straight back with nobody told.
+        """
+        queued = _pending_report(
+            db_session, reporter=reporter, post=_make_post(db_session, offender)
+        )
+        _restrict_then_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            admin=admin,
+        )
+
+        _decide(db_session, queued, moderator, ReportDecision.INVALID)
+
+        db_session.refresh(reporter)
+        assert reporter.is_report_restricted is False
+        assert len(_flag_audit_entries(db_session)) == 1
+        assert [user_id for _, user_id in revoked_alerts] == [reporter.id]
+
+    def test_dismissals_from_before_the_lift_do_not_top_up_the_new_count(
+        self, db_session, moderator, offender, reporter, admin
+    ):
+        """
+        One short after the lift stays one short, though the window holds
+        twice the limit. The pre-lift dismissals are left out, not
+        discounted.
+        """
+        _restrict_then_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            admin=admin,
+        )
+
+        _dismiss_after_the_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            count=settings.FALSE_REPORT_LIMIT - 1,
+        )
+
+        assert reporter.is_report_restricted is False
+
+    def test_the_full_limit_after_the_lift_restricts_again(
+        self, db_session, moderator, offender, reporter, admin, revoked_alerts
+    ):
+        """
+        The lift is a clean slate, not an exemption: five new dismissals
+        withdraw the reporting again, record it again and alert the
+        moderators again, exactly as the first time.
+        """
+        _restrict_then_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            admin=admin,
+        )
+
+        _dismiss_after_the_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            count=settings.FALSE_REPORT_LIMIT,
+        )
+
+        assert reporter.is_report_restricted is True
+        assert len(_flag_audit_entries(db_session)) == 2
+        assert [user_id for _, user_id in revoked_alerts] == [reporter.id] * 2
+
+    def test_the_new_entry_counts_from_the_lift_and_says_so(
+        self, db_session, moderator, offender, reporter, admin
+    ):
+        """
+        `report_count` is the post-lift count, not the ten in the window. The
+        entry names the lift it counted from, so an admin reading "5 in 30
+        days" right after her own lift can see why.
+        """
+        _restrict_then_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            admin=admin,
+        )
+        lifted_at = reporter.report_restriction_lifted_at
+
+        _dismiss_after_the_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            count=settings.FALSE_REPORT_LIMIT,
+        )
+
+        # Told apart by content, not `timestamp`: SQLite stamps both entries
+        # with the same whole second.
+        first, again = sorted(
+            _flag_audit_entries(db_session),
+            key=lambda e: "counted_since_lift" in e.details,
+        )
+        assert "counted_since_lift" not in first.details
+        assert again.details["report_count"] == settings.FALSE_REPORT_LIMIT
+        assert again.details["counted_since_lift"] == lifted_at.isoformat()
+
+    def test_only_the_latest_lift_starts_the_count(
+        self, db_session, moderator, offender, reporter, admin
+    ):
+        """
+        Restricted, lifted, restricted again on five new dismissals, lifted
+        again. The five between the two lifts are what the second lift
+        answered, so they no longer count either.
+        """
+        _restrict_then_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            admin=admin,
+        )
+        _dismiss_after_the_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            count=settings.FALSE_REPORT_LIMIT,
+        )
+        assert reporter.is_report_restricted is True
+        user_service.lift_report_restriction(db_session, reporter.id, admin)
+
+        _decide_a_fresh_report(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            moderator=moderator,
+            decision=ReportDecision.INVALID,
+        )
+
+        db_session.refresh(reporter)
+        assert reporter.is_report_restricted is False
+
+    def test_a_dismissal_decided_at_the_instant_of_the_lift_does_not_count(
+        self, db_session, moderator, offender, reporter
+    ):
+        """
+        "After the lift" is strict. A decision stamped with the lift's own
+        instant was already on record when the admin looked.
+        """
+        lifted_at = _days_ago(1)
+        reporter.report_restriction_lifted_at = lifted_at
+        db_session.commit()
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.INVALID,
+            count=settings.FALSE_REPORT_LIMIT,
+            decided_at=lifted_at,
+        )
+
+        report_service._check_frequent_false_reporter(db_session, reporter, moderator)
+
+        db_session.refresh(reporter)
+        assert reporter.is_report_restricted is False
+
+    def test_a_dismissal_decided_just_after_the_lift_does_count(
+        self, db_session, moderator, offender, reporter
+    ):
+        lifted_at = _days_ago(1)
+        reporter.report_restriction_lifted_at = lifted_at
+        db_session.commit()
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.INVALID,
+            count=settings.FALSE_REPORT_LIMIT,
+            decided_at=lifted_at + timedelta(microseconds=1),
+        )
+
+        report_service._check_frequent_false_reporter(db_session, reporter, moderator)
+
+        db_session.refresh(reporter)
+        assert reporter.is_report_restricted is True
+
+    def test_a_lift_older_than_the_window_leaves_the_window_in_charge(
+        self, db_session, moderator, offender, reporter
+    ):
+        """
+        The lift only ever narrows the window. Dismissals after an old lift
+        that have since left the 30 days do not count.
+        """
+        reporter.report_restriction_lifted_at = _days_ago(
+            settings.FALSE_REPORT_DAYS_WINDOW + 10
+        )
+        db_session.commit()
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.INVALID,
+            count=settings.FALSE_REPORT_LIMIT,
+            decided_at=_days_ago(settings.FALSE_REPORT_DAYS_WINDOW + 1),
+        )
+
+        report_service._check_frequent_false_reporter(db_session, reporter, moderator)
+
+        db_session.refresh(reporter)
+        assert reporter.is_report_restricted is False
+
+    def test_after_an_old_lift_the_window_counts_as_it_always_did(
+        self, db_session, moderator, offender, reporter
+    ):
+        reporter.report_restriction_lifted_at = _days_ago(
+            settings.FALSE_REPORT_DAYS_WINDOW + 10
+        )
+        db_session.commit()
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.INVALID,
+            count=settings.FALSE_REPORT_LIMIT,
+            decided_at=_days_ago(settings.FALSE_REPORT_DAYS_WINDOW - 1),
+        )
+
+        report_service._check_frequent_false_reporter(db_session, reporter, moderator)
+
+        db_session.refresh(reporter)
+        assert reporter.is_report_restricted is True
+
+
+class TestAMemberNeverLiftedIsCountedAsBefore:
+    """
+    "משתמש ללא lift בכלל — ההתנהגות הקיימת לא משתנה". TestFalseReporterFlag
+    and TestFalseReporterAuditTrail already pin the count and the window, and
+    pass unchanged. These pin what the ticket adds, and only for a member
+    who has been lifted: the column and the audit key.
+    """
+
+    def test_a_member_never_lifted_has_no_lift_time(self, db_session, reporter):
+        assert reporter.report_restriction_lifted_at is None
+
+    def test_the_limit_still_restricts_on_the_whole_window(
+        self, db_session, moderator, offender, reporter
+    ):
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.INVALID,
+            count=settings.FALSE_REPORT_LIMIT - 1,
+            decided_at=_days_ago(settings.FALSE_REPORT_DAYS_WINDOW - 1),
+        )
+
+        _decide_a_fresh_report(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            moderator=moderator,
+            decision=ReportDecision.INVALID,
+        )
+
+        db_session.refresh(reporter)
+        assert reporter.is_report_restricted is True
+
+    def test_the_audit_entry_is_the_one_it_always_was(
+        self, db_session, moderator, offender, reporter
+    ):
+        _fill_history(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            decision=ReportDecision.INVALID,
+            count=settings.FALSE_REPORT_LIMIT - 1,
+        )
+
+        _decide_a_fresh_report(
+            db_session,
+            reporter=reporter,
+            reported_user=offender,
+            moderator=moderator,
+            decision=ReportDecision.INVALID,
+        )
+
+        assert _flag_audit_entries(db_session)[0].details == {
+            "measure": "report_restricted",
+            "report_count": settings.FALSE_REPORT_LIMIT,
+            "window_days": settings.FALSE_REPORT_DAYS_WINDOW,
+            "automatic": True,
+        }
+
+
+class TestALiftDoesNotReachTheOtherDirection:
+    def test_findings_against_a_lifted_member_still_count_from_before_the_lift(
+        self, db_session, moderator, offender, reporter, admin
+    ):
+        """
+        The lift answers her *reporting*. Reports upheld against her own
+        content are §7.2's other direction, and the lift does not wipe them:
+        the suspension rule counts its full 7 days as before.
+        """
+        _restrict_then_lift(
+            db_session,
+            moderator=moderator,
+            offender=offender,
+            reporter=reporter,
+            admin=admin,
+        )
+        _fill_history(
+            db_session,
+            reporter=offender,
+            reported_user=reporter,
+            decision=ReportDecision.VALID,
+            count=settings.AUTO_SUSPEND_VALID_REPORTS - 1,
+            decided_at=_days_ago(2),
+            prefix="against-her",
+        )
+
+        _decide_a_fresh_report(
+            db_session,
+            reporter=offender,
+            reported_user=reporter,
+            moderator=moderator,
+            decision=ReportDecision.VALID,
+        )
+
+        db_session.refresh(reporter)
+        assert reporter.is_suspended is True
 
 
 # ---------------------------------------------------------------------------

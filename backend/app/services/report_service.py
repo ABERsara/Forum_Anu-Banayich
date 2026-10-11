@@ -11,7 +11,8 @@ Rules:
   5+ dismissed reports from the same USER in 30 days → her reporting drops
       to 3 a day + notify her cell's moderator (§7.2, ABF-116), and the
       reporting itself is withdrawn until an admin restores it (§7.2, ABF-154)
-      + email her cell's moderator about that (ABF-164)
+      + email her cell's moderator about that (ABF-164); once an admin has
+      lifted it, only dismissals decided after the lift count (ABF-XXX)
   3+ upheld reports on a USER in 7 days → auto-suspend 48h (§7.2, ABF-154)
       + email the admin team (ABF-164)
 
@@ -1175,20 +1176,44 @@ def _check_frequent_false_reporter(
     Once the flag is committed, the moderators responsible for her cell are
     emailed (ABF-164). That happens once, for the same reason the audit entry
     is written once: a member who already carries the flag returns above.
+
+    After an admin lifts the flag (ABF-162), only dismissals decided after
+    the lift count (ABF-XXX). The ones before it are what the flag answered,
+    and the admin has reviewed them. Counting them again meant one more
+    dismissal of a report still waiting in the queue put the flag straight
+    back, with nothing to tell the admin. "After" is the decision time, not
+    the filing time: a report filed before the lift and dismissed after it
+    is a new finding, and it counts. The 30-day window still applies on top,
+    so a lift older than the window changes nothing, and a member never
+    lifted is counted exactly as before.
     """
     if reporter is None or reporter.is_report_restricted:
         return
 
     window_days = settings.FALSE_REPORT_DAYS_WINDOW
+    lifted_at = reporter.report_restriction_lifted_at
     count = restriction_service.decided_report_count(
         db,
         subject=Report.reporter_id,
         user_id=reporter.id,
         decision=ReportDecision.INVALID,
         window_days=window_days,
+        since=lifted_at,
     )
     if count < settings.FALSE_REPORT_LIMIT:
         return
+
+    details: dict[str, Any] = {
+        "measure": "report_restricted",
+        "report_count": count,
+        "window_days": window_days,
+        "automatic": True,
+    }
+    # Only on a re-restriction, so the entry for a member never lifted is the
+    # same as before. Without it, an admin reading "5 in 30 days" right after
+    # her own lift could not tell that the count started at the lift.
+    if lifted_at is not None:
+        details["counted_since_lift"] = lifted_at.isoformat()
 
     reporter.is_report_restricted = True
     # USER_RESTRICTED rather than a new AuditAction member, which is what
@@ -1206,12 +1231,7 @@ def _check_frequent_false_reporter(
         action=AuditAction.USER_RESTRICTED,
         entity_type="User",
         entity_id=reporter.id,
-        details={
-            "measure": "report_restricted",
-            "report_count": count,
-            "window_days": window_days,
-            "automatic": True,
-        },
+        details=details,
     )
 
     # After log_action() has committed the flag, and never fatal, for the same
