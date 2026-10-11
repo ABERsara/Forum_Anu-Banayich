@@ -16,6 +16,10 @@
  *                      pager agrees with the page the server answered with.
  *   `the states`     — loading, empty (and *which* empty), and an error that
  *                      does not leave an empty table claiming the log is bare.
+ *   `one entry`      — a row opens the entry dialog (ABF-153), from a mouse
+ *                      or a keyboard, and closing it lands the admin back on
+ *                      the same filter and page, refetching nothing, with
+ *                      focus on the row they opened.
  *
  * Nothing here asserts on an IP address, because there is nothing to assert
  * on: the response has no such field. What is asserted is that a server which
@@ -84,12 +88,18 @@ function wallClock(naiveUtc: string): string {
 
 describe('AuditLogComponent', () => {
   let fixture: ComponentFixture<AuditLogComponent>;
-  let adminServiceMock: { getAuditLog: ReturnType<typeof vi.fn> };
+  let adminServiceMock: {
+    getAuditLog: ReturnType<typeof vi.fn>;
+    getAuditLogEntry: ReturnType<typeof vi.fn>;
+  };
 
   async function render(log: unknown = of(makePage())): Promise<void> {
     TestBed.resetTestingModule();
 
-    adminServiceMock = { getAuditLog: vi.fn().mockReturnValue(log) };
+    adminServiceMock = {
+      getAuditLog: vi.fn().mockReturnValue(log),
+      getAuditLogEntry: vi.fn((id: string) => of(makeEntry({ id, details: { hours: 48 } }))),
+    };
 
     await TestBed.configureTestingModule({
       imports: [AuditLogComponent, translocoTesting()],
@@ -642,6 +652,210 @@ describe('AuditLogComponent', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // One entry, in full (ABF-153)
+  // ---------------------------------------------------------------------------
+
+  describe('one entry, in full', () => {
+    function entryDialog(): HTMLElement | null {
+      return root().querySelector('app-audit-log-entry-dialog');
+    }
+
+    function openButton(rowIndex = 0): HTMLButtonElement {
+      return rows()[rowIndex].querySelector<HTMLButtonElement>('.audit-log__open')!;
+    }
+
+    function closeDialog(): void {
+      entryDialog()!.querySelector<HTMLButtonElement>('.entry-dialog__header button')!.click();
+      fixture.detectChanges();
+    }
+
+    async function renderThreeRows(): Promise<void> {
+      await render(
+        of(
+          makePage({
+            items: [makeEntry({ id: 'a' }), makeEntry({ id: 'b' }), makeEntry({ id: 'c' })],
+            total_count: 3,
+          }),
+        ),
+      );
+    }
+
+    it('opens nothing, and fetches nothing, until a row is chosen', () => {
+      expect(entryDialog()).toBeNull();
+      expect(adminServiceMock.getAuditLogEntry).not.toHaveBeenCalled();
+    });
+
+    it('opens the entry of the row that was clicked', async () => {
+      await renderThreeRows();
+
+      rows()[1].querySelector('td')!.click();
+      fixture.detectChanges();
+
+      expect(entryDialog()).not.toBeNull();
+      expect(adminServiceMock.getAuditLogEntry).toHaveBeenCalledWith('b');
+    });
+
+    /** The button's click bubbles to the row; one click must be one request. */
+    it("opens from the row's own button, once", async () => {
+      await renderThreeRows();
+
+      openButton(2).click();
+      fixture.detectChanges();
+
+      expect(adminServiceMock.getAuditLogEntry).toHaveBeenCalledTimes(1);
+      expect(adminServiceMock.getAuditLogEntry).toHaveBeenCalledWith('c');
+    });
+
+    it('shows the entry with details as readable JSON, not a string', () => {
+      openButton().click();
+      fixture.detectChanges();
+
+      const details = entryDialog()!.querySelector('.entry-dialog__details')!;
+      expect(details.textContent).toBe(JSON.stringify({ hours: 48 }, null, 2));
+    });
+
+    /**
+     * A clickable <tr> is mouse-only: not focusable, not announced as
+     * operable. Every row carries a real button too, named for its entry —
+     * a column of identical "open" buttons tells a screen reader nothing.
+     */
+    it('gives every row a real button, named for its entry', async () => {
+      await renderThreeRows();
+
+      for (const [index] of rows().entries()) {
+        const button = openButton(index);
+        expect(button.tagName).toBe('BUTTON');
+        expect(button.type).toBe('button');
+        expect(button.textContent!.trim()).toBe('אישור הרשמה');
+        expect(button.getAttribute('aria-label')).toBe(
+          `פתיחת פרטי הרשומה: אישור הרשמה, ${wallClock('2026-09-01T12:00:00')}`,
+        );
+      }
+    });
+
+    it('closes, and the dialog is gone', () => {
+      openButton().click();
+      fixture.detectChanges();
+
+      closeDialog();
+
+      expect(entryDialog()).toBeNull();
+    });
+
+    /**
+     * The DoD, as an admin would do it: filter, go to page 2, open a row,
+     * close it. They are back where they were — the same filter in the box,
+     * the same filter and page on the request, the same rows — and the list
+     * was not fetched again behind their back.
+     */
+    it('closing returns to the same filter and page, refetching nothing', async () => {
+      await render(of(makePage({ items: [makeEntry()], total_count: 120, page: 1 })));
+      type('actor_id', 'admin-0001');
+      choose(AuditAction.USER_APPROVED);
+      apply();
+      adminServiceMock.getAuditLog.mockReturnValue(
+        of(makePage({ items: [makeEntry({ id: 'on-page-2' })], total_count: 120, page: 2 })),
+      );
+      buttonWith('הבא').click();
+      fixture.detectChanges();
+      const listRequests = adminServiceMock.getAuditLog.mock.calls.length;
+      const queryBefore = lastQuery();
+
+      openButton().click();
+      fixture.detectChanges();
+      closeDialog();
+
+      expect(adminServiceMock.getAuditLog.mock.calls.length).toBe(listRequests);
+      expect(queryBefore).toMatchObject({
+        actor_id: 'admin-0001',
+        action_type: AuditAction.USER_APPROVED,
+        page: 2,
+      });
+      expect(text()).toContain('עמוד 2 מתוך 3');
+      expect(input('actor_id').value).toBe('admin-0001');
+      expect(actionSelect().value).toBe(AuditAction.USER_APPROVED);
+      expect(rows()).toHaveLength(1);
+      expect(adminServiceMock.getAuditLogEntry).toHaveBeenCalledWith('on-page-2');
+    });
+
+    it('opening a row refetches nothing either', () => {
+      const listRequests = adminServiceMock.getAuditLog.mock.calls.length;
+
+      openButton().click();
+      fixture.detectChanges();
+
+      expect(adminServiceMock.getAuditLog.mock.calls.length).toBe(listRequests);
+    });
+
+    describe('focus', () => {
+      beforeEach(async () => {
+        await renderThreeRows();
+        document.body.appendChild(fixture.nativeElement);
+      });
+
+      afterEach(() => {
+        (fixture.nativeElement as HTMLElement).remove();
+      });
+
+      /**
+       * Back on the row the admin opened, not on <body>: a keyboard reader
+       * whose focus was dropped would have to tab through the whole filter
+       * panel to get back to row 2.
+       */
+      it('hands focus back to the row that opened it', () => {
+        rows()[1].querySelector('td')!.click();
+        fixture.detectChanges();
+
+        closeDialog();
+
+        expect(document.activeElement).toBe(openButton(1));
+      });
+
+      it('does so when Escape closes it too', () => {
+        openButton(2).click();
+        fixture.detectChanges();
+
+        document.activeElement!.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        );
+        fixture.detectChanges();
+
+        expect(entryDialog()).toBeNull();
+        expect(document.activeElement).toBe(openButton(2));
+      });
+
+      it('opens another row after closing the first', () => {
+        openButton(0).click();
+        fixture.detectChanges();
+        closeDialog();
+
+        openButton(1).click();
+        fixture.detectChanges();
+
+        expect(adminServiceMock.getAuditLogEntry.mock.calls.map(([id]) => id)).toEqual(['a', 'b']);
+      });
+    });
+
+    it("names the row's button in English too", () => {
+      switchToEnglish();
+
+      expect(openButton().textContent!.trim()).toBe('Registration approved');
+      expect(openButton().getAttribute('aria-label')).toBe(
+        `Open entry details: Registration approved, ${wallClock('2026-09-01T12:00:00')}`,
+      );
+    });
+
+    it('leaves no Hebrew on the page in English with the dialog open', () => {
+      openButton().click();
+      fixture.detectChanges();
+
+      switchToEnglish();
+
+      expect(text()).not.toMatch(HEBREW);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // i18n — the guards the stub spec left behind, on the screen that replaced it
   // ---------------------------------------------------------------------------
 
@@ -744,6 +958,270 @@ describe('AuditLogComponent', () => {
 
       expect(page.hasAttribute('dir')).toBe(false);
       expect(page.style.direction).toBe('');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Export (ABF-161)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * "Export CSV" downloads the rows the table is showing: cut by the filters
+   * that were *applied* — not by what is half-typed in a box — with every page
+   * included and no paging or sort parameters sent, and saved as the very
+   * bytes the server sent, so the BOM that makes Excel read Hebrew survives.
+   *
+   * The download itself is the real `saveFile()`; only the two browser
+   * functions jsdom lacks, and the click that would leave the page, are
+   * stubbed.
+   */
+  describe('export', () => {
+    const FILE = new Blob(['csv'], { type: 'text/csv' });
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    let exportAuditLog: ReturnType<typeof vi.fn>;
+    let createObjectURL: ReturnType<typeof vi.fn<(file: Blob) => string>>;
+    let downloads: HTMLAnchorElement[];
+
+    /**
+     * Put `exportAuditLog` on the service mock. On the same object `render()`
+     * provided, rather than a new one, since `useValue` hands the component
+     * that exact object — so it also survives a re-render inside a test.
+     */
+    function stubExport(result: unknown = of(FILE)): void {
+      exportAuditLog = vi.fn().mockReturnValue(result);
+      Object.assign(adminServiceMock, { exportAuditLog });
+    }
+
+    beforeEach(() => {
+      // Fake, so saveFile's delayed revoke cannot fire after the URL stubs
+      // below have been put back.
+      vi.useFakeTimers();
+      stubExport();
+      createObjectURL = vi.fn<(file: Blob) => string>().mockReturnValue('blob:audit-log');
+      URL.createObjectURL = createObjectURL;
+      URL.revokeObjectURL = vi.fn<(url: string) => void>();
+      downloads = [];
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+        this: HTMLAnchorElement,
+      ) {
+        downloads.push(this);
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+    });
+
+    function exportButton(): HTMLButtonElement {
+      return root().querySelector<HTMLButtonElement>('.audit-log__export button')!;
+    }
+
+    function clickExport(): void {
+      exportButton().click();
+      fixture.detectChanges();
+    }
+
+    function exportedFilters(): Record<string, unknown> {
+      expect(exportAuditLog).toHaveBeenCalledTimes(1);
+      return exportAuditLog.mock.calls[0][0] as Record<string, unknown>;
+    }
+
+    it('offers the button beside the title, labelled as the ticket names it', () => {
+      expect(exportButton().textContent!.trim()).toBe('ייצוא CSV');
+      expect(exportButton().disabled).toBe(false);
+    });
+
+    it('fetches nothing until it is pressed', () => {
+      expect(exportAuditLog).not.toHaveBeenCalled();
+    });
+
+    it('exports the two filters the table was fetched with, together', () => {
+      type('actor_id', 'admin-0001');
+      choose(AuditAction.USER_SUSPENDED);
+      apply();
+
+      clickExport();
+
+      expect(exportedFilters()).toEqual({
+        actor_id: 'admin-0001',
+        action_type: AuditAction.USER_SUSPENDED,
+      });
+    });
+
+    it('sends every filter the panel offers', () => {
+      type('actor_id', 'admin-0001');
+      choose(AuditAction.POST_DELETED);
+      type('entity_type', 'ForumPost');
+      type('entity_id', 'post-3');
+      type('date_from', '2026-09-01');
+      type('date_to', '2026-09-30');
+      apply();
+
+      clickExport();
+
+      expect(exportedFilters()).toEqual({
+        actor_id: 'admin-0001',
+        action_type: AuditAction.POST_DELETED,
+        entity_type: 'ForumPost',
+        entity_id: 'post-3',
+        date_from: '2026-09-01',
+        date_to: '2026-09-30',
+      });
+    });
+
+    it('sends the filters the service sends for the table, exactly', () => {
+      type('entity_id', 'user-0009');
+      choose(AuditAction.USER_APPROVED);
+      apply();
+
+      clickExport();
+
+      const { direction, page, page_size, ...tableFilters } = lastQuery();
+      expect([direction, page, page_size].every((value) => value !== undefined)).toBe(true);
+      expect(exportedFilters()).toEqual(tableFilters);
+    });
+
+    it('exports the applied filters, not what is half-typed in a box', () => {
+      type('actor_id', 'admin-0001');
+      apply();
+      type('actor_id', 'someone-else');
+
+      clickExport();
+
+      expect(exportedFilters()).toEqual({ actor_id: 'admin-0001' });
+    });
+
+    it('exports every page, not the one on screen, in the server order', async () => {
+      await render(of(makePage({ total_count: 120 })));
+      stubExport();
+      buttonWith('הבא').click();
+      sortHeaderButton().click();
+      fixture.detectChanges();
+
+      clickExport();
+
+      expect(exportedFilters()).toEqual({});
+    });
+
+    it('saves the very file the server sent, under a dated .csv name', () => {
+      clickExport();
+
+      expect(createObjectURL).toHaveBeenCalledWith(FILE);
+      expect(downloads).toHaveLength(1);
+      expect(downloads[0].download).toMatch(/^audit-log-\d{4}-\d{2}-\d{2}\.csv$/);
+    });
+
+    it('cannot be pressed twice while the file is on its way', () => {
+      const pending = new Subject<Blob>();
+      stubExport(pending);
+
+      clickExport();
+      clickExport();
+
+      expect(exportAuditLog).toHaveBeenCalledTimes(1);
+      expect(exportButton().disabled).toBe(true);
+      expect(exportButton().getAttribute('aria-busy')).toBe('true');
+      expect(exportButton().textContent!.trim()).toBe('מייצא…');
+
+      pending.next(FILE);
+      pending.complete();
+      fixture.detectChanges();
+
+      expect(exportButton().disabled).toBe(false);
+      expect(exportButton().textContent!.trim()).toBe('ייצוא CSV');
+    });
+
+    it('is disabled while the table is loading', async () => {
+      await render(NEVER);
+
+      expect(exportButton().disabled).toBe(true);
+    });
+
+    it('is disabled when there are no rows to export', async () => {
+      await render(of(makePage({ items: [], total_count: 0 })));
+
+      expect(exportButton().disabled).toBe(true);
+    });
+
+    it('is disabled when the table failed to load', async () => {
+      await render(throwError(() => ({ status: 500 })));
+
+      expect(exportButton().disabled).toBe(true);
+    });
+
+    it('says the export failed, and leaves the table as it was', () => {
+      stubExport(throwError(() => ({ status: 500, error: new Blob(['{}']) })));
+
+      clickExport();
+
+      expect(text()).toContain('אירעה שגיאה בייצוא יומן הביקורת. נסה שוב.');
+      expect(rows()).toHaveLength(1);
+      expect(downloads).toHaveLength(0);
+      expect(exportButton().disabled).toBe(false);
+    });
+
+    it('clears a failed export once the next one succeeds', () => {
+      stubExport(throwError(() => ({ status: 500 })));
+      clickExport();
+      stubExport();
+
+      clickExport();
+
+      expect(text()).not.toContain('אירעה שגיאה בייצוא');
+      expect(downloads).toHaveLength(1);
+    });
+
+    it('drops a failed export message once the table is filtered again', () => {
+      stubExport(throwError(() => ({ status: 500 })));
+      clickExport();
+      expect(text()).toContain('אירעה שגיאה בייצוא יומן הביקורת');
+
+      type('actor_id', 'admin-0001');
+      apply();
+
+      expect(text()).not.toContain('אירעה שגיאה בייצוא יומן הביקורת');
+    });
+
+    /** ABF-165's review: an export stops listening when the screen is left. */
+    it('drops a file that arrives after the admin has left the page', () => {
+      const pending = new Subject<Blob>();
+      stubExport(pending);
+      clickExport();
+
+      fixture.destroy();
+      pending.next(FILE);
+
+      expect(pending.observed).toBe(false);
+      expect(createObjectURL).not.toHaveBeenCalled();
+    });
+
+    it('tells every reader the file is the whole filtered result', () => {
+      const hintId = exportButton().getAttribute('aria-describedby')!;
+
+      expect(root().querySelector(`#${hintId}`)!.textContent).toContain(
+        'כל הרשומות התואמות לסינון',
+      );
+    });
+
+    it('reads in English with no Hebrew left in it', () => {
+      switchToEnglish();
+      const area = root().querySelector('.audit-log__export')!.textContent!;
+
+      expect(exportButton().textContent!.trim()).toBe('Export CSV');
+      expect(area).not.toMatch(HEBREW);
+    });
+
+    it('shows the failure in English too', () => {
+      stubExport(throwError(() => ({ status: 500 })));
+      switchToEnglish();
+
+      clickExport();
+
+      expect(text()).toContain('Something went wrong exporting the audit log.');
     });
   });
 });

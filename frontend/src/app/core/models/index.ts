@@ -921,8 +921,9 @@ export interface AuditLogEntry {
   /** Naive UTC, like every other timestamp this API returns — see utcIso(). */
   timestamp: string;
   /**
-   * Context the logging service attached, never PII (CONTRIBUTING §4). Read
-   * by the single-entry view (Task 2); the list does not render it.
+   * Context the logging service attached, never PII (CONTRIBUTING §4). An
+   * object, not a string holding JSON. Shown by the single-entry dialog
+   * (ABF-153); the list does not render it.
    */
   details: Record<string, unknown> | null;
 }
@@ -943,12 +944,15 @@ export interface AuditLogList {
 }
 
 /**
- * What the audit log screen is asking for. Every field optional: an absent one
- * is a filter not applied, which is how the service decides what to put in the
- * query string — `actor_id=` with nothing after it is a filter on the empty
- * string, not the absence of a filter.
+ * The audit log's six filters, and nothing else — what the CSV export takes
+ * (ABF-161), and what the screen's query is built on.
+ *
+ * Every field optional: an absent one is a filter not applied, which is how
+ * the service decides what to put in the query string — `actor_id=` with
+ * nothing after it is a filter on the empty string, not the absence of a
+ * filter.
  */
-export interface AuditLogQuery {
+export interface AuditLogFilters {
   actor_id?: string;
   action_type?: AuditAction;
   entity_type?: string;
@@ -956,6 +960,14 @@ export interface AuditLogQuery {
   /** `YYYY-MM-DD`. Inclusive, as is `date_to` — both name whole days. */
   date_from?: string;
   date_to?: string;
+}
+
+/**
+ * What the audit log screen is asking for: the filters, plus the order and the
+ * page. Built on `AuditLogFilters` rather than beside it, so the export and the
+ * screen cannot come to disagree about what a filter is.
+ */
+export interface AuditLogQuery extends AuditLogFilters {
   sort?: AuditSortField;
   direction?: SortDirection;
   page?: number;

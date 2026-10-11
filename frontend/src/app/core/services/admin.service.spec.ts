@@ -16,6 +16,7 @@ import {
   UserType,
 } from '../constants';
 import type {
+  AuditLogEntry,
   AuditLogList,
   ForumPost,
   ModeratorAdminView,
@@ -262,6 +263,85 @@ describe('AdminService', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // The audit log as a CSV file (ABF-161)
+  // ---------------------------------------------------------------------------
+
+  describe('exportAuditLog', () => {
+    const EXPORT_URL = `${environment.apiUrl}/admin/audit-log/export`;
+
+    /** The bytes the server sends: a UTF-8 BOM, then the header row. */
+    const CSV_BYTES = new Uint8Array([0xef, 0xbb, 0xbf, 0x61, 0x2c, 0x62, 0x0d, 0x0a]);
+
+    it('GETs the export endpoint, asking for the body as a file', () => {
+      service.exportAuditLog().subscribe();
+
+      const req = httpMock.expectOne(EXPORT_URL);
+      expect(req.request.method).toBe('GET');
+      expect(req.request.responseType).toBe('blob');
+      req.flush(new Blob([CSV_BYTES]));
+    });
+
+    /**
+     * The point of `responseType: 'blob'`: read as text, the body would go
+     * through a TextDecoder that drops the BOM, and the saved file would open
+     * in Excel with its Hebrew as mojibake.
+     */
+    it('hands back the bytes it received, the BOM included', async () => {
+      let result: Blob | undefined;
+      service.exportAuditLog().subscribe((file) => (result = file));
+
+      httpMock.expectOne(EXPORT_URL).flush(new Blob([CSV_BYTES], { type: 'text/csv' }));
+
+      expect(result).toBeInstanceOf(Blob);
+      expect(new Uint8Array(await result!.arrayBuffer())).toEqual(CSV_BYTES);
+    });
+
+    it('sends every filter it was given, and nothing else', () => {
+      service
+        .exportAuditLog({
+          actor_id: 'admin-1',
+          action_type: AuditAction.POST_DELETED,
+          entity_type: 'ForumPost',
+          entity_id: 'post-3',
+          date_from: '2026-09-01',
+          date_to: '2026-09-30',
+        })
+        .subscribe();
+
+      const req = httpMock.expectOne((r) => r.url.startsWith(EXPORT_URL));
+      const params = new URLSearchParams(req.request.url.split('?')[1]);
+      expect(Object.fromEntries(params)).toEqual({
+        actor_id: 'admin-1',
+        action_type: 'post_deleted',
+        entity_type: 'ForumPost',
+        entity_id: 'post-3',
+        date_from: '2026-09-01',
+        date_to: '2026-09-30',
+      });
+      req.flush(new Blob());
+    });
+
+    it('builds the same query string the table request does', () => {
+      const filters = { actor_id: 'a&b', entity_type: '', date_to: '2026-09-30' };
+
+      service.exportAuditLog(filters).subscribe();
+      service.getAuditLog(filters).subscribe();
+
+      const [exportReq, listReq] = httpMock.match((r) => r.url.includes('/admin/audit-log'));
+      expect(exportReq.request.url.split('?')[1]).toBe(listReq.request.url.split('?')[1]);
+      expect(exportReq.request.url).toBe(`${EXPORT_URL}?actor_id=a%26b&date_to=2026-09-30`);
+      exportReq.flush(new Blob());
+      listReq.flush({ items: [], total_count: 0, page: 1, page_size: 50 });
+    });
+
+    it('sends no query string when nothing is filtered', () => {
+      service.exportAuditLog({}).subscribe();
+
+      httpMock.expectOne(EXPORT_URL).flush(new Blob());
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // The audit log (ABF-152)
   // ---------------------------------------------------------------------------
 
@@ -369,6 +449,51 @@ describe('AdminService', () => {
       // `&` — which is what a template literal would have produced.
       expect(params.get('entity_id')).toBe('a&b=c d');
       expect([...params.keys()]).toEqual(['entity_id']);
+    });
+  });
+
+  describe('getAuditLogEntry', () => {
+    const ENTRY: AuditLogEntry = {
+      id: 'entry-1',
+      actor_id: 'admin-1',
+      action_type: AuditAction.USER_SUSPENDED,
+      entity_type: 'User',
+      entity_id: 'user-9',
+      timestamp: '2026-09-01T12:00:00',
+      details: { hours: 48, changes: { title: { from: 'a', to: 'b' } } },
+    };
+
+    it('GETs the one entry by id and returns it', () => {
+      let result: AuditLogEntry | undefined;
+
+      service.getAuditLogEntry('entry-1').subscribe((res) => (result = res));
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/admin/audit-log/entry-1`);
+      expect(req.request.method).toBe('GET');
+
+      req.flush(ENTRY);
+      expect(result).toEqual(ENTRY);
+    });
+
+    it('hands details on as the object it arrived as', () => {
+      let result: AuditLogEntry | undefined;
+
+      service.getAuditLogEntry('entry-1').subscribe((res) => (result = res));
+      httpMock.expectOne(`${environment.apiUrl}/admin/audit-log/entry-1`).flush(ENTRY);
+
+      expect(result!.details).toEqual({ hours: 48, changes: { title: { from: 'a', to: 'b' } } });
+    });
+
+    /**
+     * A path segment, not a query value: unencoded, an id with a `/` in it
+     * would address a different route, and one with a `?` would turn the
+     * rest of itself into a query string.
+     */
+    it('encodes the id so it stays one path segment', () => {
+      service.getAuditLogEntry('a/b?c').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/admin/audit-log/a%2Fb%3Fc`);
+      req.flush(ENTRY);
     });
   });
 });

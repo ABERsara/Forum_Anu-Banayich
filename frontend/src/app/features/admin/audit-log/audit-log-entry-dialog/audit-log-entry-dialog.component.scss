@@ -1,0 +1,131 @@
+@use '../../../../../styles/variables' as *;
+@use '../../../../../styles/mixins' as *;
+
+// Above the page, like the shared confirm dialog, and dimmed the same way.
+.entry-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-md;
+  background: rgba(0, 0, 0, 0.4);
+
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 70ch;
+    // The panel scrolls, not the page under it: a long `details` must not
+    // push the close button off screen.
+    max-height: 100%;
+    overflow-y: auto;
+    padding: $spacing-xl;
+    border-radius: $radius-lg;
+    background: $color-bg;
+    box-shadow: $shadow-lg;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-md;
+  }
+
+  &__title {
+    margin: 0;
+    color: $color-text;
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+  }
+
+  // Label beside value from md up, label above value below it.
+  &__fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: $spacing-xs $spacing-md;
+    margin: 0;
+
+    @include responsive(md) {
+      grid-template-columns: max-content 1fr;
+    }
+
+    dt {
+      color: $color-text-muted;
+      font-size: $font-size-sm;
+    }
+
+    dd {
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  // The same treatment the list gives its id cells.
+  &__id,
+  &__code {
+    font-family: ui-monospace, monospace;
+    font-size: $font-size-xs;
+  }
+
+  &__code {
+    margin-inline-start: $spacing-xs;
+    color: $color-text-muted;
+  }
+
+  &__details {
+    margin: 0;
+    padding: $spacing-md;
+    overflow: auto;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    background: $color-bg-subtle;
+    color: $color-text;
+    font-family: ui-monospace, monospace;
+    font-size: $font-size-sm;
+    // Indentation is the structure; it must survive. Long values break
+    // rather than stretch the panel sideways.
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    text-align: start;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__empty {
+    margin: 0;
+    color: $color-text-muted;
+  }
+}
+
+.btn {
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: $color-bg;
+  color: $color-text;
+  font-size: $font-size-base;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover {
+    background: $color-bg-subtle;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}

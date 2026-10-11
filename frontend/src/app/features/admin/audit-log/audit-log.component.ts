@@ -15,35 +15,46 @@
  * Typing does not refetch. The separation is what lets the empty state say
  * *which* emptiness it means ("no entries match the filters you chose" rather
  * than "the log is empty") without that message flickering between the
- * keystroke and the request.
+ * keystroke and the request. It is also what "Export CSV" (ABF-161) is cut by:
+ * the file holds every row `applied` selects, across all pages, so it is the
+ * table the admin is looking at, not whatever is half-typed above it.
  *
  * The one thing this screen never shows is the actor's IP address. The API
  * does not send it, under any parameter, and the decision recorded on this
  * ticket is that no screen ever will.
  *
  * `details` is fetched — it is part of the frozen contract — and deliberately
- * not rendered: the single-entry view is Task 2, and a JSON blob squeezed into
- * a list row is the thing that view exists to do properly.
+ * not rendered in the table: a JSON object squeezed into a list row is what
+ * the single-entry dialog exists to do properly (ABF-153). A row opens it.
+ *
+ * Opening and closing the dialog touch none of the list's state. The filters,
+ * the sort and the page stay exactly as they were and nothing is refetched,
+ * so closing lands the admin back on the same filter and page, with focus on
+ * the row they opened.
  */
 
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   OnInit,
   computed,
   inject,
   signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import { AUDIT_ACTION_LABELS, AuditAction, SortDirection } from '../../../core/constants';
 import { LabelService } from '../../../core/i18n/label.service';
 import { NO_ERROR, ScreenError, screenErrorFrom } from '../../../core/i18n/screen-error';
-import { AuditLogEntry, AuditLogQuery } from '../../../core/models';
+import { saveFile } from '../../../core/utils/save-file.util';
+import { AuditLogEntry, AuditLogFilters, AuditLogQuery } from '../../../core/models';
 import { AdminService } from '../../../core/services/admin.service';
-import { utcIso } from '../../../core/utils/utc-date.util';
+import { AuditLogEntryDialogComponent } from './audit-log-entry-dialog/audit-log-entry-dialog.component';
+import { auditActionLabel, auditOccurredAt } from './audit-log.util';
 import { ErrorDisplayComponent } from '../../../shared/components/error-display/error-display.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 
@@ -75,7 +86,14 @@ type FilterField = keyof Filters;
 @Component({
   selector: 'app-audit-log',
   standalone: true,
-  imports: [DatePipe, RouterLink, TranslocoPipe, ErrorDisplayComponent, LoadingSpinnerComponent],
+  imports: [
+    DatePipe,
+    RouterLink,
+    TranslocoPipe,
+    AuditLogEntryDialogComponent,
+    ErrorDisplayComponent,
+    LoadingSpinnerComponent,
+  ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -83,6 +101,7 @@ type FilterField = keyof Filters;
 export class AuditLogComponent implements OnInit {
   private readonly adminService = inject(AdminService);
   private readonly labels = inject(LabelService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly entries = signal<AuditLogEntry[]>([]);
   readonly totalCount = signal(0);
@@ -90,10 +109,16 @@ export class AuditLogComponent implements OnInit {
   readonly isLoading = signal(false);
   /** A key of ours, or the sentence the API sent (ABF-129). */
   readonly loadError = signal<ScreenError>(NO_ERROR);
+  /** Whether a CSV export is on its way down (ABF-161). */
+  readonly isExporting = signal(false);
+  readonly exportError = signal<ScreenError>(NO_ERROR);
 
   readonly draft = signal<Filters>(NO_FILTERS);
   readonly applied = signal<Filters>(NO_FILTERS);
   readonly direction = signal<SortDirection>(SortDirection.DESC);
+
+  /** The entry the dialog is showing, or `null` when it is closed. */
+  readonly openEntryId = signal<string | null>(null);
 
   readonly pageSize = PAGE_SIZE;
   readonly directions = SortDirection;
@@ -120,6 +145,18 @@ export class AuditLogComponent implements OnInit {
   );
 
   /**
+   * Whether "Export CSV" can be pressed.
+   *
+   * Only once there are rows on screen to export: the file is "the rows you
+   * are looking at", and while the table is loading, has failed, or is empty
+   * there are none — an export then would be a file of headers, or a file of
+   * rows the screen has not shown yet. And not twice at once.
+   */
+  readonly canExport = computed(
+    () => !this.isExporting() && !this.isLoading() && this.entries().length > 0,
+  );
+
+  /**
    * What `aria-sort` on the `when` header should say.
    *
    * It is the only sortable column, so this is the whole sort state — and it
@@ -142,6 +179,9 @@ export class AuditLogComponent implements OnInit {
    * something else.
    */
   private latestRequest = 0;
+
+  /** The row's button that opened the dialog, to hand focus back to. */
+  private entryOpener: HTMLElement | null = null;
 
   ngOnInit(): void {
     this.load();
@@ -212,6 +252,51 @@ export class AuditLogComponent implements OnInit {
   }
 
   // ---------------------------------------------------------------------------
+  // Export (ABF-161)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Download what the table is showing, as a CSV file.
+   *
+   * Cut by `applied`, not `draft`: the rows on screen were fetched with the
+   * applied filters, and a box the admin has typed into without pressing
+   * Apply has not narrowed anything they can see. Exporting the draft would
+   * hand them a file that disagrees with the screen it came from.
+   *
+   * Every page, not this one, and in the server's order — the file is the
+   * whole filtered result, so `page`, `page_size` and the sort stay behind.
+   *
+   * `takeUntilDestroyed`, as on the profile screen's export (ABF-165): an
+   * admin who leaves while the file is still coming should not have it land
+   * in their downloads on whatever screen they went to.
+   */
+  exportCsv(): void {
+    if (!this.canExport()) {
+      return;
+    }
+    this.isExporting.set(true);
+    this.exportError.set(NO_ERROR);
+
+    this.adminService
+      .exportAuditLog(this.filtersFor(this.applied()))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (file) => {
+          // Dated in UTC, as the server dates the Content-Disposition name,
+          // so the file is called the same whichever way it was fetched.
+          saveFile(file, `audit-log-${new Date().toISOString().slice(0, 10)}.csv`);
+          this.isExporting.set(false);
+        },
+        error: (err: unknown) => {
+          // The body of a failed blob request is a Blob too, so there is no
+          // `detail` sentence to show; screenErrorFrom falls back to our key.
+          this.exportError.set(screenErrorFrom(err, 'admin.errors.export_audit_log_failed'));
+          this.isExporting.set(false);
+        },
+      });
+  }
+
+  // ---------------------------------------------------------------------------
   // Paging
   // ---------------------------------------------------------------------------
 
@@ -230,36 +315,47 @@ export class AuditLogComponent implements OnInit {
   }
 
   // ---------------------------------------------------------------------------
-  // Rendering one row
+  // One entry, in full (ABF-153)
   // ---------------------------------------------------------------------------
 
   /**
-   * The `what` column.
+   * Open the dialog on a row's entry.
    *
-   * Through LabelService rather than the template pipe because of the second
-   * branch: an action the server has and this build's `AuditAction` does not
-   * has no key to pipe, and the raw wire value is a better cell than a blank
-   * one — an audit log that quietly omits what happened is worse than one
-   * that says `some_new_action`. The LabelService read is what keeps the
-   * first branch following a language switch (CONTRIBUTING §6, ABF-128).
+   * `opener` is the row's own button, whether the click landed on it or
+   * anywhere else on the row, so focus goes back to something a keyboard can
+   * reach — a table cell is not.
    */
-  actionLabel(entry: AuditLogEntry): string {
-    const key = this.actionLabels[entry.action_type];
-    return key ? this.labels.label(key) : entry.action_type;
+  openEntry(entry: AuditLogEntry, opener: HTMLElement): void {
+    this.entryOpener = opener;
+    this.openEntryId.set(entry.id);
   }
 
   /**
-   * The row's timestamp as an *instant*.
+   * Close the dialog, and nothing else.
    *
-   * It arrives as naive UTC — `2026-09-01T12:00:00`, no offset — and the date
-   * pipe reads a string without one as a local wall clock, so an admin in
-   * Israel would be shown 12:00 for something that happened at 15:00 her
-   * time. On an audit log that is not cosmetic: the whole point of the column
-   * is to say when, and this is a record that may be read back in a legal
-   * proceeding (see `core/utils/utc-date.util.ts`).
+   * No `load()`: the rows on screen are still the answer to the filters, the
+   * sort and the page on screen, and the log is append-only, so nothing the
+   * dialog showed can have changed them. Refetching would only risk landing
+   * the admin somewhere other than where they were.
    */
+  closeEntry(): void {
+    this.openEntryId.set(null);
+    this.entryOpener?.focus();
+    this.entryOpener = null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rendering one row
+  // ---------------------------------------------------------------------------
+
+  /** The `what` column — shared with the dialog, see `audit-log.util.ts`. */
+  actionLabel(entry: AuditLogEntry): string {
+    return auditActionLabel(entry, this.labels);
+  }
+
+  /** The `when` column as an instant — shared with the dialog, see `audit-log.util.ts`. */
   occurredAt(entry: AuditLogEntry): string {
-    return utcIso(entry.timestamp);
+    return auditOccurredAt(entry);
   }
 
   // ---------------------------------------------------------------------------
@@ -270,6 +366,10 @@ export class AuditLogComponent implements OnInit {
     const request = ++this.latestRequest;
     this.isLoading.set(true);
     this.loadError.set(NO_ERROR);
+    // A failed export belongs to the table it was cut from. Once the table is
+    // being replaced, "the export failed" would describe a file nobody can
+    // ask for any more.
+    this.exportError.set(NO_ERROR);
 
     this.adminService.getAuditLog(this.queryFor(this.applied())).subscribe({
       next: (result) => {
@@ -300,17 +400,27 @@ export class AuditLogComponent implements OnInit {
 
   /**
    * The applied filters, the sort and the page, as the service's query object.
+   */
+  private queryFor(filters: Filters): AuditLogQuery {
+    return {
+      ...this.filtersFor(filters),
+      direction: this.direction(),
+      page: this.page(),
+      page_size: this.pageSize,
+    };
+  }
+
+  /**
+   * The filter boxes as the API's filters — the one translation both the
+   * table and the export go through, so the file is cut by exactly what the
+   * table was fetched with (ABF-161).
    *
    * Empty boxes are left out rather than sent empty — see the service: an
    * `actor_id=` with nothing after it is a filter on the empty string, which
    * matches no row at all.
    */
-  private queryFor(filters: Filters): AuditLogQuery {
-    const query: AuditLogQuery = {
-      direction: this.direction(),
-      page: this.page(),
-      page_size: this.pageSize,
-    };
+  private filtersFor(filters: Filters): AuditLogFilters {
+    const query: AuditLogFilters = {};
 
     if (filters.actorId) query.actor_id = filters.actorId;
     if (filters.actionType) query.action_type = filters.actionType as AuditAction;
