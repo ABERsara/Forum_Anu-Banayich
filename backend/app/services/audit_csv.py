@@ -110,6 +110,8 @@ ACTION_LABELS: Final[dict[AuditAction, str]] = {
     AuditAction.AGENT_CONVERSATION: "שיחה עם סוכן AI",
     AuditAction.AGENT_CONVERSATION_ACCESS_DENIED: "גישה לשיחת סוכן נדחתה",
     AuditAction.MEETING_CREATED: "קביעת פגישה",
+    AuditAction.MEETING_UPDATED: "עריכת פגישה",
+    AuditAction.MEETING_CANCELLED: "ביטול פגישה",
     AuditAction.PROFILE_UPDATED: "עדכון פרופיל",
 }
 
